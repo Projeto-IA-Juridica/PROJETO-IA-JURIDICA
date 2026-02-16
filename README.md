@@ -101,45 +101,6 @@ concierge-juridico/
 │       └── constants.py                 # constantes do sistema
 │
 ├── feature-1-ia-personalizada/          # MVP: IA + WhatsApp + Monitoramento
-│   ├── api/
-│   │   ├── routes/
-│   │   │   ├── webhook_whatsapp.py      # POST /webhook/whatsapp
-│   │   │   ├── processos.py             # CRUD processos
-│   │   │   └── chat.py                  # /chat/history, /chat/send
-│   │   └── middleware/
-│   │       ├── auth.py                  # JWT middleware
-│   │       └── rate_limit.py            # rate limit por IP/user
-│   ├── services/
-│   │   ├── ai/
-│   │   │   ├── orchestrator.py          # LangGraph workflow
-│   │   │   ├── claude_client.py         # Anthropic Claude client
-│   │   │   ├── prompts.py               # templates de prompts
-│   │   │   ├── memory.py                # Redis memory
-│   │   │   ├── fact_checker.py          # anti-alucinação (DB check)
-│   │   │   └── translator.py            # jurídico -> leigo
-│   │   ├── messaging/
-│   │   │   ├── whatsapp.py              # wrapper envio WhatsApp
-│   │   │   ├── evolution_client.py      # Evolution API client
-│   │   │   ├── templates.py             # templates de mensagens
-│   │   │   └── scheduler.py             # agendamentos
-│   │   └── legal_data/
-│   │       ├── jusbrasil_client.py      # fonte primária
-│   │       ├── datajud_client.py        # backup CNJ
-│   │       ├── data_cleaner.py          # limpeza/pipeline
-│   │       └── cache_manager.py         # Redis cache
-│   ├── workers/
-│   │   ├── celery_app.py                # Celery config
-│   │   ├── monitor_processos.py         # monitoramento 24/7
-│   │   └── send_notifications.py        # notificações em lote
-│   ├── tests/
-│   │   ├── unit/
-│   │   └── integration/
-│   └── data/
-│       ├── knowledge_base/
-│       │   └── disclaimers.json         # disclaimers OAB
-│       └── termos_juridicos/
-│           └── traducoes.json           # termos iniciais validados
-│
 ├── feature-2-controladoria/             # Deveres diários + Projuris
 ├── feature-3-conexoes/                  # Chat interno + distribuição tarefas
 ├── feature-4-ml-prazos/                 # Predição prazos com ML
@@ -147,61 +108,9 @@ concierge-juridico/
 ├── feature-6-integracao-crms/           # Integrações nativas (Projuris/Astrea/SAJ)
 │
 ├── infrastructure/                      # IaC + Containers + Monitoring
-│   ├── terraform/
-│   │   ├── modules/
-│   │   └── environments/
-│   │       ├── dev/
-│   │       ├── staging/
-│   │       └── prod/
-│   ├── docker/
-│   │   ├── Dockerfile.f1
-│   │   ├── Dockerfile.f2
-│   │   ├── docker-compose.yml
-│   │   └── docker-compose.prod.yml
-│   ├── kubernetes/
-│   │   ├── base/
-│   │   └── overlays/
-│   │       ├── dev/
-│   │       └── prod/
-│   └── monitoring/
-│       ├── prometheus/
-│       │   └── prometheus.yml
-│       └── grafana/
-│           ├── dashboards.json
-│           └── datasources.yml
-│
 ├── docs/                                # Documentação
-│   ├── api/
-│   │   ├── openapi.yaml
-│   │   └── postman_collection.json
-│   ├── architecture/
-│   │   ├── system_design.md
-│   │   ├── database_schema.md
-│   │   └── integration_flow.md
-│   ├── deployment/
-│   │   ├── aws_setup.md
-│   │   ├── docker_deploy.md
-│   │   └── kubernetes_deploy.md
-│   └── guides/
-│       ├── development.md
-│       ├── testing.md
-│       ├── lgpd_compliance.md
-│       └── oab_compliance.md
-│
 └── scripts/                             # Scripts utilitários
-    ├── setup/
-    │   ├── init_db.py
-    │   ├── seed_data.py
-    │   └── create_admin.py
-    ├── migration/
-    │   ├── migrate_v1_to_v2.py
-    │   └── cleanup_old_data.py
-    ├── backup/
-    │   ├── backup_to_s3.py
-    │   └── restore_from_backup.py
-    └── monitoring/
-        ├── health_check.py
-        └── performance_test.py
+
 
 
 
