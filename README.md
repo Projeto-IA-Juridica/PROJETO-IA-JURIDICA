@@ -70,50 +70,387 @@ O sistema deve permitir, via portal administrativo do escritório:
 
 
 concierge-juridico/
-├── shared/                              # Core compartilhado entre todas as features
-│   ├── models/                          # SQLAlchemy models
-│   │   ├── base.py                      # Base class para models
-│   │   ├── escritorio.py                # Escritório (cliente B2B)
-│   │   ├── cliente.py                   # Cliente final (pessoa física)
-│   │   ├── processo.py                  # Processos judiciais
-│   │   ├── usuario.py                   # Usuários (advogados, assistentes)
-│   │   └── interacao.py                 # Logs IA-Cliente
-│   ├── schemas/                         # Pydantic schemas
-│   │   ├── escritorio.py
-│   │   ├── cliente.py
-│   │   ├── processo.py
-│   │   ├── usuario.py
-│   │   └── response.py                  # Respostas genéricas
-│   ├── database/                        # Conexão DB
-│   │   ├── connection.py                # Engine + session factory
-│   │   └── session.py                   # Dependency Injection (DB session)
-│   ├── utils/                           # Utilitários comuns
-│   │   ├── validators.py                # CPF, CNPJ, nº processo
-│   │   ├── formatters.py                # datas, moeda etc.
-│   │   ├── lgpd.py                      # helpers LGPD
-│   │   └── audio_handler.py             # processamento de áudio
-│   ├── security/                        # Auth e segurança
-│   │   ├── jwt.py                       # JWT tokens
-│   │   ├── encryption.py                # criptografia dados sensíveis
-│   │   └── permissions.py               # RBAC
-│   └── config/                          # Config global
-│       ├── settings.py                  # env vars (Pydantic Settings)
-│       └── constants.py                 # constantes do sistema
 │
-├── feature-1-ia-personalizada/          # MVP: IA + WhatsApp + Monitoramento
-├── feature-2-controladoria/             # Deveres diários + Projuris
-├── feature-3-conexoes/                  # Chat interno + distribuição tarefas
-├── feature-4-ml-prazos/                 # Predição prazos com ML
-├── feature-5-app-mobile/                # React Native + backend do app
-├── feature-6-integracao-crms/           # Integrações nativas (Projuris/Astrea/SAJ)
+├── shared/ ──────────────────────────────────────────────────────────────
+│   │   (Core compartilhado entre TODAS as features)
+│   │
+│   ├── models/ ─────────────────── SQLAlchemy models do banco de dados
+│   │   ├── base.py ────────────── Base class para todos os models
+│   │   ├── escritorio.py ──────── Model: Escritório (cliente B2B)
+│   │   ├── cliente.py ─────────── Model: Cliente final (pessoa física)
+│   │   ├── processo.py ────────── Model: Processos judiciais
+│   │   ├── usuario.py ─────────── Model: Usuários (advogados, assistentes)
+│   │   └── interacao.py ───────── Model: Logs de interações IA-Cliente
+│   │
+│   ├── schemas/ ────────────────── Pydantic schemas (validação de dados)
+│   │   ├── escritorio.py ──────── Schemas de request/response Escritório
+│   │   ├── cliente.py ─────────── Schemas Cliente
+│   │   ├── processo.py ────────── Schemas Processo
+│   │   ├── usuario.py ─────────── Schemas Usuario
+│   │   └── response.py ────────── Schemas genéricos de resposta
+│   │
+│   ├── database/ ───────────────── Configuração de conexão com banco
+│   │   ├── connection.py ──────── Engine SQLAlchemy, sessão factory
+│   │   └── session.py ─────────── Dependency Injection de sessão DB
+│   │
+│   ├── utils/ ──────────────────── Utilitários comuns a todas features
+│   │   ├── validators.py ──────── Validadores (CPF, CNPJ, nº processo)
+│   │   ├── formatters.py ──────── Formatação de dados (datas, moeda)
+│   │   ├── lgpd.py ────────────── Utilitários de compliance LGPD
+│   │   └── audio_handler.py ───── Conversão e processamento de áudios
+│   │
+│   ├── security/ ───────────────── Segurança e autenticação
+│   │   ├── jwt.py ─────────────── Criação e validação de tokens JWT
+│   │   ├── encryption.py ──────── Criptografia de dados sensíveis
+│   │   └── permissions.py ─────── Sistema de permissões (RBAC)
+│   │
+│   └── config/ ─────────────────── Configurações globais
+│       ├── settings.py ────────── Pydantic Settings (env vars)
+│       └── constants.py ───────── Constantes globais do sistema
 │
-├── infrastructure/                      # IaC + Containers + Monitoring
-├── docs/                                # Documentação
-└── scripts/                             # Scripts utilitários
-
-
-
-
+│
+├── feature-1-ia-personalizada/ ──────────────────────────────────────────
+│   │   (MVP - IA conversacional + WhatsApp + Monitoramento)
+│   │
+│   ├── api/ ────────────────────── FastAPI application
+│   │   ├── routes/ ─────────────── Endpoints REST
+│   │   │   ├── webhook_whatsapp.py ─ POST /webhook/whatsapp (recebe msgs)
+│   │   │   ├── processos.py ─────── CRUD de processos
+│   │   │   └── chat.py ──────────── GET /chat/history, POST /chat/send
+│   │   │
+│   │   └── middleware/ ──────────── Middlewares FastAPI
+│   │       ├── auth.py ──────────── Middleware de autenticação JWT
+│   │       └── rate_limit.py ────── Rate limiting por IP/user
+│   │
+│   ├── services/ ───────────────── Lógica de negócio
+│   │   │
+│   │   ├── ai/ ─────────────────── Orquestração de IA
+│   │   │   ├── orchestrator.py ──── LangGraph workflow (cérebro da IA)
+│   │   │   ├── claude_client.py ─── Cliente Anthropic Claude API
+│   │   │   ├── prompts.py ───────── Templates de system prompts
+│   │   │   ├── memory.py ────────── Memória de conversação (Redis)
+│   │   │   ├── fact_checker.py ──── Anti-alucinação (verifica com DB)
+│   │   │   └── translator.py ────── Tradução termos jurídicos→leigo
+│   │   │
+│   │   ├── messaging/ ──────────── Comunicação WhatsApp
+│   │   │   ├── whatsapp.py ──────── Envio de mensagens (wrapper)
+│   │   │   ├── evolution_client.py ─ Cliente Evolution API
+│   │   │   ├── templates.py ─────── Templates de mensagens prontas
+│   │   │   └── scheduler.py ─────── Agendamento de mensagens
+│   │   │
+│   │   └── legal_data/ ─────────── Busca de dados processuais
+│   │       ├── jusbrasil_client.py ─ Cliente Jusbrasil API (primário)
+│   │       ├── datajud_client.py ─── Cliente DataJud CNJ (backup)
+│   │       ├── data_cleaner.py ──── Pipeline de limpeza de dados
+│   │       └── cache_manager.py ─── Cache inteligente (Redis)
+│   │
+│   ├── workers/ ────────────────── Celery workers (tarefas assíncronas)
+│   │   ├── celery_app.py ──────── Configuração Celery
+│   │   ├── monitor_processos.py ─ Worker: monitoramento 24/7
+│   │   └── send_notifications.py ─ Worker: envio notificações em lote
+│   │
+│   ├── tests/ ──────────────────── Testes automatizados
+│   │   ├── unit/ ───────────────── Testes unitários
+│   │   │   ├── test_orchestrator.py ─ Testa LangGraph
+│   │   │   ├── test_translator.py ─── Testa traduções
+│   │   │   └── test_fact_checker.py ─ Testa anti-alucinação
+│   │   │
+│   │   └── integration/ ────────── Testes de integração
+│   │       ├── test_whatsapp_flow.py ─ Testa fluxo completo WhatsApp
+│   │       └── test_process_monitoring.py ─ Testa monitoramento
+│   │
+│   └── data/ ───────────────────── Dados estáticos
+│       ├── knowledge_base/ ─────── Base de conhecimento
+│       │   └── disclaimers.json ─── Disclaimers OAB obrigatórios
+│       │
+│       └── termos_juridicos/ ───── Traduções jurídicas
+│           └── traducoes.json ───── 500 termos iniciais validados
+│
+│
+├── feature-2-controladoria/ ─────────────────────────────────────────────
+│   │   (Avisos de deveres diários + Integração Projuris)
+│   │
+│   ├── api/ ────────────────────── FastAPI application
+│   │   └── routes/ ─────────────── Endpoints REST
+│   │       ├── deveres.py ───────── GET /deveres/hoje
+│   │       ├── tarefas.py ───────── CRUD de tarefas
+│   │       └── dashboard.py ─────── GET /dashboard/analytics
+│   │
+│   ├── services/ ───────────────── Lógica de negócio
+│   │   ├── integrations/ ───────── Integrações externas
+│   │   │   ├── projuris_client.py ─ Cliente OAuth2 Projuris API
+│   │   │   └── base_crm.py ──────── Interface base para outros CRMs
+│   │   │
+│   │   └── business/ ───────────── Regras de negócio
+│   │       ├── dever_manager.py ─── Parser de deveres do Projuris
+│   │       ├── notificador.py ───── Envia avisos via WhatsApp (usa F1)
+│   │       └── analytics.py ─────── Gera métricas de produtividade
+│   │
+│   ├── workers/ ────────────────── Celery workers
+│   │   ├── celery_app.py ──────── Configuração Celery
+│   │   ├── check_deveres_diarios.py ─ Roda 6h, 12h, 18h (cron)
+│   │   └── send_alerts.py ─────── Envia alertas de prazos
+│   │
+│   └── tests/ ──────────────────── Testes
+│       ├── unit/ ───────────────── Testes unitários
+│       │   ├── test_dever_manager.py
+│       │   └── test_projuris_client.py
+│       │
+│       └── integration/ ────────── Testes de integração
+│           └── test_daily_workflow.py ─ Testa fluxo completo diário
+│
+│
+├── feature-3-conexoes/ ──────────────────────────────────────────────────
+│   │   (Chat interno + Distribuição de tarefas entre funcionários)
+│   │
+│   ├── api/ ────────────────────── FastAPI application
+│   │   └── routes/ ─────────────── Endpoints REST
+│   │       ├── funcionarios.py ──── CRUD de funcionários
+│   │       ├── empresas.py ──────── CRUD de empresas clientes
+│   │       ├── conexoes.py ──────── Gerenciar conexões funcionário↔empresa
+│   │       └── chat.py ──────────── GET /messages, POST /send
+│   │
+│   ├── services/ ───────────────── Lógica de negócio
+│   │   ├── chat/ ───────────────── Sistema de chat
+│   │   │   ├── chat_manager.py ──── Gerencia conexões WebSocket
+│   │   │   └── message_handler.py ─ Processa/roteia mensagens
+│   │   │
+│   │   └── permissions/ ────────── Sistema de permissões
+│   │       ├── acl.py ───────────── Access Control List (Casbin)
+│   │       └── role_manager.py ──── Gerencia roles (admin, advogado, etc)
+│   │
+│   ├── websockets/ ─────────────── WebSocket server
+│   │   ├── chat_server.py ─────── Servidor WebSocket (conexões persistentes)
+│   │   └── events.py ──────────── Handlers de eventos WS
+│   │
+│   ├── workers/ ────────────────── Celery workers
+│   │   ├── celery_app.py ──────── Configuração Celery
+│   │   └── distribute_tasks.py ─── Worker: distribuição automática
+│   │
+│   └── tests/ ──────────────────── Testes
+│       ├── unit/
+│       │   ├── test_chat_manager.py
+│       │   └── test_permissions.py
+│       │
+│       └── integration/
+│           └── test_websocket_chat.py ─ Testa chat em tempo real
+│
+│
+├── feature-4-ml-prazos/ ─────────────────────────────────────────────────
+│   │   (Predição de prazos processuais com Machine Learning)
+│   │
+│   ├── api/ ────────────────────── FastAPI application
+│   │   └── routes/ ─────────────── Endpoints REST
+│   │       ├── predicoes.py ─────── POST /predict/prazo
+│   │       └── metrics.py ───────── GET /model/metrics (MAE, RMSE, R²)
+│   │
+│   ├── services/ ───────────────── Lógica de negócio
+│   │   ├── ml/ ─────────────────── Machine Learning
+│   │   │   ├── prazo_predictor.py ─ Classe principal de predição
+│   │   │   ├── model_trainer.py ─── Treino de modelos (RF, XGBoost)
+│   │   │   └── evaluator.py ─────── Avaliação de performance
+│   │   │
+│   │   └── feature_engineering/ ─ Criação de features
+│   │       ├── extractor.py ─────── Extrai features dos processos
+│   │       └── transformer.py ───── Transforma/normaliza features
+│   │
+│   ├── models/ ─────────────────── Modelos ML treinados
+│   │   ├── trained/ ────────────── .pkl dos modelos em produção
+│   │   └── registry/ ───────────── Metadata dos modelos (MLflow)
+│   │
+│   ├── workers/ ────────────────── Celery workers
+│   │   ├── celery_app.py ──────── Configuração Celery
+│   │   ├── train_models.py ────── Worker: re-treino semanal
+│   │   └── update_predictions.py ─ Worker: atualiza predições
+│   │
+│   ├── tests/ ──────────────────── Testes
+│   │   ├── unit/
+│   │   │   ├── test_predictor.py
+│   │   │   └── test_feature_engineering.py
+│   │   │
+│   │   └── integration/
+│   │       └── test_prediction_pipeline.py
+│   │
+│   ├── notebooks/ ──────────────── Jupyter notebooks
+│   │   ├── exploratory_analysis.ipynb ─ EDA dos dados
+│   │   └── model_comparison.ipynb ──── Comparação de modelos
+│   │
+│   └── data/ ───────────────────── Dados para ML
+│       ├── raw/ ────────────────── Dados brutos (histórico processos)
+│       └── processed/ ──────────── Dados processados (features prontas)
+│
+│
+├── feature-5-app-mobile/ ────────────────────────────────────────────────
+│   │   (App mobile - Competidor JusBrasil)
+│   │
+│   ├── src/ ────────────────────── Código React Native
+│   │   ├── screens/ ────────────── Telas do app
+│   │   │   ├── LoginScreen.tsx ──── Tela de login
+│   │   │   ├── ProcessosScreen.tsx ─ Lista de processos
+│   │   │   ├── ProcessoDetailScreen.tsx ─ Detalhes do processo
+│   │   │   ├── ChatIAScreen.tsx ──── Chat com IA
+│   │   │   ├── PaymentScreen.tsx ─── Tela de pagamento (Stripe)
+│   │   │   └── ProfileScreen.tsx ─── Perfil do usuário
+│   │   │
+│   │   ├── components/ ─────────── Componentes reutilizáveis
+│   │   │   ├── ProcessCard.tsx ──── Card de processo
+│   │   │   ├── ChatBubble.tsx ───── Balão de mensagem
+│   │   │   ├── Header.tsx ───────── Header customizado
+│   │   │   └── LoadingSpinner.tsx ─ Spinner de loading
+│   │   │
+│   │   ├── services/ ───────────── Serviços/API clients
+│   │   │   ├── api.ts ───────────── Cliente HTTP (axios)
+│   │   │   ├── auth.ts ──────────── Autenticação JWT
+│   │   │   ├── payment.ts ───────── Stripe integration
+│   │   │   └── storage.ts ───────── AsyncStorage (cache local)
+│   │   │
+│   │   ├── navigation/ ─────────── React Navigation
+│   │   │   ├── AppNavigator.tsx ─── Stack navigator principal
+│   │   │   └── AuthNavigator.tsx ── Stack de autenticação
+│   │   │
+│   │   ├── hooks/ ──────────────── Custom React hooks
+│   │   │
+│   │   └── store/ ──────────────── State management (Zustand)
+│   │       ├── authStore.ts ─────── Store de autenticação
+│   │       └── processosStore.ts ── Store de processos
+│
+│
+├── feature-6-integracao-crms/ ───────────────────────────────────────────
+│   │   (Ecossistema fechado - Integrações nativas com 3 CRMs)
+│   │
+│   ├── api/ ────────────────────── FastAPI application
+│   │   └── routes/ ─────────────── Endpoints REST
+│   │       ├── integracoes.py ───── POST /integrations/connect
+│   │       ├── webhooks.py ──────── POST /webhook/{crm_name}
+│   │       └── sync.py ──────────── POST /sync/manual
+│   │
+│   ├── services/ ───────────────── Lógica de negócio
+│   │   ├── sync/ ───────────────── Sincronização bidirecional
+│   │   │   ├── sync_manager.py ──── Orquestra sync entre CRMs
+│   │   │   └── conflict_resolver.py ─ Resolve conflitos de dados
+│   │   │
+│   │   └── webhooks/ ───────────── Processamento de webhooks
+│   │       ├── webhook_handler.py ─ Handler genérico de webhooks
+│   │       └── event_processor.py ─ Processa eventos dos CRMs
+│   │
+│   ├── adapters/ ───────────────── Adapter Pattern (um por CRM)
+│   │   ├── base_adapter.py ─────── Interface base AbstractAdapter
+│   │   │
+│   │   ├── projuris/ ───────────── Adapter Projuris
+│   │   │   ├── client.py ────────── Cliente OAuth2 Projuris
+│   │   │   ├── adapter.py ───────── Implementa AbstractAdapter
+│   │   │   └── mapper.py ────────── Mapeia campos Projuris→Nosso DB
+│   │   │
+│   │   ├── astrea/ ─────────────── Adapter Astrea
+│   │   │   ├── client.py ────────── Cliente API Key Astrea
+│   │   │   ├── adapter.py ───────── Implementa AbstractAdapter
+│   │   │   └── mapper.py ────────── Mapeia campos Astrea→Nosso DB
+│   │   │
+│   │   └── saj_adv/ ────────────── Adapter SAJ ADV
+│   │       ├── client.py ────────── Cliente SOAP SAJ
+│   │       ├── adapter.py ───────── Implementa AbstractAdapter
+│   │       └── mapper.py ────────── Mapeia campos SAJ→Nosso DB
+│   │
+│   ├── workers/ ────────────────── Celery workers
+│   │   ├── celery_app.py ──────── Configuração Celery
+│   │   ├── sync_crm_data.py ───── Worker: sync periódico (5 em 5 min)
+│   │   └── process_webhooks.py ─── Worker: processa webhooks assíncronos
+│   │
+│   └── tests/ ──────────────────── Testes
+│       ├── unit/
+│       │   ├── test_adapters.py ─── Testa cada adapter
+│       │   └── test_sync_manager.py
+│       │
+│       └── integration/
+│           ├── test_projuris_sync.py ─ Testa sync com Projuris real
+│           └── test_webhook_flow.py ── Testa fluxo de webhooks
+│
+│
+├── infrastructure/ ──────────────────────────────────────────────────────
+│   │   (Infrastructure as Code + Containers + Monitoring)
+│   │
+│   ├── terraform/ ──────────────── IaC para AWS
+│   │   ├── modules/ ────────────── Módulos Terraform reutilizáveis
+│   │   │   ├── lambda/ ─────────── Módulo: AWS Lambda functions
+│   │   │   ├── rds/ ────────────── Módulo: RDS PostgreSQL
+│   │   │   ├── s3/ ─────────────── Módulo: S3 buckets
+│   │   │   ├── elasticache/ ────── Módulo: ElastiCache Redis
+│   │   │   └── vpc/ ────────────── Módulo: VPC + Subnets + Security Groups
+│   │   │
+│   │   └── environments/ ───────── Ambientes (usando modules)
+│   │       ├── dev/ ────────────── Terraform para DEV
+│   │       ├── staging/ ────────── Terraform para STAGING
+│   │       └── prod/ ───────────── Terraform para PRODUÇÃO
+│   │
+│   ├── docker/ ─────────────────── Dockerfiles
+│   │   ├── Dockerfile.f1 ───────── Dockerfile Feature 1
+│   │   ├── Dockerfile.f2 ───────── Dockerfile Feature 2
+│   │   ├── ... (f3, f4, f5, f6)
+│   │   ├── docker-compose.yml ──── Compose para desenvolvimento
+│   │   └── docker-compose.prod.yml ─ Compose para produção
+│   │
+│   ├── kubernetes/ ─────────────── Manifests K8s
+│   │   ├── base/ ───────────────── Configs base (Kustomize)
+│   │   │   ├── deployment.yaml ──── Deployment genérico
+│   │   │   ├── service.yaml ─────── Service genérico
+│   │   │   └── configmap.yaml ───── ConfigMaps
+│   │   │
+│   │   └── overlays/ ───────────── Overlays por ambiente
+│   │       ├── dev/ ────────────── Kustomization DEV
+│   │       └── prod/ ───────────── Kustomization PROD
+│   │
+│   └── monitoring/ ─────────────── Monitoramento
+│       ├── prometheus/ ─────────── Configuração Prometheus
+│       │   └── prometheus.yml ───── Scrape configs
+│       │
+│       └── grafana/ ────────────── Dashboards Grafana
+│           ├── dashboards.json ──── Dashboards pré-configurados
+│           └── datasources.yml ──── Datasources (Prometheus)
+│
+│
+├── docs/ ────────────────────────────────────────────────────────────────
+│   │   (Documentação do projeto)
+│   │
+│   ├── api/ ────────────────────── Documentação de APIs
+│   │   ├── openapi.yaml ────────── OpenAPI Spec (Swagger)
+│   │   └── postman_collection.json ─ Collection Postman
+│   │
+│   ├── architecture/ ───────────── Documentação de arquitetura
+│   │   ├── system_design.md ────── Design do sistema
+│   │   ├── database_schema.md ──── Schema do banco
+│   │   └── integration_flow.md ─── Fluxos de integração
+│   │
+│   ├── deployment/ ─────────────── Guias de deploy
+│   │   ├── aws_setup.md ────────── Como deployar na AWS
+│   │   ├── docker_deploy.md ────── Como deployar com Docker
+│   │   └── kubernetes_deploy.md ── Como deployar no K8s
+│   │
+│   └── guides/ ─────────────────── Guias gerais
+│       ├── development.md ──────── Guia de desenvolvimento
+│       ├── testing.md ──────────── Guia de testes
+│       ├── lgpd_compliance.md ──── Compliance LGPD
+│       └── oab_compliance.md ───── Compliance OAB
+│
+│
+└── scripts/ ─────────────────────────────────────────────────────────────
+    │   (Scripts utilitários)
+    │
+    ├── setup/ ──────────────────── Scripts de setup inicial
+    │   ├── init_db.py ──────────── Cria tabelas + migrations
+    │   ├── seed_data.py ────────── Popula dados iniciais
+    │   └── create_admin.py ─────── Cria usuário admin
+    │
+    ├── migration/ ──────────────── Scripts de migração de dados
+    │   ├── migrate_v1_to_v2.py ─── Migração de versões
+    │   └── cleanup_old_data.py ─── Limpeza de dados antigos
+    │
+    ├── backup/ ─────────────────── Scripts de backup
+    │   ├── backup_to_s3.py ─────── Backup diário para S3
+    │   └── restore_from_backup.py ─ Restore de backup
+    │
+    └── monitoring/ ─────────────── Scripts de monitoramento
+        ├── health_check.py ─────── Health check das APIs
+        └── performance_test.py ─── Testes de performance/carga
 
 
 - FUNCIONALIDADES ADICIONAIS 
