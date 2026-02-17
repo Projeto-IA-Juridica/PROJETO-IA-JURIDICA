@@ -1,109 +1,168 @@
-# Python
+# ==========================
+# GERAL / SISTEMA OPERACIONAL
+# ==========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==========================
+# PYTHON (Backend & Workers)
+# ==========================
 __pycache__/
 *.py[cod]
 *$py.class
-*.pyo
-*.pyd
+*.so
 .Python
-pip-log.txt
-pip-delete-this-directory.txt
-*.egg
-*.egg-info/
-dist/
 build/
-eggs/
-parts/
-var/
-sdist/
 develop-eggs/
-.installed.cfg
+dist/
+downloads/
+eggs/
+.eggs/
 lib/
 lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 MANIFEST
 
-# Virtual environments
+# Ambientes Virtuais
 .venv/
 venv/
 env/
 ENV/
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-!.env.example
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Linting / Typing
-.ruff_cache/
-.mypy_cache/
-.dmypy.json
-
-# ML Models
-*.pkl
-*.joblib
-*.h5
-*.pt
-*.pth
-feature_4_ml_prazos/models/trained/
-
-# Node / Frontend
-node_modules/
-.next/
-.nuxt/
-dist/
-build/
-*.min.js
-*.min.css
-.npm
-
-# Docker
-.docker/
-
-# Logs
+# Logs e Debug
 *.log
 logs/
 celerybeat-schedule
 celerybeat.pid
 
-# Alembic
-# (manter migrations versionadas, ignorar apenas o cache)
-alembic/__pycache__/
+# Testes e Coverage
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
 
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+# Jupyter Notebooks (Checkpoint)
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
 
-# Terraform
-infrastructure/terraform/**/.terraform/
-infrastructure/terraform/**/*.tfstate
-infrastructure/terraform/**/*.tfstate.backup
-infrastructure/terraform/**/.terraform.lock.hcl
-
-# Backups
-*.bak
-*.backup
-
-# Secrets / Keys
+# ==========================
+# SEGURANÇA E AMBIENTE
+# ==========================
+# CRÍTICO: Nunca commitar chaves de API ou segredos
+.env
+.env.*
+!.env.example
 *.pem
 *.key
 *.crt
 *.p12
 secrets/
+
+# ==========================
+# MACHINE LEARNING (Feature 4)
+# ==========================
+# Modelos pesados (use DVC ou MLflow remoto para versionar isso)
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*.onnx
+
+# Correção: Ignorar pastas de modelos independentemente de hífen ou underline
+feature[-_]4[-_]ml[-_]prazos/models/trained/
+feature[-_]4[-_]ml[-_]prazos/models/registry/
+
+# DADOS (LGPD Compliance) - Bloqueia dados brutos de clientes
+data/raw/
+data/processed/
+*/data/raw/*
+*/data/processed/*
+data/**/*.csv
+*/data/**/*.csv
+data/**/*.xlsx
+*/data/**/*.xlsx
+data/**/*.pdf
+*/data/**/*.pdf
+
+# ==========================
+# FRONTEND / NODE
+# ==========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.next/
+.nuxt/
+*.min.js
+*.min.css
+
+# ==========================
+# MOBILE (React Native / Expo - Feature 5)
+# ==========================
+.expo/
+web-build/
+
+# iOS
+ios/*.xcodeproj/*
+!ios/*.xcodeproj/project.pbxproj
+ios/*.xcworkspace/*
+!ios/*.xcworkspace/contents.xcworkspacedata
+ios/Pods/
+ios/build/
+ios/DerivedData/
+
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+local.properties
+
+# ==========================
+# INFRAESTRUTURA (Terraform / Docker)
+# ==========================
+.docker/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+.terraform.lock.hcl
+
+# AWS SAM / Serverless (se usar no futuro)
+.aws-sam/
+.serverless/
+
+# ==========================
+# BANCO DE DADOS (Local)
+# ==========================
+*.sqlite3
+*.db
+postgres_data/
+redis_data/

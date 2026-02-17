@@ -1,4 +1,9 @@
-.PHONY: setup dev test lint migrate docker-up docker-down seed help
+.PHONY: setup install-base dev worker beat flower \
+       migrate migrate-create migrate-down migrate-history seed create-admin init-db \
+       lint format lint-check type-check \
+       test test-unit test-integration test-fast test-file \
+       docker-up docker-down docker-logs docker-build docker-restart \
+       health clean verify-install help
 
 PYTHON := python3.12
 VENV := .venv
