@@ -1,0 +1,87 @@
+# =============================================================================
+# CONCIERGE JURÍDICO DIGITAL — Dockerfile Feature 1 (IA Personalizada)
+# =============================================================================
+# Multi-stage build para imagem menor em produção
+# Inclui ffmpeg para processamento de áudios WhatsApp (OGG → MP3)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# STAGE 1: Builder — instala dependências
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Instalar dependências do sistema necessárias para compilar pacotes
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de dependências primeiro (melhor cache)
+COPY requirements-base.txt requirements-base.txt
+COPY requirements-f1.txt requirements-f1.txt
+
+# Criar virtualenv e instalar dependências
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements-f1.txt
+
+# -----------------------------------------------------------------------------
+# STAGE 2: Runtime — imagem final mínima
+# -----------------------------------------------------------------------------
+FROM python:3.12-slim AS runtime
+
+LABEL maintainer="equipe@concierge-juridico.com.br"
+LABEL description="Concierge Jurídico Digital — Feature 1: IA Personalizada"
+LABEL version="0.1.0"
+
+WORKDIR /app
+
+# Instalar dependências de sistema em runtime (ffmpeg para áudio + libpq para postgres)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar virtualenv do stage builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Criar usuário não-root para segurança
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid 1000 --no-create-home --shell /bin/bash appuser
+
+# Copiar código da aplicação
+COPY --chown=appuser:appgroup shared/ ./shared/
+COPY --chown=appuser:appgroup feature_1_ia_personalizada/ ./feature_1_ia_personalizada/
+COPY --chown=appuser:appgroup scripts/ ./scripts/
+COPY --chown=appuser:appgroup alembic/ ./alembic/ 2>/dev/null || true
+COPY --chown=appuser:appgroup alembic.ini ./alembic.ini 2>/dev/null || true
+
+# Variáveis de ambiente padrão
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+# Porta da aplicação
+EXPOSE 8000
+
+# Trocar para usuário não-root
+USER appuser
+
+# Health check básico
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -sf http://localhost:8000/health || exit 1
+
+# Comando padrão: iniciar servidor FastAPI
+# Em produção, remover --reload
+CMD ["uvicorn", "feature_1_ia_personalizada.api.app:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "2", \
+     "--log-level", "info"]

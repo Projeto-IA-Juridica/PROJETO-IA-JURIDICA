@@ -1,0 +1,217 @@
+version: "3.9"
+
+# =============================================================================
+# CONCIERGE JURÍDICO DIGITAL — Docker Compose (Desenvolvimento)
+# =============================================================================
+# Uso: docker compose -f infrastructure/docker/docker-compose.yml up -d
+#      Ou via Makefile: make docker-up
+# =============================================================================
+
+networks:
+  concierge-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  evolution_data:
+    driver: local
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # BANCO DE DADOS — PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: concierge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: concierge
+      POSTGRES_PASSWORD: concierge_pass
+      POSTGRES_DB: concierge_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - concierge-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U concierge -d concierge_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # CACHE + BROKER — Redis 7
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: concierge-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - concierge-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # WHATSAPP — Evolution API (self-hosted)
+  # ---------------------------------------------------------------------------
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: concierge-evolution
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: http://evolution-api:8080
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-evolution-dev-key}
+      DATABASE_PROVIDER: redis
+      DATABASE_CONNECTION_URI: redis://redis:6379/3
+      REDIS_URI: redis://redis:6379/4
+      DEL_INSTANCE: false
+    volumes:
+      - evolution_data:/evolution/instances
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # API — Feature 1: IA Personalizada
+  # ---------------------------------------------------------------------------
+  app-f1:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    container_name: concierge-app-f1
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://concierge:concierge_pass@postgres:5432/concierge_dev
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      EVOLUTION_API_URL: http://evolution-api:8080
+    networks:
+      - concierge-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ../..:/app  # hot-reload em desenvolvimento
+    command: >
+      uvicorn feature_1_ia_personalizada.api.app:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --log-level info
+
+  # ---------------------------------------------------------------------------
+  # WORKER — Celery (processamento assíncrono)
+  # ---------------------------------------------------------------------------
+  celery-worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    container_name: concierge-celery-worker
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://concierge:concierge_pass@postgres:5432/concierge_dev
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      EVOLUTION_API_URL: http://evolution-api:8080
+    networks:
+      - concierge-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app worker
+      --loglevel=info
+      --queues=monitoramento,notificacoes,ia
+      --concurrency=4
+
+  # ---------------------------------------------------------------------------
+  # BEAT — Celery Beat (agendador de tarefas cron)
+  # ---------------------------------------------------------------------------
+  celery-beat:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    container_name: concierge-celery-beat
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://concierge:concierge_pass@postgres:5432/concierge_dev
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app beat
+      --loglevel=info
+
+  # ---------------------------------------------------------------------------
+  # FLOWER — Monitoramento Celery (UI em localhost:5555)
+  # ---------------------------------------------------------------------------
+  flower:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    container_name: concierge-flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    env_file:
+      - ../../.env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app flower
+      --port=5555
+      --basic_auth=admin:admin

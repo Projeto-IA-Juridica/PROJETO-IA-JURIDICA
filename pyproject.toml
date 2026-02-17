@@ -1,0 +1,106 @@
+[project]
+name = "concierge-juridico"
+version = "0.1.0"
+description = "Concierge Jurídico Digital — IA conversacional para escritórios de advocacia"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+
+dependencies = [
+    # Web framework
+    "fastapi==0.109.0",
+    "uvicorn[standard]==0.27.0",
+    # Database
+    "sqlalchemy==2.0.25",
+    "asyncpg==0.29.0",
+    "alembic==1.13.1",
+    # Cache
+    "redis==5.0.1",
+    # Security
+    "cryptography==42.0.0",
+    "python-jose[cryptography]==3.3.0",
+    "bcrypt==4.1.2",
+    # HTTP client
+    "httpx==0.26.0",
+    # Validation
+    "pydantic==2.5.0",
+    "pydantic-settings==2.1.0",
+    # Monitoring
+    "prometheus-client==0.19.0",
+    "sentry-sdk[fastapi]==1.40.0",
+    # Logging
+    "structlog==24.1.0",
+]
+
+[project.optional-dependencies]
+feature1 = [
+    # IA & LLM
+    "langchain==0.1.0",
+    "langgraph==0.0.20",
+    "anthropic==0.18.0",
+    "openai==1.12.0",
+    # Async tasks
+    "celery==5.3.6",
+    "flower==2.0.1",
+    # HTTP async
+    "aiohttp==3.9.3",
+    # Audio
+    "pydub==0.25.1",
+]
+dev = [
+    "pytest==7.4.4",
+    "pytest-asyncio==0.23.3",
+    "pytest-cov==4.1.0",
+    "httpx==0.26.0",
+    "ruff==0.2.1",
+    "black==24.1.1",
+    "mypy==1.8.0",
+    "pre-commit==3.6.0",
+    "factory-boy==3.3.0",
+    "faker==22.6.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shared*", "feature_*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "feature_1_ia_personalizada/tests",
+    "shared",
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=. --cov-report=term-missing --cov-report=html"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in default arguments (FastAPI depends on this)
+]
+
+[tool.ruff.isort]
+known-first-party = ["shared", "feature_1_ia_personalizada"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
