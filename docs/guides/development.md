@@ -66,11 +66,12 @@ Define quais arquivos e pastas o Git deve **ignorar completamente** — ou seja,
 |---|---|---|
 | **Python** | `__pycache__/`, `*.pyc`, `*.egg-info/`, `dist/`, `build/` | Arquivos gerados automaticamente, não pertencem ao repositório |
 | **Virtualenv** | `.venv/`, `venv/`, `env/` | Cada dev tem o seu próprio, não deve ser compartilhado |
-| **Segredos** | `.env`, `.env.local`, `.env.*.local` | Contém credenciais reais — NUNCA commitar |
+| **Segredos** | `.env`, `.env.*`, `*.pem`, `*.key`, `*.crt`, `secrets/` | Contém credenciais reais — NUNCA commitar |
 | **IDEs** | `.vscode/`, `.idea/`, `*.swp`, `.DS_Store` | Configurações pessoais de cada desenvolvedor |
-| **Testes** | `.pytest_cache/`, `.coverage`, `htmlcov/` | Resultados de teste são gerados localmente |
-| **ML Models** | `*.pkl`, `*.joblib`, `*.h5` | Modelos treinados são grandes demais para Git (usar S3) |
-| **Terraform** | `**/.terraform/`, `*.tfstate` | Estado da infra contém dados sensíveis |
+| **Testes/Lint** | `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `.coverage`, `htmlcov/` | Resultados de teste e cache de linters são gerados localmente |
+| **ML Models** | `*.pkl`, `*.joblib`, `*.h5`, `*.pt`, `*.pth`, `*.onnx` | Modelos treinados são grandes demais para Git (usar DVC/S3) |
+| **Dados (LGPD)** | `data/raw/`, `data/processed/`, `data/**/*.csv`, `data/**/*.xlsx`, `data/**/*.pdf` | Dados de clientes restritos a `data/` — compliance LGPD |
+| **Terraform** | `.terraform/`, `*.tfstate`, `*.tfvars` | Estado da infra contém dados sensíveis |
 | **Logs** | `*.log`, `celerybeat-schedule`, `celerybeat.pid` | Logs são gerados em runtime |
 
 ### Exceção importante
@@ -147,6 +148,8 @@ O ruff verifica: erros de estilo (E/W), bugs comuns (F/B), imports desorganizado
 ### O que faz
 
 Centraliza todos os comandos frequentes do projeto em atalhos simples. Em vez de memorizar comandos longos, você usa `make <comando>`.
+
+> **Nota técnica:** Todos os 25 targets estão declarados como `.PHONY` no topo do arquivo, garantindo que o Make os execute sempre — mesmo que exista um arquivo ou diretório com o mesmo nome de um target.
 
 ### Referência de comandos
 
@@ -478,6 +481,6 @@ make dev
 
 ---
 
-> **Última atualização:** Fevereiro 2026 — Fase 0.1 concluída
+> **Última atualização:** Fevereiro 2026 — Fase 0.1 (revisão: .gitignore corrigido, .PHONY completo)
 >
 > **Próxima fase:** [0.2 — Banco de Dados Local](./database_setup.md) (configurar Alembic + criar migration inicial)
