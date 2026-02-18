@@ -1,0 +1,31 @@
+# ==============================================================================
+# requirements-f1.txt — Dependências da Feature 1 (IA Personalizada / MVP)
+# Inclui todas as deps base + específicas da Feature 1
+# ==============================================================================
+
+-r requirements-base.txt
+
+# IA & LLM
+langchain==0.1.0
+langgraph==0.0.20
+anthropic==0.18.0         # Claude API (IA conversacional principal)
+openai==1.12.0            # Whisper API (transcrição de áudios WhatsApp)
+langchain-anthropic==0.1.1    # Integração nativa LangChain + Claude (ChatAnthropic sem wrapper manual)
+langchain-openai==0.0.8       # Integração nativa LangChain + OpenAI (ChatOpenAI no LangGraph)
+langchain-community==0.0.20   # Ferramentas de busca, carregadores de documentos e utilitários do agente
+tiktoken==0.5.2               # Contagem de tokens para gerenciar contexto e memória do LangChain
+
+# Async Tasks
+celery==5.3.6
+flower==2.0.1             # Interface web de monitoramento Celery
+
+# HTTP async
+aiohttp==3.9.3
+
+# Audio
+pydub==0.25.1             # Conversão ogg→mp3 (requer ffmpeg instalado no SO)
+# ffmpeg: instalado via apt no Dockerfile.f1 / brew install ffmpeg localmente
+
+# Google Sheets
+google-api-python-client==2.116.0
+google-auth==2.27.0
