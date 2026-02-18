@@ -144,30 +144,37 @@ concierge-juridico/
 │   │   │   ├── templates.py ─────── Templates de mensagens prontas
 │   │   │   └── scheduler.py ─────── Agendamento de mensagens
 │   │   │
-│   │   └── legal_data/ ─────────── Busca de dados processuais
-│   │       ├── jusbrasil_client.py ─ Cliente Jusbrasil API (primário)
-│   │       ├── datajud_client.py ─── Cliente DataJud CNJ (backup)
-│   │       ├── data_cleaner.py ──── Pipeline de limpeza de dados
-│   │       └── cache_manager.py ─── Cache inteligente (Redis)
+│   │   ├── legal_data/ ─────────── Busca de dados processuais
+│   │   │   ├── jusbrasil_client.py ─ Cliente Jusbrasil API (primário)
+│   │   │   ├── datajud_client.py ─── Cliente DataJud CNJ (backup)
+│   │   │   ├── data_cleaner.py ──── Pipeline de limpeza de dados
+│   │   │   └── cache_manager.py ─── Cache inteligente (Redis)
+│   │   │
+│   │   └── integrations/ ────────── Integrações externas
+│   │       └── google_sheets.py ─── Cliente Google Sheets API
 │   │
 │   ├── workers/ ────────────────── Celery workers (tarefas assíncronas)
 │   │   ├── celery_app.py ──────── Configuração Celery
 │   │   ├── monitor_processos.py ─ Worker: monitoramento 24/7
-│   │   └── send_notifications.py ─ Worker: envio notificações em lote
+│   │   ├── send_notifications.py ─ Worker: envio notificações em lote
+│   │   └── mensagens_relacionamento.py ─ Worker: mensagens comemorativas
 │   │
 │   ├── tests/ ──────────────────── Testes automatizados
 │   │   ├── unit/ ───────────────── Testes unitários
 │   │   │   ├── test_orchestrator.py ─ Testa LangGraph
 │   │   │   ├── test_translator.py ─── Testa traduções
-│   │   │   └── test_fact_checker.py ─ Testa anti-alucinação
+│   │   │   ├── test_fact_checker.py ─ Testa anti-alucinação
+│   │   │   └── test_google_sheets.py ─ Testa integração Sheets
 │   │   │
 │   │   └── integration/ ────────── Testes de integração
 │   │       ├── test_whatsapp_flow.py ─ Testa fluxo completo WhatsApp
-│   │       └── test_process_monitoring.py ─ Testa monitoramento
+│   │       ├── test_process_monitoring.py ─ Testa monitoramento
+│   │       └── test_mensagens_relacionamento.py ─ Testa msgs comemorativas
 │   │
 │   └── data/ ───────────────────── Dados estáticos
 │       ├── knowledge_base/ ─────── Base de conhecimento
-│       │   └── disclaimers.json ─── Disclaimers OAB obrigatórios
+│       │   ├── disclaimers.json ─── Disclaimers OAB obrigatórios
+│       │   └── datas_comemorativas.json ─ Datas profissionais
 │       │
 │       └── termos_juridicos/ ───── Traduções jurídicas
 │           └── traducoes.json ───── 500 termos iniciais validados
@@ -449,7 +456,8 @@ concierge-juridico/
 │       ├── development.md ──────── Guia de desenvolvimento
 │       ├── testing.md ──────────── Guia de testes
 │       ├── lgpd_compliance.md ──── Compliance LGPD
-│       └── oab_compliance.md ───── Compliance OAB
+│       ├── oab_compliance.md ───── Compliance OAB
+│       └── google_sheets_setup.md ─ Setup Google Sheets API
 │
 │
 └── scripts/ ─────────────────────────────────────────────────────────────
@@ -462,7 +470,8 @@ concierge-juridico/
     │
     ├── migration/ ──────────────── Scripts de migração de dados
     │   ├── migrate_v1_to_v2.py ─── Migração de versões
-    │   └── cleanup_old_data.py ─── Limpeza de dados antigos
+    │   ├── cleanup_old_data.py ─── Limpeza de dados antigos
+    │   └── sync_sheets_to_db.py ─── Migração Sheets → DB
     │
     ├── backup/ ─────────────────── Scripts de backup
     │   ├── backup_to_s3.py ─────── Backup diário para S3
@@ -543,6 +552,10 @@ flower==2.0.1
 # HTTP
 httpx==0.26.0
 aiohttp==3.9.3
+
+# Google Sheets Integration
+google-api-python-client==2.116.0
+google-auth==2.27.0
 ```
 
 **APIs Externas**
@@ -670,6 +683,52 @@ transcript = client.audio.transcriptions.create(
   language="pt"
 )
 ```
+
+#### 6️⃣ Google Sheets API
+
+```yaml
+URL: https://sheets.googleapis.com/v4/spreadsheets
+Custo: Gratuito (até 100k reads/dia)
+Uso: Gerenciamento de dados de clientes (MVP)
+Auth: Service Account (OAuth2)
+Docs: https://developers.google.com/sheets/api
+```
+
+**Setup:**
+1. Criar projeto no Google Cloud Console
+2. Ativar Google Sheets API
+3. Criar Service Account
+4. Baixar JSON de credenciais
+5. Compartilhar planilha com email da service account
+
+**Exemplo de uso:**
+
+```python
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+
+creds = Credentials.from_service_account_file(
+    'credentials.json',
+    scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+)
+
+service = build('sheets', 'v4', credentials=creds)
+result = service.spreadsheets().values().get(
+    spreadsheetId='SPREADSHEET_ID',
+    range='Clientes!A2:I'
+).execute()
+```
+
+**Estrutura das Planilhas:**
+
+**Planilha 1: Clientes**
+- ID, Nome, Telefone, CPF, Data Nascimento, Profissão, Empresa, Status, Último Contato
+
+**Planilha 2: Datas Comemorativas**
+- Profissão, Data, Nome da Comemoração, Template Mensagem
+
+**Planilha 3: Log de Mensagens**
+- Cliente ID, Tipo, Data Envio, Sucesso, Erro
 
 ### FEATURE 2 - Controladoria
 
@@ -1091,8 +1150,16 @@ Jusbrasil API:         R$ 150/mês
 Claude API:            R$ 50/mês
 OpenAI Whisper:        R$ 10/mês
 AWS:                   R$ 200/mês
+Google Sheets API:     R$ 0 (free tier)
 ────────────────────────────────
-TOTAL:                 R$ 410/mês
+SUBTOTAL:              R$ 410/mês
+
+Mensagens Relacionamento:
+- Aniversários:        R$ 0,08/mês
+- Datas profissionais: R$ 0,10/mês  
+- Check-ins:           R$ 0,10/mês
+────────────────────────────────
+TOTAL:                 R$ 410,28/mês
 Receita (20 clientes): R$ 30.000/mês
 Margem:                98.6%
 ```
@@ -1244,6 +1311,10 @@ terraform apply
 - [ ] Setup PostgreSQL local ou Docker
 - [ ] Setup Redis local ou Docker
 - [ ] Criar conta AWS (Free Tier)
+- [ ] Criar projeto Google Cloud Console
+- [ ] Ativar Google Sheets API
+- [ ] Criar Service Account e baixar credentials.json
+- [ ] Criar planilha Google Sheets (3 abas)
 - [ ] Ler documentação OAB sobre uso de IA
 - [ ] Ler LGPD (Lei 13.709/2018)
 
@@ -1254,6 +1325,8 @@ terraform apply
 - [ ] Integrar Claude API
 - [ ] Integrar Evolution API (WhatsApp)
 - [ ] Integrar Jusbrasil API
+- [ ] Integrar Google Sheets API
+- [ ] Implementar workers mensagens relacionamento
 - [ ] Sistema fact-checking
 - [ ] Worker monitoramento Celery
 - [ ] Testes unitários + integração
