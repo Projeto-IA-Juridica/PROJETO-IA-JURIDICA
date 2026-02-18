@@ -1,0 +1,40 @@
+# ==============================================================================
+# requirements-base.txt — Dependências compartilhadas (shared/)
+# Usadas por TODAS as features do Concierge Jurídico Digital
+# ==============================================================================
+
+# Web framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.9   # Obrigatório para FastAPI processar Form data e upload de arquivos (PDFs)
+
+# Database
+sqlalchemy==2.0.25
+asyncpg==0.29.0          # Driver assíncrono obrigatório para create_async_engine
+alembic==1.13.1
+
+# Cache
+redis==5.0.1
+
+# Security
+cryptography==42.0.0
+python-jose[cryptography]==3.3.0
+bcrypt==4.1.2
+
+# HTTP client
+httpx==0.26.0
+
+# Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0  # Separado do pydantic desde v2 — obrigatório para BaseSettings
+email-validator==2.1.0    # Obrigatório para usar EmailStr no Pydantic (campos de e-mail)
+
+# Monitoring
+prometheus-client==0.19.0
+sentry-sdk[fastapi]==1.40.0
+
+# Logging estruturado
+structlog==24.1.0
+
+# Variáveis de ambiente
+python-dotenv==1.0.0      # Obrigatório para o Alembic (env.py) carregar .env antes das migrations

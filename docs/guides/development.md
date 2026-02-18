@@ -1,11 +1,24 @@
 # Guia de Desenvolvimento — Estrutura Raiz do Projeto
 
-> Documento de referência para a **Fase 0.1** do Concierge Jurídico Digital.
-> Cobre a estrutura base do repositório e como utilizar cada arquivo criado.
+> Documento de referência para a **Fase 0 — Setup do Projeto** do Concierge Jurídico Digital.
+> Cobre toda a configuração inicial: estrutura do repositório, banco de dados, ferramentas de desenvolvimento e dependências.
 
 ---
 
 ## Índice
+
+**Progresso da Fase 0:**
+
+| Sub-fase | Status | Descrição |
+|---|---|---|
+| 0.1 Estrutura Raiz | ✅ Concluída | `.gitignore`, `pyproject.toml`, `Makefile`, `.env.example`, Docker |
+| 0.2 Banco de Dados Local | ✅ Concluída | PostgreSQL/Redis via docker-compose, `alembic.ini` + `env.py` async configurados |
+| 0.3 Ferramentas de Desenvolvimento | ✅ Concluída | `ruff`, `pytest`, `pre-commit` |
+| 0.4 Instalar Dependências Python | ✅ Concluída | `requirements-base.txt`, `requirements-f1.txt`, virtualenv |
+| 0.5 Criar `__init__.py` nos Módulos | ✅ Concluída | Todos os diretórios Python (shared + feature_1) |
+| 0.6 Configurar Entry Point Uvicorn | ✅ Concluída | `app.py` placeholder + `make dev` funcional |
+
+---
 
 1. [Visão Geral da Estrutura](#1-visão-geral-da-estrutura)
 2. [.gitignore](#2-gitignore)
@@ -15,14 +28,23 @@
 6. [Docker](#6-docker)
    - [docker-compose.yml](#61-docker-composeyml)
    - [Dockerfile.f1](#62-dockerfilef1)
-7. [Fluxo de Setup Inicial](#7-fluxo-de-setup-inicial)
-8. [Variáveis de Ambiente — Referência Completa](#8-variáveis-de-ambiente--referência-completa)
+7. [Banco de Dados Local (Fase 0.2)](#7-banco-de-dados-local-fase-02)
+   - [PostgreSQL 16](#71-postgresql-16)
+   - [Redis 7](#72-redis-7)
+   - [Configurar Alembic](#73-configurar-alembic)
+8. [Dependências Python (Fase 0.4)](#8-dependências-python-fase-04)
+   - [requirements-base.txt](#81-requirements-basetxt)
+   - [requirements-f1.txt](#82-requirements-f1txt)
+   - [Instalar e verificar](#83-instalar-e-verificar)
+9. [Fluxo de Setup Inicial](#9-fluxo-de-setup-inicial)
+10. [Variáveis de Ambiente — Referência Completa](#10-variáveis-de-ambiente--referência-completa)
+11. [.pre-commit-config.yaml (Fase 0.3)](#11-pre-commit-configyaml-fase-03)
 
 ---
 
 ## 1. Visão Geral da Estrutura
 
-Após a Fase 0.1, a raiz do repositório ficou assim:
+Estrutura da raiz após a Fase 0 (Setup completo):
 
 ```
 PROJETO-IA-JURIDICA/
@@ -31,11 +53,18 @@ PROJETO-IA-JURIDICA/
 ├── .env.example                        ← Template de variáveis de ambiente
 ├── .env                                ← Suas credenciais reais (NÃO commitar!)
 │
-├── pyproject.toml                      ← Configuração do projeto Python
+├── pyproject.toml                      ← Configuração do projeto Python + configs ruff/pytest
 ├── Makefile                            ← Atalhos de comandos (setup, dev, test...)
+├── .pre-commit-config.yaml             ← Hooks automáticos de qualidade (Fase 0.3)
 │
-├── requirements-base.txt               ← Deps compartilhadas (criadas na Fase 0.4)
-├── requirements-f1.txt                 ← Deps da Feature 1 (criadas na Fase 0.4)
+├── requirements-base.txt               ← Deps compartilhadas (Fase 0.4)
+├── requirements-f1.txt                 ← Deps da Feature 1 (Fase 0.4)
+│
+├── feature_1_ia_personalizada/         ← Feature 1: IA Personalizada (MVP)
+│   ├── __init__.py
+│   └── api/
+│       ├── __init__.py
+│       └── app.py                      ← Entry point Uvicorn (Fase 0.6 — placeholder)
 │
 ├── infrastructure/
 │   └── docker/
@@ -414,7 +443,288 @@ make docker-build
 
 ---
 
-## 7. Fluxo de Setup Inicial
+## 7. Banco de Dados Local (Fase 0.2)
+
+> **Status:** ⏳ Pendente — esta seção documenta o que será configurado na Fase 0.2.
+
+A Fase 0.2 configura o PostgreSQL e o Redis localmente (ou via Docker) e inicializa o Alembic para controle de migrations.
+
+---
+
+### 7.1 PostgreSQL 16
+
+#### Opção A — Via Docker (recomendado para desenvolvimento)
+
+O `docker-compose.yml` já inclui o serviço `postgres`. Basta subir o ambiente:
+
+```bash
+make docker-up
+# → postgres:16-alpine rodando em localhost:5432
+# → usuário: concierge | senha: concierge_pass | database: concierge_dev
+```
+
+Para verificar que está rodando:
+
+```bash
+docker compose -f infrastructure/docker/docker-compose.yml ps postgres
+```
+
+Para conectar via `psql`:
+
+```bash
+docker exec -it concierge-postgres psql -U concierge -d concierge_dev
+```
+
+#### Opção B — Instalação local
+
+```bash
+# macOS (Homebrew)
+brew install postgresql@16
+brew services start postgresql@16
+
+# Ubuntu/Debian
+sudo apt install postgresql-16
+sudo systemctl start postgresql
+
+# Criar usuário e database
+psql -U postgres -c "CREATE USER concierge WITH PASSWORD 'concierge_pass';"
+psql -U postgres -c "CREATE DATABASE concierge_dev OWNER concierge;"
+psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE concierge_dev TO concierge;"
+```
+
+#### Variável de ambiente
+
+```env
+DATABASE_URL=postgresql+asyncpg://concierge:concierge_pass@localhost:5432/concierge_dev
+```
+
+> **Atenção:** O scheme `postgresql+asyncpg://` é obrigatório. O driver `asyncpg` é o que permite ao SQLAlchemy operar de forma assíncrona com FastAPI. O `psycopg2-binary` (síncrono) não é compatível com `create_async_engine`.
+
+---
+
+### 7.2 Redis 7
+
+#### Opção A — Via Docker (recomendado)
+
+Também já incluído no `docker-compose.yml`:
+
+```bash
+make docker-up
+# → redis:7-alpine rodando em localhost:6379
+```
+
+Para verificar:
+
+```bash
+docker exec -it concierge-redis redis-cli ping
+# → PONG
+```
+
+#### Opção B — Instalação local
+
+```bash
+# macOS
+brew install redis
+brew services start redis
+
+# Ubuntu/Debian
+sudo apt install redis-server
+sudo systemctl start redis-server
+
+# Testar conexão
+redis-cli ping
+# → PONG
+```
+
+#### Databases Redis utilizados
+
+| Database | URL | Uso |
+|---|---|---|
+| `redis/0` | `REDIS_URL` | Cache da aplicação (processos, sessões) |
+| `redis/1` | `CELERY_BROKER_URL` | Fila de tasks Celery |
+| `redis/2` | `CELERY_RESULT_BACKEND` | Resultados das tasks Celery |
+
+---
+
+### 7.3 Configurar Alembic
+
+O Alembic é o sistema de migrations do SQLAlchemy — permite criar, versionar e aplicar mudanças no schema do banco de forma incremental e reversível.
+
+#### Inicialização (uma vez por projeto)
+
+```bash
+# Na raiz do projeto, com o virtualenv ativado:
+alembic init alembic
+```
+
+Isso cria:
+```
+alembic/
+├── env.py          ← Script de configuração do ambiente
+├── script.py.mako  ← Template de migration
+└── versions/       ← Arquivos de migration gerados
+alembic.ini         ← Configuração principal
+```
+
+#### Ajustes necessários após `alembic init`
+
+**`alembic.ini`** — apontar para variável de ambiente em vez de URL hardcoded:
+
+```ini
+# Trocar a linha sqlalchemy.url por:
+sqlalchemy.url = %(DATABASE_URL)s
+```
+
+**`alembic/env.py`** — carregar `.env` e importar os models:
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+# Importar todos os models para o autogenerate funcionar
+from shared.models import Base  # noqa: F401 (precisa ser importado)
+
+target_metadata = Base.metadata
+```
+
+#### Fluxo de uso
+
+```bash
+# Criar migration após alterar um model
+make migrate-create MSG="create initial tables"
+# → gera: alembic/versions/xxxx_create_initial_tables.py
+
+# Aplicar todas as migrations pendentes
+make migrate
+# → alembic upgrade head
+
+# Reverter última migration
+make migrate-down
+# → alembic downgrade -1
+
+# Ver histórico de migrations
+make migrate-history
+```
+
+> **Dependência:** A Fase 1 (shared/models) deve ser implementada antes de criar a migration inicial, pois o Alembic usa os models SQLAlchemy para gerar o schema automaticamente via `--autogenerate`.
+
+---
+
+## 8. Dependências Python (Fase 0.4)
+
+O projeto usa dois arquivos de requirements com hierarquia — o `requirements-f1.txt` inclui o `requirements-base.txt` via `-r`, evitando duplicação.
+
+---
+
+### 8.1 `requirements-base.txt`
+
+**Localização:** [`requirements-base.txt`](../../requirements-base.txt)
+
+Contém as dependências **compartilhadas** entre todas as features — tudo que está em `shared/`. Qualquer feature nova parte daqui.
+
+| Pacote | Versão | Para quê |
+|---|---|---|
+| `fastapi` | 0.109.0 | Framework web assíncrono |
+| `uvicorn[standard]` | 0.27.0 | Servidor ASGI (com websockets e http/2) |
+| `sqlalchemy` | 2.0.25 | ORM — modelos e queries |
+| `asyncpg` | 0.29.0 | Driver async PostgreSQL (obrigatório com `create_async_engine`) |
+| `alembic` | 1.13.1 | Migrations do banco |
+| `redis` | 5.0.1 | Cache + broker Celery |
+| `cryptography` | 42.0.0 | AES-256 para CPFs (Fernet) |
+| `python-jose[cryptography]` | 3.3.0 | Geração e validação de JWTs |
+| `bcrypt` | 4.1.2 | Hash de senhas |
+| `httpx` | 0.26.0 | Cliente HTTP async (chamadas a APIs externas) |
+| `pydantic` | 2.5.0 | Validação de dados |
+| `pydantic-settings` | 2.1.0 | `BaseSettings` para variáveis de ambiente (separado do pydantic desde v2) |
+| `prometheus-client` | 0.19.0 | Métricas expostas no `/metrics` |
+| `sentry-sdk[fastapi]` | 1.40.0 | Rastreamento de erros em produção |
+| `structlog` | 24.1.0 | Logging estruturado (JSON em prod, colorido em dev) |
+
+---
+
+### 8.2 `requirements-f1.txt`
+
+**Localização:** [`requirements-f1.txt`](../../requirements-f1.txt)
+
+Contém as dependências **específicas da Feature 1** (IA + WhatsApp + Celery). A primeira linha inclui automaticamente todas as deps base:
+
+```
+-r requirements-base.txt
+```
+
+| Pacote | Versão | Para quê |
+|---|---|---|
+| `langchain` | 0.1.0 | Integração de LLMs e ferramentas |
+| `langgraph` | 0.0.20 | Workflow stateful da IA (orquestrador) |
+| `anthropic` | 0.18.0 | Cliente Claude API (IA conversacional) |
+| `openai` | 1.12.0 | Cliente Whisper API (transcrição de áudios) |
+| `celery` | 5.3.6 | Workers assíncronos (monitoramento, notificações) |
+| `flower` | 2.0.1 | UI web de monitoramento do Celery |
+| `aiohttp` | 3.9.3 | HTTP async (para workers Celery) |
+| `pydub` | 0.25.1 | Conversão ogg→mp3 de áudios WhatsApp |
+| `google-api-python-client` | 2.116.0 | Cliente Google Sheets API |
+| `google-auth` | 2.27.0 | Autenticação service account Google |
+
+> **Nota sobre `pydub`:** requer o binário `ffmpeg` instalado no sistema operacional.
+> - macOS: `brew install ffmpeg`
+> - Docker: já incluído no `Dockerfile.f1` via `apt install ffmpeg`
+
+---
+
+### 8.3 Instalar e Verificar
+
+#### Criar virtualenv e instalar
+
+```bash
+# Criar virtualenv com Python 3.12
+python3.12 -m venv .venv
+
+# Ativar (macOS/Linux)
+source .venv/bin/activate
+
+# Atualizar pip
+pip install --upgrade pip
+
+# Instalar deps da Feature 1 (inclui base automaticamente)
+pip install -r requirements-f1.txt
+
+# Instalar deps de dev (pytest, ruff, black, mypy, pre-commit)
+pip install -e ".[dev]"
+```
+
+Ou usando o Makefile (faz tudo em um comando):
+
+```bash
+make setup
+```
+
+#### Verificar instalação
+
+```bash
+python -c "import fastapi, sqlalchemy, anthropic, langgraph, celery, structlog; print('OK')"
+# → OK
+```
+
+Ou via Makefile:
+
+```bash
+make verify-install
+# → ✅ Todas as dependências OK!
+```
+
+#### Estrutura de grupos
+
+```
+requirements-base.txt        ← instala shared/ (core)
+    └── requirements-f1.txt  ← instala feature_1/ + base
+
+pyproject.toml [dev]         ← instala ferramentas de desenvolvimento
+    pytest, ruff, black, mypy, pre-commit, factory-boy, faker
+```
+
+---
+
+## 9. Fluxo de Setup Inicial
 
 Para um novo desenvolvedor começar do zero:
 
@@ -458,7 +768,7 @@ make dev
 
 ---
 
-## 8. Variáveis de Ambiente — Referência Completa
+## 10. Variáveis de Ambiente — Referência Completa
 
 | Variável | Obrigatória | Default | Descrição |
 |---|---|---|---|
@@ -481,6 +791,145 @@ make dev
 
 ---
 
-> **Última atualização:** Fevereiro 2026 — Fase 0.1 (revisão: .gitignore corrigido, .PHONY completo)
+## 11. `.pre-commit-config.yaml` (Fase 0.3)
+
+**Localização:** [`.pre-commit-config.yaml`](../../.pre-commit-config.yaml)
+
+### O que faz
+
+Configura hooks que rodam **automaticamente antes de cada `git commit`**, garantindo que código com problemas de lint, formatação ou tipos nunca entre no repositório.
+
+### Instalação
+
+```bash
+# Instalar o pre-commit no virtualenv (já incluído em [dev] do pyproject.toml)
+pip install pre-commit
+
+# Registrar os hooks no repositório Git local (feito uma vez por dev)
+pre-commit install
+```
+
+Após rodar `pre-commit install`, os hooks passam a ser executados automaticamente em todo `git commit`.
+
+### Hooks configurados
+
+| Hook | Versão | O que faz |
+|---|---|---|
+| `ruff` | v0.2.1 | Linting + correção automática de imports e estilo |
+| `black` | 24.1.1 | Formatação do código (PEP 8 + opinionated) |
+| `mypy` | v1.8.0 | Checagem estática de tipos |
+| `trailing-whitespace` | pre-commit-hooks | Remove espaços no final de linhas |
+| `end-of-file-fixer` | pre-commit-hooks | Garante newline no final de cada arquivo |
+| `check-yaml` | pre-commit-hooks | Valida sintaxe de arquivos YAML |
+| `check-json` | pre-commit-hooks | Valida sintaxe de arquivos JSON |
+| `check-merge-conflict` | pre-commit-hooks | Detecta marcadores de conflito esquecidos |
+| `debug-statements` | pre-commit-hooks | Detecta `pdb`, `ipdb`, `breakpoint()` acidentais |
+
+### Fluxo de uso
+
+```bash
+# Commit normal — hooks rodam automaticamente
+git add .
+git commit -m "feat: adicionar endpoint de processos"
+# → ruff verifica e corrige imports
+# → black formata o código
+# → mypy checa tipos
+# → hooks gerais verificam YAML, JSON, whitespace
+# Se tudo passar → commit criado
+# Se algum hook falhar → commit abortado, você corrige e tenta novamente
+
+# Rodar hooks manualmente (sem fazer commit)
+pre-commit run --all-files
+
+# Rodar apenas um hook específico
+pre-commit run ruff --all-files
+pre-commit run black --all-files
+pre-commit run mypy --all-files
+
+# Pular hooks em situação de emergência (não recomendado)
+git commit --no-verify -m "mensagem"
+```
+
+### Relação com o Makefile
+
+Os hooks do pre-commit e os targets do Makefile fazem a mesma coisa — a diferença é o momento:
+
+| Ferramenta | Quando roda | Uso ideal |
+|---|---|---|
+| `pre-commit` | Automático no `git commit` | Barreira final antes de commitar |
+| `make lint` | Manual, quando quiser | Durante desenvolvimento, para checar rapidamente |
+| `make format` | Manual, quando quiser | Para formatar antes do commit |
+| `make lint-check` | CI/CD pipeline | Verificação sem correção automática |
+
+> **Dica:** O `ruff` com `--fix` (configurado no hook) corrige automaticamente boa parte dos problemas de lint. Se o hook falhar e corrigir arquivos, basta re-adicionar os arquivos corrigidos (`git add .`) e tentar o commit novamente.
+
+---
+
+## 12. Entry Point Uvicorn (Fase 0.6)
+
+### O que foi criado
+
+Para o servidor Uvicorn conseguir importar a aplicação, dois arquivos são necessários:
+
+**`feature_1_ia_personalizada/__init__.py`** — marca o diretório como pacote Python.
+
+**`feature_1_ia_personalizada/api/app.py`** — define a instância `app` do FastAPI que o Uvicorn importa:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI(
+    title="Concierge Jurídico Digital",
+    description="IA conversacional para escritórios de advocacia",
+    version="0.1.0",
+)
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+```
+
+> **Fase 2** expandirá este arquivo com: routers, middlewares (CORS, auth, rate limit), Sentry, Prometheus e event handlers de startup/shutdown.
+
+### Comando de execução
+
+```bash
+# Via Makefile (recomendado)
+make dev
+
+# Equivalente manual
+uvicorn feature_1_ia_personalizada.api.app:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --reload \
+    --log-level info
+```
+
+### Por que underscores no nome da pasta?
+
+O Python exige que nomes de pacotes (pastas importáveis) usem **underscores**, não hífens.
+
+```bash
+# ❌ Inválido como módulo Python
+feature-1-ia-personalizada/
+
+# ✅ Válido — importável normalmente
+feature_1_ia_personalizada/
+```
+
+O nome com hífens causaria `ModuleNotFoundError` ao tentar importar `feature-1-ia-personalizada.api.app`.
+
+### Verificar que o import funciona
+
+Com o virtualenv ativado e as deps instaladas:
+
+```bash
+python -c "from feature_1_ia_personalizada.api.app import app; print('Entry point OK:', app.title)"
+# → Entry point OK: Concierge Jurídico Digital
+```
+
+---
+
+> **Última atualização:** Fevereiro 2026 — **Fase 0 completa** (0.1 ✅ | 0.2 ✅ | 0.3 ✅ | 0.4 ✅ | 0.5 ✅ | 0.6 ✅)
 >
-> **Próxima fase:** [0.2 — Banco de Dados Local](./database_setup.md) (configurar Alembic + criar migration inicial)
+> **Próxima etapa:** Fase 1 — Shared (models, schemas, security, utils, database)
