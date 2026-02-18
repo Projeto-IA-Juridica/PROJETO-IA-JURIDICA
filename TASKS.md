@@ -40,6 +40,8 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   SENTRY_DSN=...
   CELERY_BROKER_URL=redis://localhost:6379/1
   CELERY_RESULT_BACKEND=redis://localhost:6379/2
+  GOOGLE_SHEETS_ID=...
+  GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
   ```
 - [ ] **Criar `docker-compose.yml`** em `infrastructure/docker/` — serviços: postgres:16, redis:7, evolution-api, celery-worker, celery-beat, flower, app-f1
 - [ ] **Criar `Dockerfile.f1`** em `infrastructure/docker/` — imagem Python 3.12-slim, instala dependências + ffmpeg, copia código, expõe porta 8000
@@ -92,6 +94,9 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   aiohttp==3.9.3
   # Audio
   pydub==0.25.1
+  # Google Sheets
+  google-api-python-client==2.116.0
+  google-auth==2.27.0
   # (ffmpeg instalado via apt no Dockerfile)
   ```
 - [ ] **Criar virtualenv** e instalar: `pip install -r requirements-f1.txt`
@@ -116,6 +121,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   feature_1_ia_personalizada/services/ai/__init__.py
   feature_1_ia_personalizada/services/messaging/__init__.py
   feature_1_ia_personalizada/services/legal_data/__init__.py
+  feature_1_ia_personalizada/services/integrations/__init__.py
   feature_1_ia_personalizada/workers/__init__.py
   feature_1_ia_personalizada/tests/__init__.py
   feature_1_ia_personalizada/tests/unit/__init__.py
@@ -159,6 +165,8 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `SENTRY_DSN: str | None = None`
   - `CELERY_BROKER_URL: str`
   - `CELERY_RESULT_BACKEND: str`
+  - `GOOGLE_SHEETS_ID: str | None = None`
+  - `GOOGLE_CREDENTIALS_PATH: str | None = None`
   - `ENVIRONMENT: str = "development"` (development | staging | production)
   - `LOG_LEVEL: str = "INFO"`
 - [ ] Implementar `model_config` com `env_file = ".env"`
@@ -248,6 +256,10 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `cpf: str` (max 14, not null) — criptografado em repouso
   - `email: str` (max 200, nullable)
   - `telefone_whatsapp: str` (max 20, not null) — formato 5511999999999
+  - `data_nascimento: Date` (nullable) — para mensagens de aniversário
+  - `profissao: str` (max 100, nullable) — para mensagens de datas comemorativas
+  - `empresa_atual: str` (max 200, nullable) — contextualização adicional
+  - `cargo: str` (max 100, nullable) — personalização de mensagens
   - `ativo: bool` (default True)
   - `aceite_lgpd: bool` (default False)
   - `data_aceite_lgpd: datetime` (nullable)
@@ -255,6 +267,8 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Herda `TimestampMixin`, `TenantMixin`
 - [ ] Criar índice composto `(escritorio_id, cpf)` unique
 - [ ] Criar índice em `telefone_whatsapp`
+- [ ] **Criar property `idade`** — calcula idade a partir de `data_nascimento`
+- [ ] **Criar property `e_bancario`** — detecta se profissão contém termos bancários
 
 #### `shared/models/processo.py`
 - [ ] **Criar model `Processo`** (tabela `processos`):
@@ -311,7 +325,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `tempo_resposta_ms: int` (nullable) — latência em milissegundos
   - `satisfacao: int` (nullable) — 1 a 5 (pesquisa NPS)
   - `audio_transcricao: str` (text, nullable) — transcrição do áudio se houver
-  - `metadata_json: JSON` (nullable) — dados extras (ID mensagem WhatsApp, etc)
+  - `metadata_json: JSON` (nullable) — dados extras (ID mensagem WhatsApp, tipo_relacionamento: aniversario | data_comemorativa | check_in)
   - Herda `TimestampMixin`, `TenantMixin`
 - [ ] Criar índice em `(escritorio_id, cliente_id)`
 - [ ] Criar índice em `created_at` — para queries de analytics
@@ -331,10 +345,14 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] `EscritorioList` — resposta paginada (items, total, page, per_page)
 
 #### `shared/schemas/cliente.py`
-- [ ] `ClienteCreate` — nome, cpf, telefone_whatsapp, email (opcional)
+- [ ] `ClienteCreate` — nome, cpf, telefone_whatsapp, email (opcional), data_nascimento (opcional), profissao (opcional), empresa_atual (opcional), cargo (opcional)
 - [ ] `ClienteUpdate` — todos opcionais
-- [ ] `ClienteResponse` — resposta com CPF mascarado (***.***.***-XX)
+- [ ] `ClienteResponse` — resposta com CPF mascarado (***.***.***-XX), inclui idade calculada se data_nascimento presente
 - [ ] `ClienteAceiteLGPD` — schema para registrar aceite LGPD
+- [ ] **Adicionar validador em `ClienteCreate`** para `data_nascimento`:
+  - Não pode ser futura
+  - Cliente deve ser maior de 18 anos
+  - Data não pode ser anterior a 150 anos atrás
 
 #### `shared/schemas/processo.py`
 - [ ] `ProcessoCreate` — numero_cnj, cliente_id, polo_cliente, tipo_acao (opcional)
@@ -748,6 +766,10 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `TEMPLATE_CLIENTE_NAO_ENCONTRADO` — "Olá! Não encontrei seu cadastro..."
   - `TEMPLATE_AGENDAMENTO_CONFIRMADO` — "Consulta agendada com Dr(a). {nome} para {data}"
   - `TEMPLATE_CLIENTE_SEM_PROCESSO` — ⚡ NOVO — "Não encontrei processos vinculados ao seu cadastro..."
+  - `TEMPLATE_ANIVERSARIO` — ⚡ NOVO — "🎉🎂 Feliz Aniversário, {nome}! A equipe do escritório {escritorio} deseja..."
+  - `TEMPLATE_DIA_BANCARIO` — ⚡ NOVO — "💼 Feliz Dia do Bancário! Seu processo está {status_processo}..."
+  - `TEMPLATE_DIA_PROFESSOR` — ⚡ NOVO — "📚 Feliz Dia do Professor!..."
+  - `TEMPLATE_MENSAGEM_TRIMESTRAL` — ⚡ NOVO — "Olá {nome}! Faz {dias} dias desde nosso último contato..."
 
 #### `services/messaging/scheduler.py`
 - [ ] **Criar classe `MessageScheduler`**:
@@ -800,6 +822,26 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 
 ---
 
+### 3.4 `services/integrations/` — Integrações Externas ⚡ NOVA
+
+#### `services/integrations/google_sheets.py`
+- [ ] **Criar classe `GoogleSheetsClient`**:
+  - `__init__(credentials_path, spreadsheet_id)` — inicializa com credenciais service account
+  - `async get_clientes() -> list[dict]` — busca dados da planilha "Clientes" (range A2:I)
+    - Retorna lista de dicts com: id, nome, telefone, cpf, data_nascimento, profissao, empresa, status, ultimo_contato
+    - Parseia data_nascimento do formato DD/MM/YYYY
+    - Pula linhas incompletas
+  - `async get_datas_comemorativas() -> list[dict]` — busca da planilha "Datas" (range A2:D)
+    - Retorna: profissao, dia, mes, nome, template
+  - `async registrar_envio(cliente_id, tipo, sucesso, erro=None)` — registra no log (planilha "Log")
+    - Append em range "Log!A:E"
+    - Campos: cliente_id, tipo, data_envio, sucesso (Sim/Não), erro
+- [ ] Implementar retry com backoff exponencial (3 tentativas)
+- [ ] Timeout de 30 segundos por request
+- [ ] Logar todas as operações com structlog
+
+---
+
 ## FASE 4 — FEATURE 1: WORKERS (Celery)
 
 > Tudo em `feature_1_ia_personalizada/workers/`
@@ -811,12 +853,15 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Broker: Redis (`CELERY_BROKER_URL`)
   - Result backend: Redis (`CELERY_RESULT_BACKEND`)
   - Serializer: JSON
-  - Task routes: definir filas separadas (`monitoramento`, `notificacoes`, `ia`)
+  - Task routes: definir filas separadas (`monitoramento`, `notificacoes`, `ia`, `relacionamento`)
   - Beat schedule:
     - `monitorar-processos`: a cada 6 horas (06h, 12h, 18h, 00h)
     - `enviar-sem-movimentacao`: semanal (segunda, 10h)
     - `pesquisa-satisfacao`: mensal (dia 1, 14h)
     - `limpar-cache-expirado`: diário (03h)
+    - `verificar-aniversarios`: diário (08h)
+    - `verificar-datas-profissoes`: diário (08h30)
+    - `mensagens-trimestrais`: semanal (segunda, 10h)
 
 #### `workers/monitor_processos.py`
 - [ ] **Criar task `monitorar_todos_processos()`**:
@@ -860,6 +905,44 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Executa workflow completo
   - Em caso de erro: envia mensagem genérica + notifica admin
 
+#### `workers/mensagens_relacionamento.py` ⚡ NOVA
+- [ ] **Criar task `verificar_aniversarios_diarios()`** — roda todo dia às 8h:
+  - Buscar clientes do Google Sheets com `GoogleSheetsClient.get_clientes()`
+  - Filtrar clientes com status "Ativo"
+  - Identificar aniversariantes do dia (comparar dia/mês de `data_nascimento` com hoje)
+  - Para cada aniversariante:
+    1. Buscar processo ativo do cliente
+    2. Montar mensagem usando `TEMPLATE_ANIVERSARIO`
+    3. Enviar via `WhatsAppService`
+    4. Registrar envio no Google Sheets log
+    5. Salvar interação no banco com `metadata_json: {tipo_relacionamento: "aniversario"}`
+  - Rate limit: processar em batches de 10
+  - Timeout: 15 segundos por cliente
+
+- [ ] **Criar task `verificar_datas_comemorativas()`** — roda todo dia às 8h30:
+  - Buscar datas comemorativas do Google Sheets
+  - Identificar quais profissões fazem aniversário hoje
+  - Para cada profissão:
+    1. Buscar clientes com aquela profissão (filtro case-insensitive)
+    2. Para cada cliente:
+       - Buscar processo ativo
+       - Montar mensagem usando template apropriado (TEMPLATE_DIA_BANCARIO, etc)
+       - Enviar via WhatsAppService
+       - Registrar envio no log
+       - Salvar interação com `metadata_json: {tipo_relacionamento: "data_comemorativa"}`
+
+- [ ] **Criar task `verificar_clientes_sem_contato()`** — roda semanalmente (segunda 10h):
+  - Buscar clientes ativos do Google Sheets
+  - Para cada cliente:
+    1. Verificar última interação no banco de dados
+    2. Se última interação > 90 dias ou nenhuma interação:
+       - Buscar processo ativo do cliente
+       - Montar mensagem usando `TEMPLATE_MENSAGEM_TRIMESTRAL`
+       - Enviar via WhatsAppService
+       - Registrar envio
+       - Salvar interação com `metadata_json: {tipo_relacionamento: "check_in"}`
+  - Limite: máximo 10 clientes sem contato por execução (evitar spam)
+
 #### Refatoração do Webhook ⚡ NOVA
 - [ ] **Refatorar `webhook_whatsapp.py`** para usar Celery:
   - Substituir chamada síncrona ao orchestrator por `processar_mensagem_recebida.delay()`
@@ -889,6 +972,42 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
     "quando_perguntam_conselho": "Entendo sua dúvida! Porém, como assistente digital, não posso dar orientações jurídicas..."
   }
   ```
+
+#### `data/knowledge_base/datas_comemorativas.json` ⚡ NOVA
+- [ ] Criar JSON com datas profissionais pré-configuradas:
+  ```json
+  [
+    {
+      "profissao": "Bancário",
+      "dia": 28,
+      "mes": 8,
+      "nome": "Dia do Bancário",
+      "template": "DIA_BANCARIO"
+    },
+    {
+      "profissao": "Professor",
+      "dia": 15,
+      "mes": 10,
+      "nome": "Dia do Professor",
+      "template": "DIA_PROFESSOR"
+    },
+    {
+      "profissao": "Advogado",
+      "dia": 11,
+      "mes": 8,
+      "nome": "Dia do Advogado",
+      "template": "DIA_ADVOGADO"
+    },
+    {
+      "profissao": "Médico",
+      "dia": 18,
+      "mes": 10,
+      "nome": "Dia do Médico",
+      "template": "DIA_MEDICO"
+    }
+  ]
+  ```
+  - Total de ~11 profissões pré-configuradas
 
 #### `data/termos_juridicos/traducoes.json`
 - [ ] Criar JSON com **50 termos** iniciais (MVP) e traduções — formato:
@@ -986,6 +1105,15 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Testar rate limit: 5ª mensagem do dia → envia; 6ª → rejeita (exceto resposta a pergunta)
 - [ ] Testar `enviar_boas_vindas` → mensagem contém disclaimer OAB
 
+#### `test_google_sheets.py` ⚡ NOVA
+- [ ] Testar `get_clientes()` com mock — retorna lista de dicts
+- [ ] Testar parse de data DD/MM/YYYY → objeto date correto
+- [ ] Testar pular linhas incompletas (< 8 colunas)
+- [ ] Testar `get_datas_comemorativas()` — retorna lista com profissão, dia, mês
+- [ ] Testar `registrar_envio()` — append no Google Sheets
+- [ ] Testar retry em caso de erro de API
+- [ ] Testar timeout (30s)
+
 ### 6.2 Testes de Integração (`tests/integration/`)
 
 #### `test_whatsapp_flow.py`
@@ -1000,6 +1128,21 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Testar worker: processo sem novidade → nenhuma notificação
 - [ ] Testar fallback: Jusbrasil down → DataJud chamado
 - [ ] Testar rate limit: não enviar mais de 5 mensagens/dia para o mesmo cliente
+
+#### `test_mensagens_relacionamento.py` ⚡ NOVA
+- [ ] Testar `verificar_aniversarios_diarios()`:
+  - Mock Google Sheets retorna 2 clientes: 1 aniversariante, 1 não
+  - Verificar que apenas aniversariante recebe mensagem
+  - Verificar que log é registrado no Sheets
+  - Verificar que interação é salva no banco com metadata correto
+- [ ] Testar `verificar_datas_comemorativas()`:
+  - Hoje é Dia do Bancário (28/08)
+  - Mock retorna 3 clientes: 2 bancários, 1 professor
+  - Verificar que apenas bancários recebem mensagem
+- [ ] Testar `verificar_clientes_sem_contato()`:
+  - Cliente com última interação há 95 dias → recebe mensagem
+  - Cliente com última interação há 50 dias → não recebe
+  - Cliente sem interação → recebe
 
 #### `test_auth_flow.py` ⚡ NOVO
 - [ ] Testar login com credenciais válidas → retorna tokens
@@ -1019,6 +1162,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `mock_claude` — mock do ClaudeClient
   - `mock_evolution` — mock do EvolutionClient
   - `mock_jusbrasil` — mock do JusbrasilClient
+  - `mock_google_sheets` — ⚡ NOVA — mock do GoogleSheetsClient
   - `escritorio_factory` — cria escritório de teste
   - `cliente_factory` — cria cliente de teste
   - `processo_factory` — cria processo de teste
@@ -1041,12 +1185,14 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - `Counter: ia_requests_total` (labels: intencao, sucesso)
   - `Counter: ia_errors_total` (labels: tipo_erro)
   - `Counter: ia_fallback_used_total` — ⚡ NOVO — conta vezes que fallback foi ativado
+  - `Counter: mensagens_relacionamento_enviadas_total` — ⚡ NOVA (labels: tipo=aniversario|data_comemorativa|check_in)
   - `Histogram: ia_response_time_seconds`
   - `Histogram: webhook_processing_time_seconds`
   - `Gauge: processos_monitorados_total`
   - `Counter: ia_tokens_consumed_total` (labels: tipo=input|output)
   - `Counter: jusbrasil_requests_total` (labels: endpoint, status)
   - `Counter: fact_check_corrections_total`
+  - `Counter: google_sheets_requests_total` — ⚡ NOVA (labels: operacao=get|append, sucesso)
 
 ### 7.2 Logging Estruturado
 
@@ -1059,6 +1205,8 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Toda consulta Jusbrasil
   - Todos os erros com stack trace
   - Todo uso de fallback (quando Claude está fora)
+  - ⚡ NOVO: Toda mensagem de relacionamento enviada (aniversário, data comemorativa, check-in)
+  - ⚡ NOVO: Toda operação Google Sheets (sucesso/falha, tempo)
 
 ### 7.3 Health Checks Detalhados
 
@@ -1069,6 +1217,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Conectividade Claude API (HEAD)
   - Conectividade Evolution API (status da instância)
   - Status workers Celery
+  - ⚡ NOVO: Conectividade Google Sheets API (verificar se consegue ler planilha)
 
 ---
 
@@ -1093,6 +1242,17 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 #### `scripts/setup/seed_data.py`
 - [ ] Popula dados de demonstração
 
+#### `scripts/migration/sync_sheets_to_db.py` ⚡ NOVA
+- [ ] **Migrar dados do Google Sheets para o banco de dados**:
+  - Buscar todos os clientes do Google Sheets
+  - Para cada cliente:
+    1. Verificar se já existe no banco (por CPF + escritorio_id)
+    2. Se não existe: criar registro em `clientes`
+    3. Se existe: atualizar campos (data_nascimento, profissao, empresa_atual, cargo)
+  - Logar estatísticas: total processado, novos criados, atualizados, erros
+  - Modo dry-run opcional (--dry-run flag)
+  - Validar dados antes de inserir (CPF, telefone, data_nascimento)
+
 #### `scripts/monitoring/health_check.py`
 - [ ] Script standalone que verifica saúde de todos os serviços
 - [ ] Retorna exit code 0 (OK) ou 1 (falha) — usável em CI/CD
@@ -1104,25 +1264,30 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 | Fase | Prioridade | Estimativa | Descrição |
 |------|-----------|------------|-----------|
 | 0    | 🔴 Crítica | 1-2 dias   | Setup projeto, Docker, .env, deps, __init__.py |
-| 1    | 🔴 Crítica | 3-4 dias   | Shared: models, schemas, security, utils, DB, logging base |
+| 1    | 🔴 Crítica | 3-4 dias   | Shared: models (+ novos campos Cliente), schemas, security, utils, DB, logging base |
 | 2    | 🔴 Crítica | 3-4 dias   | API: auth, webhook, processos, chat, health + middleware |
 | 3.1  | 🔴 Crítica | **6-7 dias** | Services AI: orchestrator (6 nós), claude_client, prompts, memory, fact_checker, fallbacks |
-| 3.2  | 🔴 Crítica | 2-3 dias   | Services Messaging: evolution_client, whatsapp, templates |
+| 3.2  | 🔴 Crítica | 2-3 dias   | Services Messaging: evolution_client, whatsapp, templates (+ novos templates) |
 | 3.3  | 🟡 Alta    | 2-3 dias   | Services Legal Data: jusbrasil, datajud, cache |
-| 4    | 🟡 Alta    | 2-3 dias   | Workers Celery: monitoramento, notificações, refatoração webhook |
-| 5    | 🟢 Média   | 1 dia      | Dados estáticos: disclaimers, 50 termos jurídicos |
-| 6    | 🟡 Alta    | **4-5 dias** | Testes unitários (12 arquivos) + integração (3 fluxos) |
+| 3.4  | 🟢 Média   | **1 dia**  | ⚡ NOVA: Services Integrations: google_sheets.py |
+| 4    | 🟡 Alta    | **3-4 dias** | Workers Celery: monitoramento, notificações, mensagens_relacionamento, refatoração webhook |
+| 5    | 🟢 Média   | 1 dia      | Dados estáticos: disclaimers, 50 termos, datas_comemorativas.json |
+| 6    | 🟡 Alta    | **5-6 dias** | Testes unitários (13 arquivos) + integração (4 fluxos) |
 | 7    | 🟢 Média   | 1-2 dias   | Monitoramento: Prometheus, logging expandido, health detalhado |
-| 8    | 🟡 Alta    | 1-2 dias   | Deploy Docker local completo |
-| **TOTAL** | | **~28-35 dias** | **Para 1 desenvolvedor senior full-time** |
+| 8    | 🟡 Alta    | 1-2 dias   | Deploy Docker local completo + script migração Sheets→DB |
+| **TOTAL** | | **~30-38 dias** | **Para 1 desenvolvedor senior full-time** |
 
 ---
 
-> **Nota:** Estimativa revisada de 22-30 → **28-35 dias** após validação. A Fase 3.1 (orchestrator LangGraph com 6 nós + fallbacks + error handling) é a mais complexa e foi reestimada de 4-5 → 6-7 dias. Com 2 devs, as fases podem ser paralelizadas (ex: um faz Shared/API enquanto o outro faz Services AI). A ordem das fases é sequencial por dependência — não é possível fazer a Fase 3 sem a Fase 1 completa.
+> **Nota:** Estimativa atualizada de 28-35 → **30-38 dias** após adicionar Google Sheets + workers de relacionamento. A Fase 3.4 (Google Sheets) adiciona 1 dia, a Fase 4 (workers) aumentou de 2-3 → 3-4 dias, e a Fase 6 (testes) aumentou de 4-5 → 5-6 dias. Com 2 devs, as fases podem ser paralelizadas (ex: um faz Shared/API enquanto o outro faz Services AI). A ordem das fases é sequencial por dependência — não é possível fazer a Fase 3 sem a Fase 1 completa.
 >
 > **Dependências críticas entre fases:**
 > - Fase 2 (API) depende de Fase 1 (Shared) completa
 > - Fase 2 `POST /processos` depende de Fase 3.3 `jusbrasil_client.py` (usar stub temporário)
 > - Fase 2 webhook depende de Fase 4 para processamento assíncrono (usar síncrono temporário)
 > - Fase 3.1 orchestrator depende de Fase 3.2 (messaging) e 3.3 (legal_data)
-> - Fase 4 (Workers) pode ser feita em paralelo com Fase 3.2/3.3
+> - Fase 3.4 (Google Sheets) é independente, pode ser feita em paralelo com 3.1-3.3
+> - Fase 4 (Workers) pode ser feita em paralelo com Fase 3.2/3.3, mas workers de relacionamento dependem de 3.4
+
+**Última atualização:** Fevereiro 2026  
+**Versão:** 2.1 (+ Google Sheets Integration)
