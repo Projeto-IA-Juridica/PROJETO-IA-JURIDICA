@@ -168,6 +168,16 @@ select = ["E", "W", "F", "I", "B", "C4", "UP"]
 
 O ruff verifica: erros de estilo (E/W), bugs comuns (F/B), imports desorganizados (I), código desatualizado (UP) e comprehensions ineficientes (C4).
 
+#### `[build-system]` — Backend de build
+
+```toml
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+```
+
+> **Correção aplicada (setup inicial):** O valor original `setuptools.backends.legacy:build` não existe no setuptools e causava `BackendUnavailable` ao rodar `pip install -e ".[dev]"`. O backend padrão e correto é `setuptools.build_meta`.
+
 ---
 
 ## 4. `Makefile`
@@ -626,6 +636,7 @@ Contém as dependências **compartilhadas** entre todas as features — tudo que
 |---|---|---|
 | `fastapi` | 0.109.0 | Framework web assíncrono |
 | `uvicorn[standard]` | 0.27.0 | Servidor ASGI (com websockets e http/2) |
+| `python-multipart` | 0.0.9 | Obrigatório para FastAPI processar `Form` data e upload de arquivos (PDFs) |
 | `sqlalchemy` | 2.0.25 | ORM — modelos e queries |
 | `asyncpg` | 0.29.0 | Driver async PostgreSQL (obrigatório com `create_async_engine`) |
 | `alembic` | 1.13.1 | Migrations do banco |
@@ -636,9 +647,11 @@ Contém as dependências **compartilhadas** entre todas as features — tudo que
 | `httpx` | 0.26.0 | Cliente HTTP async (chamadas a APIs externas) |
 | `pydantic` | 2.5.0 | Validação de dados |
 | `pydantic-settings` | 2.1.0 | `BaseSettings` para variáveis de ambiente (separado do pydantic desde v2) |
+| `email-validator` | 2.1.0 | Obrigatório para usar `EmailStr` no Pydantic |
 | `prometheus-client` | 0.19.0 | Métricas expostas no `/metrics` |
 | `sentry-sdk[fastapi]` | 1.40.0 | Rastreamento de erros em produção |
 | `structlog` | 24.1.0 | Logging estruturado (JSON em prod, colorido em dev) |
+| `python-dotenv` | 1.0.0 | Carrega `.env` no Alembic (`env.py`) antes das migrations |
 
 ---
 
@@ -654,10 +667,14 @@ Contém as dependências **específicas da Feature 1** (IA + WhatsApp + Celery).
 
 | Pacote | Versão | Para quê |
 |---|---|---|
-| `langchain` | 0.1.0 | Integração de LLMs e ferramentas |
-| `langgraph` | 0.0.20 | Workflow stateful da IA (orquestrador) |
-| `anthropic` | 0.18.0 | Cliente Claude API (IA conversacional) |
-| `openai` | 1.12.0 | Cliente Whisper API (transcrição de áudios) |
+| `langchain` | 0.2.16 | Integração de LLMs e ferramentas |
+| `langgraph` | 0.2.28 | Workflow stateful da IA (orquestrador) |
+| `anthropic` | 0.34.2 | Cliente Claude API (IA conversacional) |
+| `openai` | 1.50.2 | Cliente Whisper API (transcrição de áudios) |
+| `langchain-anthropic` | 0.1.23 | Integração nativa LangChain + Claude (`ChatAnthropic`) |
+| `langchain-openai` | 0.1.25 | Integração nativa LangChain + OpenAI (`ChatOpenAI`) |
+| `langchain-community` | 0.2.16 | Ferramentas de busca, loaders de docs e utilitários do agente |
+| `tiktoken` | 0.7.0 | Contagem de tokens para gerenciar contexto e memória |
 | `celery` | 5.3.6 | Workers assíncronos (monitoramento, notificações) |
 | `flower` | 2.0.1 | UI web de monitoramento do Celery |
 | `aiohttp` | 3.9.3 | HTTP async (para workers Celery) |
@@ -668,6 +685,8 @@ Contém as dependências **específicas da Feature 1** (IA + WhatsApp + Celery).
 > **Nota sobre `pydub`:** requer o binário `ffmpeg` instalado no sistema operacional.
 > - macOS: `brew install ffmpeg`
 > - Docker: já incluído no `Dockerfile.f1` via `apt install ffmpeg`
+
+> **Versões do ecossistema LangChain:** As versões originais (`langchain==0.1.0`, `langgraph==0.0.20`, `anthropic==0.18.0`) causavam conflito de dependência com `langsmith` — `langchain 0.1.x` exige `langsmith<0.1`, mas `langchain-anthropic` e `langchain-community` exigem `langsmith>=0.1.0`. A solução foi migrar para `langchain>=0.2.0`, que usa `langsmith>=0.1.0` de forma consistente em todo o ecossistema.
 
 ---
 
@@ -788,6 +807,8 @@ make dev
 | `JWT_EXPIRATION_MINUTES` | Não | `60` | Validade do access token |
 | `ENCRYPTION_KEY` | **Sim** | — | Chave Fernet (AES-256) para CPFs |
 | `SENTRY_DSN` | Não | `None` | DSN Sentry (deixar vazio em dev) |
+| `GOOGLE_SHEETS_ID` | Não | `None` | ID da planilha Google Sheets (integração opcional no MVP local) |
+| `GOOGLE_CREDENTIALS_PATH` | Não | `None` | Caminho para JSON de service account Google |
 
 ---
 
@@ -886,7 +907,8 @@ app = FastAPI(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    """Health check básico — expande na Fase 2."""
+    return {"status": "ok", "service": "concierge-juridico-f1"}
 ```
 
 > **Fase 2** expandirá este arquivo com: routers, middlewares (CORS, auth, rate limit), Sentry, Prometheus e event handlers de startup/shutdown.
@@ -931,5 +953,10 @@ python -c "from feature_1_ia_personalizada.api.app import app; print('Entry poin
 ---
 
 > **Última atualização:** Fevereiro 2026 — **Fase 0 completa** (0.1 ✅ | 0.2 ✅ | 0.3 ✅ | 0.4 ✅ | 0.5 ✅ | 0.6 ✅)
+>
+> **Correções aplicadas no setup real (fevereiro 2026):**
+> - `pyproject.toml`: build-backend corrigido de `setuptools.backends.legacy:build` → `setuptools.build_meta`
+> - `requirements-base.txt`: adicionados `python-multipart`, `email-validator` e `python-dotenv` que estavam faltando
+> - `requirements-f1.txt`: ecossistema LangChain migrado para `0.2.x` — versões originais (`langchain==0.1.0`, etc.) causavam conflito irresolvível com `langsmith`; adicionados `langchain-anthropic`, `langchain-openai`, `langchain-community` e `tiktoken` que estavam ausentes
 >
 > **Próxima etapa:** Fase 1 — Shared (models, schemas, security, utils, database)
