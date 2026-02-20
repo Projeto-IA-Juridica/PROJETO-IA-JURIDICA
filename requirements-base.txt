@@ -38,3 +38,7 @@ structlog==24.1.0
 
 # Variáveis de ambiente
 python-dotenv==1.0.0      # Obrigatório para o Alembic (env.py) carregar .env antes das migrations
+
+
+pydantic>=2.0
+pydantic-settings>=2.0
