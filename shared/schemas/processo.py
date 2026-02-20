@@ -11,12 +11,8 @@ Schemas Pydantic para o recurso Processo Judicial.
 
 Formato CNJ obrigatório: NNNNNNN-DD.AAAA.J.TT.OOOO
 Exemplo: 0001234-56.2024.8.26.0100
-
-Nota: _validar_numero_cnj / _validar_digito_cnj estão inline aqui por
-enquanto. Quando shared/utils/validators.py for criado, migrar para lá.
 """
 
-import re
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -24,46 +20,16 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from shared.schemas.response import PaginatedResponse
+from shared.utils.validators import validar_numero_processo
 
 # ---------------------------------------------------------------------------
-# Helpers de validação (inline — migrar para shared/utils/validators.py)
+# Constantes de schema (específicas deste recurso)
 # ---------------------------------------------------------------------------
 
 _POLOS_VALIDOS = {"autor", "reu", "terceiro"}
 _FREQUENCIAS_VALIDAS = {"diario", "semanal"}
 # Nota: status é gerenciado pelo sistema (não validado aqui).
 # Valores possíveis: ativo | arquivado | suspenso | encerrado
-
-# CNJ: NNNNNNN-DD.AAAA.J.TT.OOOO
-# Segmento de justiça (J): 1-9  |  Tribunal (TT): 01-99  |  Origem (OOOO): 0001-9999
-_CNJ_REGEX = re.compile(r"^\d{7}-\d{2}\.\d{4}\.[1-9]\.\d{2}\.\d{4}$")
-
-
-def _validar_formato_cnj(numero: str) -> bool:
-    """Valida apenas a estrutura do número CNJ (regex)."""
-    return bool(_CNJ_REGEX.match(numero.strip()))
-
-
-def _validar_digito_cnj(numero: str) -> bool:
-    """
-    Valida o dígito verificador do número CNJ usando ISO 7064 MOD 97-10.
-
-    Algoritmo (Resolução CNJ nº 65/2008):
-    1. Extrair componentes: NNNNNNN, DD, AAAA, J, TT, OOOO
-    2. Formar base: NNNNNNN + AAAA + J + TT + OOOO  (sem DD)
-    3. Calcular: DD_esperado = 98 - (int(base + "00") % 97)
-    4. Comparar DD_esperado com DD extraído do número
-    """
-    partes = re.split(r"[-.]", numero.strip())
-    if len(partes) != 6:
-        return False
-
-    nnnnnnn, dd_str, aaaa, j, tt, oooo = partes
-    base = nnnnnnn + aaaa + j + tt + oooo
-    dd_esperado = 98 - (int(base + "00") % 97)
-
-    return int(dd_str) == dd_esperado
-
 
 # ---------------------------------------------------------------------------
 # Schemas auxiliares
@@ -119,22 +85,16 @@ class ProcessoCreate(BaseModel):
     @classmethod
     def validar_numero_cnj(cls, v: str) -> str:
         normalizado = v.strip()
-        if not _validar_formato_cnj(normalizado):
+        if not validar_numero_processo(normalizado):
             raise ValueError(
                 "Número de processo inválido — formato esperado: NNNNNNN-DD.AAAA.J.TT.OOOO"
-                " (ex: 0001234-56.2024.8.26.0100)"
-            )
-        if not _validar_digito_cnj(normalizado):
-            raise ValueError(
-                "Número de processo inválido — dígito verificador incorreto (DD)"
+                " (ex: 0001234-56.2024.8.26.0100) ou dígito verificador incorreto"
             )
         return normalizado
 
     @field_validator("polo_cliente")
     @classmethod
     def validar_polo(cls, v: str) -> str:
-        # Nota: string vazia ("") passa pelo `if v is None` mas falha no `not in`
-        # levantando ValueError corretamente — comportamento intencional
         normalizado = v.lower().strip()
         if normalizado not in _POLOS_VALIDOS:
             raise ValueError(
@@ -161,7 +121,6 @@ class ProcessoUpdate(BaseModel):
     def validar_polo(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        # String vazia falha corretamente no `not in` — intencional
         normalizado = v.lower().strip()
         if normalizado not in _POLOS_VALIDOS:
             raise ValueError(

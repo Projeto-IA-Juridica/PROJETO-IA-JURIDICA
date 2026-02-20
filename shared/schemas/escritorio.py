@@ -7,76 +7,25 @@ Schemas Pydantic para o recurso Escritório.
 - EscritorioUpdate  → atualização parcial (PUT/PATCH)
 - EscritorioResponse → retorno da API (sem dados sensíveis internos)
 - EscritorioList    → alias tipado de PaginatedResponse[EscritorioResponse]
-
-Nota: as funções _validar_cnpj / _validar_oab / _validar_telefone_br estão
-inline aqui por enquanto. Quando shared/utils/validators.py for criado,
-migrar a lógica para lá e substituir por chamadas diretas.
 """
 
-import re
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from shared.schemas.response import PaginatedResponse
+from shared.utils.validators import (
+    normalizar_cnpj,
+    validar_cnpj,
+    validar_oab,
+    validar_telefone_br,
+)
 
 # ---------------------------------------------------------------------------
-# Helpers de validação (inline — migrar para shared/utils/validators.py)
+# Constantes de schema (específicas deste recurso)
 # ---------------------------------------------------------------------------
 
 _PLANOS_VALIDOS = {"basico", "profissional", "enterprise"}
-
-
-def _validar_cnpj(cnpj: str) -> bool:
-    """Valida CNPJ com algoritmo oficial dos dígitos verificadores."""
-    digits = re.sub(r"[^0-9]", "", cnpj)
-    if len(digits) != 14:
-        return False
-    # Rejeita sequências repetidas (ex: 00000000000000)
-    if digits == digits[0] * 14:
-        return False
-
-    def _calcular_digito(parcial: str, pesos: list[int]) -> int:
-        total = sum(int(d) * p for d, p in zip(parcial, pesos))
-        resto = total % 11
-        return 0 if resto < 2 else 11 - resto
-
-    pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-
-    if int(digits[12]) != _calcular_digito(digits[:12], pesos1):
-        return False
-    if int(digits[13]) != _calcular_digito(digits[:13], pesos2):
-        return False
-    return True
-
-
-def _normalizar_cnpj(cnpj: str) -> str:
-    """Remove formatação e retorna apenas os 14 dígitos."""
-    return re.sub(r"[^0-9]", "", cnpj)
-
-
-_OAB_REGEX = re.compile(r"^[A-Z]{2}\d{4,8}$")
-
-
-def _validar_oab(oab: str) -> bool:
-    """Valida formato OAB: 2 letras maiúsculas de UF + 4 a 8 dígitos."""
-    return bool(_OAB_REGEX.match(oab.upper()))
-
-
-# Aceita formatos: (11) 99999-9999 | 11 99999-9999 | 11999999999 | +5511999999999
-_TEL_REGEX = re.compile(
-    r"^(\+55\s?)?"           # prefixo internacional opcional
-    r"(\(?\d{2}\)?\s?)"     # DDD com ou sem parênteses
-    r"9?\d{4}"               # dígito 9 opcional + 4 dígitos
-    r"[-]?"               # separador opcional
-    r"\d{4}$"                # 4 dígitos finais
-)
-
-
-def _validar_telefone_br(telefone: str) -> bool:
-    return bool(_TEL_REGEX.match(telefone.strip()))
-
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -102,15 +51,15 @@ class EscritorioCreate(BaseModel):
     @field_validator("cnpj")
     @classmethod
     def validar_cnpj(cls, v: str) -> str:
-        if not _validar_cnpj(v):
+        if not validar_cnpj(v):
             raise ValueError("CNPJ inválido — verifique os dígitos verificadores")
-        return _normalizar_cnpj(v)  # armazena só os dígitos
+        return normalizar_cnpj(v)  # armazena só os dígitos
 
     @field_validator("oab_responsavel")
     @classmethod
-    def validar_oab(cls, v: str) -> str:
+    def validar_oab_responsavel(cls, v: str) -> str:
         normalizado = v.upper().strip()
-        if not _validar_oab(normalizado):
+        if not validar_oab(normalizado):
             raise ValueError(
                 "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
             )
@@ -121,7 +70,7 @@ class EscritorioCreate(BaseModel):
     def validar_telefone(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        if not _validar_telefone_br(v):
+        if not validar_telefone_br(v):
             raise ValueError(
                 "Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)"
             )
@@ -148,11 +97,11 @@ class EscritorioUpdate(BaseModel):
 
     @field_validator("oab_responsavel")
     @classmethod
-    def validar_oab(cls, v: str | None) -> str | None:
+    def validar_oab_responsavel(cls, v: str | None) -> str | None:
         if v is None:
             return v
         normalizado = v.upper().strip()
-        if not _validar_oab(normalizado):
+        if not validar_oab(normalizado):
             raise ValueError(
                 "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
             )
@@ -163,7 +112,7 @@ class EscritorioUpdate(BaseModel):
     def validar_telefone(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        if not _validar_telefone_br(v):
+        if not validar_telefone_br(v):
             raise ValueError(
                 "Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)"
             )

@@ -13,9 +13,6 @@ Notas sobre CPF:
   A criptografia (AES-256 Fernet) é responsabilidade da camada de serviço.
 - Em ClienteResponse, o campo cpf_mascarado é populado pelo serviço
   após descriptografar e mascarar (***.***.***-XX).
-
-Nota: _validar_cpf e _validar_telefone_whatsapp estão inline aqui por
-enquanto. Quando shared/utils/validators.py for criado, migrar para lá.
 """
 
 import re
@@ -24,49 +21,13 @@ from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from shared.schemas.response import PaginatedResponse
+from shared.utils.validators import normalizar_cpf, validar_cpf, validar_telefone_whatsapp
 
 # ---------------------------------------------------------------------------
-# Helpers de validação (inline — migrar para shared/utils/validators.py)
+# Constantes de schema (específicas deste recurso)
 # ---------------------------------------------------------------------------
 
 _PREFERENCIAS_HORARIO = {"comercial", "qualquer", "silencioso"}
-
-# WhatsApp BR: 55 + DDD (2 dígitos, primeiro 1-9) + 9 obrigatório + 8 dígitos = 13 total
-# Fixo (8 dígitos sem o 9) é rejeitado — WhatsApp só funciona em celular
-_TEL_WPP_REGEX = re.compile(r"^55[1-9]\d9\d{8}$")
-
-
-def _validar_cpf(cpf: str) -> bool:
-    """Valida CPF com algoritmo oficial dos dígitos verificadores."""
-    digits = re.sub(r"[^0-9]", "", cpf)
-    if len(digits) != 11:
-        return False
-    # Rejeita sequências iguais (ex: 11111111111)
-    if digits == digits[0] * 11:
-        return False
-
-    def _calcular_digito(parcial: str, peso_inicial: int) -> int:
-        total = sum(int(d) * p for d, p in zip(parcial, range(peso_inicial, 1, -1)))
-        resto = total % 11
-        return 0 if resto < 2 else 11 - resto
-
-    if int(digits[9]) != _calcular_digito(digits[:9], 10):
-        return False
-    if int(digits[10]) != _calcular_digito(digits[:10], 11):
-        return False
-    return True
-
-
-def _normalizar_cpf(cpf: str) -> str:
-    """Remove formatação — retorna apenas os 11 dígitos."""
-    return re.sub(r"[^0-9]", "", cpf)
-
-
-def _validar_telefone_whatsapp(telefone: str) -> bool:
-    """Valida formato WhatsApp: 5511999999999 (55 + DDD + número)."""
-    digits = re.sub(r"[^0-9]", "", telefone)
-    return bool(_TEL_WPP_REGEX.match(digits))
-
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -93,15 +54,15 @@ class ClienteCreate(BaseModel):
     @field_validator("cpf")
     @classmethod
     def validar_cpf(cls, v: str) -> str:
-        if not _validar_cpf(v):
+        if not validar_cpf(v):
             raise ValueError("CPF inválido — verifique os dígitos verificadores")
-        return _normalizar_cpf(v)  # armazena sem formatação (antes de criptografar)
+        return normalizar_cpf(v)  # armazena sem formatação (antes de criptografar)
 
     @field_validator("telefone_whatsapp")
     @classmethod
     def validar_telefone_whatsapp(cls, v: str) -> str:
         digits = re.sub(r"[^0-9]", "", v)
-        if not _validar_telefone_whatsapp(digits):
+        if not validar_telefone_whatsapp(digits):
             raise ValueError(
                 "Telefone WhatsApp inválido — formato esperado: 5511999999999"
                 " (55 + DDD + número)"
@@ -151,7 +112,7 @@ class ClienteUpdate(BaseModel):
         if v is None:
             return v
         digits = re.sub(r"[^0-9]", "", v)
-        if not _validar_telefone_whatsapp(digits):
+        if not validar_telefone_whatsapp(digits):
             raise ValueError(
                 "Telefone WhatsApp inválido — formato esperado: 5511999999999"
             )
