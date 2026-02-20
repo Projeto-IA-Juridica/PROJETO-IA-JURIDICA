@@ -10,8 +10,6 @@ Schemas Pydantic para o recurso Usuário (advogados, assistentes, admins).
 
 Roles disponíveis: admin | advogado | assistente | estagiario
 
-Nota: _validar_oab está inline aqui por enquanto.
-Quando shared/utils/validators.py for criado, migrar para lá.
 A validação de força de senha aqui cobre o mínimo necessário —
 políticas mais avançadas (rotação, histórico) são responsabilidade
 da camada de segurança.
@@ -22,19 +20,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from shared.utils.validators import validar_oab
+
 # ---------------------------------------------------------------------------
-# Helpers de validação (inline — migrar para shared/utils/validators.py)
+# Constantes de schema (específicas deste recurso)
 # ---------------------------------------------------------------------------
 
 _ROLES_VALIDAS = {"admin", "advogado", "assistente", "estagiario"}
-
-# OAB: 2 letras (UF) + 4 a 8 dígitos — mesma regra de escritorio.py
-_OAB_REGEX = re.compile(r"^[A-Z]{2}\d{4,8}$")
-
-
-def _validar_oab(oab: str) -> bool:
-    return bool(_OAB_REGEX.match(oab.upper()))
-
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -89,7 +81,7 @@ class UsuarioCreate(BaseModel):
         if v is None:
             return v
         normalizado = v.upper().strip()
-        if not _validar_oab(normalizado):
+        if not validar_oab(normalizado):
             raise ValueError(
                 "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
             )
