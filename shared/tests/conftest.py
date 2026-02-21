@@ -13,6 +13,13 @@ evitando que Settings() falhe por campos obrigatórios ausentes.
 
 import os
 
+from cryptography.fernet import Fernet
+
+# Chave Fernet válida gerada dinamicamente para testes.
+# Fernet exige exatamente 32 bytes em URL-safe base64 (44 chars com padding).
+# NÃO usar em produção — apenas para testes unitários.
+_TEST_FERNET_KEY = Fernet.generate_key().decode()
+
 # Define vars ANTES de qualquer import de módulo de aplicação.
 # os.environ.setdefault preserva valores reais se já existirem (ex: CI com .env).
 _FAKE_ENV = {
@@ -24,7 +31,7 @@ _FAKE_ENV = {
     "EVOLUTION_API_KEY": "test-evolution-key",
     "JUSBRASIL_API_KEY": "test-jusbrasil-key",
     "JWT_SECRET_KEY": "test-jwt-secret-key-for-unit-tests-only",
-    "ENCRYPTION_KEY": "dGVzdC1lbmNyeXB0aW9uLWtleS1mb3ItdGVzdHMh",  # base64 fake
+    "ENCRYPTION_KEY": _TEST_FERNET_KEY,  # chave Fernet real (32 bytes base64url)
     "CELERY_BROKER_URL": "redis://localhost:6379/1",
     "CELERY_RESULT_BACKEND": "redis://localhost:6379/2",
 }

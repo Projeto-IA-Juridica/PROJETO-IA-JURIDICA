@@ -79,8 +79,8 @@ seed: ## Popula banco com dados de desenvolvimento
 create-admin: ## Cria usuário admin interativo
 	$(VENV)/bin/python scripts/setup/create_admin.py
 
-init-db: ## Inicializa banco (migrations + seed)
-	$(MAKE) migrate
+init-db: ## Inicializa banco (migrations + verifica tabelas + seed)
+	$(VENV)/bin/python -m scripts.setup.init_db
 	$(MAKE) seed
 
 # ==============================================================================
