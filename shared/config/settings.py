@@ -1,5 +1,5 @@
 # shared/config/settings.py
-
+#testado
 from typing import Optional, Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
