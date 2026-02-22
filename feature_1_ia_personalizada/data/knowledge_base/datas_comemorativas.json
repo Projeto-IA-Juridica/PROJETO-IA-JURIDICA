@@ -1,0 +1,79 @@
+[
+  {
+    "profissao": "Bancário",
+    "dia": 28,
+    "mes": 8,
+    "nome": "Dia do Bancário",
+    "template": "DIA_BANCARIO"
+  },
+  {
+    "profissao": "Professor",
+    "dia": 15,
+    "mes": 10,
+    "nome": "Dia do Professor",
+    "template": "DIA_PROFESSOR"
+  },
+  {
+    "profissao": "Advogado",
+    "dia": 11,
+    "mes": 8,
+    "nome": "Dia do Advogado",
+    "template": "DIA_ADVOGADO"
+  },
+  {
+    "profissao": "Médico",
+    "dia": 18,
+    "mes": 10,
+    "nome": "Dia do Médico",
+    "template": "DIA_MEDICO"
+  },
+  {
+    "profissao": "Engenheiro",
+    "dia": 11,
+    "mes": 12,
+    "nome": "Dia do Engenheiro",
+    "template": "DIA_ENGENHEIRO"
+  },
+  {
+    "profissao": "Contador",
+    "dia": 22,
+    "mes": 5,
+    "nome": "Dia do Contador",
+    "template": "DIA_CONTADOR"
+  },
+  {
+    "profissao": "Enfermeiro",
+    "dia": 12,
+    "mes": 5,
+    "nome": "Dia do Enfermeiro",
+    "template": "DIA_ENFERMEIRO"
+  },
+  {
+    "profissao": "Farmacêutico",
+    "dia": 20,
+    "mes": 1,
+    "nome": "Dia do Farmacêutico",
+    "template": "DIA_FARMACEUTICO"
+  },
+  {
+    "profissao": "Psicólogo",
+    "dia": 27,
+    "mes": 8,
+    "nome": "Dia do Psicólogo",
+    "template": "DIA_PSICOLOGO"
+  },
+  {
+    "profissao": "Arquiteto",
+    "dia": 15,
+    "mes": 12,
+    "nome": "Dia do Arquiteto",
+    "template": "DIA_ARQUITETO"
+  },
+  {
+    "profissao": "Dentista",
+    "dia": 25,
+    "mes": 10,
+    "nome": "Dia do Dentista",
+    "template": "DIA_DENTISTA"
+  }
+]

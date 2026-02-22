@@ -1,0 +1,210 @@
+{
+  "sentença": {
+    "traducao": "A decisão final do juiz sobre o seu caso em primeira instância. É o momento em que o juiz resolve quem tem razão no processo.",
+    "exemplo": "Depois de meses de audiências e provas, o juiz deu a sentença e decidiu a favor do autor."
+  },
+  "acórdão": {
+    "traducao": "A decisão de um grupo de juízes (desembargadores) nos tribunais superiores, tomada em conjunto. É como a sentença, mas em segunda instância.",
+    "exemplo": "O tribunal analisou o recurso e o acórdão manteve a decisão original do juiz de primeira instância."
+  },
+  "agravo de instrumento": {
+    "traducao": "Um recurso usado para contestar uma decisão do juiz que não encerra o processo, como a negativa de um pedido urgente.",
+    "exemplo": "O advogado entrou com agravo de instrumento porque o juiz negou o pedido de liminar."
+  },
+  "apelação": {
+    "traducao": "O recurso principal para contestar uma sentença com a qual você não concorda. É apresentado após a decisão final do juiz.",
+    "exemplo": "Como perdemos em primeira instância, o advogado entrou com apelação no tribunal."
+  },
+  "tutela antecipada": {
+    "traducao": "Uma decisão do juiz que concede, de forma provisória, o que você está pedindo no processo antes do julgamento final, quando há urgência.",
+    "exemplo": "A cliente conseguiu tutela antecipada para retomar o imóvel enquanto o processo principal ainda estava em andamento."
+  },
+  "tutela de urgência": {
+    "traducao": "Pedido de proteção imediata ao juiz, usado quando a demora do processo pode causar um dano que não pode ser reparado depois.",
+    "exemplo": "Pedimos tutela de urgência para bloquear a conta do devedor antes que ele transferisse todo o dinheiro."
+  },
+  "liminar": {
+    "traducao": "Uma decisão provisória e rápida do juiz, tomada no início do processo ou sem ouvir a outra parte, para evitar um dano urgente.",
+    "exemplo": "O juiz concedeu a liminar e a empresa teve que parar de usar a marca imediatamente."
+  },
+  "citação": {
+    "traducao": "O ato oficial de informar ao réu (a outra parte) que existe um processo contra ele e que ele tem um prazo para se defender.",
+    "exemplo": "O réu foi citado por carta e tem 15 dias para apresentar sua defesa."
+  },
+  "intimação": {
+    "traducao": "Aviso oficial do tribunal para que uma das partes do processo faça algo: apresentar um documento, comparecer a uma audiência ou cumprir uma decisão.",
+    "exemplo": "Recebemos uma intimação para apresentar os documentos do contrato em até 10 dias."
+  },
+  "contestação": {
+    "traducao": "A defesa apresentada pelo réu (a parte processada) em resposta ao que o autor pediu. É a oportunidade de contar a sua versão da história.",
+    "exemplo": "A empresa apresentou sua contestação negando todos os pedidos feitos pelo autor."
+  },
+  "petição inicial": {
+    "traducao": "O documento escrito pelo advogado para dar início ao processo. É onde são explicados os fatos, os pedidos e os fundamentos legais da ação.",
+    "exemplo": "O advogado redigiu a petição inicial narrando tudo que aconteceu e pedindo a indenização."
+  },
+  "despacho": {
+    "traducao": "Uma decisão simples do juiz para dar andamento ao processo, como ordenar a citação do réu ou pedir um documento. Não resolve o mérito do caso.",
+    "exemplo": "O juiz proferiu despacho determinando que o autor completasse seu cadastro no sistema."
+  },
+  "decisão interlocutória": {
+    "traducao": "Uma decisão do juiz durante o processo que resolve uma questão importante, mas não encerra o caso. É mais importante que um despacho, mas menos que uma sentença.",
+    "exemplo": "O juiz proferiu decisão interlocutória rejeitando o pedido de tutela de urgência."
+  },
+  "embargos de declaração": {
+    "traducao": "Um recurso simples para pedir ao juiz que esclareça pontos obscuros, contraditórios ou que ficaram sem resposta na sentença.",
+    "exemplo": "Como a sentença não mencionou os juros de mora, entramos com embargos de declaração para que o juiz esclarecesse."
+  },
+  "habeas corpus": {
+    "traducao": "Um instrumento jurídico usado para proteger a liberdade de uma pessoa que está presa ou ameaçada de ser presa de forma ilegal.",
+    "exemplo": "O advogado impetrou habeas corpus para libertar o cliente que havia sido preso sem mandado judicial."
+  },
+  "mandado de segurança": {
+    "traducao": "Uma ação usada para proteger um direito líquido e certo que está sendo violado por uma autoridade pública (governo, órgão, empresa pública).",
+    "exemplo": "A empresa entrou com mandado de segurança contra a decisão da prefeitura que cassou seu alvará."
+  },
+  "penhora": {
+    "traducao": "O bloqueio de bens do devedor (dinheiro em conta, imóvel, veículo) para garantir o pagamento da dívida reconhecida pelo juiz.",
+    "exemplo": "Como o réu não pagou, o juiz determinou a penhora do veículo registrado em seu nome."
+  },
+  "execução": {
+    "traducao": "A fase do processo onde se busca efetivar na prática o que foi decidido pelo juiz. Se o devedor não paga voluntariamente, o juiz usa o poder do Estado para forçar o cumprimento.",
+    "exemplo": "Após a sentença favorável, abrimos a fase de execução para receber os valores devidos."
+  },
+  "trânsito em julgado": {
+    "traducao": "O momento em que uma decisão judicial se torna definitiva e não pode mais ser contestada por recursos. A decisão virou 'lei entre as partes'.",
+    "exemplo": "Com o trânsito em julgado, a sentença é irrecorrível e podemos iniciar a execução."
+  },
+  "coisa julgada": {
+    "traducao": "A qualidade de uma decisão que transitou em julgado. Significa que o assunto já foi decidido pela Justiça e não pode ser discutido novamente.",
+    "exemplo": "O advogado da outra parte tentou abrir um novo processo, mas o juiz extinguiu por coisa julgada."
+  },
+  "prescrição": {
+    "traducao": "A perda do direito de entrar com um processo porque o prazo legal para fazer isso já expirou. Cada tipo de ação tem um prazo diferente na lei.",
+    "exemplo": "Como passaram mais de 3 anos sem que o credor cobrasse, a dívida prescreveu."
+  },
+  "decadência": {
+    "traducao": "A extinção de um direito porque o prazo para exercê-lo passou. Diferente da prescrição, atinge o direito em si, e não apenas a ação.",
+    "exemplo": "O consumidor perdeu o direito de pedir a troca do produto por decadência, pois o prazo de 90 dias já havia expirado."
+  },
+  "reconvenção": {
+    "traducao": "A 'contra-ação' que o réu move contra o autor dentro do mesmo processo. Em vez de abrir um processo separado, o réu aproveita o mesmo para fazer seus pedidos.",
+    "exemplo": "Ao ser processado por inadimplência, o réu entrou com reconvenção pedindo indenização por danos morais sofridos."
+  },
+  "litigância de má-fé": {
+    "traducao": "Quando uma parte age de forma desonesta no processo, como mentir, usar provas falsas ou criar obstáculos desnecessários. O juiz pode aplicar multa por isso.",
+    "exemplo": "O juiz condenou a empresa por litigância de má-fé por ter apresentado documentos que sabia serem falsos."
+  },
+  "ônus da prova": {
+    "traducao": "A responsabilidade de apresentar as provas que sustentam o que você está afirmando no processo. Quem alega, em regra, precisa provar.",
+    "exemplo": "O ônus da prova era do autor, que precisava comprovar que o produto estava com defeito."
+  },
+  "perícia": {
+    "traducao": "Uma análise técnica feita por um especialista nomeado pelo juiz para esclarecer questões que exigem conhecimento técnico específico.",
+    "exemplo": "O juiz determinou uma perícia contábil para apurar os valores reais do dano sofrido."
+  },
+  "laudo pericial": {
+    "traducao": "O relatório escrito com as conclusões do perito (especialista) após realizar a perícia.",
+    "exemplo": "O laudo pericial confirmou que o imóvel tinha vícios de construção anteriores à venda."
+  },
+  "inventário": {
+    "traducao": "O processo legal para identificar e dividir os bens de uma pessoa que faleceu entre seus herdeiros.",
+    "exemplo": "Após o falecimento do pai, a família abriu o inventário para regularizar a herança."
+  },
+  "arrolamento": {
+    "traducao": "Uma forma mais simples e rápida de inventário, usada quando os herdeiros concordam entre si ou quando o patrimônio é de valor menor.",
+    "exemplo": "Como todos os filhos concordaram com a divisão, optaram pelo arrolamento em vez do inventário judicial."
+  },
+  "partilha": {
+    "traducao": "A divisão efetiva dos bens entre os herdeiros, que encerra o inventário. É quando cada um recebe o que lhe cabe.",
+    "exemplo": "Após meses de processo, a partilha foi homologada e o imóvel ficou com a filha mais velha."
+  },
+  "usucapião": {
+    "traducao": "O direito de adquirir a propriedade de um bem (imóvel ou móvel) pela posse prolongada, contínua e sem oposição por um período definido em lei.",
+    "exemplo": "Após 15 anos morando no terreno sem oposição do proprietário, o morador entrou com ação de usucapião."
+  },
+  "alimentos": {
+    "traducao": "Valor em dinheiro pago por um familiar (pai, mãe, filho) para garantir o sustento de quem não tem condições de se manter sozinho.",
+    "exemplo": "O juiz fixou alimentos no valor de 30% do salário do pai para garantir o sustento do filho."
+  },
+  "guarda": {
+    "traducao": "A definição de quem ficará responsável pelos cuidados e pela criação do filho após a separação dos pais.",
+    "exemplo": "O juiz determinou guarda compartilhada, com o filho passando igual tempo com cada um dos pais."
+  },
+  "curatela": {
+    "traducao": "A proteção legal dada a uma pessoa adulta que, por doença ou deficiência, não tem capacidade de cuidar de si mesma ou de seus bens.",
+    "exemplo": "Após o acidente que deixou o irmão incapacitado, a família abriu processo de curatela."
+  },
+  "tutela de menores": {
+    "traducao": "A proteção legal concedida a menores de idade que não estão sob o poder dos pais, atribuindo a responsabilidade a outra pessoa (o tutor). Não confundir com 'tutela antecipada', que é um instrumento processual para obter uma decisão provisória urgente — são institutos completamente diferentes.",
+    "exemplo": "Com o falecimento dos pais, o tio foi nomeado tutor das crianças pelo juiz."
+  },
+  "depósito judicial": {
+    "traducao": "Dinheiro depositado em uma conta oficial do tribunal para garantir o pagamento de uma dívida enquanto o processo está em andamento.",
+    "exemplo": "O réu fez o depósito judicial do valor discutido para suspender a execução."
+  },
+  "arresto": {
+    "traducao": "O bloqueio preventivo de bens do devedor antes de uma decisão final. Diferente do sequestro judicial, o arresto é genérico: pode recair sobre qualquer bem disponível do devedor (conta, carro, imóvel), pois o objetivo é apenas garantir que haverá patrimônio para pagar a dívida se ele perder.",
+    "exemplo": "Para evitar que o devedor escondesse os bens, o juiz decretou o arresto de sua conta bancária."
+  },
+  "sequestro judicial": {
+    "traducao": "A apreensão de um bem específico que já é objeto de disputa no processo, colocado sob guarda do tribunal até a decisão final. Diferente do arresto, o sequestro recai sobre um bem determinado — aquele que as partes estão brigando — e não sobre bens genéricos do devedor.",
+    "exemplo": "O juiz determinou o sequestro judicial do veículo para preservá-lo até o fim da disputa sobre a propriedade."
+  },
+  "nulidade": {
+    "traducao": "A invalidade de um ato do processo que foi feito de forma errada ou sem seguir as regras legais. Um ato nulo é como se não tivesse acontecido.",
+    "exemplo": "O advogado requereu a nulidade da citação porque ela foi feita no endereço errado."
+  },
+  "precatório": {
+    "traducao": "A fila de espera para receber dinheiro do governo quando o Estado perde uma ação judicial. O pagamento segue uma ordem cronológica.",
+    "exemplo": "Ganhamos o processo contra a prefeitura, mas o pagamento virá por precatório e pode levar anos."
+  },
+  "RPV": {
+    "traducao": "Requisição de Pequeno Valor — um pagamento do governo que, por ser de valor menor, tem prioridade e não entra na fila dos precatórios.",
+    "exemplo": "Como o valor devido era pequeno, recebemos por RPV em menos de 60 dias."
+  },
+  "cumprimento de sentença": {
+    "traducao": "A fase em que se exige que a parte perdedora cumpra na prática o que o juiz determinou na sentença: pagar, fazer ou deixar de fazer algo.",
+    "exemplo": "Iniciamos o cumprimento de sentença pois o réu não pagou espontaneamente no prazo de 15 dias."
+  },
+  "homologação": {
+    "traducao": "A aprovação formal do juiz para que um acordo ou decisão tomada pelas partes tenha validade legal.",
+    "exemplo": "As partes fecharam acordo e o juiz homologou, encerrando o processo."
+  },
+  "litispendência": {
+    "traducao": "Quando dois processos idênticos estão em andamento ao mesmo tempo. A lei não permite isso e um deles deve ser extinto.",
+    "exemplo": "O juiz extinguiu o segundo processo por litispendência, pois o mesmo caso já corria em outro juízo."
+  },
+  "conexão": {
+    "traducao": "Quando dois processos têm partes ou causas relacionadas, permitindo que sejam reunidos e julgados pelo mesmo juiz.",
+    "exemplo": "Os processos foram reunidos por conexão para evitar decisões contraditórias."
+  },
+  "recurso": {
+    "traducao": "O pedido formal para que uma instância superior revise uma decisão judicial com a qual você não concorda.",
+    "exemplo": "O advogado entrou com recurso ao tribunal para tentar reverter a decisão."
+  },
+  "dano moral": {
+    "traducao": "A indenização por sofrimento emocional, humilhação, angústia ou abalo psicológico causado por alguém. Não tem relação com prejuízo financeiro.",
+    "exemplo": "A empresa foi condenada a pagar dano moral por expor os dados pessoais do cliente indevidamente."
+  },
+  "dano material": {
+    "traducao": "A indenização por perdas financeiras concretas e comprovadas causadas por outra pessoa ou empresa.",
+    "exemplo": "A indenização por dano material cobriu o conserto do veículo que foi batido pelo réu."
+  },
+  "réu": {
+    "traducao": "A pessoa ou empresa que está sendo processada, ou seja, contra quem o processo foi aberto.",
+    "exemplo": "A empresa foi citada como ré na ação de indenização movida pelo ex-funcionário."
+  },
+  "autor": {
+    "traducao": "A pessoa ou empresa que tomou a iniciativa de abrir o processo, fazendo os pedidos ao juiz.",
+    "exemplo": "Como autor da ação, o cliente tem o ônus de provar os fatos que alegou."
+  },
+  "polo ativo": {
+    "traducao": "O lado do processo onde está quem entrou com a ação (o autor ou autores). Ocupa a posição de quem faz os pedidos.",
+    "exemplo": "No polo ativo estão os três moradores que juntos processaram a construtora."
+  },
+  "polo passivo": {
+    "traducao": "O lado do processo onde está quem está sendo processado (o réu ou réus). Ocupa a posição de quem precisa se defender.",
+    "exemplo": "A montadora e a concessionária estão no polo passivo da ação de recall."
+  }
+}
