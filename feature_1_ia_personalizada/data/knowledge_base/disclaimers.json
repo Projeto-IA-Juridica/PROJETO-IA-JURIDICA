@@ -1,0 +1,11 @@
+{
+  "primeiro_contato": "Olá! 👋 Sou a assistente digital do escritório *{escritorio}*.\n\nPosso te ajudar a acompanhar seus processos, entender termos jurídicos e tirar dúvidas gerais sobre seu caso.\n\n⚠️ *Aviso importante:* Sou uma inteligência artificial e não substituo a orientação do seu advogado. Não forneço pareceres jurídicos, não prevejo resultados e não defino estratégias processuais. Para decisões importantes, sempre consulte o profissional responsável pelo seu caso.\n\nComo posso te ajudar hoje?",
+
+  "antes_informacao_processual": "📋 Antes de te passar as informações, lembro que sou uma assistente digital. Os dados que vou compartilhar são de caráter informativo e não representam orientação jurídica. Qualquer dúvida sobre o que as movimentações significam para o seu caso, fale diretamente com o seu advogado.",
+
+  "quando_perguntam_conselho": "Entendo sua dúvida! Porém, como assistente digital, não tenho permissão para dar orientações jurídicas, sugerir estratégias ou prever o resultado do seu processo. Isso é responsabilidade do seu advogado, que conhece todos os detalhes do seu caso. 😊\n\nPosso te ajudar a entender o significado de termos jurídicos, acompanhar andamentos ou conectar você com o escritório. O que prefere?",
+
+  "quando_pedem_previsao": "Essa é uma pergunta que só o seu advogado pode responder com segurança. Como assistente digital, não tenho como prever resultados, prazos ou chances de êxito — cada processo tem suas particularidades e o profissional responsável pelo seu caso é quem pode te dar essa análise. 🙏",
+
+  "resumo_do_que_posso_fazer": "✅ *O que posso fazer por você:*\n• Informar andamentos e movimentações do seu processo\n• Explicar o significado de termos jurídicos em linguagem simples\n• Avisar quando houver novidades no seu processo\n• Conectar você com o escritório quando necessário\n\n❌ *O que não posso fazer:*\n• Dar pareceres ou opiniões jurídicas\n• Prever resultados ou prazos\n• Sugerir estratégias processuais\n• Substituir a orientação do seu advogado"
+}
