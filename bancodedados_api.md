@@ -42,30 +42,33 @@ O servidor web propriamente dito usando FastAPI, feito na pasta `feature_1_ia_pe
 *   **`api/app.py`**: O arquivo mestre. Configura a inicialização, ajusta CORS para permitir acessos web, prepara o esqueleto do "Lifespan" (startup e shutdown commands para plugar no Redis/PostgreSQL).
 *   **Roteadores Base**: Criamos os 5 roteadores vazios (apenas as URLs) em `api/routes/` para já deixar o app principal com a arquitetura final. São eles: `auth`, `chat`, `health`, `processos`, `webhook_whatsapp`.
 
-### 1.5 Primeira Rota Realizada (Fase 2C)
+### 1.5 Rota Realizada (Fase 2C)
 *   **`api/routes/health.py`**: Criamos a rota de monitoramento real.
     *   Acessando o sistema, o endpoint de health faz **pings síncronos**: testa o SQLAlchemy batendo no Postgres via async, e testa o pool do Redis via `redis.asyncio` usando a ENV URL. Traz ms e logs.
 
-### 1.6 Schemas, Utils e Alembic (Feito pelo Outro Dev)
-O que entrou via `git pull`:
-*   **Schemas (`shared/schemas/`)**: Scripts Pydantic (validação exata de entrada de dados da API).
-*   **Utils (`shared/utils/`)**: Conversores de data, validadores de CPF nativos e funções atreladas ao Whisper (áudio).
-*   **Alembic (`alembic/`) e Scripts**: Foi gerada a Migration 001 que traduz nossos Models (do item 1.1) em linguagem SQL.
+### 1.6 Middlewares Globais da API (Fase 2B)
+Os "porteiros" do nosso backend, implementados em `api/middleware/`:
+*   **`auth.py (JWTAuthMiddleware)`**: Intercepta as requisições, exige o Header `Authorization: Bearer <token>` em rotas protegidas e injeta o Payload do usuário.
+*   **`rate_limit.py (RateLimitMiddleware)`**: Limita acesso por IP (rotas públicas) ou Usuário (rotas privadas) usando o Redis em memória, prevenindo spam e ataques de força bruta.
+
+### 1.7 Schemas, Utils, Alembic e Configs Adicionais (Git Pull)
+Arquivos complementares vindos do repositório:
+*   **Logging (`shared/config/logging.py`)**: Estrutura avançada com `structlog` para logs estruturados em JSON.
+*   **Base de Conhecimento (`data/`)**: JSONs com regras de negócio da IA (datas comemorativas, dicas, traduções de juridiquês e disclaimers obrigatórios).
+*   **Schemas (`shared/schemas/`)**: Pydantic para validação de entrada de dados da API.
+*   **Utils (`shared/utils/`)**: Conversores de data, formatadores, etc.
+*   **Alembic (`alembic/`) e Scripts**: Migration 001 gerada para os nossos Models.
 
 ---
 
-## 2. O Que Vamos Fazer Pela Frente (Próximos Passos na FASE 2)
+## 2. O Que Vamos Fazer Pela Frente (Próximos Passos na FASE 2C)
 
-Agora o Banco de Dados, Segurança e Padrões estão finalizados. Nossa missão inteira foca puramente em rechear o servidor web.
+Agora o Banco de Dados, Segurança e Padrões, além dos interceptadores da API, estão finalizados. Nossa missão foca puramente nos endpoints de dados.
 
-**Etapas Futuras na API (`feature_1_ia_personalizada/api/`):**
+**Etapas Futuras na API (`feature_1_ia_personalizada/api/routes/`):**
 
-1.  **Middlewares de Intercepção (Fase 2B)**
-    *   *`auth.py`*: Plugar no nível global para interceptar toda e qualquer requisição. Ele varre o header antes da rota ser chamada para confirmar que o usuário enviou o token JWT e barrar acessos sem credencial.
-    *   *`rate_limit.py`*: Um bloqueador de flodding para interagir com o Redis. Conta quantas vezes o cara chamou o nosso webhook para nós não explodirmos de custos de IA, jogando um `429 Too Many Requests`.
-
-2.  **A Rota de Autenticação Real (`api/routes/auth.py`)**
-    *   Fazer o `POST /auth/login`. O usuário baterá com email+senha -> A gente vai no `usuario.py` do banco -> Checa usando método `verificar_senha` que fizemos hoje -> Pega o `Access_Token` do `jwt.py` e devolve.
+1.  **A Rota de Autenticação Real (`auth.py`)**
+    *   Fazer o `POST /auth/login`. O usuário baterá com email+senha -> A gente vai no `usuario.py` do banco -> Checa usando método `verificar_senha` -> Pega o `Access_Token` do `jwt.py` e devolve.
 
 3.  **A Rota de Processos e CRUD (`api/routes/processos.py`)**
     *   Aqui nós leremos o `processo.py` do banco de dados e exporemos. Cadastrar um processo novo, deletar, puxar andamentos, e garantir o Multi-Tenant. (Se o JWT for do Escritório A, nunca retorna Processos do Escritório B).
