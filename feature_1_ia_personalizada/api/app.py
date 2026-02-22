@@ -10,6 +10,11 @@ registra todos os roteadores de domínio e define tratadores de eventos de ciclo
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import redis.asyncio as redis
+
+from shared.config.settings import settings
+from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+from feature_1_ia_personalizada.api.middleware.auth import JWTAuthMiddleware
 
 # Importando os roteadores das nossas subpastas
 from feature_1_ia_personalizada.api.routes import (
@@ -20,16 +25,25 @@ from feature_1_ia_personalizada.api.routes import (
     webhook_whatsapp,
 )
 
-# TODO: Fase 3/4 - Inicialização do Banco e Conexões Externas
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Executado ao iniciar o servidor (Startup)
     print("🚀 Iniciando o Concierge Jurídico Digital...")
-    # Aqui vamos conectar ao PostgreSQL e Redis no futuro próximo
+    
+    # 1. Ligando o Redis para o Rate Limit
+    app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    try:
+        await app.state.redis_client.ping()
+        print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
+    except Exception as e:
+        print(f"❌ Erro ao conectar no Redis: {e}")
+        
     yield
+    
     # Executado ao desligar o servidor (Shutdown)
     print("🛑 Encerrando o servidor de forma graciosa...")
-    # Aqui vamos fechar pools do PostgreSQL e Redis no futuro próximo
+    if hasattr(app.state, "redis_client"):
+        await app.state.redis_client.aclose()
 
 
 # Instanciando o App com o ciclo de vida
@@ -53,6 +67,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
+# Fluxo ideal ao receber requisição: 1. Rate Limit -> 2. Autenticação JWT -> 3. Rotas
+app.add_middleware(JWTAuthMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # ==========================================
 # REGISTRO DE ROTEADORES (ENDPOINTS)
