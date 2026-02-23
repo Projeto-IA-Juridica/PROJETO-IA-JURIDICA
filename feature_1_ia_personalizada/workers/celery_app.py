@@ -28,6 +28,7 @@ celery_app = Celery(
         "feature_1_ia_personalizada.workers.monitor_processos",
     ],
 )
+# --- FORÇAR CARREGAMENTO DAS TASKS (MVP: sem mágica) ---
 celery_app.conf.include = [
     "feature_1_ia_personalizada.workers.monitor_processos",
 ]
