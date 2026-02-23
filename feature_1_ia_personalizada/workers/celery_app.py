@@ -71,57 +71,62 @@ celery_app.conf.task_routes = {
     "workers.mensagens_trimestrais": {"queue": "relacionamento", "routing_key": "relacionamento"},
 }
 
-# Beat schedule 
 celery_app.conf.beat_schedule = {
     "monitorar-processos-a-cada-6-horas": {
-        "task": "workers.monitorar_todos_processos",
+        "task": "feature_1_ia_personalizada.workers.monitorar_todos_processos",
         "schedule": crontab(minute=0, hour="0,6,12,18"),
     },
     "enviar-sem-movimentacao-semanal-seg-10h": {
-        "task": "workers.enviar_sem_movimentacao",
-        "schedule": crontab(minute=0, hour=10, day_of_week=1),  # segunda
+        "task": "feature_1_ia_personalizada.workers.enviar_sem_movimentacao",
+        "schedule": crontab(minute=0, hour=10, day_of_week=1),
     },
     "pesquisa-satisfacao-mensal-dia-1-14h": {
-        "task": "workers.pesquisa_satisfacao",
+        "task": "feature_1_ia_personalizada.workers.pesquisa_satisfacao",
         "schedule": crontab(minute=0, hour=14, day_of_month="1"),
     },
     "limpar-cache-expirado-diario-03h": {
-        "task": "workers.limpar_cache_expirado",
+        "task": "feature_1_ia_personalizada.workers.limpar_cache_expirado",
         "schedule": crontab(minute=0, hour=3),
     },
     "verificar-aniversarios-diario-08h": {
-        "task": "workers.verificar_aniversarios",
+        "task": "feature_1_ia_personalizada.workers.verificar_aniversarios",
         "schedule": crontab(minute=0, hour=8),
     },
     "verificar-datas-profissoes-diario-08h30": {
-        "task": "workers.verificar_datas_profissoes",
+        "task": "feature_1_ia_personalizada.workers.verificar_datas_profissoes",
         "schedule": crontab(minute=30, hour=8),
     },
     "mensagens-trimestrais-semanal-seg-10h": {
-        "task": "workers.mensagens_trimestrais",
-        "schedule": crontab(minute=0, hour=10, day_of_week=1),  # segunda
+        "task": "feature_1_ia_personalizada.workers.mensagens_trimestrais",
+        "schedule": crontab(minute=0, hour=10, day_of_week=1),
     },
+
+    # RELACIONAMENTO
     "relacionamento-aniversarios-08h": {
-        "task": "workers.mensagens_relacionamento.verificar_aniversarios_diarios",
+        "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios",
         "schedule": crontab(hour=8, minute=0),
     },
     "relacionamento-datas-0830": {
-        "task": "workers.mensagens_relacionamento.verificar_datas_comemorativas",
+        "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_datas_comemorativas",
         "schedule": crontab(hour=8, minute=30),
     },
     "relacionamento-sem-contato-seg-10h": {
-        "task": "workers.mensagens_relacionamento.verificar_clientes_sem_contato",
+        "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_clientes_sem_contato",
         "schedule": crontab(day_of_week=1, hour=10, minute=0),
     },
 }
 
 
 
-
 # (opcional) para evitar warning de "no hostname supplied"
 celery_app.conf.broker_connection_retry_on_startup = True
 
-
+celery_app.autodiscover_tasks(["feature_1_ia_personalizada.workers"])
+import feature_1_ia_personalizada.workers.send_notifications  # noqa: F401
+import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
+
+
+
 
 
