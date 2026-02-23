@@ -69,24 +69,21 @@ A base para as automações (Phase 4) foi incluída através da stack do **Celer
 
 ---
 
-## 2. O Que Vamos Fazer Pela Frente (Próximos Passos na FASE 2C)
+### 1.9 Rotas API de Negócio (Fase 2C - Em andamento/Concluído)
+*   **A Rota de Autenticação Real (`auth.py`)**: Valida credenciais (Email+Bcrypt) no banco gerando Access e Refresh Tokens JWT. Conta também com rota de revalidação `/refresh` e consulta de perfil `/me`.
+*   **A Rota de Processos e CRUD (`processos.py`)**: Lista de forma paginada e cadastra novos processos vinculados ao cliente, amarrando sempre o `escritorio_id` do Advogado logado (Isolamento Multi-Tenant). Inicia automaticamente o robô de monitoramento de instâncias na criação.
+*   **A Rota do Webhook do WhatsApp (`webhook_whatsapp.py`)**: A porta receptora da Evolution API. Recebe mensagens, filtra apenas mensagens úteis de clientes cadastrados, formata a string/caption e insere no Celery garantindo resposta HTTP 200 hiper-rápida.
 
-Agora o Banco de Dados, Segurança e Padrões, além dos interceptadores da API, estão finalizados. Nossa missão foca puramente nos endpoints de dados.
+---
 
-**Etapas Futuras na API (`feature_1_ia_personalizada/api/routes/`):**
+## 2. O Que Vamos Fazer Pela Frente (Último Passo da FASE 2)
 
-1.  **A Rota de Autenticação Real (`auth.py`)**
-    *   Fazer o `POST /auth/login`. O usuário baterá com email+senha -> A gente vai no `usuario.py` do banco -> Checa usando método `verificar_senha` -> Pega o `Access_Token` do `jwt.py` e devolve.
+Agora o Banco de Dados, Segurança e Padrões, além de 90% das rotas essenciais, estão finalizados.
 
-3.  **A Rota de Processos e CRUD (`api/routes/processos.py`)**
-    *   Aqui nós leremos o `processo.py` do banco de dados e exporemos. Cadastrar um processo novo, deletar, puxar andamentos, e garantir o Multi-Tenant. (Se o JWT for do Escritório A, nunca retorna Processos do Escritório B).
+**Falta apenas 1 rota na API (`feature_1_ia_personalizada/api/routes/`):**
 
-4.  **A Rota do Chat Histórico (`api/routes/chat.py`)**
-    *   Fazer o dashboard do cliente, devolvendo toda aquela listagem bruta armazenada da `interacao.py` que nós definimos hoje sobre tokens e conversa.
-
-5.  **A Rota (Crucial) do Webhook do WhatsApp (`api/routes/webhook_whatsapp.py`)**
-    *   É a boca receptora da Evolution API. Recebemos requisições POST.
-    *   Vamos tratar áudio, ler o texto, e passar para o nosso orquestrador chamar o modelo Claude (A infraestrutura que virá depois).
+1.  **A Rota do Chat Histórico (`chat.py`)**
+    *   Fazer a ponte entre a tabela `interacao.py` que guarda o histórico de requisições/AI_tokens da conversa de um cliente para que o Front-End possa mostrar numa interface rica de dashboard de mensagens.
 
 ---
 > Elaborado via Pair Programming - Concierge Jurídico Digital.
