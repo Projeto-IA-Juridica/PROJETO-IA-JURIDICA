@@ -19,12 +19,14 @@ RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 TIMEZONE = os.getenv("CELERY_TIMEZONE", "America/Sao_Paulo")
 
 
-celery_app = Celery(
+celery_app = Celery( #verificar
     "concierge_worker",
     broker=BROKER_URL,
     backend=RESULT_BACKEND,
     include=[
         "feature_1_ia_personalizada.workers.monitor_processos",
+        "feature_1_ia_personalizada.workers.send_notifications",
+        "feature_1_ia_personalizada.workers.mensagens_relacionamento",
     ],
 )
 
@@ -93,3 +95,6 @@ celery_app.conf.beat_schedule = {
 
 # (opcional) para evitar warning de "no hostname supplied"
 celery_app.conf.broker_connection_retry_on_startup = True
+
+
+

@@ -1,0 +1,275 @@
+# feature_1_ia_personalizada/workers/monitor_processos.py
+
+from __future__ import annotations
+
+import logging
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from celery.exceptions import SoftTimeLimitExceeded
+from feature_1_ia_personalizada.workers.celery_app import celery_app
+# from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
+# from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
+# from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
+# from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
+# deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
+logger = logging.getLogger(__name__)
+
+
+# CONFIGURAÇÕES
+
+
+TAMANHO_LOTE = 10
+INTERVALO_ENTRE_REQUISICOES_SEGUNDOS = 0.4
+TEMPO_MAXIMO_PROCESSO_SEGUNDOS = 30
+
+
+# FUNÇÕES DE BANCO (SUBSTITUIR PELO ORM REAL)
+
+
+def listar_processos_com_monitoramento_ativo(limite: int) -> List[Dict[str, Any]]:
+    """
+    SELECT * FROM processos WHERE monitoramento_ativo = true
+    """
+    return []
+
+
+def buscar_processo_por_id(id_processo: int) -> Optional[Dict[str, Any]]:
+    return None
+
+
+def atualizar_ultimo_andamento_do_processo(
+    id_processo: int,
+    texto_ultimo_andamento: str,
+    data_ultimo_andamento_iso: str,
+) -> None:
+    """
+    UPDATE processos
+    SET ultimo_andamento = :texto,
+        data_ultimo_andamento = :data_iso
+    WHERE id = :id_processo
+    """
+    return None
+
+
+# FUNÇÕES AUXILIARES
+
+
+Andamento = Union[Dict[str, Any], Any]
+
+
+def extrair_valor(objeto: Andamento, chave: str, valor_padrao: Any = None) -> Any:
+    if isinstance(objeto, dict):
+        return objeto.get(chave, valor_padrao)
+    return getattr(objeto, chave, valor_padrao)
+
+
+def converter_para_iso(data: Any) -> Optional[str]:
+    if data is None:
+        return None
+    if isinstance(data, datetime):
+        return data.isoformat()
+    return str(data)
+
+
+def extrair_texto_e_data_do_andamento(
+    andamento: Andamento,
+) -> Tuple[str, Optional[str]]:
+    texto = extrair_valor(andamento, "texto", "")
+    data = extrair_valor(andamento, "data", None)
+    return str(texto), converter_para_iso(data)
+
+
+def buscar_andamentos_jusbrasil(
+    numero_processo: str,
+    data_referencia_iso: Optional[str],
+    cliente_jusbrasil: JusbrasilClient,
+) -> List[Any]:
+    return cliente_jusbrasil.buscar_novos_andamentos(
+        numero_processo, data_referencia_iso
+    )
+
+
+def buscar_andamentos_datajud(
+    numero_processo: str,
+    data_referencia_iso: Optional[str],
+    cliente_datajud: DataJudClient,
+) -> List[Any]:
+    return cliente_datajud.buscar_novos_andamentos(
+        numero_processo, data_referencia_iso
+    )
+
+# PROCESSAMENTO DE UM PROCESSO
+
+
+def processar_processo_individual(
+    dados_processo: Dict[str, Any]
+) -> Dict[str, Any]:
+
+    id_processo = int(dados_processo["id"])
+    numero_processo = str(dados_processo["numero"])
+    data_ultimo_andamento_salvo = dados_processo.get("data_ultimo_andamento")
+
+    cliente_jusbrasil = JusbrasilClient()
+    cliente_datajud = DataJudClient()
+
+    # 1️⃣ Buscar andamentos (Jusbrasil → fallback DataJud)
+    fonte_utilizada = "jusbrasil"
+
+    try:
+        lista_andamentos = buscar_andamentos_jusbrasil(
+            numero_processo,
+            data_ultimo_andamento_salvo,
+            cliente_jusbrasil,
+        )
+    except Exception as erro:
+        logger.warning(
+            f"Falha Jusbrasil no processo {id_processo}. Usando DataJud. Erro: {erro}"
+        )
+        fonte_utilizada = "datajud"
+        lista_andamentos = buscar_andamentos_datajud(
+            numero_processo,
+            data_ultimo_andamento_salvo,
+            cliente_datajud,
+        )
+
+    if not lista_andamentos:
+        return {
+            "id_processo": id_processo,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": fonte_utilizada,
+        }
+
+    quantidade_novos = 0
+    ultima_data_encontrada = None
+    ultimo_texto_limpo = None
+
+    for andamento in lista_andamentos:
+
+        texto_original, data_iso = extrair_texto_e_data_do_andamento(andamento)
+
+        texto_limpo = DataCleaner.limpar_andamento(texto_original)
+        texto_traduzido = JuridicalTranslator.traduzir_andamento(texto_limpo)
+
+        celery_app.send_task(
+            "workers.enviar_notificacao_andamento",
+            args=[id_processo, texto_traduzido],
+            queue="notificacoes",
+        )
+
+        quantidade_novos += 1
+        ultima_data_encontrada = data_iso
+        ultimo_texto_limpo = texto_limpo
+
+    # Atualizar banco com último andamento
+    if ultima_data_encontrada:
+        atualizar_ultimo_andamento_do_processo(
+            id_processo,
+            ultimo_texto_limpo or "",
+            ultima_data_encontrada,
+        )
+
+    return {
+        "id_processo": id_processo,
+        "sucesso": True,
+        "novos_andamentos": quantidade_novos,
+        "fonte": fonte_utilizada,
+        "data_atualizada_para": ultima_data_encontrada,
+    }
+
+
+# TASK: MONITORAR TODOS
+
+
+@celery_app.task(
+    name="workers.monitorar_todos_processos",
+    soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
+    time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
+)
+def monitorar_todos_processos() -> Dict[str, Any]:
+
+    resultados = []
+    total_processados = 0
+    total_erros = 0
+
+    try:
+        processos = listar_processos_com_monitoramento_ativo(limite=10_000)
+    except Exception as erro:
+        return {"sucesso": False, "erro": str(erro)}
+
+    for indice in range(0, len(processos), TAMANHO_LOTE):
+        lote = processos[indice : indice + TAMANHO_LOTE]
+
+        for processo in lote:
+            try:
+                resultado = processar_processo_individual(processo)
+                resultados.append(resultado)
+                total_processados += 1
+
+            except SoftTimeLimitExceeded:
+                total_erros += 1
+                resultados.append(
+                    {
+                        "id_processo": processo.get("id"),
+                        "sucesso": False,
+                        "erro": "tempo_maximo_excedido_30s",
+                    }
+                )
+
+            except Exception as erro:
+                total_erros += 1
+                resultados.append(
+                    {
+                        "id_processo": processo.get("id"),
+                        "sucesso": False,
+                        "erro": str(erro),
+                    }
+                )
+
+            time.sleep(INTERVALO_ENTRE_REQUISICOES_SEGUNDOS)
+
+    return {
+        "sucesso": True,
+        "total_processados": total_processados,
+        "total_erros": total_erros,
+        "resumo_primeiros_20": resultados[:20],
+    }
+
+
+# TASK: MONITORAR UM PROCESSO
+
+
+@celery_app.task(
+    name="workers.monitorar_processo_individual",
+    soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
+    time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
+)
+def monitorar_processo_individual(id_processo: int) -> Dict[str, Any]:
+
+    processo = buscar_processo_por_id(int(id_processo))
+
+    if not processo:
+        return {
+            "sucesso": False,
+            "erro": "processo_nao_encontrado",
+            "id_processo": id_processo,
+        }
+
+    try:
+        return processar_processo_individual(processo)
+
+    except SoftTimeLimitExceeded:
+        return {
+            "sucesso": False,
+            "erro": "tempo_maximo_excedido_30s",
+            "id_processo": id_processo,
+        }
+
+    except Exception as erro:
+        return {
+            "sucesso": False,
+            "erro": str(erro),
+            "id_processo": id_processo,
+        }
