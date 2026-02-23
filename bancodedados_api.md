@@ -51,13 +51,21 @@ Os "porteiros" do nosso backend, implementados em `api/middleware/`:
 *   **`auth.py (JWTAuthMiddleware)`**: Intercepta as requisições, exige o Header `Authorization: Bearer <token>` em rotas protegidas e injeta o Payload do usuário.
 *   **`rate_limit.py (RateLimitMiddleware)`**: Limita acesso por IP (rotas públicas) ou Usuário (rotas privadas) usando o Redis em memória, prevenindo spam e ataques de força bruta.
 
-### 1.7 Schemas, Utils, Alembic e Configs Adicionais (Git Pull)
+### 1.7 Schemas, Utils, Alembic e Configs Adicionais (Git Pull Anterior)
 Arquivos complementares vindos do repositório:
 *   **Logging (`shared/config/logging.py`)**: Estrutura avançada com `structlog` para logs estruturados em JSON.
 *   **Base de Conhecimento (`data/`)**: JSONs com regras de negócio da IA (datas comemorativas, dicas, traduções de juridiquês e disclaimers obrigatórios).
 *   **Schemas (`shared/schemas/`)**: Pydantic para validação de entrada de dados da API.
 *   **Utils (`shared/utils/`)**: Conversores de data, formatadores, etc.
 *   **Alembic (`alembic/`) e Scripts**: Migration 001 gerada para os nossos Models.
+
+### 1.8 Processamento Assíncrono e Workers Inteligentes (Git Pull Recente)
+A base para as automações (Phase 4) foi incluída através da stack do **Celery**, localizada em `feature_1_ia_personalizada/workers/`:
+*   **`celery_app.py`**: O inicializador do Celery que conecta no Redis para enfileirar tarefas pesadas.
+*   **`mensagens_relacionamento.py`**: Disparo de felicitações e lembretes baseados nos dados dos clientes (LGPD, Perfil).
+*   **`monitor_processos.py`**: Robô que acorda de tempos em tempos para bater nos sites de tribunais e buscar o `ultimo_andamento`.
+*   **`send_notifications.py`**: Carteiro eletrônico da API (mandará o aviso final via WhatsApp).
+*   **`webhook_whatsapp.py` (Worker)**: Task dedicada para desovar requisições síncronas de webhook para a fila assíncrona.
 
 ---
 
