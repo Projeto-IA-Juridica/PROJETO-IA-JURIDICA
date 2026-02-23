@@ -69,9 +69,6 @@ htmlcov/
 # SEGURANÇA E AMBIENTE
 # ==========================
 # CRÍTICO: Nunca commitar chaves de API ou segredos
-.env
-.env.*
-!.env.example
 *.pem
 *.key
 *.crt
