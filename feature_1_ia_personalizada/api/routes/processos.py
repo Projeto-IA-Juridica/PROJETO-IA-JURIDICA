@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.database.session import get_db
 from shared.models.processo import Processo
 from shared.schemas.processo import ProcessoCreate, ProcessoUpdate, ProcessoList, ProcessoResponse
-from shared.schemas.response import Links
+from shared.schemas.response import SuccessResponse, PaginatedResponse
 
 router = APIRouter(prefix="/processos", tags=["Processos Jurídicos"])
 
@@ -66,12 +66,7 @@ async def list_processos(
         page=page,
         per_page=per_page,
         total=total,
-        total_pages=total_pages,
-        links=Links(
-            self=str(request.url),
-            next=f"{base_url}?page={page+1}&per_page={per_page}" if page < total_pages else None,
-            prev=f"{base_url}?page={page-1}&per_page={per_page}" if page > 1 else None,
-        )
+        total_pages=total_pages
     )
 
 
