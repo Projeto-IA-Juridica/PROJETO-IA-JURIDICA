@@ -8,13 +8,16 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from celery.exceptions import SoftTimeLimitExceeded
-from feature_1_ia_personalizada.workers.celery_app import celery_app
+# from feature_1_ia_personalizada.workers.celery_app import celery_app
+from .celery_app import celery_app
 # from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
 # from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 # from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 # from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
 # deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
 logger = logging.getLogger(__name__)
+
+
 
 
 # CONFIGURAÇÕES
@@ -181,14 +184,12 @@ def processar_processo_individual(
 
 
 # TASK: MONITORAR TODOS
-
-
 @celery_app.task(
-    name="workers.monitorar_todos_processos",
+    name="workers.monitorar_processos",
     soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
     time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
 )
-def monitorar_todos_processos() -> Dict[str, Any]:
+def monitorar_processos() -> Dict[str, Any]:
 
     resultados = []
     total_processados = 0
@@ -273,3 +274,9 @@ def monitorar_processo_individual(id_processo: int) -> Dict[str, Any]:
             "erro": str(erro),
             "id_processo": id_processo,
         }
+        
+        
+        
+
+
+
