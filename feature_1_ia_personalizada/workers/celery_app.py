@@ -33,6 +33,7 @@ celery_app.conf.include = [
     "feature_1_ia_personalizada.workers.monitor_processos",
 ]
 
+
 # Configuração base do Celery
 celery_app.conf.update(
     timezone=TIMEZONE,
@@ -100,7 +101,22 @@ celery_app.conf.beat_schedule = {
         "task": "workers.mensagens_trimestrais",
         "schedule": crontab(minute=0, hour=10, day_of_week=1),  # segunda
     },
+    "relacionamento-aniversarios-08h": {
+        "task": "workers.mensagens_relacionamento.verificar_aniversarios_diarios",
+        "schedule": crontab(hour=8, minute=0),
+    },
+    "relacionamento-datas-0830": {
+        "task": "workers.mensagens_relacionamento.verificar_datas_comemorativas",
+        "schedule": crontab(hour=8, minute=30),
+    },
+    "relacionamento-sem-contato-seg-10h": {
+        "task": "workers.mensagens_relacionamento.verificar_clientes_sem_contato",
+        "schedule": crontab(day_of_week=1, hour=10, minute=0),
+    },
 }
+
+
+
 
 # (opcional) para evitar warning de "no hostname supplied"
 celery_app.conf.broker_connection_retry_on_startup = True

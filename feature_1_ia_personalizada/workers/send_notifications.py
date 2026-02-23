@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 
-# ==========================
+
 # CONFIGURAÇÕES
-# ==========================
+
 
 FUSO_HORARIO_PADRAO = int(os.getenv("FUSO_HORARIO_PADRAO", "-3"))
 HORA_INICIO_ENVIO = int(os.getenv("HORA_INICIO_ENVIO", "8"))
@@ -29,9 +29,9 @@ TEMPO_32_DIAS = 32 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
 
 
-# ==========================
+
 # MENSAGENS PADRÃO
-# ==========================
+
 
 MENSAGEM_NOVO_ANDAMENTO = (
     "📌 Atualização do seu processo:\n\n"
@@ -55,9 +55,9 @@ MENSAGEM_ERRO_PADRAO = (
 )
 
 
-# ==========================
+
 # FUNÇÕES AUXILIARES
-# ==========================
+
 
 def agora_local() -> datetime:
     fuso = timezone(timedelta(hours=FUSO_HORARIO_PADRAO))
@@ -100,9 +100,9 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
     return bool(cliente_redis.set(chave, "1", nx=True, ex=tempo_segundos))
 
 
-# ==========================
+
 # INTEGRAÇÕES (SUBSTITUIR)
-# ==========================
+
 
 class ServicoWhatsApp:
     @staticmethod
@@ -132,9 +132,9 @@ def executar_fluxo_orquestrador(id_escritorio: int, id_cliente: int,
     raise NotImplementedError
 
 
-# ==========================
+
 # TASKS
-# ==========================
+
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 5})
 def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: str):
