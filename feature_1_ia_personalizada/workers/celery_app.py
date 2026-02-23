@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 from celery import Celery
 from celery.schedules import crontab
+from kombu import Queue
 
 # (opcional) carregar .env automaticamente
 try:
@@ -19,16 +20,17 @@ RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 TIMEZONE = os.getenv("CELERY_TIMEZONE", "America/Sao_Paulo")
 
 
-celery_app = Celery( #verificar
+celery_app = Celery(
     "concierge_worker",
     broker=BROKER_URL,
     backend=RESULT_BACKEND,
     include=[
         "feature_1_ia_personalizada.workers.monitor_processos",
-        "feature_1_ia_personalizada.workers.send_notifications",
-        "feature_1_ia_personalizada.workers.mensagens_relacionamento",
     ],
 )
+celery_app.conf.include = [
+    "feature_1_ia_personalizada.workers.monitor_processos",
+]
 
 # Configuração base do Celery
 celery_app.conf.update(
@@ -43,16 +45,22 @@ celery_app.conf.update(
 )
 
 # Filas separadas (monitoramento, notificacoes, ia, relacionamento)
-celery_app.conf.task_queues = {
-    "monitoramento": {"exchange": "monitoramento", "routing_key": "monitoramento"},
-    "notificacoes": {"exchange": "notificacoes", "routing_key": "notificacoes"},
-    "ia": {"exchange": "ia", "routing_key": "ia"},
-    "relacionamento": {"exchange": "relacionamento", "routing_key": "relacionamento"},
-}
+
+
+celery_app.conf.task_queues = (
+    Queue("monitoramento", routing_key="monitoramento"),
+    Queue("notificacoes", routing_key="notificacoes"),
+    Queue("ia", routing_key="ia"),
+    Queue("relacionamento", routing_key="relacionamento"),
+)
+celery_app.conf.task_default_queue = "monitoramento"
+celery_app.conf.task_default_exchange = "monitoramento"
+celery_app.conf.task_default_routing_key = "monitoramento"
 
 # Routes: manda cada task para a fila certa
 celery_app.conf.task_routes = {
-    "workers.monitorar_processos": {"queue": "monitoramento", "routing_key": "monitoramento"},
+    "workers.monitorar_todos_processos": {"queue": "monitoramento", "routing_key": "monitoramento"},
+    "workers.monitorar_processo_individual": {"queue": "monitoramento", "routing_key": "monitoramento"},
     "workers.enviar_sem_movimentacao": {"queue": "notificacoes", "routing_key": "notificacoes"},
     "workers.pesquisa_satisfacao": {"queue": "relacionamento", "routing_key": "relacionamento"},
     "workers.limpar_cache_expirado": {"queue": "monitoramento", "routing_key": "monitoramento"},
@@ -64,7 +72,7 @@ celery_app.conf.task_routes = {
 # Beat schedule 
 celery_app.conf.beat_schedule = {
     "monitorar-processos-a-cada-6-horas": {
-        "task": "workers.monitorar_processos",
+        "task": "workers.monitorar_todos_processos",
         "schedule": crontab(minute=0, hour="0,6,12,18"),
     },
     "enviar-sem-movimentacao-semanal-seg-10h": {
@@ -96,5 +104,7 @@ celery_app.conf.beat_schedule = {
 # (opcional) para evitar warning de "no hostname supplied"
 celery_app.conf.broker_connection_retry_on_startup = True
 
+
+import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
 
 
