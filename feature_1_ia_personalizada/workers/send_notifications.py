@@ -34,23 +34,23 @@ TEMPO_5_MINUTOS = 5 * 60
 
 
 MENSAGEM_NOVO_ANDAMENTO = (
-    "📌 Atualização do seu processo:\n\n"
+    "Atualização do seu processo:\n\n"
     "{descricao_andamento}\n\n"
     "Se desejar, posso explicar em linguagem mais simples."
 )
 
 MENSAGEM_SEM_MOVIMENTACAO = (
-    "🟡 Seu processo está sem movimentação nos últimos 30 dias.\n\n"
+    "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
     "Isso é comum e não significa necessariamente um problema."
 )
 
 MENSAGEM_PESQUISA_SATISFACAO = (
-    "⭐ De 1 a 5, como você avalia nosso atendimento este mês?\n"
+    "De 1 a 5, como você avalia nosso atendimento este mês?\n"
     "Responda apenas com um número."
 )
 
 MENSAGEM_ERRO_PADRAO = (
-    "⚠️ No momento não consegui processar sua mensagem. "
+    "No momento não consegui processar sua mensagem. "
     "Nossa equipe será notificada."
 )
 
