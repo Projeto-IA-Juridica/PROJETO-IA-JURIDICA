@@ -51,7 +51,7 @@ Os "porteiros" do nosso backend, implementados em `api/middleware/`:
 *   **`auth.py (JWTAuthMiddleware)`**: Intercepta as requisições, exige o Header `Authorization: Bearer <token>` em rotas protegidas e injeta o Payload do usuário.
 *   **`rate_limit.py (RateLimitMiddleware)`**: Limita acesso por IP (rotas públicas) ou Usuário (rotas privadas) usando o Redis em memória, prevenindo spam e ataques de força bruta.
 
-### 1.7 Schemas, Utils, Alembic e Configs Adicionais (Git Pull)
+### 1.7 Schemas, Utils, Alembic e Configs Adicionais (Git Pull Anterior)
 Arquivos complementares vindos do repositório:
 *   **Logging (`shared/config/logging.py`)**: Estrutura avançada com `structlog` para logs estruturados em JSON.
 *   **Base de Conhecimento (`data/`)**: JSONs com regras de negócio da IA (datas comemorativas, dicas, traduções de juridiquês e disclaimers obrigatórios).
@@ -59,26 +59,33 @@ Arquivos complementares vindos do repositório:
 *   **Utils (`shared/utils/`)**: Conversores de data, formatadores, etc.
 *   **Alembic (`alembic/`) e Scripts**: Migration 001 gerada para os nossos Models.
 
+### 1.8 Processamento Assíncrono e Workers Inteligentes (Git Pull Recente)
+A base para as automações (Phase 4) foi incluída através da stack do **Celery**, localizada em `feature_1_ia_personalizada/workers/`:
+*   **`celery_app.py`**: O inicializador do Celery que conecta no Redis para enfileirar tarefas pesadas.
+*   **`mensagens_relacionamento.py`**: Disparo de felicitações e lembretes baseados nos dados dos clientes (LGPD, Perfil).
+*   **`monitor_processos.py`**: Robô que acorda de tempos em tempos para bater nos sites de tribunais e buscar o `ultimo_andamento`.
+*   **`send_notifications.py`**: Carteiro eletrônico da API (mandará o aviso final via WhatsApp).
+*   **`webhook_whatsapp.py` (Worker)**: Task dedicada para desovar requisições síncronas de webhook para a fila assíncrona.
+
 ---
 
-## 2. O Que Vamos Fazer Pela Frente (Próximos Passos na FASE 2C)
+### 1.9 Rotas API de Negócio (Fase 2C - Em andamento/Concluído)
+*   **A Rota de Autenticação Real (`auth.py`)**: Valida credenciais (Email+Bcrypt) no banco gerando Access e Refresh Tokens JWT. Conta também com rota de revalidação `/refresh` e consulta de perfil `/me`.
+*   **A Rota de Processos e CRUD (`processos.py`)**: Lista de forma paginada e cadastra novos processos vinculados ao cliente, amarrando sempre o `escritorio_id` do Advogado logado (Isolamento Multi-Tenant). Inicia automaticamente o robô de monitoramento de instâncias na criação.
+*   **A Rota do Webhook do WhatsApp (`webhook_whatsapp.py`)**: A porta receptora da Evolution API. Recebe mensagens, filtra apenas mensagens úteis de clientes cadastrados, formata a string/caption e insere no Celery garantindo resposta HTTP 200 hiper-rápida.
 
-Agora o Banco de Dados, Segurança e Padrões, além dos interceptadores da API, estão finalizados. Nossa missão foca puramente nos endpoints de dados.
+---
 
-**Etapas Futuras na API (`feature_1_ia_personalizada/api/routes/`):**
+*   **A Rota do Chat Histórico (`chat.py`)**: Fornece endpoints analíticos e proativos. Traz o histórico de mensagens de um cliente (`/chat/history`), permite que o advogado dispare uma mensagem manualmente que vai pra fila do Celery (`/chat/send`) e traz os KPIs daquele escritório como custo total em USD e tokens consumidos (`/chat/stats/dashboard`).
 
-1.  **A Rota de Autenticação Real (`auth.py`)**
-    *   Fazer o `POST /auth/login`. O usuário baterá com email+senha -> A gente vai no `usuario.py` do banco -> Checa usando método `verificar_senha` -> Pega o `Access_Token` do `jwt.py` e devolve.
+---
 
-3.  **A Rota de Processos e CRUD (`api/routes/processos.py`)**
-    *   Aqui nós leremos o `processo.py` do banco de dados e exporemos. Cadastrar um processo novo, deletar, puxar andamentos, e garantir o Multi-Tenant. (Se o JWT for do Escritório A, nunca retorna Processos do Escritório B).
+## 🎉 CONCLUSÃO: FASE 1 e FASE 2 FINALIZADAS! (100% do App Base)
 
-4.  **A Rota do Chat Histórico (`api/routes/chat.py`)**
-    *   Fazer o dashboard do cliente, devolvendo toda aquela listagem bruta armazenada da `interacao.py` que nós definimos hoje sobre tokens e conversa.
+O backend web (`FastAPI`), o banco de dados (`PostgreSQL/SQLAlchemy`), as validações de input (`Pydantic`), a segurança (`JWT/Bcrypt`) e todas as esteiras principais de rotas estão prontas!
 
-5.  **A Rota (Crucial) do Webhook do WhatsApp (`api/routes/webhook_whatsapp.py`)**
-    *   É a boca receptora da Evolution API. Recebemos requisições POST.
-    *   Vamos tratar áudio, ler o texto, e passar para o nosso orquestrador chamar o modelo Claude (A infraestrutura que virá depois).
+**Próximo Grande Marco (Fase 3 & 4):**
+Entraremos no core da Inteligência Artificial. A API Web e os Workers vão parar de trafegar strings vazias e começar a chamar a API da Anthropic (Claude) e o Jusbrasil conectando nossa arquitetura de RAG local.
 
 ---
 > Elaborado via Pair Programming - Concierge Jurídico Digital.
