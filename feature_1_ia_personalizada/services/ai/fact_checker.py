@@ -221,6 +221,7 @@ class FactChecker:
         )
 
         metadata["auditoria_fact_checker"] = auditoria
+        metadata["fact_check_corrigido"] = True
 
         # grava de volta no objeto
         setattr(interacao, "metadata_json", metadata)
