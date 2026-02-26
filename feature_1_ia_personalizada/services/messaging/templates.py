@@ -1,4 +1,4 @@
-# feature_1_ia_personalizada/services/messaging/templates.py
+# 
 # Templates de mensagens formatáveis usando .format(**kwargs)
 
 # -----------------------------------------------------------
