@@ -1,0 +1,9 @@
+# ==============================================================================
+# requirements-dev.txt — Ferramentas de desenvolvimento e testes locais
+# NÃO instalar em produção / Docker
+# ==============================================================================
+
+-r requirements-f1.txt
+
+# Interface de teste da IA
+streamlit==1.54.0
