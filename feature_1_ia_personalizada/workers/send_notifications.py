@@ -295,3 +295,4 @@ def processar_mensagem_recebida(self, id_escritorio: int,
         )
 
         raise
+    
