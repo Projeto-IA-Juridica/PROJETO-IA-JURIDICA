@@ -127,9 +127,6 @@ def registrar_interacao(id_cliente: int, id_processo: Optional[int],
     logger.info(f"Interação registrada: {tipo}")
 
 
-def executar_fluxo_orquestrador(id_escritorio: int, id_cliente: int,
-                                mensagem: str, tipo: str) -> dict:
-    raise NotImplementedError
 
 
 
@@ -253,45 +250,36 @@ def processar_mensagem_recebida(self, id_escritorio: int,
                                 id_cliente: int,
                                 mensagem: str,
                                 tipo: str):
+    # Import lazy: evita importar asyncpg e SQLAlchemy no boot do módulo.
+    # O orchestrator já envia a resposta via EvolutionClient em _node_enviar_resposta,
+    # portanto esta task NÃO deve reenviar pelo WhatsApp.
+    from feature_1_ia_personalizada.services.ai.orchestrator import (
+        executar_fluxo_orquestrador,
+    )
 
     try:
-
         resultado = executar_fluxo_orquestrador(
             id_escritorio=id_escritorio,
             id_cliente=id_cliente,
             mensagem=mensagem,
-            tipo=tipo
+            tipo=tipo,
         )
-
-        resposta = resultado.get("resposta")
-
-        if resposta:
-            ServicoWhatsApp.enviar_mensagem(
-                telefone=os.getenv("TELEFONE_TESTE", ""),
-                texto=resposta
-            )
 
         registrar_interacao(
             id_cliente=id_cliente,
             id_processo=None,
             tipo="mensagem_processada",
-            dados=resultado
+            dados=resultado,
         )
 
         return {"status": "ok"}
 
     except Exception as erro:
-
-        ServicoWhatsApp.enviar_mensagem(
-            telefone=os.getenv("TELEFONE_TESTE", ""),
-            texto=MENSAGEM_ERRO_PADRAO
-        )
-
         registrar_interacao(
             id_cliente=id_cliente,
             id_processo=None,
             tipo="erro_processamento",
-            dados={"erro": str(erro)}
+            dados={"erro": str(erro)},
         )
 
         raise
