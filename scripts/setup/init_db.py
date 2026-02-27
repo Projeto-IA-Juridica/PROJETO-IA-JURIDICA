@@ -64,19 +64,19 @@ async def verify_tables() -> None:
     await engine.dispose()
 
 
-async def main() -> None:
-    print("=" * 50)
-    print(" Inicializando banco de dados")
-    print("=" * 50)
+def main() -> None:
+    print("=" * 50, flush=True)
+    print(" Inicializando banco de dados", flush=True)
+    print("=" * 50, flush=True)
 
     run_migrations()
 
-    print("\nVerificando tabelas criadas:")
-    await verify_tables()
+    print("\nVerificando tabelas criadas:", flush=True)
+    asyncio.run(verify_tables())
 
-    print("\nBanco de dados pronto.")
+    print("\nBanco de dados pronto.", flush=True)
     print("Próximo passo: python -m scripts.setup.seed_data")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

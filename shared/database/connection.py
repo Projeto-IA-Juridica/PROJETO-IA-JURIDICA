@@ -14,14 +14,19 @@ from shared.config.settings import settings
 # Caso a variável de ambiente não inclua "+asyncpg", fazemos o replace garantindo
 # que o driver correto seja usado.
 db_url = settings.DATABASE_URL
-if db_url.startswith("postgresql://"):
+if not db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
+connect_args = {}
+if "supabase.com" in db_url:
+    connect_args["ssl"] = "require"
+
 engine = create_async_engine(
     db_url,
+    connect_args=connect_args,
     echo=(settings.ENVIRONMENT == "development"),  # Loga queries SQL no console apenas em dev
     pool_size=20,       # Mantém 20 conexões abertas no pool (prontas para uso)
     max_overflow=10,    # Se as 20 estiverem em uso, cria até mais 10 temporárias

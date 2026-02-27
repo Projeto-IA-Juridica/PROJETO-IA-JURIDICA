@@ -13,6 +13,7 @@ import os
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
@@ -47,6 +48,8 @@ def get_database_url() -> str:
             "DATABASE_URL não definida. "
             "Verifique seu arquivo .env ou variáveis de ambiente."
         )
+    if not url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
 
@@ -84,7 +87,17 @@ def do_run_migrations(connection) -> None:
 async def run_async_migrations() -> None:
     """Cria engine assíncrona e executa migrations com run_sync."""
     url = get_database_url()
-    connectable = create_async_engine(url, echo=False)
+    
+    connect_args = {}
+    if "supabase.com" in url:
+        connect_args["ssl"] = "require"
+        
+    connectable = create_async_engine(
+        url, 
+        poolclass=NullPool, 
+        echo=False,
+        connect_args=connect_args
+    )
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
