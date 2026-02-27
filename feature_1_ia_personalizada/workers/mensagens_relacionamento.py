@@ -2,22 +2,27 @@ from __future__ import annotations
 
 import os
 import time
-import logging
 import unicodedata
+import structlog
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 
 import redis
 from celery import shared_task
+from prometheus_client import Counter
 
 from feature_1_ia_personalizada.services.integrations.google_sheets import (
     GoogleSheetsClient as _RealGoogleSheetsClient,
 )
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = structlog.get_logger(__name__)
 
+_mensagens_relacionamento_enviadas_total = Counter(
+    "mensagens_relacionamento_enviadas_total",
+    "Total de mensagens de relacionamento enviadas com sucesso",
+    labelnames=["tipo"],
+)
 
 FUSO_HORARIO_PADRAO = int(os.getenv("FUSO_HORARIO_PADRAO", "-3"))
 URL_REDIS = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -231,6 +236,7 @@ def verificar_aniversarios_diarios(self) -> dict:
                 metadata_json={"tipo_relacionamento": "aniversario"}
             )
 
+            _mensagens_relacionamento_enviadas_total.labels(tipo="aniversario").inc()
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
             enviados += 1
 
@@ -306,6 +312,7 @@ def verificar_datas_comemorativas(self) -> dict:
                     metadata_json={"tipo_relacionamento": "data_comemorativa", "nome_data": nome_data}
                 )
 
+                _mensagens_relacionamento_enviadas_total.labels(tipo="data_comemorativa").inc()
                 marcar_enviado(chave_envio, TEMPO_30_DIAS)
                 enviados += 1
 
@@ -373,6 +380,7 @@ def verificar_clientes_sem_contato(self) -> dict:
                 metadata_json={"tipo_relacionamento": "check_in"}
             )
 
+            _mensagens_relacionamento_enviadas_total.labels(tipo="check_in").inc()
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
             enviados += 1
 

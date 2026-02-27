@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+import structlog
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 import httpx
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 
@@ -117,25 +117,25 @@ class EvolutionClient:
 
             except httpx.ReadTimeout as e:
                 ultima_excecao = e
-                logger.warning("Timeout Evolution (tentativa %s/%s): %s", tentativa, self._config.max_tentativas, str(e))
+                logger.warning("evolution_timeout", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
                 if tentativa == self._config.max_tentativas:
                     raise EvolutionTimeoutError("Timeout ao chamar Evolution API") from e
 
             except httpx.ConnectError as e:
                 ultima_excecao = e
-                logger.warning("Falha de conexão Evolution (tentativa %s/%s): %s", tentativa, self._config.max_tentativas, str(e))
+                logger.warning("evolution_connect_error", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
                 if tentativa == self._config.max_tentativas:
                     raise EvolutionRequestError("Falha de conexão com Evolution API") from e
 
             except EvolutionOfflineError as e:
                 ultima_excecao = e
-                logger.warning("Evolution offline (tentativa %s/%s): %s", tentativa, self._config.max_tentativas, str(e))
+                logger.warning("evolution_instancia_offline", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
                 if tentativa == self._config.max_tentativas:
                     raise
 
             except httpx.HTTPError as e:
                 ultima_excecao = e
-                logger.warning("Erro HTTP genérico Evolution (tentativa %s/%s): %s", tentativa, self._config.max_tentativas, str(e))
+                logger.warning("evolution_http_error", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
                 if tentativa == self._config.max_tentativas:
                     raise EvolutionRequestError("Erro HTTP ao chamar Evolution API") from e
 

@@ -15,11 +15,13 @@ import redis.asyncio as redis
 from shared.config.settings import settings
 from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
 from feature_1_ia_personalizada.api.middleware.auth import JWTAuthMiddleware
+from feature_1_ia_personalizada.api.middleware.request_logging import RequestLoggingMiddleware
 
 # Importando os roteadores das nossas subpastas
 from feature_1_ia_personalizada.api.routes import (
     auth,
     health,
+    metrics,
     processos,
     chat,
     webhook_whatsapp,
@@ -72,11 +74,15 @@ app.add_middleware(
 # Fluxo ideal ao receber requisição: 1. Rate Limit -> 2. Autenticação JWT -> 3. Rotas
 app.add_middleware(JWTAuthMiddleware)
 app.add_middleware(RateLimitMiddleware)
+# RequestLoggingMiddleware adicionado por último = executa PRIMEIRO (outermost)
+# Garante que request_id está disponível para todos os middlewares internos e rotas
+app.add_middleware(RequestLoggingMiddleware)
 
 # ==========================================
 # REGISTRO DE ROTEADORES (ENDPOINTS)
 # ==========================================
 app.include_router(health)
+app.include_router(metrics)
 app.include_router(auth)
 app.include_router(processos)
 app.include_router(chat)

@@ -9,8 +9,15 @@ import structlog
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from prometheus_client import Counter
 
 logger = structlog.get_logger(__name__)
+
+_google_sheets_requests_total = Counter(
+    "google_sheets_requests_total",
+    "Total de operações no Google Sheets",
+    labelnames=["operacao", "sucesso"],
+)
 
 _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _MAX_TENTATIVAS = 3
@@ -112,7 +119,13 @@ class GoogleSheetsClient:
         Linhas com menos de 8 colunas são ignoradas.
         data_nascimento é normalizada para YYYY-MM-DD.
         """
-        linhas = self._ler_intervalo("Clientes!A2:I")
+        _inicio = time.perf_counter()
+        try:
+            linhas = self._ler_intervalo("Clientes!A2:I")
+        except Exception as exc:
+            _google_sheets_requests_total.labels(operacao="get", sucesso="false").inc()
+            logger.error("google_sheets_get_clientes_falhou", erro=str(exc), exc_info=True)
+            raise
         clientes: list[dict] = []
 
         for i, linha in enumerate(linhas):
@@ -139,7 +152,8 @@ class GoogleSheetsClient:
                 }
             )
 
-        logger.info("google_sheets_clientes_lidos", total=len(clientes))
+        _google_sheets_requests_total.labels(operacao="get", sucesso="true").inc()
+        logger.info("google_sheets_clientes_lidos", total=len(clientes), duracao_s=round(time.perf_counter() - _inicio, 3))
         return clientes
 
     def get_datas_comemorativas(self) -> list[dict]:
@@ -148,7 +162,13 @@ class GoogleSheetsClient:
         Retorna lista com: profissao_alvo, dia, mes, nome, template.
         Linhas com menos de 3 colunas são ignoradas.
         """
-        linhas = self._ler_intervalo("Datas!A2:E")
+        _inicio = time.perf_counter()
+        try:
+            linhas = self._ler_intervalo("Datas!A2:E")
+        except Exception as exc:
+            _google_sheets_requests_total.labels(operacao="get", sucesso="false").inc()
+            logger.error("google_sheets_get_datas_falhou", erro=str(exc), exc_info=True)
+            raise
         datas: list[dict] = []
 
         for i, linha in enumerate(linhas):
@@ -171,7 +191,8 @@ class GoogleSheetsClient:
                 }
             )
 
-        logger.info("google_sheets_datas_lidas", total=len(datas))
+        _google_sheets_requests_total.labels(operacao="get", sucesso="true").inc()
+        logger.info("google_sheets_datas_lidas", total=len(datas), duracao_s=round(time.perf_counter() - _inicio, 3))
         return datas
 
     def registrar_log_envio(
@@ -187,6 +208,7 @@ class GoogleSheetsClient:
         Registra envio na aba "Log" (append em A:E).
         Colunas: cliente_id, tipo, data_envio, sucesso (Sim/Não), detalhe/erro.
         """
+        _inicio = time.perf_counter()
         agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         linha = [
             str(cliente_id),
@@ -205,10 +227,18 @@ class GoogleSheetsClient:
                 body={"values": [linha]},
             ).execute(num_retries=0)
 
-        _retry_http(_append)
+        try:
+            _retry_http(_append)
+        except Exception as exc:
+            _google_sheets_requests_total.labels(operacao="append", sucesso="false").inc()
+            logger.error("google_sheets_append_falhou", tipo=tipo, cliente_id=cliente_id, erro=str(exc), exc_info=True)
+            raise
+
+        _google_sheets_requests_total.labels(operacao="append", sucesso="true").inc()
         logger.info(
             "google_sheets_log_registrado",
             tipo=tipo,
             cliente_id=cliente_id,
             sucesso=sucesso,
+            duracao_s=round(time.perf_counter() - _inicio, 3),
         )

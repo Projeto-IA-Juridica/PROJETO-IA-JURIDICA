@@ -9,9 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.database.session import get_db
 from shared.models.interacao import Interacao
 from shared.models.cliente import Cliente
+from shared.utils.lgpd import registrar_acesso
 from feature_1_ia_personalizada.workers.send_notifications import processar_mensagem_recebida
 
 router = APIRouter(prefix="/chat", tags=["Histórico e Chat"])
+
+def _get_user_id(request: Request) -> int:
+    payload = getattr(request.state, "user_payload", {})
+    return int(payload.get("sub", 0))
+
+def _get_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 # --- Schemas Inline (Específicos da Rota) ---
 class InteracaoResponse(BaseModel):
@@ -53,6 +64,8 @@ async def get_history(
     cliente = await db.get(Cliente, cliente_id)
     if not cliente or cliente.escritorio_id != escritorio_id:
         raise HTTPException(status_code=404, detail="Cliente não encontrado ou acesso restrito.")
+
+    registrar_acesso(_get_user_id(request), f"chat:historico:cliente:{cliente_id}", "leitura", _get_ip(request))
         
     stmt = (
         select(Interacao)
@@ -93,7 +106,9 @@ async def send_proactive_message(
     cliente = await db.get(Cliente, cliente_id)
     if not cliente or cliente.escritorio_id != escritorio_id:
         raise HTTPException(status_code=404, detail="Cliente não encontrado.")
-        
+
+    registrar_acesso(_get_user_id(request), f"chat:envio_proativo:cliente:{cliente_id}", "escrita", _get_ip(request))
+
     # Despacha para a IA/Celery formatar e mandar via Evolution API
     processar_mensagem_recebida.delay(
         id_escritorio=escritorio_id,

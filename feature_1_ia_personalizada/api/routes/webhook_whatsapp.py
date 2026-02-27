@@ -1,15 +1,27 @@
-import logging
+import structlog
 import re
+import time
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram
 
 from shared.database.session import get_db
 from shared.models.escritorio import Escritorio
 from shared.models.cliente import Cliente
 from feature_1_ia_personalizada.workers.send_notifications import processar_mensagem_recebida
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+_mensagens_recebidas = Counter(
+    "whatsapp_messages_received_total",
+    "Total de mensagens WhatsApp recebidas via webhook",
+    labelnames=["escritorio_id", "tipo"],
+)
+_webhook_processing_time = Histogram(
+    "webhook_processing_time_seconds",
+    "Tempo de processamento do webhook WhatsApp (até enfileirar no Celery)",
+)
 
 router = APIRouter(prefix="/webhook/whatsapp", tags=["Webhooks Evolution"])
 
@@ -21,6 +33,7 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
     localiza o Escritório e o Cliente correspondentes no banco de dados,
     e envia a tarefa pesada de I.A. para a fila do Celery.
     """
+    _inicio = time.perf_counter()
     try:
         body = await request.json()
     except Exception:
@@ -86,16 +99,15 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
     instance_name = body.get("instance")
     
     if not instance_name:
-         logger.warning("Webhook Evolution sem nome de instância.")
-         return {"status": "error", "reason": "Missing instance"}
-         
+        logger.warning("webhook_sem_instancia")
+        return {"status": "error", "reason": "Missing instance"}
+
     # 1. Puxar o Escritório correspondente a essa instância da Evolution
     stmt_esc = select(Escritorio).where(Escritorio.webhook_whatsapp_instance == instance_name)
     escritorio = (await db.execute(stmt_esc)).scalars().first()
-    
+
     if not escritorio:
-        logger.warning(f"Instância '{instance_name}' não vinculada a nenhum escritório.")
-        # Retorna 200 pra Evolution parar de tentar, mas avisa erro internamente
+        logger.warning("webhook_instancia_nao_vinculada", instance_name=instance_name)
         return {"status": "ignored", "reason": "Instance not found in DB"}
 
     # 2. Puxar o Cliente correspondente a esse telefone dentro do escritório
@@ -104,22 +116,39 @@ async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
         Cliente.escritorio_id == escritorio.id
     )
     cliente = (await db.execute(stmt_cli)).scalars().first()
-    
+
     if not cliente:
-         # TODO: Em um sistema real, poderíamos criar o Lead/Cliente automaticamente aqui.
-         logger.info(f"Mensagem recebida de número desconhecido: {telefone_digitos} para a instância {instance_name}")
-         return {"status": "ignored", "reason": "Client not registered"}
+        logger.info(
+            "webhook_numero_desconhecido",
+            telefone=telefone_digitos,
+            instance_name=instance_name,
+        )
+        return {"status": "ignored", "reason": "Client not registered"}
 
     # 3. Disparar o Worker (Processamento via Celery assíncrono)
     # A IA fará todo o trabalho pesado longe da Main Thread do FastAPI
+    tipo_mensagem = "texto"
+    if "audioMessage" in (msg_content if isinstance(msg_content, dict) else {}):
+        tipo_mensagem = "audio"
+    elif "imageMessage" in (msg_content if isinstance(msg_content, dict) else {}):
+        tipo_mensagem = "imagem"
+
     processar_mensagem_recebida.delay(
         id_escritorio=escritorio.id,
         id_cliente=cliente.id,
         mensagem=texto,
-        tipo="texto"  # Evoluir para audio, imagem depois
+        tipo=tipo_mensagem,
     )
 
-    logger.info(f"Mensagem do cliente {cliente.id} enfileirada no Celery.")
+    _mensagens_recebidas.labels(escritorio_id=str(escritorio.id), tipo=tipo_mensagem).inc()
+    _webhook_processing_time.observe(time.perf_counter() - _inicio)
+
+    logger.info(
+        "webhook_mensagem_enfileirada",
+        cliente_id=cliente.id,
+        escritorio_id=escritorio.id,
+        tipo=tipo_mensagem,
+    )
 
     return {"status": "queued"}
 

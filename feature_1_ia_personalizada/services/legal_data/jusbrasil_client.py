@@ -15,8 +15,15 @@ import asyncio
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 import structlog
+from prometheus_client import Counter
 
 logger = structlog.get_logger(__name__)
+
+_jusbrasil_requests_total = Counter(
+    "jusbrasil_requests_total",
+    "Total de requisições ao Jusbrasil (ou mock)",
+    labelnames=["endpoint", "status"],
+)
 
 class JusbrasilClientError(Exception):
     """Exceção base para erros na integração com o Jusbrasil."""
@@ -45,10 +52,11 @@ class JusbrasilClient:
             Dict com tribunal, comarca, vara, assunto principal e data de ajuizamento.
         """
         logger.info("jusbrasil_buscando_capa_processo", cnj=numero_cnj)
-        
+
         # Simula latência de rede ir até a internet (1 a 2 segundos)
         await asyncio.sleep(1.5)
-        
+        _jusbrasil_requests_total.labels(endpoint="buscar_dados_processo", status="ok").inc()
+
         # Retorno Simulado (MOCK) para o teste da IA
         return {
             "numero_cnj": numero_cnj,
@@ -75,10 +83,11 @@ class JusbrasilClient:
             Lista de dicionários [{data, descricao, tipo}]. Ordenado do mais recente para o mais antigo.
         """
         logger.info("jusbrasil_buscando_andamentos", cnj=numero_cnj)
-        
+
         # Simula tempo de requisição e parsing da página/API
         await asyncio.sleep(2.0)
-        
+        _jusbrasil_requests_total.labels(endpoint="sincronizar_andamentos", status="ok").inc()
+
         # Gerando andamentos fictícios contextualizados
         hoje = datetime.now()
         

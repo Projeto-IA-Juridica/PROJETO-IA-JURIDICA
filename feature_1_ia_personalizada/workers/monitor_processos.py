@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import logging
+import structlog
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from celery.exceptions import SoftTimeLimitExceeded
+from prometheus_client import Gauge
 # from feature_1_ia_personalizada.workers.celery_app import celery_app
 from .celery_app import celery_app
 # from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
@@ -15,7 +16,12 @@ from .celery_app import celery_app
 # from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 # from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
 # deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+_processos_monitorados_total = Gauge(
+    "processos_monitorados_total",
+    "Número atual de processos com monitoramento ativo",
+)
 
 
 
@@ -128,7 +134,10 @@ def processar_processo_individual(
         )
     except Exception as erro:
         logger.warning(
-            f"Falha Jusbrasil no processo {id_processo}. Usando DataJud. Erro: {erro}"
+            "jusbrasil_fallback_datajud",
+            id_processo=id_processo,
+            erro=str(erro),
+            exc_info=True,
         )
         fonte_utilizada = "datajud"
         lista_andamentos = buscar_andamentos_datajud(
@@ -199,6 +208,8 @@ def monitorar_processos() -> Dict[str, Any]:
         processos = listar_processos_com_monitoramento_ativo(limite=10_000)
     except Exception as erro:
         return {"sucesso": False, "erro": str(erro)}
+
+    _processos_monitorados_total.set(len(processos))
 
     for indice in range(0, len(processos), TAMANHO_LOTE):
         lote = processos[indice : indice + TAMANHO_LOTE]

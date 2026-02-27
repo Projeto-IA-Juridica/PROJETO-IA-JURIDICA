@@ -93,6 +93,15 @@ _erros_total = Counter(
     "Total de erros no orchestrator por nó",
     labelnames=["no"],
 )
+_ia_requests_total = Counter(
+    "ia_requests_total",
+    "Total de requisições processadas pela IA (orquestrador)",
+    labelnames=["intencao", "sucesso"],
+)
+_ia_fallback_used_total = Counter(
+    "ia_fallback_used_total",
+    "Total de vezes que o fallback foi ativado (Claude indisponível ou erro)",
+)
 
 # ---------------------------------------------------------------------------
 # State Schema — CÉREBRO do fluxo
@@ -261,10 +270,19 @@ class ConversationOrchestrator:
             or TEMPLATE_ERRO_GENERICO
         )
 
+        _usando_fallback = final_state.get("usando_fallback", False)
+        _intencao_final = final_state.get("intencao", "outro")
+
         _fluxo_total.labels(
-            intencao=final_state.get("intencao", "outro"),
-            status="fallback" if final_state.get("usando_fallback") else "ok",
+            intencao=_intencao_final,
+            status="fallback" if _usando_fallback else "ok",
         ).inc()
+        _ia_requests_total.labels(
+            intencao=_intencao_final,
+            sucesso="false" if _usando_fallback else "true",
+        ).inc()
+        if _usando_fallback:
+            _ia_fallback_used_total.inc()
 
         return {
             "resposta": resposta_final,

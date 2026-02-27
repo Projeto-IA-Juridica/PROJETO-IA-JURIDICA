@@ -4,6 +4,12 @@ import re
 from datetime import datetime
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
+from prometheus_client import Counter
+
+_fact_check_corrections_total = Counter(
+    "fact_check_corrections_total",
+    "Total de correções aplicadas pelo FactChecker (status, prazo ou linguagem)",
+)
 
 # Tipos auxiliares
 BuscarDadosProcessoFn = Callable[[str], Awaitable[Dict[str, Any]]]
@@ -222,6 +228,8 @@ class FactChecker:
 
         metadata["auditoria_fact_checker"] = auditoria
         metadata["fact_check_corrigido"] = True
+
+        _fact_check_corrections_total.inc()
 
         # grava de volta no objeto
         setattr(interacao, "metadata_json", metadata)

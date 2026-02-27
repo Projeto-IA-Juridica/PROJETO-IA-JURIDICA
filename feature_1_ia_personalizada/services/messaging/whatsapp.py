@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Any, Dict, Optional, Protocol
 
+from prometheus_client import Counter
+
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+_mensagens_enviadas = Counter(
+    "whatsapp_messages_sent_total",
+    "Total de mensagens WhatsApp enviadas com sucesso via Evolution API",
+    labelnames=["escritorio_id", "tipo"],
+)
 
 
 # Protocols (DB / Repositórios)
@@ -181,10 +189,16 @@ class WhatsAppService:
                 status="enviado",
                 payload_resposta=resposta,
             )
+            _mensagens_enviadas.labels(escritorio_id=str(escritorio_id), tipo="texto").inc()
             return {"ok": True, "agendado": False, "resposta": resposta}
 
         except EvolutionOfflineError as e:
-            logger.warning("Instância offline: %s", str(e))
+            logger.warning(
+                "whatsapp_instancia_offline",
+                escritorio_id=escritorio_id,
+                cliente_id=cliente_id,
+                erro=str(e),
+            )
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -196,7 +210,13 @@ class WhatsAppService:
             return {"ok": False, "erro": "instancia_offline"}
 
         except EvolutionError as e:
-            logger.exception("Falha Evolution: %s", str(e))
+            logger.error(
+                "whatsapp_falha_evolution",
+                escritorio_id=escritorio_id,
+                cliente_id=cliente_id,
+                erro=str(e),
+                exc_info=True,
+            )
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,

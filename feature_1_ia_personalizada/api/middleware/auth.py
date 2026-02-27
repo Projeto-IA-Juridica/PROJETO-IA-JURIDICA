@@ -20,11 +20,12 @@ ROTAS_PUBLICAS = [
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/health",         # O health check básico é open
-    "/health/ready",   # O detailed também, para pods k8s conseguirem ler
-    "/auth/login",     # Obviamente, pra gerar o token
-    "/auth/refresh",   # Pra renovar
-    "/webhook/whatsapp", # Evoluton API manda pra cá (autenticado via Header X-API-Key depois)
+    "/health",           # O health check básico é open
+    "/health/ready",     # O detailed também, para pods k8s conseguirem ler
+    "/auth/login",       # Obviamente, pra gerar o token
+    "/auth/refresh",     # Pra renovar
+    "/webhook/whatsapp", # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
+    "/metrics",          # Prometheus scraper não usa JWT
 ]
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):

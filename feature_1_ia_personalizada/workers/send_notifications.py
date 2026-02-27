@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import logging
+import structlog
 from datetime import datetime, timedelta, time, timezone
 from typing import Optional, Any
 
@@ -9,8 +9,7 @@ import redis
 from celery import shared_task
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = structlog.get_logger(__name__)
 
 
 
@@ -107,7 +106,7 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
 class ServicoWhatsApp:
     @staticmethod
     def enviar_mensagem(telefone: str, texto: str, botoes: Optional[list[dict]] = None):
-        logger.info(f"Enviando mensagem para {telefone}")
+        logger.info("whatsapp_enviando_mensagem", telefone=telefone)
 
 
 def buscar_processo_e_cliente(id_processo: int):
@@ -124,7 +123,7 @@ def buscar_clientes_para_pesquisa():
 
 def registrar_interacao(id_cliente: int, id_processo: Optional[int],
                         tipo: str, dados: dict):
-    logger.info(f"Interação registrada: {tipo}")
+    logger.info("interacao_registrada", tipo=tipo, cliente_id=id_cliente, processo_id=id_processo)
 
 
 
