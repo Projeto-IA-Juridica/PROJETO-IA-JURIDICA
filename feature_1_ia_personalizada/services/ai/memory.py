@@ -9,8 +9,8 @@ from redis.asyncio import Redis
 
 logger = structlog.get_logger(__name__)
 
-_TTL_SEGUNDOS = 60 * 60 * 24   # 24 horas sem interação → histórico expira
-_MAX_MENSAGENS = 50             # FIFO: remove as mais antigas ao atingir o limite
+_TTL_SEGUNDOS = 60 * 60 * 24 * 7  # 7 dias sem interação → histórico expira
+_MAX_MENSAGENS = 100               # FIFO: remove as mais antigas ao atingir o limite
 _MAX_CONTENT_CHARS = 4096       # trunca conteúdo antes de serializar — proteção de memória
 
 

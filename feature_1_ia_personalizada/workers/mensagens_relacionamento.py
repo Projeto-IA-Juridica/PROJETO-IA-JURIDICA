@@ -11,6 +11,9 @@ from typing import Optional, Any
 import redis
 from celery import shared_task
 
+from feature_1_ia_personalizada.services.integrations.google_sheets import (
+    GoogleSheetsClient as _RealGoogleSheetsClient,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -105,24 +108,54 @@ def dividir_em_lotes(itens: list[Any], tamanho: int) -> list[list[Any]]:
     return [itens[i:i + tamanho] for i in range(0, len(itens), tamanho)]
 
 
-# ====== INTEGRAÇÕES (AJUSTE PARA O SEU PROJETO) ======
+# ====== INTEGRAÇÕES ======
+
+def _criar_sheets_client() -> _RealGoogleSheetsClient:
+    """Instancia o cliente real a partir das variáveis de ambiente."""
+    credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+    spreadsheet_id = os.getenv("GOOGLE_SHEETS_ID", "")
+    return _RealGoogleSheetsClient(credentials_path, spreadsheet_id)
+
 
 class GoogleSheetsClient:
+    """
+    Wrapper síncrono sobre o GoogleSheetsClient real.
+    Converte os dicts retornados pelo cliente para objetos Cliente.
+    O cliente real é instanciado sob demanda (lazy) a partir das env vars.
+    """
+
+    _client: _RealGoogleSheetsClient | None = None
+
+    @classmethod
+    def _get(cls) -> _RealGoogleSheetsClient:
+        if cls._client is None:
+            cls._client = _criar_sheets_client()
+        return cls._client
+
     @staticmethod
     def get_clientes() -> list[Cliente]:
-        raise NotImplementedError
+        raw = GoogleSheetsClient._get().get_clientes()
+        return [
+            Cliente(
+                id=d["id"],
+                nome=d["nome"],
+                telefone=d["telefone"],
+                status=d["status"],
+                data_nascimento=d.get("data_nascimento"),
+                profissao=d.get("profissao"),
+            )
+            for d in raw
+        ]
 
     @staticmethod
     def get_datas_comemorativas() -> list[dict]:
-        """
-        Retornar algo como:
-        [{"dia": 5, "mes": 3, "nome": "Dia do Bancário", "profissao_alvo": "bancario", "template": "TEMPLATE_DIA_BANCARIO"}]
-        """
-        raise NotImplementedError
+        return GoogleSheetsClient._get().get_datas_comemorativas()
 
     @staticmethod
-    def registrar_log_envio(*, tipo: str, cliente_id: int, detalhe: str):
-        raise NotImplementedError
+    def registrar_log_envio(*, tipo: str, cliente_id: int, detalhe: str) -> None:
+        GoogleSheetsClient._get().registrar_log_envio(
+            tipo=tipo, cliente_id=cliente_id, detalhe=detalhe
+        )
 
 
 class WhatsAppService:

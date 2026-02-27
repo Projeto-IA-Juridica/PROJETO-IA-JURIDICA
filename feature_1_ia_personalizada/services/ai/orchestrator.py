@@ -57,6 +57,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_BASE,
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
+    SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
 )
@@ -603,10 +604,17 @@ class ConversationOrchestrator:
                     nome_escritorio=nome_escritorio,
                 )
             elif intencao == "saudacao":
-                system_prompt = SYSTEM_PROMPT_BOAS_VINDAS.format(
-                    nome_escritorio=nome_escritorio,
-                    nome_cliente=nome_cliente,
-                )
+                cliente_recorrente = len(state.get("historico", [])) > 0
+                if cliente_recorrente:
+                    system_prompt = SYSTEM_PROMPT_SAUDACAO_RECORRENTE.format(
+                        nome_escritorio=nome_escritorio,
+                        nome_cliente=nome_cliente,
+                    )
+                else:
+                    system_prompt = SYSTEM_PROMPT_BOAS_VINDAS.format(
+                        nome_escritorio=nome_escritorio,
+                        nome_cliente=nome_cliente,
+                    )
             else:
                 system_prompt = SYSTEM_PROMPT_BASE.format(nome_escritorio=nome_escritorio)
 
@@ -812,7 +820,7 @@ class ConversationOrchestrator:
                 usando_fallback=state.get("usando_fallback"),
                 tokens=tokens,
             )
-            return {}
+            return {"precisa_regenerar": False}
 
         except Exception as exc:
             _erros_total.labels(no="enviar_resposta").inc()
@@ -881,7 +889,7 @@ class ConversationOrchestrator:
         except Exception as exc_inner:
             log.error("tratar_erro_falhou_persistir", exc_inner=str(exc_inner))
 
-        return {}
+        return {"usando_fallback": True}
 
     # -----------------------------------------------------------------------
     # Fluxo sequencial — usado quando LangGraph não está disponível
