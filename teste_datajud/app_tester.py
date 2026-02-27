@@ -6,7 +6,14 @@ import streamlit as st
 # Setup de paths para garantir os imports corretos
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from teste_datajud.standalone_pipeline import DatajudTesterPipeline
+from shared.database.connection import async_session_factory
+from shared.models.interacao import Interacao
+from shared.models.escritorio import Escritorio
+from shared.models.cliente import Cliente
+import os
+from dotenv import load_dotenv
 
 # Configuração da Página
 st.set_page_config(
@@ -162,5 +169,39 @@ else:
                     r_texto = resposta["resposta"]
                     st.markdown(r_texto)
                     st.session_state.mensagens.append({"role": "assistant", "content": r_texto})
+                    
+                    # Salva a interação no Supabase (Postgres)
+                    async def salvar_no_banco():
+                        async with async_session_factory() as session:
+                            # Tenta pegar um escritório/cliente teste
+                            import sqlalchemy as sa
+                            esc = await session.execute(sa.select(Escritorio).limit(1))
+                            escritorio = esc.scalar_one_or_none()
+                            
+                            cli = await session.execute(sa.select(Cliente).limit(1))
+                            cliente = cli.scalar_one_or_none()
+                            
+                            if escritorio and cliente:
+                                nova_interacao = Interacao(
+                                    escritorio_id=escritorio.id,
+                                    cliente_id=cliente.id,
+                                    tipo="sistema", # teste standalone
+                                    direcao="saida",
+                                    mensagem_cliente=prompt,
+                                    mensagem_ia=r_texto,
+                                    tokens_input=resposta.get("tokens_input", 0),
+                                    tokens_output=resposta.get("tokens_output", 0),
+                                    custo_estimado=resposta.get("custo", 0),
+                                    metadata_json={"origem": "sandbox_datajud", "cnj": st.session_state.contexto_processo.get("bruto", {}).get("numeroProcesso", "")}
+                                )
+                                session.add(nova_interacao)
+                                await session.commit()
+                                return True
+                        return False
+                        
+                    salvo = asyncio.run(salvar_no_banco())
+                    if salvo:
+                        st.caption("💾 Interação salva no banco de dados!")
+                        
                 except Exception as e:
                     st.error(f"Erro na comunicação com a IA: {e}")
