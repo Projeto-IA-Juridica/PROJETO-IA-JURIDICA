@@ -140,3 +140,120 @@ class FakeRedis:
 @pytest.fixture
 def fake_redis() -> FakeRedis:
     return FakeRedis()
+
+# ---------------------------------------------------------------------------
+# Database e API Mocks
+# ---------------------------------------------------------------------------
+
+from faker import Faker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from shared.models.base import Base
+
+# Dependências reais/modelos
+from shared.database.session import get_db
+from shared.models.escritorio import Escritorio
+from shared.models.usuario import Usuario
+from shared.models.cliente import Cliente
+from shared.models.processo import Processo
+from shared.security.encryption import hash_senha
+from shared.security.jwt import criar_token
+
+fake = Faker('pt_BR')
+
+# Engine in-memory para SQLite Async
+# Como o Postgres exigiria um banco de dados real rodando e limpar as tabelas,
+# o SQLite:memory: é o padrao de ouro pra rodar pytest super rapido,
+# porém precisamos do driver aiosqlite (que vamos instalar agora).
+# Aqui vamos usar o esquema do sqlite
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+from sqlalchemy.pool import StaticPool
+
+@pytest.fixture(scope="session")
+def engine():
+    _engine = create_async_engine(
+        TEST_DATABASE_URL, 
+        echo=False,
+        poolclass=StaticPool,
+        connect_args={'check_same_thread': False}
+    )
+    yield _engine
+    _engine.sync_engine.dispose()
+
+@pytest.fixture(scope="function")
+async def init_db(engine):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+@pytest.fixture(scope="function")
+async def db_session(engine, init_db) -> AsyncSession:
+    Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    async with Session() as session:
+        yield session
+
+# Factory para Escritório
+@pytest.fixture
+async def escritorio_factory(db_session):
+    async def _criar_escritorio(**kwargs):
+        escritorio = Escritorio(
+            nome=kwargs.get("nome", fake.company()),
+            cnpj=kwargs.get("cnpj", fake.cnpj()),
+            telefone=kwargs.get("telefone", "5511999999999"),
+            email=kwargs.get("email", fake.company_email()),
+            oab_responsavel=kwargs.get("oab_responsavel", "SP123456"),
+            nome_responsavel=kwargs.get("nome_responsavel", fake.name()),
+        )
+        db_session.add(escritorio)
+        await db_session.commit()
+        await db_session.refresh(escritorio)
+        return escritorio
+    return _criar_escritorio
+
+# Factory para Usuário
+@pytest.fixture
+async def usuario_factory(db_session):
+    async def _criar_usuario(escritorio_id: int, senha_plana: str = "Senha123!", **kwargs):
+        hashed = hash_senha(senha_plana)
+        usuario = Usuario(
+            escritorio_id=escritorio_id,
+            nome=kwargs.get("nome", fake.name()),
+            email=kwargs.get("email", fake.email()),
+            senha_hash=hashed,
+            role=kwargs.get("role", "admin"),
+        )
+        db_session.add(usuario)
+        await db_session.commit()
+        await db_session.refresh(usuario)
+        return usuario
+    return _criar_usuario
+
+# Token de autenticação válido
+@pytest.fixture
+def auth_token():
+    def _gerar_token(user_id: int, escritorio_id: int, role: str = "admin"):
+        # usa _TEST_FERNET_KEY de teste definida no topo
+        return criar_token(user_id=user_id, escritorio_id=escritorio_id, role=role)
+    return _gerar_token
+
+# AsyncClient (TestClient) para bater nas rotas da API
+@pytest.fixture
+async def async_client(db_session):
+    from httpx import AsyncClient
+    from feature_1_ia_personalizada.api.app import app
+    from httpx import ASGITransport
+
+    # Override the get_db dependency to use our isolated test transaction
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        yield client
+
+    app.dependency_overrides.clear()

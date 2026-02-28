@@ -1145,13 +1145,13 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
   - Cliente sem interação → recebe
 
 #### `test_auth_flow.py` ⚡ NOVO
-- [ ] Testar login com credenciais válidas → retorna tokens
-- [ ] Testar login com senha errada → 401
-- [ ] Testar login com email inexistente → 401
-- [ ] Testar refresh token → novo access_token
-- [ ] Testar acesso a rota protegida com token válido → 200
-- [ ] Testar acesso a rota protegida sem token → 401
-- [ ] Testar acesso com token expirado → 401
+- [x] Testar login com credenciais válidas → retorna tokens
+- [x] Testar login com senha errada → 401
+- [x] Testar login com email inexistente → 401
+- [x] Testar refresh token → novo access_token
+- [x] Testar acesso a rota protegida com token válido → 200
+- [x] Testar acesso a rota protegida sem token → 401
+- [x] Testar acesso com token expirado → 401
 
 ### 6.3 Configuração de Testes
 
