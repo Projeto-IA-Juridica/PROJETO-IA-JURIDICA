@@ -1065,13 +1065,13 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [x] Telefone com 55+DDD+9 dígitos → True; sem 55 → False
 
 #### `test_encryption.py` ⚡ NOVO (em shared)
-- [ ] Testar `criptografar` → `descriptografar` retorna texto original
-- [ ] Testar com texto vazio
-- [ ] Testar com caracteres especiais (acentos, emojis)
-- [ ] Testar `hash_senha` → `verificar_senha` retorna True
-- [ ] Testar `verificar_senha` com hash errado → False
-- [ ] Testar `mascarar_cpf` com CPF válido → formato `***.***.***-XX`
-- [ ] Testar `mascarar_telefone` com telefone válido → formato `(**) *****-XXXX`
+- [x] Testar `criptografar` → `descriptografar` retorna texto original
+- [x] Testar com texto vazio
+- [x] Testar com caracteres especiais (acentos, emojis)
+- [x] Testar `hash_senha` → `verificar_senha` retorna True
+- [x] Testar `verificar_senha` com hash errado → False
+- [x] Testar `mascarar_cpf` com CPF válido → formato `***.***.***-XX`
+- [x] Testar `mascarar_telefone` com telefone válido → formato `(**) *****-XXXX`
 
 #### `test_evolution_client.py`
 - [ ] Testar envio de texto (mock HTTP) → verifica payload correto
@@ -1369,7 +1369,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Testar `GET /metrics` → 200 com content-type Prometheus
 
 #### Testes ausentes (unitários)
-- [ ] Criar `tests/unit/test_encryption.py` (shared) — criptografar/descriptografar, hash_senha, mascarar_cpf
+- [x] Criar `tests/unit/test_encryption.py` (shared) — criptografar/descriptografar, hash_senha, mascarar_cpf
 - [ ] Criar `tests/unit/test_evolution_client.py` — envio texto mock HTTP, retry, erro 4xx/5xx
 - [ ] Criar `tests/unit/test_jusbrasil_client.py` — busca processo mock, fallback DataJud
 - [ ] Criar `tests/unit/test_cache_manager.py` — cache hit/miss, TTL, invalidar
