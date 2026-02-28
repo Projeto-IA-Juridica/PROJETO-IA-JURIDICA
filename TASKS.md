@@ -1411,7 +1411,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Criar `infrastructure/nginx/nginx.conf` com reverse proxy HTTP→HTTPS e TLS
 
 #### Scripts
-- [ ] Criar `scripts/migration/sync_sheets_to_db.py` — migrar clientes do Google Sheets para o banco PostgreSQL (com modo `--dry-run`)
+- [x] Criar `scripts/migration/sync_sheets_to_db.py` — migrar clientes do Google Sheets para o banco PostgreSQL (com modo `--dry-run`)
 - [ ] Criar `infrastructure/scripts/backup.sh` — `pg_dump` + compressão + upload S3 + retenção 30 dias
 
 #### Secrets Management
