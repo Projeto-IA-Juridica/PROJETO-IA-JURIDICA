@@ -1243,15 +1243,15 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [x] Popula dados de demonstração
 
 #### `scripts/migration/sync_sheets_to_db.py` ⚡ NOVA
-- [ ] **Migrar dados do Google Sheets para o banco de dados**:
-  - Buscar todos os clientes do Google Sheets
-  - Para cada cliente:
-    1. Verificar se já existe no banco (por CPF + escritorio_id)
-    2. Se não existe: criar registro em `clientes`
-    3. Se existe: atualizar campos (data_nascimento, profissao, empresa_atual, cargo)
-  - Logar estatísticas: total processado, novos criados, atualizados, erros
-  - Modo dry-run opcional (--dry-run flag)
-  - Validar dados antes de inserir (CPF, telefone, data_nascimento)
+- [x] **Migrar dados do Google Sheets para o banco de dados**:
+  - [x] Buscar todos os clientes do Google Sheets
+  - [x] Para cada cliente:
+    1. [x] Verificar se já existe no banco (por CPF + escritorio_id)
+    2. [x] Se não existe: criar registro em `clientes`
+    3. [x] Se existe: atualizar campos (data_nascimento, profissao, empresa_atual, cargo)
+  - [x] Logar estatísticas: total processado, novos criados, atualizados, erros
+  - [x] Modo dry-run opcional (--dry-run flag)
+  - [x] Validar dados antes de inserir (CPF, telefone, data_nascimento)
 
 #### `scripts/monitoring/health_check.py`
 - [x] Script standalone que verifica saúde de todos os serviços
