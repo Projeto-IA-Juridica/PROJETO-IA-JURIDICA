@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 import pytest
 
+import feature_1_ia_personalizada.services.ai.translator as translator_mod
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 
 
@@ -39,12 +40,8 @@ def translator_custom(tmp_path: Path) -> JuridicalTranslator:
     t._original = {}
     t._disponivel = False
 
-    # Força o carregamento do JSON customizado
-    import feature_1_ia_personalizada.services.ai.translator as mod
-    original = mod._TERMOS_JSON
-    mod._TERMOS_JSON = json_path
-    t._carregar_dicionario()
-    mod._TERMOS_JSON = original
+    with patch.object(translator_mod, "_TERMOS_JSON", json_path):
+        t._carregar_dicionario()
     return t
 
 
@@ -64,11 +61,10 @@ class TestCarregamento:
         t._dicionario = {}
         t._original = {}
         t._disponivel = False
-        import feature_1_ia_personalizada.services.ai.translator as mod
-        original = mod._TERMOS_JSON
-        mod._TERMOS_JSON = Path("/caminho/inexistente/traducoes.json")
-        t._carregar_dicionario()
-        mod._TERMOS_JSON = original
+
+        with patch.object(translator_mod, "_TERMOS_JSON", Path("/caminho/inexistente/traducoes.json")):
+            t._carregar_dicionario()
+
         assert t.dicionario_disponivel is False
         assert t.total_termos == 0
 
@@ -80,11 +76,10 @@ class TestCarregamento:
         t._dicionario = {}
         t._original = {}
         t._disponivel = False
-        import feature_1_ia_personalizada.services.ai.translator as mod
-        original = mod._TERMOS_JSON
-        mod._TERMOS_JSON = json_ruim
-        t._carregar_dicionario()
-        mod._TERMOS_JSON = original
+
+        with patch.object(translator_mod, "_TERMOS_JSON", json_ruim):
+            t._carregar_dicionario()
+
         assert t.dicionario_disponivel is False
 
 
@@ -98,18 +93,18 @@ class TestTraduzirTermo:
         assert resultado is not None
         assert "juiz" in resultado.lower() or "decisão" in resultado.lower()
 
-    def test_termo_uppercase_encontrado(self, translator: JuridicalTranslator):
-        assert translator.traduzir_termo("SENTENÇA") is not None
+    def test_termo_uppercase_encontrado(self, translator_custom: JuridicalTranslator):
+        assert translator_custom.traduzir_termo("SENTENÇA") is not None
 
-    def test_termo_capitalizado_encontrado(self, translator: JuridicalTranslator):
-        assert translator.traduzir_termo("Sentença") is not None
+    def test_termo_capitalizado_encontrado(self, translator_custom: JuridicalTranslator):
+        assert translator_custom.traduzir_termo("Sentença") is not None
 
-    def test_termo_sem_acento_encontrado(self, translator: JuridicalTranslator):
+    def test_termo_sem_acento_encontrado(self, translator_custom: JuridicalTranslator):
         """'sentenca' (sem acento) deve bater com 'sentença' no dicionário."""
-        assert translator.traduzir_termo("sentenca") is not None
+        assert translator_custom.traduzir_termo("sentenca") is not None
 
-    def test_termo_composto_encontrado(self, translator: JuridicalTranslator):
-        assert translator.traduzir_termo("agravo de instrumento") is not None
+    def test_termo_composto_encontrado(self, translator_custom: JuridicalTranslator):
+        assert translator_custom.traduzir_termo("agravo de instrumento") is not None
 
     def test_termo_inexistente_retorna_none(self, translator: JuridicalTranslator):
         assert translator.traduzir_termo("xyzzy_nao_existe_2024") is None
@@ -132,9 +127,14 @@ class TestTraduzirTermo:
         assert "O juiz deu a sentença." in resultado
 
     def test_retorno_sem_exemplo_nao_tem_label_exemplo(self, translator_custom: JuridicalTranslator):
+        # penhora tem "exemplo": "" no fixture — sem exemplo preenchido, label não deve aparecer
         resultado = translator_custom.traduzir_termo("penhora")
         assert resultado is not None
         assert "Exemplo:" not in resultado
+
+    def test_termo_com_espacos_extras_nao_encontrado(self, translator_custom: JuridicalTranslator):
+        """_normalizar não faz strip: '  sentença  ' não bate com 'sentença'. Documenta o comportamento atual."""
+        assert translator_custom.traduzir_termo("  sentença  ") is None
 
 
 # ---------------------------------------------------------------------------
@@ -193,11 +193,8 @@ class TestIdentificarTermos:
     def test_regex_chars_no_texto_nao_causam_crash(self, translator: JuridicalTranslator):
         """Texto com caracteres especiais de regex não deve levantar exceção."""
         texto_perigoso = "O prazo é (.*) dias? [urgente!] {imediato}"
-        try:
-            resultado = translator.identificar_termos_tecnicos(texto_perigoso)
-            assert isinstance(resultado, list)
-        except Exception as exc:
-            pytest.fail(f"identificar_termos_tecnicos levantou exceção inesperada: {exc}")
+        resultado = translator.identificar_termos_tecnicos(texto_perigoso)
+        assert isinstance(resultado, list)
 
     def test_texto_muito_longo_nao_causa_crash(self, translator: JuridicalTranslator):
         texto_longo = "palavra " * 10_000 + "sentença " * 5
@@ -210,6 +207,15 @@ class TestIdentificarTermos:
         t._original = {}
         t._disponivel = False
         assert t.identificar_termos_tecnicos("O juiz deu a sentença.") == []
+
+    def test_disponivel_false_mas_dicionario_populado_retorna_resultados(
+        self, translator_custom: JuridicalTranslator
+    ):
+        """identificar_termos_tecnicos não verifica _disponivel — usa o dicionário diretamente.
+        Documenta que _disponivel=False com dicionário populado ainda retorna matches."""
+        translator_custom._disponivel = False
+        termos = translator_custom.identificar_termos_tecnicos("A penhora foi decretada.")
+        assert "penhora" in termos
 
     def test_termo_parcial_nao_encontrado(self, translator_custom: JuridicalTranslator):
         """'pen' não deve bater com 'penhora'."""

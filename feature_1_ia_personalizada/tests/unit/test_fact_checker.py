@@ -150,6 +150,15 @@ class TestVerificarStatusProcesso:
 
         assert resultado["verificado"] is True
 
+    async def test_campo_string_vazia_ou_espacos_nos_dados_reais_ignorado(self):
+        """String vazia ou só espaços no banco também não geram correção após strip."""
+        checker = _make_checker({"numero_cnj": "", "tribunal": "   "})
+        interacao = _interacao()
+        resultado = await checker.verificar_status_processo("proc-1", "sem info", interacao)
+
+        assert resultado["verificado"] is True
+        assert resultado["correcoes"] == []
+
 
 # ---------------------------------------------------------------------------
 # verificar_prazo
@@ -199,6 +208,15 @@ class TestVerificarPrazo:
 
         assert resultado["prazo_real"] == "30/06/2025"
 
+    async def test_prazo_mencionado_com_espacos_extras_tratado(self):
+        """prazo_mencionado.strip() deve bater com o prazo real — espaços são ignorados."""
+        checker = _make_checker({"prazo": "30/06/2025"})
+        interacao = _interacao()
+        resultado = await checker.verificar_prazo("proc-1", "  30/06/2025  ", interacao)
+
+        assert resultado["verificado"] is True
+        assert resultado["correcoes"] == []
+
 
 # ---------------------------------------------------------------------------
 # filtrar_resposta
@@ -212,7 +230,7 @@ class TestFiltrarResposta:
 
         return FactChecker(buscar_dados_processo=buscar, utcnow=_utcnow_fixo)
 
-    def test_texto_limpo_nao_alterado_sem_log(self):
+    def test_texto_limpo_sem_disclaimer_nao_alterado(self):
         checker = self._checker()
         interacao = _interacao()
         resultado = checker.filtrar_resposta(
@@ -294,6 +312,19 @@ class TestFiltrarResposta:
         )
 
         assert checker._disclaimer in resultado
+        # Disclaimer é o único motivo de alteração — motivo genérico deve estar registrado
+        motivos = interacao.metadata_json["auditoria_fact_checker"][0]["payload"]["motivos"]
+        assert motivos == ["Ajuste de linguagem aplicado."]
+
+    def test_disclaimer_sem_padrao_proibido_ainda_loga_auditoria(self):
+        """Texto limpo com adicionar_disclaimer=True ainda gera log de auditoria
+        porque ajustada != original após acrescentar o disclaimer."""
+        checker = self._checker()
+        interacao = _interacao()
+        checker.filtrar_resposta("Texto neutro.", interacao, adicionar_disclaimer=True)
+
+        assert interacao.metadata_json is not None
+        assert interacao.metadata_json["fact_check_corrigido"] is True
 
     def test_correcao_loga_metadata_json(self):
         checker = self._checker()
@@ -392,3 +423,13 @@ class TestLogarMetadataJson:
 
         payload = interacao.metadata_json["auditoria_fact_checker"][0]["payload"]
         assert payload == {"chave": "valor", "numero": 42}
+
+    def test_interacao_sem_atributo_metadata_json_nao_causa_erro(self):
+        """getattr com default=None deve absorver ausência do atributo sem crash."""
+        checker = self._checker()
+        interacao = SimpleNamespace()  # sem metadata_json
+        checker._logar_metadata_json(interacao, "evt", {})
+
+        assert hasattr(interacao, "metadata_json")
+        assert isinstance(interacao.metadata_json, dict)
+        assert "auditoria_fact_checker" in interacao.metadata_json
