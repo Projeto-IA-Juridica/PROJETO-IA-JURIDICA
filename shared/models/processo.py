@@ -144,8 +144,6 @@ class Processo(Base, TimestampMixin, TenantMixin):
         UniqueConstraint(
             "escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"
         ),
-        Index("ix_processos_cliente_id", "cliente_id"),
-        Index("ix_processos_status", "status"),
     )
 
     def __repr__(self) -> str:
