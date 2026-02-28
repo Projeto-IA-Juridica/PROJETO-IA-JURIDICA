@@ -29,7 +29,7 @@ URL_REDIS = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
 
 TAMANHO_LOTE = 10
-TEMPO_MAXIMO_POR_CLIENTE = 15
+TEMPO_ALERTA_POR_CLIENTE = 15  # limiar de observabilidade; não interrompe o processamento
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
 
@@ -166,18 +166,24 @@ class GoogleSheetsClient:
 class WhatsAppService:
     @staticmethod
     def enviar_mensagem(*, telefone: str, texto: str):
+        # TODO: implementar integração real com a API do WhatsApp
         raise NotImplementedError
 
 
 def buscar_processo_ativo_do_cliente(id_cliente: int) -> Optional[Processo]:
+    # TODO: implementar consulta ao banco de dados
     raise NotImplementedError
 
 
 def salvar_interacao(*, id_cliente: int, id_processo: Optional[int], texto: str, metadata_json: dict):
+    # TODO: implementar persistência no banco de dados
     raise NotImplementedError
 
 
 def buscar_data_ultima_interacao(id_cliente: int) -> Optional[datetime]:
+    # TODO: implementar consulta ao banco de dados.
+    # Atenção: chamada em loop em verificar_clientes_sem_contato — preferir batch lookup
+    # para evitar N+1 queries (ex: SELECT id, ultima_interacao FROM clientes WHERE id IN (...)).
     raise NotImplementedError
 
 
@@ -240,8 +246,8 @@ def verificar_aniversarios_diarios(self) -> dict:
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
             enviados += 1
 
-            if time.time() - inicio > TEMPO_MAXIMO_POR_CLIENTE:
-                logger.warning(f"Timeout por cliente (aniversario): cliente_id={cliente.id}")
+            if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
+                logger.warning("timeout_por_cliente", tipo="aniversario", cliente_id=cliente.id)
 
         time.sleep(1)
 
@@ -316,8 +322,8 @@ def verificar_datas_comemorativas(self) -> dict:
                 marcar_enviado(chave_envio, TEMPO_30_DIAS)
                 enviados += 1
 
-                if time.time() - inicio > TEMPO_MAXIMO_POR_CLIENTE:
-                    logger.warning(f"Timeout por cliente (data): cliente_id={cliente.id}")
+                if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
+                    logger.warning("timeout_por_cliente", tipo="data_comemorativa", cliente_id=cliente.id)
 
             time.sleep(1)
 
@@ -384,8 +390,8 @@ def verificar_clientes_sem_contato(self) -> dict:
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
             enviados += 1
 
-            if time.time() - inicio > TEMPO_MAXIMO_POR_CLIENTE:
-                logger.warning(f"Timeout por cliente (checkin): cliente_id={cliente.id}")
+            if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
+                logger.warning("timeout_por_cliente", tipo="check_in", cliente_id=cliente.id)
 
         time.sleep(1)
 

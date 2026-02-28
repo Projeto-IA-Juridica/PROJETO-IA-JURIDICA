@@ -32,6 +32,7 @@ _processos_monitorados_total = Gauge(
 TAMANHO_LOTE = 10
 INTERVALO_ENTRE_REQUISICOES_SEGUNDOS = 0.4
 TEMPO_MAXIMO_PROCESSO_SEGUNDOS = 30
+_LIMITE_BUSCA_PROCESSOS = 10_000  # máximo de processos por execução da task
 
 
 # FUNÇÕES DE BANCO (SUBSTITUIR PELO ORM REAL)
@@ -205,7 +206,7 @@ def monitorar_processos() -> Dict[str, Any]:
     total_erros = 0
 
     try:
-        processos = listar_processos_com_monitoramento_ativo(limite=10_000)
+        processos = listar_processos_com_monitoramento_ativo(limite=_LIMITE_BUSCA_PROCESSOS)
     except Exception as erro:
         return {"sucesso": False, "erro": str(erro)}
 
@@ -240,6 +241,9 @@ def monitorar_processos() -> Dict[str, Any]:
                     }
                 )
 
+            # Rate limiting por requisição — inclui o último processo de cada lote,
+            # o que gera um sleep extra antes do início do lote seguinte. Aceitável
+            # para MVP; ajustar se precisar de intervalo uniforme entre lotes.
             time.sleep(INTERVALO_ENTRE_REQUISICOES_SEGUNDOS)
 
     return {

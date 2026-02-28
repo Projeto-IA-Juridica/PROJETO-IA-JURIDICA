@@ -81,8 +81,8 @@ class TestHappyPath:
 # ---------------------------------------------------------------------------
 
 class TestFIFO:
-    async def test_51a_mensagem_remove_a_mais_antiga(self, memory: ConversationMemory, fake_redis: FakeRedis):
-        """Ao atingir 50 msgs, a 51ª deve descartar a mais antiga."""
+    async def test_101a_mensagem_remove_a_mais_antiga(self, memory: ConversationMemory, fake_redis: FakeRedis):
+        """Ao atingir 100 msgs, a 101ª deve descartar a mais antiga."""
         for i in range(_MAX_MENSAGENS):
             await memory.salvar_mensagem(1, 1, "user", f"msg_{i}")
 
@@ -135,8 +135,8 @@ class TestTTL:
         await memory.buscar_historico(1, 1)
         assert fake_redis._ttl(chave) == _TTL_SEGUNDOS
 
-    async def test_ttl_e_24_horas(self):
-        assert _TTL_SEGUNDOS == 60 * 60 * 24
+    async def test_ttl_e_7_dias(self):
+        assert _TTL_SEGUNDOS == 60 * 60 * 24 * 7
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +220,9 @@ class TestResiliencia:
     ):
         """Um item com JSON inválido no Redis não deve derrubar o buscar_historico."""
         chave = _chave(1, 1)
-        # Injeta diretamente um item corrompido no store
+        # Acesso direto ao _store.lists é intencional: precisamos injetar um estado
+        # corrompido que não pode ser criado pela API pública do FakeRedis.
+        # Se a estrutura interna do FakeRedis mudar, este teste precisará ser atualizado.
         fake_redis._store.lists[chave] = [
             json.dumps({"role": "user", "content": "ok"}),
             "ISSO NAO E JSON {{{",  # corrompido
@@ -239,6 +241,8 @@ class TestResiliencia:
         """LGPD: o log de item inválido não deve logar o conteúdo bruto."""
         chave = _chave(1, 1)
         dados_sensiveis = "CPF: 123.456.789-00 — NÃO DEVE APARECER NO LOG"
+        # Acesso direto ao _store.lists é intencional: simula dado sensível corrompido
+        # já persistido no Redis, impossível de injetar via API pública.
         fake_redis._store.lists[chave] = [dados_sensiveis]
 
         with caplog.at_level(logging.WARNING):

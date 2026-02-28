@@ -93,6 +93,12 @@ class TestIntSeguro:
     def test_string_vazia_retorna_zero(self):
         assert _int_seguro("") == 0
 
+    def test_none_retorna_zero(self):
+        assert _int_seguro(None) == 0
+
+    def test_inteiro_direto_aceito(self):
+        assert _int_seguro(99) == 99
+
 
 # ---------------------------------------------------------------------------
 # _retry_http
@@ -144,6 +150,38 @@ class TestRetryHttp:
 
         assert mock_sleep.call_count == 2
         mock_sleep.assert_has_calls([call(1), call(2)])
+
+    def test_excecao_nao_http_propagada_sem_retry(self):
+        """Erros que não são HttpError devem subir imediatamente, sem retry."""
+        fn = MagicMock(side_effect=ValueError("erro inesperado"))
+        with pytest.raises(ValueError):
+            _retry_http(fn, max_tentativas=3)
+        fn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _ler_intervalo  (testado diretamente para cobrir a camada HTTP interna)
+# ---------------------------------------------------------------------------
+
+class TestLerIntervalo:
+    def _mock_execute(self, cliente, payload: dict):
+        """Configura self._sheet para retornar payload no execute()."""
+        cliente._sheet.values.return_value.get.return_value.execute.return_value = payload
+
+    def test_retorna_linhas_da_api(self, cliente):
+        self._mock_execute(cliente, {"values": [["a", "b"], ["c", "d"]]})
+        assert cliente._ler_intervalo("Clientes!A2:I") == [["a", "b"], ["c", "d"]]
+
+    def test_resposta_sem_values_retorna_lista_vazia(self, cliente):
+        self._mock_execute(cliente, {})
+        assert cliente._ler_intervalo("Datas!A2:E") == []
+
+    def test_chama_api_com_intervalo_correto(self, cliente):
+        self._mock_execute(cliente, {"values": []})
+        cliente._ler_intervalo("Log!A:E")
+        cliente._sheet.values.return_value.get.assert_called_once_with(
+            spreadsheetId="SHEET_ID", range="Log!A:E"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +244,23 @@ class TestGetClientes:
             resultado = cliente.get_clientes()
         assert resultado[0]["data_nascimento"] is None
 
+    def test_oito_colunas_exatas_sem_ultimo_contato(self, cliente):
+        """Linha com 8 colunas: ultimo_contato deve ser string vazia."""
+        linhas = [
+            ["1", "Nome", "5511999", "cpf", "01/01/1990", "prof", "emp", "ativo"],
+        ]
+        with patch.object(cliente, "_ler_intervalo", return_value=linhas):
+            resultado = cliente.get_clientes()
+        assert resultado[0]["ultimo_contato"] == ""
+
+    def test_get_clientes_propaga_excecao_da_api(self, cliente):
+        """Erro na API deve ser propagado (não silenciado)."""
+        with (
+            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
+            pytest.raises(RuntimeError),
+        ):
+            cliente.get_clientes()
+
 
 # ---------------------------------------------------------------------------
 # get_datas_comemorativas
@@ -251,6 +306,22 @@ class TestGetDatasComemorativas:
         with patch.object(cliente, "_ler_intervalo", return_value=[]):
             resultado = cliente.get_datas_comemorativas()
         assert resultado == []
+
+    def test_dia_mes_invalidos_viram_zero(self, cliente):
+        linhas = [
+            ["bancario", "xx", "yy", "Dia Sem Data"],
+        ]
+        with patch.object(cliente, "_ler_intervalo", return_value=linhas):
+            resultado = cliente.get_datas_comemorativas()
+        assert resultado[0]["dia"] == 0
+        assert resultado[0]["mes"] == 0
+
+    def test_get_datas_propaga_excecao_da_api(self, cliente):
+        with (
+            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
+            pytest.raises(RuntimeError),
+        ):
+            cliente.get_datas_comemorativas()
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +401,34 @@ class TestRegistrarLogEnvio:
             )
 
         assert mock_execute.call_count == 2
+
+    def test_detalhe_usado_quando_sem_erro(self, cliente):
+        mock_values = self._mock_sheet(cliente)
+
+        cliente.registrar_log_envio(
+            tipo="aniversario",
+            cliente_id=5,
+            detalhe="mensagem enviada com sucesso",
+        )
+
+        linha = mock_values.append.call_args.kwargs["body"]["values"][0]
+        assert linha[4] == "mensagem enviada com sucesso"
+
+    def test_propaga_excecao_apos_retries_esgotados(self, cliente):
+        resp_mock = MagicMock()
+        resp_mock.status = 500
+        erro = HttpError(resp=resp_mock, content=b"error")
+
+        mock_execute = MagicMock(side_effect=erro)
+        mock_append = MagicMock()
+        mock_append.execute = mock_execute
+        mock_values = MagicMock()
+        mock_values.append.return_value = mock_append
+        cliente._sheet = MagicMock()
+        cliente._sheet.values.return_value = mock_values
+
+        with (
+            patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"),
+            pytest.raises(HttpError),
+        ):
+            cliente.registrar_log_envio(tipo="test", cliente_id=1, detalhe="test")

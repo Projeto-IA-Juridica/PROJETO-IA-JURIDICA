@@ -37,6 +37,14 @@ from feature_1_ia_personalizada.workers.mensagens_relacionamento import (
 _TZ_BR = timezone(timedelta(hours=-3))
 
 
+@pytest.fixture(autouse=True)
+def _reset_sheets_singleton():
+    """Reseta o singleton GoogleSheetsClient._client entre testes para evitar vazamento de estado."""
+    mr.GoogleSheetsClient._client = None
+    yield
+    mr.GoogleSheetsClient._client = None
+
+
 def _cliente(
     id: int = 1,
     nome: str = "João Silva",
@@ -265,13 +273,13 @@ class TestVerificarDatasComemorativas:
         return {"dia": dia, "mes": mes, "nome": "Dia do Teste", "profissao_alvo": "", "template": ""}
 
     def test_sem_datas_hoje_retorna_zero(self):
-        result = self._run([_cliente()], datas=[{"dia": 1, "mes": 1, "nome": "Ano Novo", "profissao_alvo": "", "template": ""}])
-        # Só chega ao assert se o dia atual não for 1/1
-        from feature_1_ia_personalizada.workers.mensagens_relacionamento import dia_mes_hoje
-        dia, mes = dia_mes_hoje()
-        if not (dia == 1 and mes == 1):
-            assert result["enviados"] == 0
-            assert result["datas"] == 0
+        """Data fixa em 15/03 garante que a data '01/01' nunca coincide com hoje."""
+        data_ano_novo = {"dia": 1, "mes": 1, "nome": "Ano Novo", "profissao_alvo": "", "template": ""}
+        data_fixa = datetime(2024, 3, 15, tzinfo=_TZ_BR)
+        with patch.object(mr, "agora_local", return_value=data_fixa):
+            result = self._run([_cliente()], datas=[data_ano_novo])
+        assert result["enviados"] == 0
+        assert result["datas"] == 0
 
     def test_data_hoje_envia_para_clientes_ativos(self):
         data = self._hoje_data()

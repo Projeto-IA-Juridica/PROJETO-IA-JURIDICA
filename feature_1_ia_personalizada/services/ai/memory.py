@@ -24,7 +24,7 @@ class ConversationMemory:
 
     Estrutura: Redis List onde cada elemento é um JSON compacto {role, content}.
     A lista cresce pelo final (RPUSH) e é lida do início (LRANGE).
-    TTL de 24h é renovado a cada interação — conversa "reinicia" após inatividade.
+    TTL de 7 dias é renovado a cada interação — conversa "reinicia" após inatividade.
     """
 
     def __init__(self, redis: Redis) -> None:
@@ -39,8 +39,8 @@ class ConversationMemory:
     ) -> None:
         """
         Adiciona uma mensagem ao final do histórico.
-        Remove a mensagem mais antiga se o limite de 50 for atingido.
-        Renova o TTL de 24h.
+        Remove a mensagem mais antiga se o limite de 100 for atingido.
+        Renova o TTL de 7 dias.
         """
         chave = _chave(escritorio_id, cliente_id)
         content_truncado = content[:_MAX_CONTENT_CHARS]

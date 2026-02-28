@@ -21,11 +21,16 @@ _google_sheets_requests_total = Counter(
 
 _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _MAX_TENTATIVAS = 3
-_TIMEOUT_SEGUNDOS = 30
 
 
 def _retry_http(fn, max_tentativas: int = _MAX_TENTATIVAS):
-    """Executa fn com retry e backoff exponencial (1s, 2s, 4s)."""
+    """
+    Executa fn com retry e backoff exponencial (1s, 2s, 4s).
+
+    Apenas HttpError é retryado — erros de rede transitórios do Google.
+    Exceções não-HTTP (ValueError, TypeError etc.) propagam imediatamente:
+    são bugs de código, não falhas de rede, e retry silenciaria o problema.
+    """
     for tentativa in range(max_tentativas):
         try:
             return fn()
@@ -143,10 +148,10 @@ class GoogleSheetsClient:
                     "id": _int_seguro(linha[0]),
                     "nome": linha[1].strip(),
                     "telefone": linha[2].strip(),
-                    "cpf": linha[3].strip() if len(linha) > 3 else "",
-                    "data_nascimento": _parse_data(linha[4].strip()) if len(linha) > 4 else None,
-                    "profissao": linha[5].strip() if len(linha) > 5 else "",
-                    "empresa": linha[6].strip() if len(linha) > 6 else "",
+                    "cpf": linha[3].strip(),
+                    "data_nascimento": _parse_data(linha[4].strip()),
+                    "profissao": linha[5].strip(),
+                    "empresa": linha[6].strip(),
                     "status": linha[7].strip(),
                     "ultimo_contato": linha[8].strip() if len(linha) > 8 else "",
                 }
@@ -183,9 +188,9 @@ class GoogleSheetsClient:
 
             datas.append(
                 {
-                    "profissao_alvo": linha[0].strip() if len(linha) > 0 else "",
-                    "dia": _int_seguro(linha[1]) if len(linha) > 1 else 0,
-                    "mes": _int_seguro(linha[2]) if len(linha) > 2 else 0,
+                    "profissao_alvo": linha[0].strip(),
+                    "dia": _int_seguro(linha[1]),
+                    "mes": _int_seguro(linha[2]),
                     "nome": linha[3].strip() if len(linha) > 3 else "",
                     "template": linha[4].strip() if len(linha) > 4 else "",
                 }
