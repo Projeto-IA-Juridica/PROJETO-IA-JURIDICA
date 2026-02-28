@@ -448,6 +448,8 @@ class TestNodeGerarResposta:
         result = await orq._node_gerar_resposta(state)
         claude.enviar_mensagem.assert_not_called()
         assert result["resposta_ia"] == "Recurso para questões processuais."
+        # Garante que o código passa mensagem_original para traduzir_termo (não termo isolado)
+        translator.traduzir_termo.assert_called_once_with("o que é agravo?")
 
     async def test_duvida_termo_sem_traducao_local_chama_claude(self):
         translator = _mock_translator()
@@ -527,6 +529,9 @@ class TestNodeGerarResposta:
 
     async def test_saudacao_nao_busca_cliente_para_outras_intencoes(self):
         """Para 'status', session.get(Cliente) não deve ser chamado."""
+        from shared.models.cliente import Cliente as ClienteModel
+        from shared.models.escritorio import Escritorio as EscritorioModel
+
         session = _make_session()
         claude = _mock_claude()
         dados = {
@@ -540,9 +545,10 @@ class TestNodeGerarResposta:
         }
         orq = _make_orchestrator(session=session, claude=claude)
         await orq._node_gerar_resposta(_base_state(intencao="status", dados_processo=dados))
-        # session.get foi chamado (para Escritorio), mas não deve ter sido chamado para Cliente
-        calls_modelos = [c.args[0].__name__ for c in session.get.call_args_list]
-        assert "Cliente" not in calls_modelos
+        # Compara a classe real (não o nome como string) — imune a refactoring de kwargs
+        classes_consultadas = {c.args[0] for c in session.get.call_args_list if c.args}
+        assert ClienteModel not in classes_consultadas
+        assert EscritorioModel in classes_consultadas  # sanity: Escritorio foi consultado
 
     async def test_tokens_acumulados_corretamente(self):
         claude = _mock_claude()
@@ -885,10 +891,49 @@ class TestNodeTratarErro:
         interacao = session.add.call_args.args[0]
         assert interacao.custo_estimado == Decimal("0")
 
-    async def test_retorna_dict_vazio(self):
+    async def test_retorna_usando_fallback_true(self):
         orq = _make_orchestrator()
         result = await orq._node_tratar_erro(_base_state(erro="any"))
-        assert result == {}
+        assert result == {"usando_fallback": True}
+
+    async def test_sem_entidades_nao_envia_whatsapp_mas_persiste_interacao(self):
+        """
+        Quando escritorio ou cliente não é encontrado no banco, o Evolution NÃO deve
+        ser chamado, mas a interação de auditoria DEVE ser persistida normalmente.
+        Cobre o guard `if escritorio and cliente and ...` dentro de _node_tratar_erro.
+        """
+        session = _make_session(escritorio=None, cliente=None)
+        evolution = _mock_evolution()
+        orq = _make_orchestrator(session=session, evolution=evolution)
+        result = await orq._node_tratar_erro(_base_state(erro="buscar_dados:DB offline"))
+        evolution.enviar_texto.assert_not_called()
+        session.add.assert_called_once()
+        assert result == {"usando_fallback": True}
+
+    async def test_falha_total_no_db_nao_propaga_excecao(self):
+        """
+        Quando a sessão do banco falha dentro de _node_tratar_erro (ex: DB offline),
+        o except interno captura o erro e o nó retorna {"usando_fallback": True}
+        sem propagar exceção — fluxo nunca trava por falha no tratamento de erro.
+        """
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(side_effect=RuntimeError("PG connection refused"))
+        cm.__aexit__ = AsyncMock(return_value=False)
+        factory = MagicMock(return_value=cm)
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
+            orq = ConversationOrchestrator(
+                claude_client=_mock_claude(),
+                memory=_mock_memory(),
+                translator=_mock_translator(),
+                jusbrasil_client=_mock_jusbrasil(),
+                cache_manager=_mock_cache(),
+                evolution_client=_mock_evolution(),
+                session_factory=factory,
+            )
+        result = await orq._node_tratar_erro(_base_state(erro="qualquer_erro"))
+        assert result == {"usando_fallback": True}
 
 
 # ---------------------------------------------------------------------------
