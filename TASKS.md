@@ -1074,9 +1074,9 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [x] Testar `mascarar_telefone` com telefone válido → formato `(**) *****-XXXX`
 
 #### `test_evolution_client.py`
-- [ ] Testar envio de texto (mock HTTP) → verifica payload correto
-- [ ] Testar retry em caso de timeout
-- [ ] Testar tratamento de erro 4xx/5xx
+- [x] Testar envio de texto (mock HTTP) → verifica payload correto
+- [x] Testar retry em caso de timeout
+- [x] Testar tratamento de erro 4xx/5xx
 
 #### `test_jusbrasil_client.py`
 - [ ] Testar busca de processo existente (mock) → retorna dados
@@ -1370,7 +1370,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 
 #### Testes ausentes (unitários)
 - [x] Criar `tests/unit/test_encryption.py` (shared) — criptografar/descriptografar, hash_senha, mascarar_cpf
-- [ ] Criar `tests/unit/test_evolution_client.py` — envio texto mock HTTP, retry, erro 4xx/5xx
+- [x] Criar `tests/unit/test_evolution_client.py` — envio texto mock HTTP, retry, erro 4xx/5xx
 - [ ] Criar `tests/unit/test_jusbrasil_client.py` — busca processo mock, fallback DataJud
 - [ ] Criar `tests/unit/test_cache_manager.py` — cache hit/miss, TTL, invalidar
 - [ ] Criar `tests/unit/test_whatsapp_service.py` — horário comercial, rate limit por cliente
