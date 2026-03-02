@@ -8,6 +8,12 @@ from typing import Optional, Any
 import redis
 from celery import shared_task
 
+from shared.database.worker_queries import (
+    insert_interacao,
+    query_clientes_para_pesquisa,
+    query_processo_e_cliente,
+    query_processos_sem_movimentacao,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -110,20 +116,24 @@ class ServicoWhatsApp:
 
 
 def buscar_processo_e_cliente(id_processo: int):
-    raise NotImplementedError
+    return query_processo_e_cliente(id_processo)
 
 
 def buscar_processos_sem_movimentacao():
-    raise NotImplementedError
+    return query_processos_sem_movimentacao()
 
 
 def buscar_clientes_para_pesquisa():
-    raise NotImplementedError
+    return query_clientes_para_pesquisa()
 
 
 def registrar_interacao(id_cliente: int, id_processo: Optional[int],
                         tipo: str, dados: dict):
-    logger.info("interacao_registrada", tipo=tipo, cliente_id=id_cliente, processo_id=id_processo)
+    insert_interacao(
+        id_cliente=id_cliente,
+        id_processo=id_processo,
+        metadata_json={"tipo_atividade": tipo, **dados},
+    )
 
 
 
@@ -145,7 +155,11 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
-    processo, cliente = buscar_processo_e_cliente(id_processo)
+    resultado = buscar_processo_e_cliente(id_processo)
+    if resultado is None:
+        return {"status": "processo_nao_encontrado", "id_processo": id_processo}
+    processo, cliente = resultado
+
 
     mensagem = MENSAGEM_NOVO_ANDAMENTO.format(
         descricao_andamento=descricao_andamento.strip()

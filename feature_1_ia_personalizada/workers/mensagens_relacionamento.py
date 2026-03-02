@@ -15,6 +15,12 @@ from prometheus_client import Counter
 from feature_1_ia_personalizada.services.integrations.google_sheets import (
     GoogleSheetsClient as _RealGoogleSheetsClient,
 )
+from shared.database.worker_queries import (
+    enviar_mensagem_whatsapp as _enviar_whatsapp,
+    insert_interacao,
+    query_processo_ativo_do_cliente as _orm_processo_ativo,
+    query_ultima_interacao_batch,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -165,26 +171,30 @@ class GoogleSheetsClient:
 
 class WhatsAppService:
     @staticmethod
-    def enviar_mensagem(*, telefone: str, texto: str):
-        # TODO: implementar integração real com a API do WhatsApp
-        raise NotImplementedError
+    def enviar_mensagem(*, id_cliente: int, telefone: str, texto: str) -> None:
+        """Envia mensagem via Evolution API. Resolve a instância WhatsApp pelo escritório do cliente."""
+        _enviar_whatsapp(id_cliente, telefone, texto)
 
 
 def buscar_processo_ativo_do_cliente(id_cliente: int) -> Optional[Processo]:
-    # TODO: implementar consulta ao banco de dados
-    raise NotImplementedError
+    dado = _orm_processo_ativo(id_cliente)
+    if dado is None:
+        return None
+    return Processo(
+        id=dado["id"],
+        numero=dado["numero"],
+        cliente_id=id_cliente,
+        status=dado["status"],
+    )
 
 
 def salvar_interacao(*, id_cliente: int, id_processo: Optional[int], texto: str, metadata_json: dict):
-    # TODO: implementar persistência no banco de dados
-    raise NotImplementedError
-
-
-def buscar_data_ultima_interacao(id_cliente: int) -> Optional[datetime]:
-    # TODO: implementar consulta ao banco de dados.
-    # Atenção: chamada em loop em verificar_clientes_sem_contato — preferir batch lookup
-    # para evitar N+1 queries (ex: SELECT id, ultima_interacao FROM clientes WHERE id IN (...)).
-    raise NotImplementedError
+    insert_interacao(
+        id_cliente=id_cliente,
+        id_processo=id_processo,
+        texto=texto,
+        metadata_json=metadata_json,
+    )
 
 
 # ====== TASKS ======
@@ -227,7 +237,7 @@ def verificar_aniversarios_diarios(self) -> dict:
             processo = buscar_processo_ativo_do_cliente(cliente.id)
 
             texto = TEMPLATE_ANIVERSARIO.format(nome=cliente.nome)
-            WhatsAppService.enviar_mensagem(telefone=cliente.telefone, texto=texto)
+            WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
 
             GoogleSheetsClient.registrar_log_envio(
                 tipo="aniversario",
@@ -303,7 +313,7 @@ def verificar_datas_comemorativas(self) -> dict:
                 else:
                     texto = TEMPLATE_DATA_COMEMORATIVA_GENERICA.format(nome_data=nome_data)
 
-                WhatsAppService.enviar_mensagem(telefone=cliente.telefone, texto=texto)
+                WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
 
                 GoogleSheetsClient.registrar_log_envio(
                     tipo="data_comemorativa",
@@ -343,12 +353,12 @@ def verificar_clientes_sem_contato(self) -> dict:
     agora = agora_local()
     candidatos: list[Cliente] = []
 
+    ids_ativos = [c.id for c in clientes_ativos]
+    datas_ultima = query_ultima_interacao_batch(ids_ativos)
+
     for cliente in clientes_ativos:
-        ultima = buscar_data_ultima_interacao(cliente.id)
-        if ultima is None:
-            candidatos.append(cliente)
-            continue
-        if (agora - ultima) > timedelta(days=dias_sem_contato):
+        ultima = datas_ultima.get(cliente.id)
+        if ultima is None or (agora - ultima) > timedelta(days=dias_sem_contato):
             candidatos.append(cliente)
 
     candidatos = candidatos[:limite_maximo]
@@ -371,7 +381,7 @@ def verificar_clientes_sem_contato(self) -> dict:
             processo = buscar_processo_ativo_do_cliente(cliente.id)
 
             texto = TEMPLATE_MENSAGEM_TRIMESTRAL.format(nome=cliente.nome)
-            WhatsAppService.enviar_mensagem(telefone=cliente.telefone, texto=texto)
+            WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
 
             GoogleSheetsClient.registrar_log_envio(
                 tipo="check_in",

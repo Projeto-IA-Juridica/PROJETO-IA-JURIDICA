@@ -9,6 +9,10 @@ from typing import Any, Dict, Optional, Protocol
 
 from prometheus_client import Counter
 
+from sqlalchemy import select
+
+from shared.database.connection import async_session_factory
+from shared.models.processo import Processo as ProcessoModel
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
 
 logger = structlog.get_logger(__name__)
@@ -231,14 +235,32 @@ class WhatsAppService:
     # Mensagens “prontas”
    
 
+    async def _obter_contexto_processo(
+        self, processo_id: int
+    ) -> Optional[tuple[int, int]]:
+        """Retorna (escritorio_id, cliente_id) do processo, ou None se não encontrado."""
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(ProcessoModel.escritorio_id, ProcessoModel.cliente_id)
+                .where(ProcessoModel.id == processo_id)
+            )
+            row = result.one_or_none()
+        if row is None:
+            logger.warning("processo_nao_encontrado", processo_id=processo_id)
+            return None
+        return row.escritorio_id, row.cliente_id
+
     async def enviar_notificacao_andamento(self, processo_id: int, andamento: str) -> Dict[str, Any]:
-        """
-        Você precisa que o seu RepositorioWhatsApp saiba:
-        - mapear processo_id -> (escritorio_id, cliente_id)
-        Se ainda não tiver, faça esse método no repo depois.
-        """
-        # TODO: implementar no repo: obter contexto do processo
-        raise NotImplementedError("Implemente no repositório: obter (escritorio_id, cliente_id) pelo processo_id")
+        contexto = await self._obter_contexto_processo(processo_id)
+        if contexto is None:
+            return {"ok": False, "erro": "processo_nao_encontrado"}
+        escritorio_id, cliente_id = contexto
+        texto = (
+            "Atualização do seu processo:\n\n"
+            f"{andamento}\n\n"
+            "Se desejar, posso explicar em linguagem mais simples."
+        )
+        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
     async def enviar_boas_vindas(self, escritorio_id: int, cliente_id: int) -> Dict[str, Any]:
         texto = (
@@ -289,8 +311,15 @@ class WhatsAppService:
             return {"ok": False, "erro": "falha_envio_nps"}
 
     async def enviar_sem_movimentacao(self, processo_id: int) -> Dict[str, Any]:
-        # TODO: implementar quando seu repo mapear processo_id -> (escritorio_id, cliente_id)
-        raise NotImplementedError("Implemente no repositório: obter (escritorio_id, cliente_id) pelo processo_id")
+        contexto = await self._obter_contexto_processo(processo_id)
+        if contexto is None:
+            return {"ok": False, "erro": "processo_nao_encontrado"}
+        escritorio_id, cliente_id = contexto
+        texto = (
+            "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
+            "Isso é comum e não significa necessariamente um problema."
+        )
+        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
 
 

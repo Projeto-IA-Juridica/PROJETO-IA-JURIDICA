@@ -16,6 +16,11 @@ from .celery_app import celery_app
 # from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 # from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
 # deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
+from shared.database.worker_queries import (
+    query_processos_monitorados,
+    query_processo_por_id,
+    update_ultimo_andamento,
+)
 logger = structlog.get_logger(__name__)
 
 _processos_monitorados_total = Gauge(
@@ -33,34 +38,6 @@ TAMANHO_LOTE = 10
 INTERVALO_ENTRE_REQUISICOES_SEGUNDOS = 0.4
 TEMPO_MAXIMO_PROCESSO_SEGUNDOS = 30
 _LIMITE_BUSCA_PROCESSOS = 10_000  # máximo de processos por execução da task
-
-
-# FUNÇÕES DE BANCO (SUBSTITUIR PELO ORM REAL)
-
-
-def listar_processos_com_monitoramento_ativo(limite: int) -> List[Dict[str, Any]]:
-    """
-    SELECT * FROM processos WHERE monitoramento_ativo = true
-    """
-    return []
-
-
-def buscar_processo_por_id(id_processo: int) -> Optional[Dict[str, Any]]:
-    return None
-
-
-def atualizar_ultimo_andamento_do_processo(
-    id_processo: int,
-    texto_ultimo_andamento: str,
-    data_ultimo_andamento_iso: str,
-) -> None:
-    """
-    UPDATE processos
-    SET ultimo_andamento = :texto,
-        data_ultimo_andamento = :data_iso
-    WHERE id = :id_processo
-    """
-    return None
 
 
 # FUNÇÕES AUXILIARES
@@ -178,7 +155,7 @@ def processar_processo_individual(
 
     # Atualizar banco com último andamento
     if ultima_data_encontrada:
-        atualizar_ultimo_andamento_do_processo(
+        update_ultimo_andamento(
             id_processo,
             ultimo_texto_limpo or "",
             ultima_data_encontrada,
@@ -206,7 +183,7 @@ def monitorar_processos() -> Dict[str, Any]:
     total_erros = 0
 
     try:
-        processos = listar_processos_com_monitoramento_ativo(limite=_LIMITE_BUSCA_PROCESSOS)
+        processos = query_processos_monitorados(limite=_LIMITE_BUSCA_PROCESSOS)
     except Exception as erro:
         return {"sucesso": False, "erro": str(erro)}
 
@@ -264,7 +241,7 @@ def monitorar_processos() -> Dict[str, Any]:
 )
 def monitorar_processo_individual(id_processo: int) -> Dict[str, Any]:
 
-    processo = buscar_processo_por_id(int(id_processo))
+    processo = query_processo_por_id(int(id_processo))
 
     if not processo:
         return {

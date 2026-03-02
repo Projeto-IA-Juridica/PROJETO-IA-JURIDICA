@@ -1,7 +1,7 @@
 # Plano de Production Readiness — Concierge Jurídico Digital
 
 > **Objetivo:** Levar a Feature 1 (IA Personalizada) de MVP avançado para produção real.
-> **Auditoria realizada em:** Fevereiro 2026
+> **Auditoria realizada em:** Fevereiro 2026 | **Última atualização:** Março 2026 (Sprint 1 concluída parcialmente)
 > **Estimativa total:** 8–10 sprints (2–3 meses com 2 engenheiros)
 
 ---
@@ -27,8 +27,8 @@
 |---|---|---|---|
 | API routes + middleware | 90% | ⚠️ Quase | CORS aberto, sem error handler global |
 | Auth JWT + segurança | 95% | ✅ Sim | — |
-| Workers Celery | 40% | ❌ Não | 7 funções stub/NotImplementedError |
-| Banco de dados + ORM | 90% | ✅ Sim | Queries ORM nos workers (stubs) |
+| Workers Celery | 80% | ⚠️ Quase | Imports Jusbrasil/DataJud comentados (aguarda Fase 3) |
+| Banco de dados + ORM | 95% | ✅ Sim | — |
 | Logging estruturado | 95% | ✅ Sim | Falta centralização em produção |
 | Métricas Prometheus | 90% | ⚠️ Quase | Sem servidor Prometheus/Grafana |
 | Health checks | 95% | ✅ Sim | — |
@@ -48,12 +48,14 @@
 - ✅ Métricas Prometheus declaradas e incrementadas corretamente
 - ✅ Docker multi-stage com usuário não-root + healthchecks
 - ✅ Alembic migrations configurado
+- ✅ Queries ORM em todos os workers (`shared/database/worker_queries.py`)
+- ✅ `WhatsAppService.enviar_mensagem` integrado ao `EvolutionClient` real
+- ✅ `whatsapp.py` — `enviar_notificacao_andamento` e `enviar_sem_movimentacao` implementados
+- ✅ Celery Beat tasks de relacionamento executam sem `NotImplementedError`
 
-### O que está quebrado hoje (não chega em produção assim)
+### O que ainda está quebrado (não chega em produção assim)
 
-- ❌ `monitorar_processos` nunca processa nada — `listar_processos_com_monitoramento_ativo()` retorna `[]`
-- ❌ Celery Beat agenda 5 tarefas que nunca executam — `NotImplementedError` em `send_notifications.py` e `mensagens_relacionamento.py`
-- ❌ `DataJudClient`, `JusbrasilClient`, `JuridicalTranslator` importados de forma comentada em `monitor_processos.py`
+- ❌ `DataJudClient`, `JusbrasilClient`, `JuridicalTranslator` com imports comentados em `monitor_processos.py` — `monitorar_processos` busca dados do banco mas não processa andamentos (aguarda Fase 3)
 - ❌ Webhook WhatsApp aceita qualquer payload sem validação de assinatura
 - ❌ CORS aberto para `*` — vulnerabilidade de CSRF
 
@@ -63,46 +65,28 @@
 
 > **Meta:** Todos os workers Celery executam sem erros. Monitor de processos busca dados reais do banco.
 
-### 2.1 Implementar queries ORM nos workers
+### 2.1 Implementar queries ORM nos workers ✅ IMPLEMENTADO
 
-**Arquivo:** `feature_1_ia_personalizada/workers/monitor_processos.py`
+**Arquivo criado:** `shared/database/worker_queries.py`
 
-As três funções de banco retornam stubs. Substituir por queries SQLAlchemy reais usando sessão síncrona (workers Celery são síncronos).
+Todas as queries foram centralizadas em um módulo único. A abordagem adotada foi `asyncio.run()` sobre o engine asyncpg existente (em vez de criar um engine psycopg2 separado), evitando adicionar dependências. Cada função pública é um wrapper síncrono que executa a coroutine no event loop.
 
-| Função | Linha atual | O que implementar |
-|---|---|---|
-| `listar_processos_com_monitoramento_ativo()` | L40 → `return []` | `SELECT * FROM processos WHERE monitoramento_ativo = true LIMIT :limite` |
-| `buscar_processo_por_id()` | L47 → `return None` | `SELECT * FROM processos WHERE id = :id` |
-| `atualizar_ultimo_andamento_do_processo()` | L51 → `return None` | `UPDATE processos SET ultimo_andamento = ..., data_ultimo_andamento = ... WHERE id = :id` |
+| Função (worker_queries.py) | Query |
+|---|---|
+| `query_processos_monitorados(limite)` | `SELECT ... WHERE monitoramento_ativo = true LIMIT :limite` |
+| `query_processo_por_id(id)` | `SELECT ... WHERE id = :id` |
+| `update_ultimo_andamento(id, texto, data_iso)` | `UPDATE processos SET ultimo_andamento, data_ultimo_andamento WHERE id` |
+| `query_processo_ativo_do_cliente(id_cliente)` | `SELECT ... WHERE cliente_id = :id AND status = 'ativo' LIMIT 1` |
+| `insert_interacao(...)` | `INSERT INTO interacoes` (obtém `escritorio_id` automaticamente do cliente) |
+| `query_ultima_interacao_batch(ids)` | `SELECT cliente_id, MAX(created_at) ... GROUP BY cliente_id` |
+| `enviar_mensagem_whatsapp(id_cliente, telefone, texto)` | Resolve `webhook_whatsapp_instance` + chama `EvolutionClient.enviar_texto` |
+| `query_processo_e_cliente(id)` | JOIN processos + clientes com `selectinload` |
+| `query_processos_sem_movimentacao()` | `WHERE data_ultimo_andamento < NOW()-30d OR NULL` com cliente eager-loaded |
+| `query_clientes_para_pesquisa()` | `WHERE ativo = true AND aceite_lgpd = true` |
 
-**Padrão a usar** (sessão síncrona para workers Celery):
+> **Nota:** Para migrar para psycopg2 (engine síncrono dedicado), substituir `asyncio.run(coro)` por `Session(_engine)` e adicionar `psycopg2-binary` ao `requirements-f1.txt`. A interface pública das funções não muda.
 
-```python
-from sqlalchemy import create_engine, select, update
-from sqlalchemy.orm import Session
-from shared.config.settings import settings
-from shared.models.processo import Processo
-
-# Engine síncrono para workers (Celery não suporta asyncio nativamente)
-_engine = create_engine(
-    settings.DATABASE_URL.replace("+asyncpg", "+psycopg2"),
-    pool_size=5,
-    pool_pre_ping=True,
-)
-
-def listar_processos_com_monitoramento_ativo(limite: int) -> list[dict]:
-    with Session(_engine) as session:
-        processos = session.scalars(
-            select(Processo)
-            .where(Processo.monitoramento_ativo == True)
-            .limit(limite)
-        ).all()
-        return [p.__dict__ for p in processos]
-```
-
-> **Atenção:** adicionar `psycopg2-binary` ao `requirements-f1.txt` — o `asyncpg` não funciona em contexto síncrono.
-
-### 2.2 Descomentar imports da Fase 3
+### 2.2 Descomentar imports da Fase 3 ⏳ AGUARDA FASE 3
 
 **Arquivo:** `feature_1_ia_personalizada/workers/monitor_processos.py` linhas 12–18
 
@@ -122,51 +106,64 @@ from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import Jusb
 - `services/legal_data/datajud_client.py`
 - `services/legal_data/jusbrasil_client.py`
 
-### 2.3 Implementar funções de banco em send_notifications.py
+### 2.3 Implementar funções de banco em send_notifications.py ✅ IMPLEMENTADO
 
 **Arquivo:** `feature_1_ia_personalizada/workers/send_notifications.py`
 
-| Função | Linha | O que implementar |
-|---|---|---|
-| `buscar_processo_e_cliente(id_processo)` | L113 | JOIN processos + clientes WHERE processo.id = :id |
-| `buscar_processos_sem_movimentacao()` | L117 | WHERE data_ultimo_andamento < NOW() - INTERVAL '30 days' AND monitoramento_ativo = true |
-| `buscar_clientes_para_pesquisa()` | L121 | Clientes com interações nos últimos 30 dias sem pesquisa respondida |
+| Função | Delegação |
+|---|---|
+| `buscar_processo_e_cliente(id_processo)` | → `query_processo_e_cliente` em `worker_queries.py` |
+| `buscar_processos_sem_movimentacao()` | → `query_processos_sem_movimentacao` em `worker_queries.py` |
+| `buscar_clientes_para_pesquisa()` | → `query_clientes_para_pesquisa` em `worker_queries.py` |
+| `registrar_interacao(id_cliente, id_processo, tipo, dados)` | → `insert_interacao` em `worker_queries.py` |
 
-### 2.4 Implementar funções de integração em mensagens_relacionamento.py
+`enviar_notificacao_andamento` agora trata `None` quando o processo não é encontrado (retorna `{"status": "processo_nao_encontrado"}` em vez de lançar `TypeError`).
+
+### 2.4 Implementar funções de integração em mensagens_relacionamento.py ✅ IMPLEMENTADO
 
 **Arquivo:** `feature_1_ia_personalizada/workers/mensagens_relacionamento.py`
 
-> **Nota importante:** As 3 tasks Celery (`verificar_aniversarios_diarios`, `verificar_datas_comemorativas`, `verificar_clientes_sem_contato`) estão bem estruturadas — Redis locking, deduplicação, lotes, métricas. O que falta são **4 funções auxiliares de integração** que elas chamam:
-
-| Função | Linha | O que implementar |
-|---|---|---|
-| `WhatsAppService.enviar_mensagem()` | L169 | Chamar `EvolutionClient.enviar_texto(telefone, texto)` |
-| `buscar_processo_ativo_do_cliente()` | L172 | `SELECT * FROM processos WHERE cliente_id = :id AND monitoramento_ativo = true LIMIT 1` |
-| `salvar_interacao()` | L176 | `INSERT INTO interacoes (cliente_id, processo_id, tipo, mensagem_ia, ...)` |
-| `buscar_data_ultima_interacao()` | L180 | `SELECT MAX(created_at) FROM interacoes WHERE cliente_id = :id` |
+| Função | Implementação |
+|---|---|
+| `WhatsAppService.enviar_mensagem(id_cliente, telefone, texto)` | Resolve `webhook_whatsapp_instance` via JOIN `clientes→escritorios` + chama `EvolutionClient.enviar_texto`. Assinatura recebeu `id_cliente` (necessário para resolver a instância). |
+| `buscar_processo_ativo_do_cliente(id_cliente)` | → `query_processo_ativo_do_cliente` em `worker_queries.py`, converte para dataclass local `Processo` |
+| `salvar_interacao(id_cliente, id_processo, texto, metadata_json)` | → `insert_interacao` em `worker_queries.py` |
+| ~~`buscar_data_ultima_interacao(id_cliente)`~~ | **Removida** — substituída por `query_ultima_interacao_batch` (uma query para todos os clientes, eliminando N+1 em `verificar_clientes_sem_contato`) |
 
 **Observação arquitetural:** as tasks lêem dados de clientes **diretamente do Google Sheets** (via `GoogleSheetsClient.get_clientes()`), não do banco. Isso é intencional — a planilha é a fonte de verdade para o módulo de relacionamento. As variáveis `GOOGLE_CREDENTIALS_PATH` e `GOOGLE_SHEETS_ID` devem estar configuradas em produção para essas tasks funcionarem.
 
-### 2.5 Resolver NotImplementedError no whatsapp.py
+### 2.5 Resolver NotImplementedError no whatsapp.py ✅ IMPLEMENTADO
 
-**Arquivo:** `feature_1_ia_personalizada/services/messaging/whatsapp.py` linhas 241 e 293
+**Arquivo:** `feature_1_ia_personalizada/services/messaging/whatsapp.py`
 
-Dois pontos onde o serviço de mensagens precisa resolver `processo_id → (escritorio_id, cliente_id)` para saber para qual escritório/cliente enviar a mensagem:
+Implementado via helper privado `_obter_contexto_processo(processo_id)` que usa o async session factory diretamente (o serviço já é `async def`, sem necessidade de `asyncio.run()`):
 
 ```python
-# Substituir os NotImplementedError por:
-with Session(_engine) as session:
-    processo = session.get(Processo, processo_id)
-    if not processo:
-        raise ValueError(f"Processo {processo_id} não encontrado")
-    return processo.escritorio_id, processo.cliente_id
+async def _obter_contexto_processo(self, processo_id: int) -> Optional[tuple[int, int]]:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(ProcessoModel.escritorio_id, ProcessoModel.cliente_id)
+            .where(ProcessoModel.id == processo_id)
+        )
+        row = result.one_or_none()
+    if row is None:
+        logger.warning("processo_nao_encontrado", processo_id=processo_id)
+        return None
+    return row.escritorio_id, row.cliente_id
 ```
+
+- `enviar_notificacao_andamento` — usa o helper e formata o texto de andamento
+- `enviar_sem_movimentacao` — usa o helper e envia mensagem de sem movimentação
 
 ### Critério de aceite da Sprint 1
 
-- [ ] `make worker` roda por 10 minutos sem erros de `NotImplementedError` ou `NameError`
-- [ ] Task `monitorar_processos` processa ao menos 1 processo com dados reais do banco
-- [ ] Beat executa `verificar_aniversarios_diarios` sem exceção
+- [x] Beat executa `verificar_aniversarios_diarios` sem exceção ✅
+- [x] Beat executa `verificar_datas_comemorativas` sem exceção ✅
+- [x] Beat executa `verificar_clientes_sem_contato` sem exceção ✅
+- [x] `send_notifications` — nenhuma função lança `NotImplementedError` ✅
+- [x] `whatsapp.py` — zero `NotImplementedError` ✅
+- [ ] `make worker` roda por 10 minutos sem `NameError` → bloqueado pelo item 2.2 (imports Fase 3 comentados em `monitor_processos.py`)
+- [ ] Task `monitorar_processos` processa andamentos reais → bloqueado pelo item 2.2
 
 ---
 
@@ -999,8 +996,8 @@ Verificar cada item antes de declarar produção:
 
 ### Código
 
-- [ ] Zero `NotImplementedError` no codebase
-- [ ] Zero imports comentados com "implementar depois"
+- [x] Zero `NotImplementedError` nos workers e serviço de mensagens ✅ (restam imports Fase 3 comentados em `monitor_processos.py`)
+- [ ] Zero imports comentados com "implementar depois" → `monitor_processos.py` linhas 14–18 (aguarda Fase 3)
 - [ ] `pytest` passa com cobertura ≥ 70%
 - [ ] `ruff check .` e `black --check .` passam sem erros
 - [ ] `mypy feature_1_ia_personalizada shared` sem erros críticos
@@ -1078,5 +1075,5 @@ Sprint 9–10 (Resiliência)
 
 ---
 
-> Última atualização: Fevereiro 2026
-> Próxima revisão: ao iniciar a Sprint 1
+> Última atualização: Março 2026
+> Sprint 1: 2.1 ✅ · 2.2 ⏳ · 2.3 ✅ · 2.4 ✅ · 2.5 ✅ — próximo: Sprint 2 (Segurança)
