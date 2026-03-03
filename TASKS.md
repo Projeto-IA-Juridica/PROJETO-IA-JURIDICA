@@ -1309,10 +1309,10 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Descomentar imports: `DataJudClient`, `JusbrasilClient`, `JuridicalTranslator` (linhas 12–18)
 - [ ] Adicionar `psycopg2-binary` ao `requirements-f1.txt` (driver síncrono para workers Celery)
 
-#### `workers/send_notifications.py` — NotImplementedError
-- [ ] Implementar `buscar_processo_e_cliente(id_processo)` — JOIN processos + clientes
-- [ ] Implementar `buscar_processos_sem_movimentacao()` — WHERE data_ultimo_andamento < NOW() - INTERVAL '30 days'
-- [ ] Implementar `buscar_clientes_para_pesquisa()` — clientes com interações no último mês sem pesquisa respondida
+#### `workers/send_notifications.py` — NotImplementedError [PIJ-193] ✅
+- [x] Implementar `buscar_processo_e_cliente(id_processo)` — JOIN processos + clientes
+- [x] Implementar `buscar_processos_sem_movimentacao()` — WHERE data_ultimo_andamento < NOW() - INTERVAL '30 days'
+- [x] Implementar `buscar_clientes_para_pesquisa()` — clientes com interações no último mês sem pesquisa respondida
 
 #### `workers/mensagens_relacionamento.py` — Helpers sem implementação
 - [ ] Implementar `WhatsAppService.enviar_mensagem()` — chamar `EvolutionClient.enviar_texto()`
@@ -1320,7 +1320,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Implementar `salvar_interacao()` — INSERT em `interacoes` com ORM
 - [ ] Implementar `buscar_data_ultima_interacao(id_cliente)` — SELECT MAX(created_at) FROM interacoes
 
-#### `services/messaging/whatsapp.py` — NotImplementedError de contexto
+#### `services/messaging/whatsapp.py` — NotImplementedError de contexto [PIJ-195]
 - [ ] Implementar resolução `processo_id → (escritorio_id, cliente_id)` nas linhas 241 e 293
 
 #### `workers/celery_app.py` — Testar Beat
@@ -1340,7 +1340,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Adicionar variável `CORS_ALLOWED_ORIGINS` ao `settings.py` e ao `.env.example`
 - [ ] Criar `@app.exception_handler(Exception)` global — retornar mensagem genérica sem stack trace para o cliente
 
-#### `api/routes/webhook_whatsapp.py` — Autenticação
+#### `api/routes/webhook_whatsapp.py` — Autenticação [PIJ-197]
 - [ ] Adicionar validação do header `apikey` comparando com `settings.EVOLUTION_API_KEY`
 - [ ] Retornar 401 se apikey ausente ou incorreto
 
@@ -1355,7 +1355,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 
 ### 9.3 Sprint 3–4 — Testes e CI/CD
 
-#### Testes HTTP das rotas (`tests/integration/test_api_routes.py`) — arquivo novo
+#### Testes HTTP das rotas (`tests/integration/test_api_routes.py`) — arquivo novo [PIJ-201]
 - [ ] Criar `tests/integration/test_api_routes.py` com `httpx.AsyncClient` + `ASGITransport`
 - [ ] Testar `GET /health` → 200
 - [ ] Testar `GET /health/ready` → 200 (com DB/Redis mockados como up)
@@ -1387,10 +1387,10 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 
 ### 9.4 Sprint 5–6 — Observabilidade e Alertas
 
-#### Prometheus + Grafana + Alertmanager
+#### Prometheus + Grafana + Alertmanager [PIJ-205]
 - [ ] Adicionar serviços `prometheus`, `grafana`, `alertmanager` ao `docker-compose.yml`
 - [ ] Criar `infrastructure/docker/prometheus/prometheus.yml` com scrape do `/metrics` da API
-- [ ] Criar `infrastructure/docker/prometheus/alerts.yml` com regras: `APIDown`, `TaxaErroIAAlta`, `LatenciaAlta`, `WorkerCelarySemResposta`
+- [ ] Criar `infrastructure/docker/prometheus/alerts.yml` com regras: `APIDown`, `TaxaErroIAAlta`, `LatenciaAlta`, `WorkerCelarySemResposta` [PIJ-206]
 - [ ] Criar `infrastructure/docker/grafana/dashboards/concierge.json` com painéis de requests/min, taxa de erro, latência p95, processos monitorados
 
 #### Sentry em produção
@@ -1407,12 +1407,12 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 ### 9.5 Sprint 7–8 — Infraestrutura de Produção
 
 #### Docker
-- [ ] Criar `infrastructure/docker/docker-compose.prod.yml` com resource limits (`mem_limit`, `cpus`) em todos os serviços
-- [ ] Criar `infrastructure/nginx/nginx.conf` com reverse proxy HTTP→HTTPS e TLS
+- [ ] Criar `infrastructure/docker/docker-compose.prod.yml` com resource limits (`mem_limit`, `cpus`) em todos os serviços [PIJ-211]
+- [ ] Criar `infrastructure/nginx/nginx.conf` com reverse proxy HTTP→HTTPS e TLS [PIJ-212]
 
 #### Scripts
 - [x] Criar `scripts/migration/sync_sheets_to_db.py` — migrar clientes do Google Sheets para o banco PostgreSQL (com modo `--dry-run`)
-- [ ] Criar `infrastructure/scripts/backup.sh` — `pg_dump` + compressão + upload S3 + retenção 30 dias
+- [ ] Criar `infrastructure/scripts/backup.sh` — `pg_dump` + compressão + upload S3 + retenção 30 dias [PIJ-213]
 
 #### Secrets Management
 - [ ] Documentar em `docs/guides/secrets.md` o processo de geração, rotação e armazenamento seguro de chaves
@@ -1426,7 +1426,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Adicionar fila `dead_letter` ao `task_queues`
 - [ ] Implementar lógica de redirecionar tasks para DLQ após retries esgotados
 
-#### Circuit Breaker para APIs externas
+#### Circuit Breaker para APIs externas [PIJ-216]
 - [ ] Adicionar `pybreaker` ao `requirements-f1.txt`
 - [ ] Envolver chamadas ao JusbrasilClient e DataJudClient com `CircuitBreaker(fail_max=5, reset_timeout=60)`
 - [ ] Tratar `CircuitBreakerError` no monitor de processos — fazer fallback para DataJud quando Jusbrasil circuit está aberto
