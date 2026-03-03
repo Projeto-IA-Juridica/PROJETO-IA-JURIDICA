@@ -68,13 +68,19 @@ def fase3():
         patch(f"{MODULE}.DataJudClient", create=True),
         patch(f"{MODULE}.DataCleaner", new=mock_cleaner, create=True),
         patch(f"{MODULE}.JuridicalTranslator", new=mock_translator, create=True),
-        patch(f"{MODULE}.atualizar_ultimo_andamento_do_processo") as mock_atualizar,
+        # Nome correto da função importada de worker_queries
+        patch(f"{MODULE}.update_ultimo_andamento") as mock_atualizar,
+        # Cache mockado como miss por padrão — isola testes do Redis real
+        patch(f"{MODULE}.get_andamentos_sync", return_value=None) as mock_get_cache,
+        patch(f"{MODULE}.set_andamentos_sync") as mock_set_cache,
         patch(f"{MODULE}.celery_app") as mock_celery,
     ):
         yield {
             "cleaner": mock_cleaner,
             "translator": mock_translator,
             "atualizar": mock_atualizar,
+            "get_cache": mock_get_cache,
+            "set_cache": mock_set_cache,
             "celery": mock_celery,
         }
 
@@ -290,7 +296,7 @@ class TestProcessarProcessoIndividual:
 class TestMonitorarProcessos:
     def test_lista_vazia_retorna_sucesso(self):
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=[]),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=[]),
             patch(f"{MODULE}.time.sleep"),
         ):
             r = monitorar_processos()
@@ -300,7 +306,7 @@ class TestMonitorarProcessos:
         assert r["resumo_primeiros_20"] == []
 
     def test_erro_no_banco_retorna_sucesso_false(self):
-        with patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", side_effect=RuntimeError("DB down")):
+        with patch(f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")):
             r = monitorar_processos()
         assert r["sucesso"] is False
         assert "DB down" in r["erro"]
@@ -309,7 +315,7 @@ class TestMonitorarProcessos:
         processos = [PROCESSO, {**PROCESSO, "id": 2}]
         mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=processos),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
             patch(f"{MODULE}.time.sleep"),
         ):
@@ -320,7 +326,7 @@ class TestMonitorarProcessos:
 
     def test_soft_time_limit_contado_como_erro(self, fase3):
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=[PROCESSO]),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=[PROCESSO]),
             patch(f"{MODULE}.processar_processo_individual", side_effect=SoftTimeLimitExceeded()),
             patch(f"{MODULE}.time.sleep"),
         ):
@@ -333,7 +339,7 @@ class TestMonitorarProcessos:
 
     def test_excecao_generica_contada_como_erro(self, fase3):
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=[PROCESSO]),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=[PROCESSO]),
             patch(f"{MODULE}.processar_processo_individual", side_effect=ValueError("bad data")),
             patch(f"{MODULE}.time.sleep"),
         ):
@@ -347,7 +353,7 @@ class TestMonitorarProcessos:
         processos = [{**PROCESSO, "id": i} for i in range(25)]
         mock_ok = {"id_processo": 0, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=processos),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
             patch(f"{MODULE}.time.sleep"),
         ):
@@ -359,7 +365,7 @@ class TestMonitorarProcessos:
         processos = [PROCESSO, {**PROCESSO, "id": 2}]
         mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=processos),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
             patch(f"{MODULE}.time.sleep") as mock_sleep,
         ):
@@ -373,7 +379,7 @@ class TestMonitorarProcessos:
         processos = [{**PROCESSO, "id": i} for i in range(4)]
         side_effects = [mock_ok, SoftTimeLimitExceeded(), mock_ok, ValueError("err")]
         with (
-            patch(f"{MODULE}.listar_processos_com_monitoramento_ativo", return_value=processos),
+            patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", side_effect=side_effects),
             patch(f"{MODULE}.time.sleep"),
         ):
@@ -388,7 +394,7 @@ class TestMonitorarProcessos:
 
 class TestMonitorarProcessoIndividual:
     def test_processo_nao_encontrado(self):
-        with patch(f"{MODULE}.buscar_processo_por_id", return_value=None):
+        with patch(f"{MODULE}.query_processo_por_id", return_value=None):
             r = monitorar_processo_individual(99)
         assert r["sucesso"] is False
         assert r["erro"] == "processo_nao_encontrado"
@@ -397,7 +403,7 @@ class TestMonitorarProcessoIndividual:
     def test_processo_encontrado_retorna_sucesso(self, fase3):
         mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
         with (
-            patch(f"{MODULE}.buscar_processo_por_id", return_value=PROCESSO),
+            patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
         ):
             r = monitorar_processo_individual(1)
@@ -405,7 +411,7 @@ class TestMonitorarProcessoIndividual:
 
     def test_soft_time_limit_retorna_erro_estruturado(self):
         with (
-            patch(f"{MODULE}.buscar_processo_por_id", return_value=PROCESSO),
+            patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
             patch(f"{MODULE}.processar_processo_individual", side_effect=SoftTimeLimitExceeded()),
         ):
             r = monitorar_processo_individual(1)
@@ -415,10 +421,72 @@ class TestMonitorarProcessoIndividual:
 
     def test_excecao_generica_retorna_erro_estruturado(self):
         with (
-            patch(f"{MODULE}.buscar_processo_por_id", return_value=PROCESSO),
+            patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
             patch(f"{MODULE}.processar_processo_individual", side_effect=RuntimeError("falha inesperada")),
         ):
             r = monitorar_processo_individual(1)
         assert r["sucesso"] is False
         assert "falha inesperada" in r["erro"]
         assert r["id_processo"] == 1
+
+
+# ---------------------------------------------------------------------------
+# processar_processo_individual — fluxo cache-aside
+# ---------------------------------------------------------------------------
+
+class TestCacheAside:
+    def test_cache_hit_nao_chama_api(self, fase3):
+        """Quando cache tem dados, não deve chamar Jusbrasil nem DataJud."""
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=[ANDAMENTO_A]),
+            patch(f"{MODULE}.buscar_andamentos_jusbrasil") as mock_jb,
+        ):
+            r = processar_processo_individual(PROCESSO)
+        mock_jb.assert_not_called()
+        assert r["fonte"] == "cache"
+        assert r["novos_andamentos"] == 1
+
+    def test_cache_miss_chama_api_e_salva(self, fase3):
+        """Quando cache miss, deve chamar Jusbrasil e salvar resultado no Redis."""
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=None),
+            patch(f"{MODULE}.set_andamentos_sync") as mock_set,
+            patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A]),
+        ):
+            processar_processo_individual(PROCESSO)
+        mock_set.assert_called_once()
+
+    def test_cache_hit_lista_vazia_nao_chama_api(self, fase3):
+        """Cache hit com lista vazia é um hit válido — não deve chamar a API."""
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=[]),
+            patch(f"{MODULE}.buscar_andamentos_jusbrasil") as mock_jb,
+        ):
+            r = processar_processo_individual(PROCESSO)
+        mock_jb.assert_not_called()
+        assert r["novos_andamentos"] == 0
+        assert r["fonte"] == "cache"
+
+    def test_cache_miss_api_vazia_salva_lista_vazia(self, fase3):
+        """Cache miss + API retorna [] → cacheia a lista vazia para evitar nova chamada."""
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=None),
+            patch(f"{MODULE}.set_andamentos_sync") as mock_set,
+            patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[]),
+        ):
+            r = processar_processo_individual(PROCESSO)
+        # Lista vazia também é cacheada (is not None)
+        mock_set.assert_called_once()
+        assert r["novos_andamentos"] == 0
+
+    def test_cache_miss_com_fallback_datajud_tambem_salva(self, fase3):
+        """Quando Jusbrasil falha e DataJud retorna dados, salva no cache."""
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=None),
+            patch(f"{MODULE}.set_andamentos_sync") as mock_set,
+            patch(f"{MODULE}.buscar_andamentos_jusbrasil", side_effect=ConnectionError("down")),
+            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
+        ):
+            r = processar_processo_individual(PROCESSO)
+        mock_set.assert_called_once()
+        assert r["fonte"] == "datajud"

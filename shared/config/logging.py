@@ -17,7 +17,8 @@ Processadores aplicados em toda mensagem (ordem importa):
   6. StackInfoRenderer    — renderiza stack_info se presente
   7. UnicodeDecoder       — garante strings UTF-8
   8. ExceptionRenderer    — serializa exc_info nos dois ambientes
-  9. Renderizador final   — JSONRenderer (prod) ou ConsoleRenderer (dev)
+  9. _mask_sensitive      — mascara CPF, CNPJ, tokens e chaves de API
+ 10. Renderizador final   — JSONRenderer (prod) ou ConsoleRenderer (dev)
 
 Uso básico:
     from shared.config.logging import get_logger
@@ -53,12 +54,86 @@ Uso em testes:
 
 import logging
 import os
+import re
 import sys
 
 import structlog
 from structlog.contextvars import merge_contextvars
 
 from shared.config.settings import settings
+
+# ---------------------------------------------------------------------------
+# Mascaramento de dados sensíveis (Sprint 2 — 3.6 production-readiness.md)
+# ---------------------------------------------------------------------------
+
+# Chaves cujo VALOR é sempre mascarado por completo, independente do formato.
+# Cobre CPF/telefone sem formatação, senhas, tokens e chaves de API específicas do projeto.
+_SENSITIVE_KEYS = frozenset({
+    # Identificadores pessoais (LGPD)
+    "cpf", "cnpj", "telefone", "phone",
+    # Credenciais de autenticação
+    "password", "senha", "secret",
+    # Tokens e chaves de API
+    "token", "api_key", "access_token", "refresh_token", "authorization",
+    # Chaves de criptografia específicas do projeto
+    "encryption_key", "jwt_secret_key", "fernet_key",
+})
+
+# Padrões regex aplicados a valores de string em chaves NÃO sensíveis
+# (ex: CPF/CNPJ que aparece interpolado dentro de uma mensagem de texto).
+_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"\d{3}\.\d{3}\.\d{3}-\d{2}"), "***.***.***-**"),           # CPF formatado
+    (re.compile(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"), "**.***.***/****-**"), # CNPJ formatado
+    (re.compile(r"sk-ant-[A-Za-z0-9\-_]+"), "sk-ant-***"),                   # Anthropic key
+    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "sk-***"),                          # OpenAI key
+    (re.compile(r"Bearer [A-Za-z0-9._\-]+"), "Bearer ***"),                  # JWT header
+]
+
+
+def _apply_patterns(value: str) -> str:
+    """Aplica todos os _PATTERNS de regex a uma string."""
+    for pattern, replacement in _PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value
+
+
+def _mask_value(key: str, value: object) -> object:
+    """
+    Mascara um valor de log de forma recursiva:
+    - Se a chave está em _SENSITIVE_KEYS → retorna "***" imediatamente.
+    - Se o valor é string → aplica os _PATTERNS de regex.
+    - Se o valor é dict → mascara recursivamente cada par chave/valor.
+    - Se o valor é list → mascara recursivamente cada elemento.
+    - Outros tipos (int, float, bool, None) → retorna sem alteração.
+    """
+    if key in _SENSITIVE_KEYS:
+        return "***"
+    if isinstance(value, str):
+        return _apply_patterns(value)
+    if isinstance(value, dict):
+        return {k: _mask_value(k, v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_mask_value(key, item) for item in value]
+    return value
+
+
+def _mask_sensitive(_logger: object, _method: str, event_dict: dict) -> dict:
+    """
+    Processador structlog que mascara dados sensíveis antes da renderização final.
+
+    Duas camadas de proteção:
+    1. Mascaramento por nome de chave (_SENSITIVE_KEYS): qualquer campo cujo nome
+       seja "cpf", "telefone", "password", etc. tem o valor substituído por "***",
+       independente do formato (cobre CPF sem formatação, telefones puros, etc.).
+    2. Mascaramento por regex (_PATTERNS): para strings em campos genéricos que
+       contenham CPF formatado, CNPJ, chaves de API ou tokens Bearer.
+
+    Funciona recursivamente em dicts e listas aninhados.
+    """
+    for key in list(event_dict.keys()):
+        event_dict[key] = _mask_value(key, event_dict[key])
+    return event_dict
+
 
 # ---------------------------------------------------------------------------
 # Tradução do nível de log configurado em settings para o módulo logging
@@ -85,6 +160,7 @@ _PROCESSADORES_BASE: list = [
     structlog.processors.StackInfoRenderer(),               # stack_info opcional
     structlog.processors.UnicodeDecoder(),                  # garante strings UTF-8
     structlog.processors.ExceptionRenderer(),               # serializa exc_info nos dois ambientes
+    _mask_sensitive,                                        # mascara CPF, tokens, chaves de API
 ]
 
 # ---------------------------------------------------------------------------

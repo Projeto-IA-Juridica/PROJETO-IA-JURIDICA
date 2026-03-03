@@ -21,6 +21,10 @@ from shared.database.worker_queries import (
     query_processo_por_id,
     update_ultimo_andamento,
 )
+from feature_1_ia_personalizada.services.legal_data.cache_manager import (
+    get_andamentos_sync,
+    set_andamentos_sync,
+)
 logger = structlog.get_logger(__name__)
 
 _processos_monitorados_total = Gauge(
@@ -98,31 +102,42 @@ def processar_processo_individual(
     numero_processo = str(dados_processo["numero"])
     data_ultimo_andamento_salvo = dados_processo.get("data_ultimo_andamento")
 
-    cliente_jusbrasil = JusbrasilClient()
-    cliente_datajud = DataJudClient()
+    # 1️⃣ Buscar andamentos: Redis (cache) → Jusbrasil → DataJud (fallback)
+    # Cache-aside: hit evita chamada HTTP e reduz custo de API.
+    # Miss: chama os clients externos (requer Fase 3 — imports acima).
+    fonte_utilizada = "cache"
+    lista_andamentos = get_andamentos_sync(numero_processo)
 
-    # 1️⃣ Buscar andamentos (Jusbrasil → fallback DataJud)
-    fonte_utilizada = "jusbrasil"
+    if lista_andamentos is None:
+        cliente_jusbrasil = JusbrasilClient()
+        cliente_datajud = DataJudClient()
+        fonte_utilizada = "jusbrasil"
 
-    try:
-        lista_andamentos = buscar_andamentos_jusbrasil(
-            numero_processo,
-            data_ultimo_andamento_salvo,
-            cliente_jusbrasil,
-        )
-    except Exception as erro:
-        logger.warning(
-            "jusbrasil_fallback_datajud",
-            id_processo=id_processo,
-            erro=str(erro),
-            exc_info=True,
-        )
-        fonte_utilizada = "datajud"
-        lista_andamentos = buscar_andamentos_datajud(
-            numero_processo,
-            data_ultimo_andamento_salvo,
-            cliente_datajud,
-        )
+        try:
+            lista_andamentos = buscar_andamentos_jusbrasil(
+                numero_processo,
+                data_ultimo_andamento_salvo,
+                cliente_jusbrasil,
+            )
+        except Exception as erro:
+            logger.warning(
+                "jusbrasil_fallback_datajud",
+                id_processo=id_processo,
+                erro=str(erro),
+                exc_info=True,
+            )
+            fonte_utilizada = "datajud"
+            lista_andamentos = buscar_andamentos_datajud(
+                numero_processo,
+                data_ultimo_andamento_salvo,
+                cliente_datajud,
+            )
+
+        # Grava no Redis para próximas execuções (TTL 6h, definido em LegalDataCacheManager).
+        # Usa "is not None" para cachear também listas vazias [] — evita chamada à API
+        # novamente dentro do TTL para processos sem movimentações recentes.
+        if lista_andamentos is not None:
+            set_andamentos_sync(numero_processo, lista_andamentos)
 
     if not lista_andamentos:
         return {

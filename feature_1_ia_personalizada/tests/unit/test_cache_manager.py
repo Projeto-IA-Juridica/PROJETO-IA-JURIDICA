@@ -2,12 +2,24 @@
 """
 Testes do LegalDataCacheManager: hit/miss, TTL, formato de chaves,
 isolamento por CNJ, invalidação e resiliência (graceful degradation).
+
+Também cobre os helpers síncronos (get/set_andamentos_sync, get/set_capa_sync)
+usados pelos workers Celery, mockando _sync_redis com MagicMock síncrono.
 """
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from feature_1_ia_personalizada.services.legal_data.cache_manager import LegalDataCacheManager
+from feature_1_ia_personalizada.services.legal_data.cache_manager import (
+    LegalDataCacheManager,
+    get_andamentos_sync,
+    get_capa_sync,
+    set_andamentos_sync,
+    set_capa_sync,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -286,3 +298,148 @@ class TestResiliencia:
 
     async def test_invalidar_redis_error_nao_crasha(self, cache_error: LegalDataCacheManager):
         await cache_error.invalidar_cache_processo(CNJ)
+
+
+# ---------------------------------------------------------------------------
+# Helpers síncronos — get/set_andamentos_sync, get/set_capa_sync
+# ---------------------------------------------------------------------------
+# Usam patch("...cache_manager._sync_redis") com MagicMock síncrono para
+# isolar dos testes do Redis real. Os helpers são chamados por workers Celery.
+# ---------------------------------------------------------------------------
+
+_CACHE_MODULE = "feature_1_ia_personalizada.services.legal_data.cache_manager"
+
+
+class TestHelpersSincronos:
+    # -----------------------------------------------------------------------
+    # get_andamentos_sync
+    # -----------------------------------------------------------------------
+
+    def test_get_andamentos_sync_hit(self):
+        """Quando Redis tem os dados, retorna a lista deserializada."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = json.dumps(ANDAMENTOS)
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_andamentos_sync(CNJ)
+        assert result == ANDAMENTOS
+        mock_redis.get.assert_called_once_with(LegalDataCacheManager._key_andamentos(CNJ))
+
+    def test_get_andamentos_sync_miss(self):
+        """Quando Redis não tem os dados, retorna None."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = None
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_andamentos_sync(CNJ)
+        assert result is None
+
+    def test_get_andamentos_sync_redis_error_retorna_none(self):
+        """Erro no Redis retorna None (graceful degradation)."""
+        mock_redis = MagicMock()
+        mock_redis.get.side_effect = ConnectionError("Redis indisponível")
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_andamentos_sync(CNJ)
+        assert result is None
+
+    def test_get_andamentos_sync_hit_lista_vazia(self):
+        """Lista vazia no cache é um hit válido — retorna [] em vez de None."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = json.dumps([])
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_andamentos_sync(CNJ)
+        assert result == []
+
+    # -----------------------------------------------------------------------
+    # set_andamentos_sync
+    # -----------------------------------------------------------------------
+
+    def test_set_andamentos_sync_chama_setex_com_ttl_correto(self):
+        """Persiste no Redis com TTL_ANDAMENTOS (6h) e chave correta."""
+        mock_redis = MagicMock()
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            set_andamentos_sync(CNJ, ANDAMENTOS)
+        mock_redis.setex.assert_called_once_with(
+            LegalDataCacheManager._key_andamentos(CNJ),
+            LegalDataCacheManager.TTL_ANDAMENTOS,
+            json.dumps(ANDAMENTOS, ensure_ascii=False),
+        )
+
+    def test_set_andamentos_sync_lista_vazia(self):
+        """Lista vazia é persitida normalmente."""
+        mock_redis = MagicMock()
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            set_andamentos_sync(CNJ, [])
+        mock_redis.setex.assert_called_once()
+
+    def test_set_andamentos_sync_redis_error_nao_crasha(self):
+        """Erro no Redis não propaga exceção (graceful degradation)."""
+        mock_redis = MagicMock()
+        mock_redis.setex.side_effect = ConnectionError("Redis indisponível")
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            set_andamentos_sync(CNJ, ANDAMENTOS)  # Não deve lançar exceção
+
+    # -----------------------------------------------------------------------
+    # get_capa_sync
+    # -----------------------------------------------------------------------
+
+    def test_get_capa_sync_hit(self):
+        """Quando Redis tem os dados, retorna o dict deserializado."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = json.dumps(CAPA)
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_capa_sync(CNJ)
+        assert result == CAPA
+        mock_redis.get.assert_called_once_with(LegalDataCacheManager._key_capa(CNJ))
+
+    def test_get_capa_sync_miss(self):
+        """Quando Redis não tem os dados, retorna None."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = None
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_capa_sync(CNJ)
+        assert result is None
+
+    def test_get_capa_sync_redis_error_retorna_none(self):
+        """Erro no Redis retorna None (graceful degradation)."""
+        mock_redis = MagicMock()
+        mock_redis.get.side_effect = ConnectionError("Redis indisponível")
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            result = get_capa_sync(CNJ)
+        assert result is None
+
+    # -----------------------------------------------------------------------
+    # set_capa_sync
+    # -----------------------------------------------------------------------
+
+    def test_set_capa_sync_chama_setex_com_ttl_correto(self):
+        """Persiste no Redis com TTL_CAPA_PROCESSO (24h) e chave correta."""
+        mock_redis = MagicMock()
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            set_capa_sync(CNJ, CAPA)
+        mock_redis.setex.assert_called_once_with(
+            LegalDataCacheManager._key_capa(CNJ),
+            LegalDataCacheManager.TTL_CAPA_PROCESSO,
+            json.dumps(CAPA, ensure_ascii=False),
+        )
+
+    def test_set_capa_sync_redis_error_nao_crasha(self):
+        """Erro no Redis não propaga exceção (graceful degradation)."""
+        mock_redis = MagicMock()
+        mock_redis.setex.side_effect = ConnectionError("Redis indisponível")
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            set_capa_sync(CNJ, CAPA)  # Não deve lançar exceção
+
+    # -----------------------------------------------------------------------
+    # Consistência de chaves entre sync e async
+    # -----------------------------------------------------------------------
+
+    def test_chaves_sync_e_async_sao_identicas(self):
+        """As funções sync usam as mesmas chaves que LegalDataCacheManager async."""
+        mock_redis = MagicMock()
+        mock_redis.get.return_value = None
+        with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
+            get_andamentos_sync(CNJ)
+            get_capa_sync(CNJ)
+
+        calls = [call.args[0] for call in mock_redis.get.call_args_list]
+        assert LegalDataCacheManager._key_andamentos(CNJ) in calls
+        assert LegalDataCacheManager._key_capa(CNJ) in calls

@@ -313,7 +313,7 @@ def _mask_sensitive(logger, method, event_dict):
 - [ ] `git log --oneline --all -- .env` não retorna nenhum commit
 - [ ] Request para `/webhook/whatsapp` sem header `apikey` correto retorna 401
 - [ ] Request cross-origin de domínio não autorizado retorna CORS error em produção
-- [ ] CPF e tokens não aparecem nos logs em texto claro
+- [x] CPF e tokens não aparecem nos logs em texto claro ✅
 
 ---
 
@@ -911,28 +911,28 @@ except CircuitBreakerError:
     lista_andamentos = buscar_andamentos_datajud(numero, data_ref)
 ```
 
-### 7.3 Cache de dados jurídicos
+### 7.3 Cache de dados jurídicos ✅ IMPLEMENTADO
 
-Dados do DataJud e Jusbrasil mudam raramente — cachear no Redis para reduzir chamadas externas:
+Dados do DataJud e Jusbrasil mudam raramente — cachear no Redis para reduzir chamadas externas.
 
-```python
-import json
-import redis
+**Implementação em dois contextos:**
 
-_redis = redis.from_url(settings.REDIS_URL)
-_CACHE_TTL_ANDAMENTOS = 3600  # 1 hora
+| Contexto | Classe/Funções | Redis client |
+|---|---|---|
+| FastAPI / Orchestrator (async) | `LegalDataCacheManager` | `redis.asyncio.Redis` |
+| Celery workers (sync) | `get/set_andamentos_sync`, `get/set_capa_sync` | `redis.Redis` |
 
-def buscar_andamentos_com_cache(numero_processo: str) -> list:
-    cache_key = f"andamentos:{numero_processo}"
+**Arquivos modificados:**
+- `feature_1_ia_personalizada/services/legal_data/cache_manager.py` — adicionadas funções de módulo síncronas + conexão `_sync_redis`
+- `feature_1_ia_personalizada/workers/monitor_processos.py` — `processar_processo_individual` agora segue o padrão cache-aside: **Redis → Jusbrasil → DataJud (fallback)**, gravando no cache após chamada externa
 
-    cached = _redis.get(cache_key)
-    if cached:
-        return json.loads(cached)
+**TTLs reutilizados (consistentes entre async e sync):**
+- Andamentos: 6h (`LegalDataCacheManager.TTL_ANDAMENTOS`)
+- Capa do processo: 24h (`LegalDataCacheManager.TTL_CAPA_PROCESSO`)
 
-    andamentos = buscar_andamentos_jusbrasil(numero_processo, None)
-    _redis.setex(cache_key, _CACHE_TTL_ANDAMENTOS, json.dumps(andamentos))
-    return andamentos
-```
+**Cache keys (compartilhadas entre worker e orchestrator):**
+- `f1:legal_data:andamentos:{cnj}`
+- `f1:legal_data:capa:{cnj}`
 
 ### 7.4 Load testing
 
@@ -1008,7 +1008,7 @@ Verificar cada item antes de declarar produção:
 - [ ] CORS restrito ao domínio de produção
 - [ ] Webhook WhatsApp valida assinatura da Evolution API
 - [ ] Error handler global retorna mensagem genérica (sem stack trace para cliente)
-- [ ] Dados sensíveis (CPF, tokens) não aparecem nos logs
+- [x] Dados sensíveis (CPF, tokens) não aparecem nos logs ✅
 - [ ] `JWT_SECRET_KEY` tem ≥ 32 caracteres aleatórios
 - [ ] `ENCRYPTION_KEY` é uma chave Fernet válida
 
