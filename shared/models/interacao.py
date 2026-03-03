@@ -17,10 +17,10 @@ Usado para:
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     Numeric,
     String,
     Text,

@@ -36,7 +36,10 @@ def validar_cpf(cpf: str) -> bool:
         return False
 
     def _digito(parcial: str, peso_inicial: int) -> int:
-        total = sum(int(d) * p for d, p in zip(parcial, range(peso_inicial, 1, -1)))
+        total = sum(
+            int(d) * p
+            for d, p in zip(parcial, range(peso_inicial, 1, -1), strict=False)
+        )
         resto = total % 11
         return 0 if resto < 2 else 11 - resto
 
@@ -71,7 +74,7 @@ def validar_cnpj(cnpj: str) -> bool:
         return False
 
     def _digito(parcial: str, pesos: list[int]) -> int:
-        total = sum(int(d) * p for d, p in zip(parcial, pesos))
+        total = sum(int(d) * p for d, p in zip(parcial, pesos, strict=False))
         resto = total % 11
         return 0 if resto < 2 else 11 - resto
 
@@ -212,11 +215,11 @@ def validar_oab(oab: str) -> bool:
 
 # Aceita: (11) 99999-9999 | 11 99999-9999 | 11999999999 | +5511999999999
 _TEL_BR_REGEX = re.compile(
-    r"^(\+55\s?)?"           # prefixo internacional opcional
-    r"(\(?\d{2}\)?\s?)"      # DDD com ou sem parênteses
-    r"9?\d{4}"               # dígito 9 opcional + 4 dígitos
-    r"[-]?"                  # separador opcional
-    r"\d{4}$"                # 4 dígitos finais
+    r"^(\+55\s?)?"  # prefixo internacional opcional
+    r"(\(?\d{2}\)?\s?)"  # DDD com ou sem parênteses
+    r"9?\d{4}"  # dígito 9 opcional + 4 dígitos
+    r"[-]?"  # separador opcional
+    r"\d{4}$"  # 4 dígitos finais
 )
 
 

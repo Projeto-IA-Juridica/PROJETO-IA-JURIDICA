@@ -6,10 +6,9 @@ agendamento, erros da Evolution API e mensagens prontas.
 from __future__ import annotations
 
 from datetime import datetime, time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helper para monkeypatch de datetime.now — o código de produção faz
@@ -37,7 +36,6 @@ from feature_1_ia_personalizada.services.messaging.whatsapp import (
     WhatsAppService,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fakes — EvolutionClient
 # ---------------------------------------------------------------------------
@@ -49,11 +47,15 @@ class _FakeEvolutionClient:
     def __init__(self) -> None:
         self.chamadas_texto: list[dict] = []
         self.chamadas_botoes: list[dict] = []
-        self._resposta_texto: Dict[str, Any] = {"key": {"id": "fake-msg-id"}}
-        self._resposta_botoes: Dict[str, Any] = {"key": {"id": "fake-btn-id"}}
+        self._resposta_texto: dict[str, Any] = {"key": {"id": "fake-msg-id"}}
+        self._resposta_botoes: dict[str, Any] = {"key": {"id": "fake-btn-id"}}
 
-    async def enviar_texto(self, instance: str, numero: str, texto: str) -> Dict[str, Any]:
-        self.chamadas_texto.append({"instance": instance, "numero": numero, "texto": texto})
+    async def enviar_texto(
+        self, instance: str, numero: str, texto: str
+    ) -> dict[str, Any]:
+        self.chamadas_texto.append(
+            {"instance": instance, "numero": numero, "texto": texto}
+        )
         return self._resposta_texto
 
     async def enviar_botoes(
@@ -62,7 +64,7 @@ class _FakeEvolutionClient:
         numero: str,
         texto: str,
         botoes: list[dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         self.chamadas_botoes.append(
             {"instance": instance, "numero": numero, "texto": texto, "botoes": botoes}
         )
@@ -72,24 +74,28 @@ class _FakeEvolutionClient:
 class _FakeEvolutionClientOffline(_FakeEvolutionClient):
     """Simula instância offline (EvolutionOfflineError)."""
 
-    async def enviar_texto(self, instance: str, numero: str, texto: str) -> Dict[str, Any]:
+    async def enviar_texto(
+        self, instance: str, numero: str, texto: str
+    ) -> dict[str, Any]:
         raise EvolutionOfflineError("Instância offline")
 
     async def enviar_botoes(
         self, instance: str, numero: str, texto: str, botoes: list
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         raise EvolutionOfflineError("Instância offline")
 
 
 class _FakeEvolutionClientError(_FakeEvolutionClient):
     """Simula erro genérico da Evolution API (EvolutionError)."""
 
-    async def enviar_texto(self, instance: str, numero: str, texto: str) -> Dict[str, Any]:
+    async def enviar_texto(
+        self, instance: str, numero: str, texto: str
+    ) -> dict[str, Any]:
         raise EvolutionError("Erro genérico Evolution")
 
     async def enviar_botoes(
         self, instance: str, numero: str, texto: str, botoes: list
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         raise EvolutionError("Erro genérico Evolution")
 
 
@@ -142,9 +148,9 @@ class _FakeRepositorio:
         escritorio_id: int,
         cliente_id: int,
         texto: str,
-        processo_id: Optional[int],
+        processo_id: int | None,
         status: str,
-        payload_resposta: Optional[Dict[str, Any]] = None,
+        payload_resposta: dict[str, Any] | None = None,
     ) -> None:
         self.interacoes_salvas.append(
             {
@@ -162,7 +168,7 @@ class _FakeRepositorio:
         escritorio_id: int,
         cliente_id: int,
         texto: str,
-        processo_id: Optional[int],
+        processo_id: int | None,
         enviar_em: datetime,
         motivo: str,
     ) -> None:
@@ -201,7 +207,9 @@ def _service(
     janela: JanelaComercial = JanelaComercial(),
 ) -> tuple[WhatsAppService, _FakeEvolutionClient, _FakeRepositorio]:
     ev = evolution or _FakeEvolutionClient()
-    rp = repo or _FakeRepositorio(preferencia=preferencia, mensagens_enviadas_hoje=mensagens_hoje)
+    rp = repo or _FakeRepositorio(
+        preferencia=preferencia, mensagens_enviadas_hoje=mensagens_hoje
+    )
     svc = WhatsAppService(ev, rp, janela)
     return svc, ev, rp
 
@@ -316,44 +324,58 @@ class TestProximaJanela:
 class TestPodeEnviarAgora:
     async def test_livre_dentro_limite_pode_enviar(self):
         svc, _, _ = _service(preferencia="livre", mensagens_hoje=0)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 9, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 9, 0)
+        )
         assert pode is True
         assert motivo is None
 
     async def test_comercial_dentro_horario_e_limite_pode_enviar(self):
         svc, _, _ = _service(preferencia="comercial", mensagens_hoje=2)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 9, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 9, 0)
+        )
         assert pode is True
         assert motivo is None
 
     async def test_comercial_fora_horario_nao_pode(self):
         svc, _, _ = _service(preferencia="comercial", mensagens_hoje=0)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 20, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 20, 0)
+        )
         assert pode is False
         assert motivo == "fora_horario_comercial"
 
     async def test_livre_rate_limit_excedido_nao_pode(self):
         svc, _, _ = _service(preferencia="livre", mensagens_hoje=5)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 9, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 9, 0)
+        )
         assert pode is False
         assert motivo == "rate_limit_diario"
 
     async def test_comercial_fora_horario_e_rate_limit_retorna_horario_primeiro(self):
         # preferência "comercial" + fora do horário: horário é verificado antes do rate limit
         svc, _, _ = _service(preferencia="comercial", mensagens_hoje=5)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 20, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 20, 0)
+        )
         assert pode is False
         assert motivo == "fora_horario_comercial"
 
     async def test_no_limite_exato_nao_pode(self):
         svc, _, _ = _service(preferencia="livre", mensagens_hoje=5)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 9, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 9, 0)
+        )
         assert pode is False
         assert motivo == "rate_limit_diario"
 
     async def test_abaixo_do_limite_exato_pode(self):
         svc, _, _ = _service(preferencia="livre", mensagens_hoje=4)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 9, 0))
+        pode, motivo = await svc._pode_enviar_agora(
+            CLIENTE_ID, datetime(2024, 6, 10, 9, 0)
+        )
         assert pode is True
 
 
@@ -410,7 +432,9 @@ class TestEnviarMensagemHappyPath:
 class TestEnviarMensagemRateLimit:
     async def test_rate_limit_com_agendamento_ativado_agenda(self):
         svc, ev, rp = _service(preferencia="livre", mensagens_hoje=5)
-        resultado = await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True)
+        resultado = await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True
+        )
         assert resultado["ok"] is True
         assert resultado["agendado"] is True
         assert resultado["motivo"] == "rate_limit_diario"
@@ -418,23 +442,31 @@ class TestEnviarMensagemRateLimit:
 
     async def test_rate_limit_com_agendamento_salva_interacao_agendado(self):
         svc, ev, rp = _service(preferencia="livre", mensagens_hoje=5)
-        await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True)
+        await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True
+        )
         assert rp.interacoes_salvas[0]["status"] == "agendado:rate_limit_diario"
 
     async def test_rate_limit_sem_agendamento_bloqueia(self):
         svc, ev, rp = _service(preferencia="livre", mensagens_hoje=5)
-        resultado = await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False)
+        resultado = await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False
+        )
         assert resultado["ok"] is False
         assert resultado["motivo"] == "rate_limit_diario"
 
     async def test_rate_limit_sem_agendamento_nao_agenda(self):
         svc, ev, rp = _service(preferencia="livre", mensagens_hoje=5)
-        await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False)
+        await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False
+        )
         assert len(rp.agendamentos) == 0
 
     async def test_rate_limit_sem_agendamento_salva_interacao_bloqueado(self):
         svc, ev, rp = _service(preferencia="livre", mensagens_hoje=5)
-        await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False)
+        await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False
+        )
         assert rp.interacoes_salvas[0]["status"] == "bloqueado:rate_limit_diario"
 
     async def test_rate_limit_nao_chama_evolution(self):
@@ -453,7 +485,9 @@ class TestEnviarMensagemForaHorario:
         rp = _FakeRepositorio(preferencia="comercial", mensagens_enviadas_hoje=0)
         svc = WhatsAppService(_FakeEvolutionClient(), rp)
         monkeypatch.setattr(_PATCH_TARGET, _Datetime22h)
-        resultado = await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True)
+        resultado = await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=True
+        )
         assert resultado["ok"] is True
         assert resultado["agendado"] is True
         assert resultado["motivo"] == "fora_horario_comercial"
@@ -462,7 +496,9 @@ class TestEnviarMensagemForaHorario:
         rp = _FakeRepositorio(preferencia="comercial", mensagens_enviadas_hoje=0)
         svc = WhatsAppService(_FakeEvolutionClient(), rp)
         monkeypatch.setattr(_PATCH_TARGET, _Datetime22h)
-        resultado = await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False)
+        resultado = await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False
+        )
         assert resultado["ok"] is False
         assert resultado["motivo"] == "fora_horario_comercial"
 
@@ -470,7 +506,9 @@ class TestEnviarMensagemForaHorario:
         rp = _FakeRepositorio(preferencia="comercial", mensagens_enviadas_hoje=0)
         svc = WhatsAppService(_FakeEvolutionClient(), rp)
         monkeypatch.setattr(_PATCH_TARGET, _Datetime22h)
-        await svc.enviar_mensagem(ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False)
+        await svc.enviar_mensagem(
+            ESCRITORIO_ID, CLIENTE_ID, TEXTO, permitir_agendamento=False
+        )
         assert rp.interacoes_salvas[0]["status"] == "bloqueado:fora_horario_comercial"
 
 

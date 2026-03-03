@@ -21,10 +21,10 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     set_capa_sync,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fake Redis — suporte a get/setex/pipeline(delete)
 # ---------------------------------------------------------------------------
+
 
 class _FakeCacheRedis:
     """
@@ -48,7 +48,7 @@ class _FakeCacheRedis:
         self._store[key] = value
         self._ttls[key] = seconds
 
-    def pipeline(self) -> "_FakeCachePipeline":
+    def pipeline(self) -> _FakeCachePipeline:
         return _FakeCachePipeline(self)
 
     # Helpers de inspeção para os testes
@@ -64,7 +64,7 @@ class _FakeCachePipeline:
         self._redis = redis
         self._cmds: list = []
 
-    def delete(self, key: str) -> "_FakeCachePipeline":
+    def delete(self, key: str) -> _FakeCachePipeline:
         self._cmds.append(("delete", key))
         return self
 
@@ -90,12 +90,12 @@ class _ErrorRedis(_FakeCacheRedis):
     async def setex(self, key: str, seconds: int, value: str) -> None:  # type: ignore[override]
         raise ConnectionError("Redis indisponível")
 
-    def pipeline(self) -> "_ErrorPipeline":  # type: ignore[override]
+    def pipeline(self) -> _ErrorPipeline:  # type: ignore[override]
         return _ErrorPipeline()
 
 
 class _ErrorPipeline:
-    def delete(self, key: str) -> "_ErrorPipeline":
+    def delete(self, key: str) -> _ErrorPipeline:
         return self
 
     async def execute(self) -> list:
@@ -105,6 +105,7 @@ class _ErrorPipeline:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def redis() -> _FakeCacheRedis:
@@ -146,6 +147,7 @@ ANDAMENTOS = [
 # Constantes
 # ---------------------------------------------------------------------------
 
+
 class TestConstantes:
     def test_ttl_capa_e_24_horas(self):
         assert LegalDataCacheManager.TTL_CAPA_PROCESSO == 60 * 60 * 24
@@ -158,21 +160,29 @@ class TestConstantes:
 # Happy path — Capa
 # ---------------------------------------------------------------------------
 
+
 class TestCapa:
-    async def test_miss_antes_de_salvar_retorna_none(self, cache: LegalDataCacheManager):
+    async def test_miss_antes_de_salvar_retorna_none(
+        self, cache: LegalDataCacheManager
+    ):
         assert await cache.get_capa(CNJ) is None
 
     async def test_set_get_round_trip(self, cache: LegalDataCacheManager):
         await cache.set_capa(CNJ, CAPA)
         assert await cache.get_capa(CNJ) == CAPA
 
-    async def test_ttl_correto_apos_set(self, cache: LegalDataCacheManager, redis: _FakeCacheRedis):
+    async def test_ttl_correto_apos_set(
+        self, cache: LegalDataCacheManager, redis: _FakeCacheRedis
+    ):
         await cache.set_capa(CNJ, CAPA)
         chave = LegalDataCacheManager._key_capa(CNJ)
         assert redis._ttl(chave) == LegalDataCacheManager.TTL_CAPA_PROCESSO
 
     async def test_unicode_preservado(self, cache: LegalDataCacheManager):
-        capa_unicode = {**CAPA, "assunto": "Execução — débito tributário (Art. 5º, § 3°)"}
+        capa_unicode = {
+            **CAPA,
+            "assunto": "Execução — débito tributário (Art. 5º, § 3°)",
+        }
         await cache.set_capa(CNJ, capa_unicode)
         assert (await cache.get_capa(CNJ))["assunto"] == capa_unicode["assunto"]
 
@@ -187,15 +197,20 @@ class TestCapa:
 # Happy path — Andamentos
 # ---------------------------------------------------------------------------
 
+
 class TestAndamentos:
-    async def test_miss_antes_de_salvar_retorna_none(self, cache: LegalDataCacheManager):
+    async def test_miss_antes_de_salvar_retorna_none(
+        self, cache: LegalDataCacheManager
+    ):
         assert await cache.get_andamentos(CNJ) is None
 
     async def test_set_get_round_trip(self, cache: LegalDataCacheManager):
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         assert await cache.get_andamentos(CNJ) == ANDAMENTOS
 
-    async def test_ttl_correto_apos_set(self, cache: LegalDataCacheManager, redis: _FakeCacheRedis):
+    async def test_ttl_correto_apos_set(
+        self, cache: LegalDataCacheManager, redis: _FakeCacheRedis
+    ):
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         chave = LegalDataCacheManager._key_andamentos(CNJ)
         assert redis._ttl(chave) == LegalDataCacheManager.TTL_ANDAMENTOS
@@ -215,23 +230,33 @@ class TestAndamentos:
 # Formato e isolamento de chaves
 # ---------------------------------------------------------------------------
 
+
 class TestChaves:
     def test_formato_chave_capa(self):
         assert LegalDataCacheManager._key_capa(CNJ) == f"f1:legal_data:capa:{CNJ}"
 
     def test_formato_chave_andamentos(self):
-        assert LegalDataCacheManager._key_andamentos(CNJ) == f"f1:legal_data:andamentos:{CNJ}"
+        assert (
+            LegalDataCacheManager._key_andamentos(CNJ)
+            == f"f1:legal_data:andamentos:{CNJ}"
+        )
 
     def test_capa_e_andamentos_chaves_distintas(self):
-        assert LegalDataCacheManager._key_capa(CNJ) != LegalDataCacheManager._key_andamentos(CNJ)
+        assert LegalDataCacheManager._key_capa(
+            CNJ
+        ) != LegalDataCacheManager._key_andamentos(CNJ)
 
-    async def test_cnjs_distintos_nao_se_misturam_capa(self, cache: LegalDataCacheManager):
+    async def test_cnjs_distintos_nao_se_misturam_capa(
+        self, cache: LegalDataCacheManager
+    ):
         await cache.set_capa(CNJ, {**CAPA, "comarca": "São Paulo"})
         await cache.set_capa(CNJ_2, {**CAPA, "comarca": "Campinas"})
         assert (await cache.get_capa(CNJ))["comarca"] == "São Paulo"
         assert (await cache.get_capa(CNJ_2))["comarca"] == "Campinas"
 
-    async def test_cnjs_distintos_nao_se_misturam_andamentos(self, cache: LegalDataCacheManager):
+    async def test_cnjs_distintos_nao_se_misturam_andamentos(
+        self, cache: LegalDataCacheManager
+    ):
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         await cache.set_andamentos(CNJ_2, [])
         assert await cache.get_andamentos(CNJ) == ANDAMENTOS
@@ -241,6 +266,7 @@ class TestChaves:
 # ---------------------------------------------------------------------------
 # Invalidação
 # ---------------------------------------------------------------------------
+
 
 class TestInvalidacao:
     async def test_invalida_capa_e_andamentos_do_cnj(
@@ -263,7 +289,9 @@ class TestInvalidacao:
         assert await cache.get_capa(CNJ) is None
         assert await cache.get_andamentos(CNJ) is None
 
-    async def test_invalida_cnj_sem_cache_nao_crasha(self, cache: LegalDataCacheManager):
+    async def test_invalida_cnj_sem_cache_nao_crasha(
+        self, cache: LegalDataCacheManager
+    ):
         """Invalidar chave inexistente não levanta exceção."""
         await cache.invalidar_cache_processo("0000000-00.0000.0.00.0000")
 
@@ -283,20 +311,31 @@ class TestInvalidacao:
 # Resiliência — graceful degradation quando Redis falha
 # ---------------------------------------------------------------------------
 
+
 class TestResiliencia:
-    async def test_get_capa_redis_error_retorna_none(self, cache_error: LegalDataCacheManager):
+    async def test_get_capa_redis_error_retorna_none(
+        self, cache_error: LegalDataCacheManager
+    ):
         assert await cache_error.get_capa(CNJ) is None
 
-    async def test_set_capa_redis_error_nao_crasha(self, cache_error: LegalDataCacheManager):
+    async def test_set_capa_redis_error_nao_crasha(
+        self, cache_error: LegalDataCacheManager
+    ):
         await cache_error.set_capa(CNJ, CAPA)
 
-    async def test_get_andamentos_redis_error_retorna_none(self, cache_error: LegalDataCacheManager):
+    async def test_get_andamentos_redis_error_retorna_none(
+        self, cache_error: LegalDataCacheManager
+    ):
         assert await cache_error.get_andamentos(CNJ) is None
 
-    async def test_set_andamentos_redis_error_nao_crasha(self, cache_error: LegalDataCacheManager):
+    async def test_set_andamentos_redis_error_nao_crasha(
+        self, cache_error: LegalDataCacheManager
+    ):
         await cache_error.set_andamentos(CNJ, ANDAMENTOS)
 
-    async def test_invalidar_redis_error_nao_crasha(self, cache_error: LegalDataCacheManager):
+    async def test_invalidar_redis_error_nao_crasha(
+        self, cache_error: LegalDataCacheManager
+    ):
         await cache_error.invalidar_cache_processo(CNJ)
 
 
@@ -322,7 +361,9 @@ class TestHelpersSincronos:
         with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
             result = get_andamentos_sync(CNJ)
         assert result == ANDAMENTOS
-        mock_redis.get.assert_called_once_with(LegalDataCacheManager._key_andamentos(CNJ))
+        mock_redis.get.assert_called_once_with(
+            LegalDataCacheManager._key_andamentos(CNJ)
+        )
 
     def test_get_andamentos_sync_miss(self):
         """Quando Redis não tem os dados, retorna None."""

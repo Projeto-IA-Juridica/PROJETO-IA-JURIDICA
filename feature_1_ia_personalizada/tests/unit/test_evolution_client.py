@@ -9,20 +9,22 @@ Cobre:
 
 from __future__ import annotations
 
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
 
 from feature_1_ia_personalizada.services.messaging.evolution_client import (
     EvolutionClient,
-    EvolutionTimeoutError,
     EvolutionOfflineError,
     EvolutionRequestError,
+    EvolutionTimeoutError,
 )
 
 # ──────────────────────────────────────────────
 # Fixture
 # ──────────────────────────────────────────────
+
 
 @pytest.fixture
 def client() -> EvolutionClient:
@@ -48,13 +50,16 @@ def _mock_response(status_code: int, json_data: dict | None = None) -> MagicMock
 # 1. Envio de texto — payload correto (PIJ-172 item 1)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_enviar_texto_payload_correto(client: EvolutionClient):
     """Garante que enviar_texto manda POST com number e text corretos."""
     resposta_esperada = {"key": "value", "messageId": "abc123"}
     mock_resp = _mock_response(200, resposta_esperada)
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
+    with patch.object(
+        client._client, "request", new_callable=AsyncMock
+    ) as mock_request:
         mock_request.return_value = mock_resp
 
         resultado = await client.enviar_texto(
@@ -81,11 +86,13 @@ async def test_enviar_texto_retorna_dict_vazio_sem_corpo(client: EvolutionClient
     """Quando a resposta 2xx não tem corpo, retorna dict vazio sem erro."""
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = 200
-    resp.content = b""           # sem corpo
+    resp.content = b""  # sem corpo
     resp.json.return_value = {}
     resp.text = ""
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
+    with patch.object(
+        client._client, "request", new_callable=AsyncMock
+    ) as mock_request:
         mock_request.return_value = resp
         resultado = await client.enviar_texto("inst", "5511999999999", "teste")
 
@@ -103,14 +110,17 @@ async def test_enviar_texto_headers_contem_apikey(client: EvolutionClient):
 # 2. Retry com backoff em timeout (PIJ-172 item 2)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_retry_em_timeout_3_tentativas(client: EvolutionClient):
     """
     Quando a Evolution lança ReadTimeout em todas as tentativas,
     deve tentar 3 vezes e lançar EvolutionTimeoutError.
     """
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
 
         mock_req.side_effect = httpx.ReadTimeout("timeout")
 
@@ -144,8 +154,10 @@ async def test_retry_sucesso_na_segunda_tentativa(client: EvolutionClient):
     """Falha na 1ª tentativa (timeout) mas sucesso na 2ª — não deve lançar exceção."""
     sucesso = _mock_response(200, {"messageId": "ok"})
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
 
         mock_req.side_effect = [httpx.ReadTimeout("t"), sucesso]
 
@@ -159,13 +171,16 @@ async def test_retry_sucesso_na_segunda_tentativa(client: EvolutionClient):
 # 3. Tratamento de erros 4xx / 5xx (PIJ-172 item 3)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_erro_400_levanta_evolution_request_error(client: EvolutionClient):
     """HTTP 400 deve lançar EvolutionRequestError na 1ª tentativa (sem retry)."""
     mock_resp = _mock_response(400, {"error": "Bad Request"})
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
 
         mock_req.return_value = mock_resp
 
@@ -182,8 +197,10 @@ async def test_erro_500_levanta_evolution_request_error(client: EvolutionClient)
     """HTTP 500 deve lançar EvolutionRequestError."""
     mock_resp = _mock_response(500, {"error": "Internal Server Error"})
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
 
         mock_req.return_value = mock_resp
 
@@ -198,8 +215,10 @@ async def test_erro_503_levanta_evolution_offline_error(client: EvolutionClient)
     """HTTP 503 indica instância offline → deve lançar EvolutionOfflineError após retries."""
     mock_resp = _mock_response(503, {"error": "Service Unavailable"})
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
 
         mock_req.return_value = mock_resp
 
@@ -213,8 +232,10 @@ async def test_erro_503_levanta_evolution_offline_error(client: EvolutionClient)
 @pytest.mark.asyncio
 async def test_erro_conexao_levanta_evolution_request_error(client: EvolutionClient):
     """Falha de conexão (ConnectError) após 3 tentativas → EvolutionRequestError."""
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_req, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+    with (
+        patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
 
         mock_req.side_effect = httpx.ConnectError("connection refused")
 

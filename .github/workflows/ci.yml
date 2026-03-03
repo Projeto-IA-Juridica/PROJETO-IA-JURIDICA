@@ -1,0 +1,96 @@
+# ==============================================================================
+# CI — Concierge Jurídico Digital
+# ==============================================================================
+# Pipeline executado em todo PR para main/develop e push em main.
+#
+# Nota sobre serviços externos:
+#   Os testes NÃO precisam de Postgres ou Redis reais.
+#   - conftest.py usa sqlite+aiosqlite:///:memory: (SQLite in-memory) como banco
+#   - FakeRedis (in-memory) simula o Redis nas fixtures
+#   - conftest.py injeta todas as env vars obrigatórias via os.environ.setdefault
+#     antes dos imports — nenhum .env ou secret é necessário para rodar pytest
+# ==============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Lint + Tipos + Testes
+  # ----------------------------------------------------------------------------
+  test:
+    name: Lint, Tipos e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"  # cacheia ~/.cache/pip entre runs para acelerar install
+
+      # Instala deps da aplicação (requirements-f1.txt = base + feature1)
+      # depois instala ferramentas de dev declaradas em pyproject.toml [dev]
+      # (pytest, ruff, black, mypy, aiosqlite, etc.)
+      - name: Instalar dependências
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-f1.txt
+          pip install -e ".[dev]"
+
+      # ruff valida estilo e erros comuns (substitui flake8 + isort)
+      - name: Lint — Ruff
+        run: ruff check .
+
+      # black --check apenas verifica formatação, não modifica arquivos
+      - name: Formatação — Black
+        run: black --check .
+
+      # mypy faz análise estática de tipos
+      # ignore_missing_imports = true está em pyproject.toml — não falha por stubs ausentes
+      - name: Tipos — Mypy
+        run: mypy feature_1_ia_personalizada shared
+
+      # conftest.py (scope=session) já injeta todas as env vars via os.environ.setdefault
+      # antes do primeiro import de módulo — nenhuma variável de ambiente extra necessária aqui
+      # --cov-fail-under=70 está configurado em pyproject.toml — bloqueia PR se cobertura < 70%
+      - name: Testes — Pytest
+        run: pytest --tb=short
+
+      # Envia relatório de cobertura para Codecov (opcional — funciona sem o secret configurado)
+      # Para ativar: adicionar CODECOV_TOKEN em Settings > Secrets > Actions no GitHub
+      - name: Upload de cobertura para Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+        # continue-on-error garante que o job não falha se o token não estiver configurado
+        continue-on-error: true
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Build Docker — valida que a imagem compila sem erros
+  # Roda em paralelo com o job de testes
+  # ----------------------------------------------------------------------------
+  docker-build:
+    name: Build Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # Valida que o Dockerfile.f1 compila corretamente (multi-stage build)
+      # Não faz push — apenas verifica que a imagem é buildável
+      - name: Build imagem
+        run: |
+          docker build \
+            -t concierge-f1:ci \
+            -f infrastructure/docker/Dockerfile.f1 \
+            .

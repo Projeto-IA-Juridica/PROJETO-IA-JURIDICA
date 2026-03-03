@@ -82,9 +82,7 @@ class UsuarioCreate(BaseModel):
             return v
         normalizado = v.upper().strip()
         if not validar_oab(normalizado):
-            raise ValueError(
-                "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
-            )
+            raise ValueError("OAB inválida — formato esperado: UFNNNNN (ex: SP123456)")
         return normalizado
 
 

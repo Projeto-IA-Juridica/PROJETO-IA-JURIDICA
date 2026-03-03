@@ -1,8 +1,8 @@
-
 # feature_1_ia_personalizada/workers/celery_app.py
 from __future__ import annotations
 
 import os
+
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import worker_process_init
@@ -11,6 +11,7 @@ from kombu import Queue
 # (opcional) carregar .env automaticamente
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except Exception:
     pass
@@ -53,37 +54,43 @@ celery_app.conf.task_default_routing_key = "monitoramento"
 celery_app.conf.task_routes = {
     # monitor_processos.py
     "feature_1_ia_personalizada.workers.monitor_processos.monitorar_todos_processos": {
-        "queue": "monitoramento", "routing_key": "monitoramento"
+        "queue": "monitoramento",
+        "routing_key": "monitoramento",
     },
     "feature_1_ia_personalizada.workers.monitor_processos.monitorar_processo_individual": {
-        "queue": "monitoramento", "routing_key": "monitoramento"
+        "queue": "monitoramento",
+        "routing_key": "monitoramento",
     },
-
     # send_notifications.py
     "feature_1_ia_personalizada.workers.send_notifications.enviar_notificacao_andamento": {
-        "queue": "notificacoes", "routing_key": "notificacoes"
+        "queue": "notificacoes",
+        "routing_key": "notificacoes",
     },
     "feature_1_ia_personalizada.workers.send_notifications.enviar_lote_sem_movimentacao": {
-        "queue": "notificacoes", "routing_key": "notificacoes"
+        "queue": "notificacoes",
+        "routing_key": "notificacoes",
     },
     "feature_1_ia_personalizada.workers.send_notifications.enviar_pesquisa_satisfacao": {
-        "queue": "relacionamento", "routing_key": "relacionamento"
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
     },
-
     # ia (se existir)
     "feature_1_ia_personalizada.workers.send_notifications.processar_mensagem_recebida": {
-        "queue": "ia", "routing_key": "ia"
+        "queue": "ia",
+        "routing_key": "ia",
     },
-
     # mensagens_relacionamento.py
     "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios": {
-        "queue": "relacionamento", "routing_key": "relacionamento"
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
     },
     "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_datas_comemorativas": {
-        "queue": "relacionamento", "routing_key": "relacionamento"
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
     },
     "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_clientes_sem_contato": {
-        "queue": "relacionamento", "routing_key": "relacionamento"
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
     },
 }
 
@@ -101,7 +108,6 @@ celery_app.conf.beat_schedule = {
         "task": "feature_1_ia_personalizada.workers.send_notifications.enviar_pesquisa_satisfacao",
         "schedule": crontab(minute=0, hour=14, day_of_month="1"),
     },
-
     "relacionamento-aniversarios-08h": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios",
         "schedule": crontab(hour=8, minute=0),
@@ -116,6 +122,7 @@ celery_app.conf.beat_schedule = {
     },
 }
 
+
 # Inicializa o JuridicalTranslator (singleton síncrono seguro) em cada processo worker.
 # Clientes assíncronos (Redis, Claude, Evolution) são criados por task — ver orchestrator.py.
 @worker_process_init.connect
@@ -123,10 +130,11 @@ def _init_worker_process(**kwargs):
     from feature_1_ia_personalizada.services.ai.orchestrator import (
         inicializar_orchestrador_worker,
     )
+
     inicializar_orchestrador_worker()
 
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
+import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
 import feature_1_ia_personalizada.workers.send_notifications  # noqa: F401
-import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401

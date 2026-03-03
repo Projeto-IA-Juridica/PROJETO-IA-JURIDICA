@@ -1,15 +1,19 @@
-from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database.session import get_db
 from shared.models.processo import Processo
-from shared.schemas.processo import ProcessoCreate, ProcessoUpdate, ProcessoList, ProcessoResponse
-from shared.schemas.response import SuccessResponse, PaginatedResponse
+from shared.schemas.processo import (
+    ProcessoCreate,
+    ProcessoList,
+    ProcessoResponse,
+    ProcessoUpdate,
+)
 from shared.utils.lgpd import registrar_acesso
 
 router = APIRouter(prefix="/processos", tags=["Processos Jurídicos"])
+
 
 def _get_escritorio_id(request: Request) -> int:
     """Helper para extrair o escritorio_id injetado pelo JWTAuthMiddleware"""
@@ -17,9 +21,11 @@ def _get_escritorio_id(request: Request) -> int:
         raise HTTPException(status_code=401, detail="Não autenticado")
     return int(request.state.user_payload.get("escritorio_id"))
 
+
 def _get_user_id(request: Request) -> int:
     payload = getattr(request.state, "user_payload", {})
     return int(payload.get("sub", 0))
+
 
 def _get_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
@@ -44,11 +50,16 @@ async def list_processos(
     - Suporta filtros opcionais por status, cliente_id ou busca de CNJ.
     """
     escritorio_id = _get_escritorio_id(request)
-    registrar_acesso(_get_user_id(request), f"processos:escritorio:{escritorio_id}", "leitura", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request),
+        f"processos:escritorio:{escritorio_id}",
+        "leitura",
+        _get_ip(request),
+    )
 
     # Montando a query de filtro base
     stmt = select(Processo).where(Processo.escritorio_id == escritorio_id)
-    
+
     if status_processo:
         stmt = stmt.where(Processo.status == status_processo)
     if cliente_id:
@@ -64,47 +75,52 @@ async def list_processos(
     # Ordenação e Paginação (Offset/Limit)
     stmt = stmt.order_by(Processo.created_at.desc())
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
-    
+
     # Executa a busca
     result = await db.execute(stmt)
     processos = result.scalars().all()
 
     # Cálculo do Links de Paginação (básico)
     total_pages = max(1, (total + per_page - 1) // per_page)
-    base_url = str(request.url).split('?')[0]
-    
+
     return ProcessoList(
         data=processos,
         page=page,
         per_page=per_page,
         total=total,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
 
 @router.post("", response_model=ProcessoResponse, status_code=status.HTTP_201_CREATED)
 async def create_processo(
-    payload: ProcessoCreate,
-    request: Request,
-    db: AsyncSession = Depends(get_db)
+    payload: ProcessoCreate, request: Request, db: AsyncSession = Depends(get_db)
 ):
     """
     Cadastra um novo processo para acompanhamento.
     Verifica se o CNJ já foi cadastrado neste escritório.
     """
     escritorio_id = _get_escritorio_id(request)
-    registrar_acesso(_get_user_id(request), f"processo:novo:cliente:{payload.cliente_id}", "escrita", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request),
+        f"processo:novo:cliente:{payload.cliente_id}",
+        "escrita",
+        _get_ip(request),
+    )
 
     # Impede cadastro duplicado de CNJ para o mesmo escritório
     stmt = select(Processo).where(
         and_(
             Processo.escritorio_id == escritorio_id,
-            Processo.numero_cnj == payload.numero_cnj
+            Processo.numero_cnj == payload.numero_cnj,
         )
     )
     result = await db.execute(stmt)
     if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Este processo (CNJ) já está cadastrado para o seu escritório.")
+        raise HTTPException(
+            status_code=400,
+            detail="Este processo (CNJ) já está cadastrado para o seu escritório.",
+        )
 
     novo_processo = Processo(
         escritorio_id=escritorio_id,
@@ -115,68 +131,85 @@ async def create_processo(
         status="ativo",  # status inicial padrão
         monitoramento_ativo=True,
     )
-    
+
     db.add(novo_processo)
     await db.flush()  # Para obtermos o ID para o retorno, sem comitar a transação explícitamente ainda (session handle faz)
-    
+
     return novo_processo
 
 
 @router.get("/{processo_id}", response_model=ProcessoResponse)
-async def get_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+):
     """Detalha um processo específico, garantindo que pertença ao escritório do usuário."""
     escritorio_id = _get_escritorio_id(request)
 
     processo = await db.get(Processo, processo_id)
     if not processo or processo.escritorio_id != escritorio_id:
-        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão de acesso.")
+        raise HTTPException(
+            status_code=404,
+            detail="Processo não encontrado ou sem permissão de acesso.",
+        )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "leitura", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "leitura", _get_ip(request)
+    )
     return processo
 
 
 @router.put("/{processo_id}", response_model=ProcessoResponse)
 async def update_processo(
-    processo_id: int, 
-    payload: ProcessoUpdate, 
-    request: Request, 
-    db: AsyncSession = Depends(get_db)
+    processo_id: int,
+    payload: ProcessoUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """Edita dados manuais de um processo (Polo, Advogado, Frequencia de Monitoramento)."""
     escritorio_id = _get_escritorio_id(request)
-    
+
     processo = await db.get(Processo, processo_id)
     if not processo or processo.escritorio_id != escritorio_id:
-        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
+        raise HTTPException(
+            status_code=404, detail="Processo não encontrado ou sem permissão."
+        )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "escrita", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "escrita", _get_ip(request)
+    )
 
     # Atualiza em lote usando pydantic exclude_unset pra não sobrescrever os Nones com None cego
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(processo, key, value)
-        
+
     await db.flush()
     return processo
 
 
 @router.delete("/{processo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+):
     """
     Remove ('soft delete' transformando em arquivado/encerrado, ou hard delete) o processo.
     Para segurança no judiciário, faremos "Soft Delete" mudando o status e desativando o robô.
     """
     escritorio_id = _get_escritorio_id(request)
-    
+
     processo = await db.get(Processo, processo_id)
     if not processo or processo.escritorio_id != escritorio_id:
-        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
+        raise HTTPException(
+            status_code=404, detail="Processo não encontrado ou sem permissão."
+        )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request)
+    )
 
     # Soft Delete:
     processo.status = "arquivado"
     processo.monitoramento_ativo = False
-    
+
     await db.flush()
     return None

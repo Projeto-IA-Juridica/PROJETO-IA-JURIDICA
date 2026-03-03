@@ -8,33 +8,59 @@ registra todos os roteadores de domínio e define tratadores de eventos de ciclo
 """
 
 from contextlib import asynccontextmanager
+
+import redis.asyncio as redis
+import sentry_sdk
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import redis.asyncio as redis
-import structlog
 from prometheus_fastapi_instrumentator import Instrumentator
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from shared.config.settings import settings
-from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+
+# ==========================================
+# SENTRY — rastreamento de erros em produção
+# ==========================================
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            SqlalchemyIntegration(),
+            CeleryIntegration(),
+        ],
+        traces_sample_rate=0.1,  # 10% das requisições para performance
+        profiles_sample_rate=0.1,
+        send_default_pii=False,  # LGPD — não enviar dados de usuário
+    )
+
 from feature_1_ia_personalizada.api.middleware.auth import JWTAuthMiddleware
-from feature_1_ia_personalizada.api.middleware.request_logging import RequestLoggingMiddleware
+from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+from feature_1_ia_personalizada.api.middleware.request_logging import (
+    RequestLoggingMiddleware,
+)
 
 # Importando os roteadores das nossas subpastas
 from feature_1_ia_personalizada.api.routes import (
     auth,
+    chat,
     health,
     metrics,
     processos,
-    chat,
     webhook_whatsapp,
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Executado ao iniciar o servidor (Startup)
     print("🚀 Iniciando o Concierge Jurídico Digital...")
-    
+
     # 1. Ligando o Redis para o Rate Limit
     app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     try:
@@ -42,9 +68,9 @@ async def lifespan(app: FastAPI):
         print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
     except Exception as e:
         print(f"❌ Erro ao conectar no Redis: {e}")
-        
+
     yield
-    
+
     # Executado ao desligar o servidor (Shutdown)
     print("🛑 Encerrando o servidor de forma graciosa...")
     if hasattr(app.state, "redis_client"):
@@ -101,8 +127,8 @@ app.include_router(webhook_whatsapp)
 #   http_request_duration_seconds{method, handler, status}
 #   http_requests_in_progress{method, handler}
 Instrumentator(
-    should_group_status_codes=False,     # separa 200, 201, 404, etc.
-    excluded_handlers=["/metrics"],      # não mede o endpoint de métricas em si
+    should_group_status_codes=False,  # separa 200, 201, 404, etc.
+    excluded_handlers=["/metrics"],  # não mede o endpoint de métricas em si
 ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
@@ -111,7 +137,11 @@ Instrumentator(
 # ==========================================
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)
+    # Captura explícita necessária: o handler impede que o Sentry capture automaticamente
+    sentry_sdk.capture_exception(exc)
+    logger.error(
+        "erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Erro interno do servidor"},

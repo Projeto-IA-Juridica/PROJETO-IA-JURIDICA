@@ -39,7 +39,7 @@ import time
 from pathlib import Path
 
 import structlog
-from openai import AsyncOpenAI, APITimeoutError, APIStatusError
+from openai import APIStatusError, APITimeoutError, AsyncOpenAI
 from pydub import AudioSegment
 
 from shared.config.settings import settings
@@ -200,9 +200,7 @@ async def transcrever_audio(audio_bytes: bytes) -> str:
 
     except APIStatusError as exc:
         logger.error("audio.whisper_erro_api", status=exc.status_code, erro=str(exc))
-        raise ValueError(
-            f"Erro na API Whisper (HTTP {exc.status_code})"
-        ) from exc
+        raise ValueError(f"Erro na API Whisper (HTTP {exc.status_code})") from exc
 
     finally:
         if tmp_path is not None:

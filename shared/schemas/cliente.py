@@ -21,7 +21,11 @@ from datetime import date, datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from shared.schemas.response import PaginatedResponse
-from shared.utils.validators import normalizar_cpf, validar_cpf, validar_telefone_whatsapp
+from shared.utils.validators import (
+    normalizar_cpf,
+    validar_cpf,
+    validar_telefone_whatsapp,
+)
 
 # ---------------------------------------------------------------------------
 # Constantes de schema (específicas deste recurso)
@@ -80,9 +84,7 @@ class ClienteCreate(BaseModel):
         if v > hoje:
             raise ValueError("Data de nascimento não pode ser futura")
 
-        anos = (
-            hoje.year - v.year - ((hoje.month, hoje.day) < (v.month, v.day))
-        )
+        anos = hoje.year - v.year - ((hoje.month, hoje.day) < (v.month, v.day))
 
         if anos < 18:
             raise ValueError("Cliente deve ter pelo menos 18 anos")

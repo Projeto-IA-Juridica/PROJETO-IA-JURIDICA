@@ -4,14 +4,17 @@ shared/database/session.py
 Módulo responsável por fornecer dependências de banco de dados para o FastAPI.
 """
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from shared.database.connection import async_session_factory
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency (Injeção de Dependência) criada para as rotas do FastAPI.
-    
+
     1. Abre uma nova sessão assíncrona com o banco.
     2. Usando o comando `yield`, devolve a sessão para a rota rodar suas queries.
     3. Se a rota terminar com sucesso, faz o `commit` automaticamente para salvar!

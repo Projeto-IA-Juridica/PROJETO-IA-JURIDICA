@@ -1,18 +1,16 @@
-
-
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
 from datetime import datetime, time
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Protocol
 
+import structlog
 from prometheus_client import Counter
-
 from sqlalchemy import select
 
 from shared.database.connection import async_session_factory
 from shared.models.processo import Processo as ProcessoModel
+
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
 
 logger = structlog.get_logger(__name__)
@@ -45,9 +43,9 @@ class RepositorioWhatsApp(Protocol):
         escritorio_id: int,
         cliente_id: int,
         texto: str,
-        processo_id: Optional[int],
+        processo_id: int | None,
         status: str,
-        payload_resposta: Optional[Dict[str, Any]] = None,
+        payload_resposta: dict[str, Any] | None = None,
     ) -> None: ...
 
     async def agendar_envio_mensagem(
@@ -55,7 +53,7 @@ class RepositorioWhatsApp(Protocol):
         escritorio_id: int,
         cliente_id: int,
         texto: str,
-        processo_id: Optional[int],
+        processo_id: int | None,
         enviar_em: datetime,
         motivo: str,
     ) -> None:
@@ -65,15 +63,13 @@ class RepositorioWhatsApp(Protocol):
         """
 
 
-
-
 # Config de horário
+
 
 @dataclass(frozen=True)
 class JanelaComercial:
     inicio: time = time(8, 0)
     fim: time = time(18, 0)
-
 
 
 # Service
@@ -102,7 +98,6 @@ class WhatsAppService:
         self.janela_comercial = janela_comercial
 
     # Regras: horário e limite
-    
 
     def _esta_na_janela_comercial(self, agora: datetime) -> bool:
         t = agora.time()
@@ -113,12 +108,28 @@ class WhatsAppService:
         Se fora do horário, agenda para o próximo início (08:00).
         """
         if agora.time() < self.janela_comercial.inicio:
-            return agora.replace(hour=self.janela_comercial.inicio.hour, minute=self.janela_comercial.inicio.minute, second=0, microsecond=0)
+            return agora.replace(
+                hour=self.janela_comercial.inicio.hour,
+                minute=self.janela_comercial.inicio.minute,
+                second=0,
+                microsecond=0,
+            )
         # depois das 18h => próximo dia 08h
-        proximo_dia = agora.replace(hour=self.janela_comercial.inicio.hour, minute=self.janela_comercial.inicio.minute, second=0, microsecond=0)
-        return proximo_dia.replace(day=agora.day) if False else (proximo_dia + _um_dia(agora))
+        proximo_dia = agora.replace(
+            hour=self.janela_comercial.inicio.hour,
+            minute=self.janela_comercial.inicio.minute,
+            second=0,
+            microsecond=0,
+        )
+        return (
+            proximo_dia.replace(day=agora.day)
+            if False
+            else (proximo_dia + _um_dia(agora))
+        )
 
-    async def _pode_enviar_agora(self, cliente_id: int, agora: datetime) -> tuple[bool, Optional[str]]:
+    async def _pode_enviar_agora(
+        self, cliente_id: int, agora: datetime
+    ) -> tuple[bool, str | None]:
         preferencia = await self.repo.obter_preferencia_horario_notificacao(cliente_id)
         if preferencia == "comercial" and not self._esta_na_janela_comercial(agora):
             return False, "fora_horario_comercial"
@@ -129,18 +140,16 @@ class WhatsAppService:
 
         return True, None
 
-    
     # API principal
-   
 
     async def enviar_mensagem(
         self,
         escritorio_id: int,
         cliente_id: int,
         texto: str,
-        processo_id: Optional[int] = None,
+        processo_id: int | None = None,
         permitir_agendamento: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Resolve instância do escritório e envia ao cliente.
         Se fora do horário comercial ou rate limit excedido, agenda (se permitir_agendamento).
@@ -160,7 +169,11 @@ class WhatsAppService:
                 )
                 return {"ok": False, "motivo": motivo_bloqueio}
 
-            enviar_em = self._proxima_janela_comercial(agora) if motivo_bloqueio == "fora_horario_comercial" else agora.replace(hour=9, minute=0, second=0, microsecond=0)
+            enviar_em = (
+                self._proxima_janela_comercial(agora)
+                if motivo_bloqueio == "fora_horario_comercial"
+                else agora.replace(hour=9, minute=0, second=0, microsecond=0)
+            )
             await self.repo.agendar_envio_mensagem(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -177,14 +190,21 @@ class WhatsAppService:
                 status=f"agendado:{motivo_bloqueio}",
                 payload_resposta={"enviar_em": enviar_em.isoformat()},
             )
-            return {"ok": True, "agendado": True, "enviar_em": enviar_em.isoformat(), "motivo": motivo_bloqueio}
+            return {
+                "ok": True,
+                "agendado": True,
+                "enviar_em": enviar_em.isoformat(),
+                "motivo": motivo_bloqueio,
+            }
 
         # Envio normal
         instancia = await self.repo.obter_instancia_por_escritorio(escritorio_id)
         numero = await self.repo.obter_numero_cliente(cliente_id)
 
         try:
-            resposta = await self.evolution_client.enviar_texto(instancia, numero, texto)
+            resposta = await self.evolution_client.enviar_texto(
+                instancia, numero, texto
+            )
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -193,7 +213,9 @@ class WhatsAppService:
                 status="enviado",
                 payload_resposta=resposta,
             )
-            _mensagens_enviadas.labels(escritorio_id=str(escritorio_id), tipo="texto").inc()
+            _mensagens_enviadas.labels(
+                escritorio_id=str(escritorio_id), tipo="texto"
+            ).inc()
             return {"ok": True, "agendado": False, "resposta": resposta}
 
         except EvolutionOfflineError as e:
@@ -231,18 +253,17 @@ class WhatsAppService:
             )
             return {"ok": False, "erro": "evolution_error"}
 
-    
     # Mensagens “prontas”
-   
 
     async def _obter_contexto_processo(
         self, processo_id: int
-    ) -> Optional[tuple[int, int]]:
+    ) -> tuple[int, int] | None:
         """Retorna (escritorio_id, cliente_id) do processo, ou None se não encontrado."""
         async with async_session_factory() as session:
             result = await session.execute(
-                select(ProcessoModel.escritorio_id, ProcessoModel.cliente_id)
-                .where(ProcessoModel.id == processo_id)
+                select(ProcessoModel.escritorio_id, ProcessoModel.cliente_id).where(
+                    ProcessoModel.id == processo_id
+                )
             )
             row = result.one_or_none()
         if row is None:
@@ -250,7 +271,9 @@ class WhatsAppService:
             return None
         return row.escritorio_id, row.cliente_id
 
-    async def enviar_notificacao_andamento(self, processo_id: int, andamento: str) -> Dict[str, Any]:
+    async def enviar_notificacao_andamento(
+        self, processo_id: int, andamento: str
+    ) -> dict[str, Any]:
         contexto = await self._obter_contexto_processo(processo_id)
         if contexto is None:
             return {"ok": False, "erro": "processo_nao_encontrado"}
@@ -260,18 +283,26 @@ class WhatsAppService:
             f"{andamento}\n\n"
             "Se desejar, posso explicar em linguagem mais simples."
         )
-        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
+        return await self.enviar_mensagem(
+            escritorio_id, cliente_id, texto, processo_id=processo_id
+        )
 
-    async def enviar_boas_vindas(self, escritorio_id: int, cliente_id: int) -> Dict[str, Any]:
+    async def enviar_boas_vindas(
+        self, escritorio_id: int, cliente_id: int
+    ) -> dict[str, Any]:
         texto = (
             "Olá! 👋 Seja bem-vindo(a).\n"
             "Este canal é para atualizações e dúvidas rápidas do seu atendimento.\n"
             "⚠️ Aviso: informações enviadas aqui não substituem orientação jurídica formal.\n"
             "Se precisar de algo, é só responder esta mensagem."
         )
-        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=None)
+        return await self.enviar_mensagem(
+            escritorio_id, cliente_id, texto, processo_id=None
+        )
 
-    async def enviar_pesquisa_satisfacao(self, escritorio_id: int, cliente_id: int) -> Dict[str, Any]:
+    async def enviar_pesquisa_satisfacao(
+        self, escritorio_id: int, cliente_id: int
+    ) -> dict[str, Any]:
         """
         Pesquisa NPS (1-5) via botões.
         """
@@ -289,7 +320,9 @@ class WhatsAppService:
         ]
 
         try:
-            resposta = await self.evolution_client.enviar_botoes(instancia, numero, texto, botoes)
+            resposta = await self.evolution_client.enviar_botoes(
+                instancia, numero, texto, botoes
+            )
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -310,7 +343,7 @@ class WhatsAppService:
             )
             return {"ok": False, "erro": "falha_envio_nps"}
 
-    async def enviar_sem_movimentacao(self, processo_id: int) -> Dict[str, Any]:
+    async def enviar_sem_movimentacao(self, processo_id: int) -> dict[str, Any]:
         contexto = await self._obter_contexto_processo(processo_id)
         if contexto is None:
             return {"ok": False, "erro": "processo_nao_encontrado"}
@@ -319,8 +352,9 @@ class WhatsAppService:
             "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
             "Isso é comum e não significa necessariamente um problema."
         )
-        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
-
+        return await self.enviar_mensagem(
+            escritorio_id, cliente_id, texto, processo_id=processo_id
+        )
 
 
 # Utils internas
@@ -329,4 +363,5 @@ class WhatsAppService:
 def _um_dia(agora: datetime):
     # sem importar timedelta no topo para manter simples
     from datetime import timedelta
+
     return timedelta(days=1)

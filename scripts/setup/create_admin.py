@@ -30,10 +30,10 @@ from shared.models.escritorio import Escritorio
 from shared.models.usuario import Usuario
 from shared.security.encryption import hash_senha
 
-
 # ---------------------------------------------------------------------------
 # Helpers de input
 # ---------------------------------------------------------------------------
+
 
 def _input(prompt: str) -> str:
     """input() com strip automático."""
@@ -59,6 +59,7 @@ def _validar_senha(senha: str) -> tuple[bool, str]:
 # Seleção / criação de escritório
 # ---------------------------------------------------------------------------
 
+
 async def selecionar_escritorio(session) -> Escritorio:
     result = await session.execute(select(Escritorio).order_by(Escritorio.id))
     escritorios = result.scalars().all()
@@ -72,7 +73,7 @@ async def selecionar_escritorio(session) -> Escritorio:
     print("\nEscritorios disponíveis:")
     for i, e in enumerate(escritorios, 1):
         print(f"  [{i}] {e.nome} — CNPJ: {e.cnpj}")
-    print(f"  [0] Criar novo escritório")
+    print("  [0] Criar novo escritório")
 
     while True:
         escolha = _input("\nEscolha o número do escritório: ")
@@ -112,6 +113,7 @@ async def criar_escritorio(session) -> Escritorio:
 # Coleta de dados do admin
 # ---------------------------------------------------------------------------
 
+
 def coletar_dados_admin() -> dict:
     print("\n--- Dados do novo administrador ---")
 
@@ -148,6 +150,7 @@ def coletar_dados_admin() -> dict:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 async def main() -> None:
     print("=" * 50)
     print(" Criar usuário administrador")
@@ -180,7 +183,7 @@ async def main() -> None:
             await session.commit()
             await session.refresh(admin)  # recarrega atributos expirados após commit
 
-            print(f"\nAdministrador criado com sucesso!")
+            print("\nAdministrador criado com sucesso!")
             print(f"  Nome:       {admin.nome}")
             print(f"  E-mail:     {admin.email}")
             print(f"  Role:       {admin.role}")

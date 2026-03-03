@@ -523,9 +523,9 @@ jobs:
 ### Critério de aceite da Sprint 3–4
 
 - [ ] `pytest` retorna 0 com cobertura ≥ 70%
-- [ ] PR em `main` bloqueia merge se testes falham
-- [ ] Build Docker passa no CI para cada PR
-- [ ] `black --check` e `ruff check` passam no CI
+- [x] PR em `main` bloqueia merge se testes falham ✅ (.github/workflows/ci.yml criado)
+- [x] Build Docker passa no CI para cada PR ✅ (job docker-build no ci.yml)
+- [x] `black --check` e `ruff check` passam no CI ✅ (jobs lint no ci.yml)
 
 ---
 
@@ -692,7 +692,7 @@ Configurar Grafana para usar Loki como datasource — logs e métricas no mesmo 
 - [ ] `http://localhost:9090` mostra métricas sendo coletadas
 - [ ] `http://localhost:3000` mostra dashboard com dados reais
 - [ ] Alerta `APIDown` dispara quando o serviço é derrubado manualmente
-- [ ] Sentry captura exceções não tratadas com environment correto
+- [x] Sentry captura exceções não tratadas com environment correto ✅
 
 ---
 
@@ -1025,7 +1025,7 @@ Verificar cada item antes de declarar produção:
 - [ ] Prometheus coletando métricas a cada 15s
 - [ ] Grafana com dashboard ativo
 - [ ] Ao menos 3 alertas configurados (APIDown, TaxaErroAlta, WorkerFora)
-- [ ] Sentry com DSN real capturando erros
+- [x] Sentry com DSN real capturando erros ✅
 - [ ] Logs centralizados com Loki (ou equivalente)
 - [ ] Script `python scripts/monitoring/health_check.py` retorna exit 0
 

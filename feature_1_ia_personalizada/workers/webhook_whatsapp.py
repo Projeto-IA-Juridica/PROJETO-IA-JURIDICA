@@ -1,10 +1,11 @@
 # webhook_whatsapp.py
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from feature_1_ia_personalizada.workers.send_notifications import processar_mensagem_recebida
-
+from feature_1_ia_personalizada.workers.send_notifications import (
+    processar_mensagem_recebida,
+)
 
 router = APIRouter()
 

@@ -13,7 +13,7 @@ Estratégia:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,7 +21,6 @@ import feature_1_ia_personalizada.workers.mensagens_relacionamento as mr
 from feature_1_ia_personalizada.workers.mensagens_relacionamento import (
     Cliente,
     Processo,
-    agora_local,
     adquirir_bloqueio,
     chave,
     dia_mes_hoje,
@@ -63,7 +62,9 @@ def _cliente(
     )
 
 
-def _processo(id: int = 10, numero: str = "0001234-56.2023.8.26.0001", cliente_id: int = 1) -> Processo:
+def _processo(
+    id: int = 10, numero: str = "0001234-56.2023.8.26.0001", cliente_id: int = 1
+) -> Processo:
     return Processo(id=id, numero=numero, cliente_id=cliente_id, status="ativo")
 
 
@@ -77,6 +78,7 @@ def _mock_redis(*, existe: bool = False, lock_ok: bool = True) -> MagicMock:
 # ---------------------------------------------------------------------------
 # Funções puras
 # ---------------------------------------------------------------------------
+
 
 class TestNormalizarTexto:
     def test_minusculo(self):
@@ -100,7 +102,10 @@ class TestNormalizarTexto:
 
 class TestChave:
     def test_prefixo_e_uma_parte(self):
-        assert chave("relacionamento:aniversario", 1, "01-03") == "relacionamento:aniversario:1:01-03"
+        assert (
+            chave("relacionamento:aniversario", 1, "01-03")
+            == "relacionamento:aniversario:1:01-03"
+        )
 
     def test_sem_partes_adicionais(self):
         assert chave("lock:teste") == "lock:teste:"
@@ -129,6 +134,7 @@ class TestDividirEmLotes:
 # ---------------------------------------------------------------------------
 # Helpers Redis
 # ---------------------------------------------------------------------------
+
 
 class TestRedisHelpers:
     def test_adquirir_bloqueio_retorna_true_quando_set_ok(self):
@@ -164,6 +170,7 @@ class TestRedisHelpers:
 # Task: verificar_aniversarios_diarios
 # ---------------------------------------------------------------------------
 
+
 class TestVerificarAniversarios:
     def _run(self, clientes, redis=None, processo=None, *, lock_ok=True, existe=False):
         """Executa a task com todas as dependências mockadas."""
@@ -181,7 +188,6 @@ class TestVerificarAniversarios:
             return verificar_aniversarios_diarios.run()
 
     def _hoje(self) -> tuple[int, int]:
-        from feature_1_ia_personalizada.workers.mensagens_relacionamento import dia_mes_hoje
         return dia_mes_hoje()
 
     def test_cliente_aniversariante_envia_mensagem(self):
@@ -207,7 +213,9 @@ class TestVerificarAniversarios:
 
     def test_cliente_inativo_e_ignorado(self):
         dia, mes = self._hoje()
-        cliente = _cliente(status="inativo", data_nascimento=f"1990-{mes:02d}-{dia:02d}")
+        cliente = _cliente(
+            status="inativo", data_nascimento=f"1990-{mes:02d}-{dia:02d}"
+        )
         result = self._run([cliente])
         assert result["enviados"] == 0
         assert result["total"] == 0
@@ -234,8 +242,8 @@ class TestVerificarAniversarios:
         dia, mes = self._hoje()
         cliente = _cliente(data_nascimento=f"1990-{mes:02d}-{dia:02d}")
         redis = MagicMock()
-        redis.exists.return_value = 0      # não enviado ainda
-        redis.set.return_value = None      # lock falha
+        redis.exists.return_value = 0  # não enviado ainda
+        redis.set.return_value = None  # lock falha
         result = self._run([cliente], redis=redis)
         assert result["ignorados"] == 1
 
@@ -251,6 +259,7 @@ class TestVerificarAniversarios:
 # Task: verificar_datas_comemorativas
 # ---------------------------------------------------------------------------
 
+
 class TestVerificarDatasComemorativas:
     def _run(self, clientes, datas, redis=None, *, lock_ok=True, existe=False):
         redis = redis or _mock_redis(lock_ok=lock_ok, existe=existe)
@@ -258,7 +267,9 @@ class TestVerificarDatasComemorativas:
         with (
             patch.object(mr, "cliente_redis", redis),
             patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=clientes),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=datas),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=datas
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem"),
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
@@ -268,13 +279,24 @@ class TestVerificarDatasComemorativas:
             return verificar_datas_comemorativas.run()
 
     def _hoje_data(self) -> dict:
-        from feature_1_ia_personalizada.workers.mensagens_relacionamento import dia_mes_hoje
         dia, mes = dia_mes_hoje()
-        return {"dia": dia, "mes": mes, "nome": "Dia do Teste", "profissao_alvo": "", "template": ""}
+        return {
+            "dia": dia,
+            "mes": mes,
+            "nome": "Dia do Teste",
+            "profissao_alvo": "",
+            "template": "",
+        }
 
     def test_sem_datas_hoje_retorna_zero(self):
         """Data fixa em 15/03 garante que a data '01/01' nunca coincide com hoje."""
-        data_ano_novo = {"dia": 1, "mes": 1, "nome": "Ano Novo", "profissao_alvo": "", "template": ""}
+        data_ano_novo = {
+            "dia": 1,
+            "mes": 1,
+            "nome": "Ano Novo",
+            "profissao_alvo": "",
+            "template": "",
+        }
         data_fixa = datetime(2024, 3, 15, tzinfo=_TZ_BR)
         with patch.object(mr, "agora_local", return_value=data_fixa):
             result = self._run([_cliente()], datas=[data_ano_novo])
@@ -288,14 +310,20 @@ class TestVerificarDatasComemorativas:
         assert result["enviados"] == 1
 
     def test_template_dia_bancario_usado_corretamente(self):
-        data = {**self._hoje_data(), "template": "TEMPLATE_DIA_BANCARIO", "nome": "Dia do Bancário"}
+        data = {
+            **self._hoje_data(),
+            "template": "TEMPLATE_DIA_BANCARIO",
+            "nome": "Dia do Bancário",
+        }
         cliente = _cliente()
         redis = _mock_redis(lock_ok=True, existe=False)
 
         with (
             patch.object(mr, "cliente_redis", redis),
             patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=[cliente]),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem") as mock_enviar,
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
@@ -316,8 +344,14 @@ class TestVerificarDatasComemorativas:
 
         with (
             patch.object(mr, "cliente_redis", _mock_redis()),
-            patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=[bancario, professor]),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]),
+            patch.object(
+                mr.GoogleSheetsClient,
+                "get_clientes",
+                return_value=[bancario, professor],
+            ),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem") as mock_enviar,
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
@@ -347,8 +381,17 @@ class TestVerificarDatasComemorativas:
 # Task: verificar_clientes_sem_contato
 # ---------------------------------------------------------------------------
 
+
 class TestVerificarClientesSemContato:
-    def _run(self, clientes, ultima_interacao_por_id: dict, redis=None, *, lock_ok=True, existe=False):
+    def _run(
+        self,
+        clientes,
+        ultima_interacao_por_id: dict,
+        redis=None,
+        *,
+        lock_ok=True,
+        existe=False,
+    ):
         redis = redis or _mock_redis(lock_ok=lock_ok, existe=existe)
 
         def _ultima(id_cliente: int):

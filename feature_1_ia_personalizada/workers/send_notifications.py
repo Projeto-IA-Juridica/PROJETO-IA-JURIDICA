@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import os
-import structlog
-from datetime import datetime, timedelta, time, timezone
-from typing import Optional, Any
+from datetime import datetime, time, timedelta, timezone
+from typing import Any
 
 import redis
+import structlog
 from celery import shared_task
 
 from shared.database.worker_queries import (
@@ -17,7 +17,6 @@ from shared.database.worker_queries import (
 )
 
 logger = structlog.get_logger(__name__)
-
 
 
 # CONFIGURAÇÕES
@@ -33,7 +32,6 @@ cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
 TEMPO_32_DIAS = 32 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
-
 
 
 # MENSAGENS PADRÃO
@@ -56,10 +54,8 @@ MENSAGEM_PESQUISA_SATISFACAO = (
 )
 
 MENSAGEM_ERRO_PADRAO = (
-    "No momento não consegui processar sua mensagem. "
-    "Nossa equipe será notificada."
+    "No momento não consegui processar sua mensagem. " "Nossa equipe será notificada."
 )
-
 
 
 # FUNÇÕES AUXILIARES
@@ -78,15 +74,22 @@ def horario_permitido(data_hora: datetime) -> bool:
 
 def segundos_ate_proximo_horario(data_hora: datetime) -> int:
     fuso = data_hora.tzinfo
-    inicio_hoje = datetime(data_hora.year, data_hora.month, data_hora.day,
-                            HORA_INICIO_ENVIO, 0, tzinfo=fuso)
+    inicio_hoje = datetime(
+        data_hora.year,
+        data_hora.month,
+        data_hora.day,
+        HORA_INICIO_ENVIO,
+        0,
+        tzinfo=fuso,
+    )
 
     if data_hora < inicio_hoje:
         return int((inicio_hoje - data_hora).total_seconds())
 
     amanha = data_hora + timedelta(days=1)
-    inicio_amanha = datetime(amanha.year, amanha.month, amanha.day,
-                             HORA_INICIO_ENVIO, 0, tzinfo=fuso)
+    inicio_amanha = datetime(
+        amanha.year, amanha.month, amanha.day, HORA_INICIO_ENVIO, 0, tzinfo=fuso
+    )
     return int((inicio_amanha - data_hora).total_seconds())
 
 
@@ -106,9 +109,6 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
     return bool(cliente_redis.set(chave, "1", nx=True, ex=tempo_segundos))
 
 
-
-
-
 def buscar_processo_e_cliente(id_processo: int):
     return query_processo_e_cliente(id_processo)
 
@@ -121,8 +121,9 @@ def buscar_clientes_para_pesquisa():
     return query_clientes_para_pesquisa()
 
 
-def registrar_interacao(id_cliente: int, id_processo: Optional[int],
-                        tipo: str, dados: dict):
+def registrar_interacao(
+    id_cliente: int, id_processo: int | None, tipo: str, dados: dict
+):
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -131,13 +132,15 @@ def registrar_interacao(id_cliente: int, id_processo: Optional[int],
     )
 
 
-
-
-
 # TASKS
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 5})
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 5},
+)
 def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: str):
 
     momento = agora_local()
@@ -146,7 +149,9 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         espera = segundos_ate_proximo_horario(momento)
         raise self.retry(countdown=espera)
 
-    chave_bloqueio = chave_limite("bloqueio_andamento", id_processo, hash(descricao_andamento))
+    chave_bloqueio = chave_limite(
+        "bloqueio_andamento", id_processo, hash(descricao_andamento)
+    )
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
@@ -154,7 +159,6 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
     if resultado is None:
         return {"status": "processo_nao_encontrado", "id_processo": id_processo}
     processo, cliente = resultado
-
 
     mensagem = MENSAGEM_NOVO_ANDAMENTO.format(
         descricao_andamento=descricao_andamento.strip()
@@ -166,7 +170,7 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         id_cliente=cliente.id,
         id_processo=processo.id,
         tipo="novo_andamento",
-        dados={"descricao": descricao_andamento}
+        dados={"descricao": descricao_andamento},
     )
 
     return {"status": "enviado"}
@@ -193,13 +197,15 @@ def enviar_lote_sem_movimentacao(self):
 
         cliente = processo.cliente
 
-        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO)
+        enviar_mensagem_whatsapp(
+            cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO
+        )
 
         registrar_interacao(
             id_cliente=cliente.id,
             id_processo=processo.id,
             tipo="sem_movimentacao",
-            dados={}
+            dados={},
         )
 
         registrar_envio_com_validade(chave, TEMPO_30_DIAS)
@@ -229,13 +235,15 @@ def enviar_pesquisa_satisfacao(self):
         if envio_recente(chave):
             continue
 
-        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO)
+        enviar_mensagem_whatsapp(
+            cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO
+        )
 
         registrar_interacao(
             id_cliente=cliente.id,
             id_processo=None,
             tipo="pesquisa_satisfacao",
-            dados={"mes": mes_referencia}
+            dados={"mes": mes_referencia},
         )
 
         registrar_envio_com_validade(chave, TEMPO_32_DIAS)
@@ -244,11 +252,15 @@ def enviar_pesquisa_satisfacao(self):
     return {"enviados": enviados}
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
-def processar_mensagem_recebida(self, id_escritorio: int,
-                                id_cliente: int,
-                                mensagem: str,
-                                tipo: str):
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def processar_mensagem_recebida(
+    self, id_escritorio: int, id_cliente: int, mensagem: str, tipo: str
+):
     # Import lazy: evita importar asyncpg e SQLAlchemy no boot do módulo.
     # O orchestrator já envia a resposta via EvolutionClient em _node_enviar_resposta,
     # portanto esta task NÃO deve reenviar pelo WhatsApp.
@@ -282,4 +294,3 @@ def processar_mensagem_recebida(self, id_escritorio: int,
         )
 
         raise
-    

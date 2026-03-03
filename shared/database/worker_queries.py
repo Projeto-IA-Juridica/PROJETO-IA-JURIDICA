@@ -42,8 +42,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
@@ -53,7 +53,6 @@ from shared.models.cliente import Cliente as ClienteModel
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.models.processo import Processo as ProcessoModel
-
 
 # ---------------------------------------------------------------------------
 # Tipos de retorno (dataclasses leves, desacoplados do SQLAlchemy)
@@ -74,7 +73,7 @@ class ProcessoWorker:
     numero_cnj: str
     cliente_id: int
     escritorio_id: int
-    cliente: Optional[ClienteWorker] = None
+    cliente: ClienteWorker | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +91,7 @@ def _run(coro):
 # ===========================================================================
 
 
-async def _query_processos_monitorados(limite: int) -> List[Dict[str, Any]]:
+async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
     async with async_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
@@ -109,12 +108,12 @@ async def _query_processos_monitorados(limite: int) -> List[Dict[str, Any]]:
         ]
 
 
-def query_processos_monitorados(limite: int) -> List[Dict[str, Any]]:
+def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
     """SELECT processos WHERE monitoramento_ativo = true LIMIT :limite."""
     return _run(_query_processos_monitorados(limite))
 
 
-async def _query_processo_por_id(id_processo: int) -> Optional[Dict[str, Any]]:
+async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     async with async_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel).where(ProcessoModel.id == id_processo)
@@ -129,16 +128,14 @@ async def _query_processo_por_id(id_processo: int) -> Optional[Dict[str, Any]]:
         }
 
 
-def query_processo_por_id(id_processo: int) -> Optional[Dict[str, Any]]:
+def query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     """SELECT processo WHERE id = :id."""
     return _run(_query_processo_por_id(id_processo))
 
 
-async def _update_ultimo_andamento(
-    id_processo: int, texto: str, data_iso: str
-) -> None:
+async def _update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None:
     try:
-        data_dt: Optional[datetime] = datetime.fromisoformat(data_iso)
+        data_dt: datetime | None = datetime.fromisoformat(data_iso)
     except (ValueError, TypeError):
         data_dt = None
 
@@ -151,9 +148,7 @@ async def _update_ultimo_andamento(
         await session.commit()
 
 
-def update_ultimo_andamento(
-    id_processo: int, texto: str, data_iso: str
-) -> None:
+def update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None:
     """UPDATE processos SET ultimo_andamento, data_ultimo_andamento WHERE id."""
     _run(_update_ultimo_andamento(id_processo, texto, data_iso))
 
@@ -165,7 +160,7 @@ def update_ultimo_andamento(
 
 async def _query_processo_ativo_do_cliente(
     id_cliente: int,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     async with async_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
@@ -183,7 +178,7 @@ async def _query_processo_ativo_do_cliente(
 
 def query_processo_ativo_do_cliente(
     id_cliente: int,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """SELECT processo ativo do cliente (1 resultado)."""
     return _run(_query_processo_ativo_do_cliente(id_cliente))
 
@@ -191,8 +186,8 @@ def query_processo_ativo_do_cliente(
 async def _insert_interacao(
     *,
     id_cliente: int,
-    id_processo: Optional[int],
-    texto: Optional[str],
+    id_processo: int | None,
+    texto: str | None,
     metadata_json: dict,
     tipo: str,
     direcao: str,
@@ -222,8 +217,8 @@ async def _insert_interacao(
 def insert_interacao(
     *,
     id_cliente: int,
-    id_processo: Optional[int],
-    texto: Optional[str] = None,
+    id_processo: int | None,
+    texto: str | None = None,
     metadata_json: dict,
     tipo: str = "notificacao",
     direcao: str = "saida",
@@ -242,8 +237,8 @@ def insert_interacao(
 
 
 async def _query_ultima_interacao_batch(
-    ids_clientes: List[int],
-) -> Dict[int, datetime]:
+    ids_clientes: list[int],
+) -> dict[int, datetime]:
     if not ids_clientes:
         return {}
     async with async_session_factory() as session:
@@ -256,8 +251,8 @@ async def _query_ultima_interacao_batch(
 
 
 def query_ultima_interacao_batch(
-    ids_clientes: List[int],
-) -> Dict[int, datetime]:
+    ids_clientes: list[int],
+) -> dict[int, datetime]:
     """
     SELECT cliente_id, MAX(created_at) FROM interacoes
     WHERE cliente_id IN (...) GROUP BY cliente_id.
@@ -275,7 +270,7 @@ def query_ultima_interacao_batch(
 
 async def _query_processo_e_cliente(
     id_processo: int,
-) -> Optional[Tuple[ProcessoWorker, ClienteWorker]]:
+) -> tuple[ProcessoWorker, ClienteWorker] | None:
     async with async_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
@@ -304,13 +299,13 @@ async def _query_processo_e_cliente(
 
 def query_processo_e_cliente(
     id_processo: int,
-) -> Optional[Tuple[ProcessoWorker, ClienteWorker]]:
+) -> tuple[ProcessoWorker, ClienteWorker] | None:
     """SELECT processo + cliente (eager load) WHERE processo.id = :id."""
     return _run(_query_processo_e_cliente(id_processo))
 
 
-async def _query_processos_sem_movimentacao() -> List[ProcessoWorker]:
-    limite_data = datetime.now(timezone.utc) - timedelta(days=30)
+async def _query_processos_sem_movimentacao() -> list[ProcessoWorker]:
+    limite_data = datetime.now(UTC) - timedelta(days=30)
     async with async_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
@@ -322,7 +317,7 @@ async def _query_processos_sem_movimentacao() -> List[ProcessoWorker]:
             )
             .options(selectinload(ProcessoModel.cliente))
         )
-        processos: List[ProcessoWorker] = []
+        processos: list[ProcessoWorker] = []
         for p in result.scalars().all():
             c = p.cliente
             if c is None:
@@ -344,7 +339,7 @@ async def _query_processos_sem_movimentacao() -> List[ProcessoWorker]:
         return processos
 
 
-def query_processos_sem_movimentacao() -> List[ProcessoWorker]:
+def query_processos_sem_movimentacao() -> list[ProcessoWorker]:
     """
     SELECT processos sem andamento nos últimos 30 dias
     (monitoramento_ativo=true, status='ativo').
@@ -353,7 +348,7 @@ def query_processos_sem_movimentacao() -> List[ProcessoWorker]:
     return _run(_query_processos_sem_movimentacao())
 
 
-async def _query_clientes_para_pesquisa() -> List[ClienteWorker]:
+async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
     async with async_session_factory() as session:
         result = await session.execute(
             select(ClienteModel).where(
@@ -372,7 +367,7 @@ async def _query_clientes_para_pesquisa() -> List[ClienteWorker]:
         ]
 
 
-def query_clientes_para_pesquisa() -> List[ClienteWorker]:
+def query_clientes_para_pesquisa() -> list[ClienteWorker]:
     """SELECT clientes ativos com aceite_lgpd=true para pesquisa de satisfação."""
     return _run(_query_clientes_para_pesquisa())
 
@@ -382,9 +377,7 @@ def query_clientes_para_pesquisa() -> List[ClienteWorker]:
 # ===========================================================================
 
 
-async def _enviar_mensagem_whatsapp(
-    id_cliente: int, telefone: str, texto: str
-) -> None:
+async def _enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) -> None:
     from feature_1_ia_personalizada.services.messaging.evolution_client import (
         EvolutionClient,
     )
@@ -401,6 +394,7 @@ async def _enviar_mensagem_whatsapp(
 
     if not instance:
         import structlog as _structlog
+
         _structlog.get_logger(__name__).warning(
             "instancia_whatsapp_nao_configurada",
             id_cliente=id_cliente,

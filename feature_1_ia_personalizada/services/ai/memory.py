@@ -10,8 +10,8 @@ from redis.asyncio import Redis
 logger = structlog.get_logger(__name__)
 
 _TTL_SEGUNDOS = 60 * 60 * 24 * 7  # 7 dias sem interação → histórico expira
-_MAX_MENSAGENS = 100               # FIFO: remove as mais antigas ao atingir o limite
-_MAX_CONTENT_CHARS = 4096       # trunca conteúdo antes de serializar — proteção de memória
+_MAX_MENSAGENS = 100  # FIFO: remove as mais antigas ao atingir o limite
+_MAX_CONTENT_CHARS = 4096  # trunca conteúdo antes de serializar — proteção de memória
 
 
 def _chave(escritorio_id: int, cliente_id: int) -> str:
@@ -44,7 +44,9 @@ class ConversationMemory:
         """
         chave = _chave(escritorio_id, cliente_id)
         content_truncado = content[:_MAX_CONTENT_CHARS]
-        payload = json.dumps({"role": role, "content": content_truncado}, ensure_ascii=False)
+        payload = json.dumps(
+            {"role": role, "content": content_truncado}, ensure_ascii=False
+        )
 
         pipe = self._redis.pipeline()
         pipe.rpush(chave, payload)

@@ -27,6 +27,7 @@ sys.path.insert(0, _ROOT)
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(os.path.join(_ROOT, ".env"), override=False)
 except ImportError:
     pass
@@ -43,11 +44,14 @@ from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.orchestrator import ConversationOrchestrator
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
+from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
+    JusbrasilClient,
+)
 
 # ---------------------------------------------------------------------------
 # Memória em RAM (substitui Redis)
 # ---------------------------------------------------------------------------
+
 
 class _MemoriaEmRam(ConversationMemory):
     def __init__(self) -> None:
@@ -70,6 +74,7 @@ class _MemoriaEmRam(ConversationMemory):
 # ---------------------------------------------------------------------------
 # Entidades fake
 # ---------------------------------------------------------------------------
+
 
 def _fake_escritorio(nome: str) -> MagicMock:
     obj = MagicMock()
@@ -103,7 +108,9 @@ def _fake_processo() -> MagicMock:
     return obj
 
 
-def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escritorio: str):
+def _make_session_factory(
+    *, com_processo: bool, nome_cliente: str, nome_escritorio: str
+):
     escritorio = _fake_escritorio(nome_escritorio)
     cliente = _fake_cliente(nome_cliente)
     processo = _fake_processo()
@@ -137,9 +144,14 @@ def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escrito
 def _jusbrasil_fake(com_processo: bool) -> JusbrasilClient:
     client = AsyncMock(spec=JusbrasilClient)
     if com_processo:
-        client.sincronizar_andamentos = AsyncMock(return_value=[
-            {"descricao": "Concluso para sentença. Aguardando decisão do juiz.", "data": "2024-03-15"}
-        ])
+        client.sincronizar_andamentos = AsyncMock(
+            return_value=[
+                {
+                    "descricao": "Concluso para sentença. Aguardando decisão do juiz.",
+                    "data": "2024-03-15",
+                }
+            ]
+        )
     else:
         client.sincronizar_andamentos = AsyncMock(return_value=[])
     return client
@@ -158,7 +170,9 @@ def _evolution_fake() -> MagicMock:
     return client
 
 
-def _criar_orchestrator(*, com_processo: bool, nome_cliente: str, nome_escritorio: str) -> ConversationOrchestrator:
+def _criar_orchestrator(
+    *, com_processo: bool, nome_cliente: str, nome_escritorio: str
+) -> ConversationOrchestrator:
     return ConversationOrchestrator(
         claude_client=ClaudeClient(api_key=ANTHROPIC_API_KEY),
         memory=_MemoriaEmRam(),
@@ -178,6 +192,7 @@ def _criar_orchestrator(*, com_processo: bool, nome_cliente: str, nome_escritori
 # Helpers de estado do Streamlit
 # ---------------------------------------------------------------------------
 
+
 def _init_state(com_processo: bool, nome_cliente: str, nome_escritorio: str) -> None:
     """Inicializa (ou reinicializa) o estado da sessão."""
     st.session_state.messages = []
@@ -195,7 +210,9 @@ def _init_state(com_processo: bool, nome_cliente: str, nome_escritorio: str) -> 
     }
 
 
-def _config_changed(com_processo: bool, nome_cliente: str, nome_escritorio: str) -> bool:
+def _config_changed(
+    com_processo: bool, nome_cliente: str, nome_escritorio: str
+) -> bool:
     cfg = st.session_state.get("config", {})
     return (
         cfg.get("com_processo") != com_processo
@@ -229,7 +246,9 @@ with st.sidebar:
     com_processo = st.toggle("Simular processo ativo (TJSP)", value=False)
 
     if com_processo:
-        st.info("📋 **Processo simulado**\n\n`0001234-56.2023.8.26.0001`\n\nTJSP · 3ª Vara Cível\n\nÚltimo andamento: *Concluso para sentença*")
+        st.info(
+            "📋 **Processo simulado**\n\n`0001234-56.2023.8.26.0001`\n\nTJSP · 3ª Vara Cível\n\nÚltimo andamento: *Concluso para sentença*"
+        )
 
     st.divider()
 
@@ -252,7 +271,9 @@ with st.sidebar:
         st.error("ANTHROPIC_API_KEY não encontrada no .env", icon="🔑")
 
 # --- Inicializa estado se necessário ---
-if "orchestrator" not in st.session_state or _config_changed(com_processo, nome_cliente, nome_escritorio):
+if "orchestrator" not in st.session_state or _config_changed(
+    com_processo, nome_cliente, nome_escritorio
+):
     _init_state(com_processo, nome_cliente, nome_escritorio)
 
 # --- Cabeçalho ---
@@ -270,7 +291,9 @@ for msg in st.session_state.messages:
             if meta.get("intencao"):
                 partes.append(f"intenção: `{meta['intencao']}`")
             if meta.get("tokens_in") or meta.get("tokens_out"):
-                partes.append(f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`")
+                partes.append(
+                    f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`"
+                )
             if meta.get("fallback"):
                 partes.append("⚠️ fallback ativo")
             if partes:
@@ -314,16 +337,18 @@ if prompt := st.chat_input("Digite sua mensagem..."):
                 st.caption(" · ".join(partes))
 
                 # Salva no histórico
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": resposta,
-                    "meta": {
-                        "intencao": intencao,
-                        "tokens_in": tokens_in,
-                        "tokens_out": tokens_out,
-                        "fallback": fallback,
-                    },
-                })
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": resposta,
+                        "meta": {
+                            "intencao": intencao,
+                            "tokens_in": tokens_in,
+                            "tokens_out": tokens_out,
+                            "fallback": fallback,
+                        },
+                    }
+                )
 
             except Exception as exc:
                 st.error(f"Erro no agente: {exc}")

@@ -3,8 +3,8 @@ import time
 from typing import Any
 
 import httpx
-import structlog
 import redis.asyncio as redis
+import structlog
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -25,12 +25,16 @@ _CHECK_TIMEOUT = 5.0
 # Verificações individuais
 # ------------------------------------------------------------------
 
+
 async def _check_postgresql(db: AsyncSession) -> dict[str, Any]:
     try:
         t = time.perf_counter()
         await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT)
-        return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
-    except asyncio.TimeoutError:
+        return {
+            "status": "ok",
+            "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+        }
+    except TimeoutError:
         return {"status": "timeout", "detail": "PostgreSQL não respondeu em 5s"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
@@ -42,8 +46,11 @@ async def _check_redis() -> dict[str, Any]:
         r = redis.from_url(settings.REDIS_URL, decode_responses=True)
         t = time.perf_counter()
         await asyncio.wait_for(r.ping(), timeout=_CHECK_TIMEOUT)
-        return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
-    except asyncio.TimeoutError:
+        return {
+            "status": "ok",
+            "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+        }
+    except TimeoutError:
         return {"status": "timeout", "detail": "Redis não respondeu em 5s"}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
@@ -63,7 +70,11 @@ async def _check_claude_api() -> dict[str, Any]:
             )
         latency_ms = round((time.perf_counter() - t) * 1000, 2)
         # Qualquer resposta (mesmo 404/400) confirma conectividade
-        return {"status": "ok", "latency_ms": latency_ms, "http_status": resp.status_code}
+        return {
+            "status": "ok",
+            "latency_ms": latency_ms,
+            "http_status": resp.status_code,
+        }
     except httpx.TimeoutException:
         return {"status": "timeout", "detail": "Claude API não respondeu em 5s"}
     except Exception as e:
@@ -78,11 +89,21 @@ async def _check_evolution_api() -> dict[str, Any]:
             timeout=_CHECK_TIMEOUT,
             headers={"apikey": settings.EVOLUTION_API_KEY},
         ) as client:
-            resp = await client.get(f"{settings.EVOLUTION_API_URL}/instance/fetchInstances")
+            resp = await client.get(
+                f"{settings.EVOLUTION_API_URL}/instance/fetchInstances"
+            )
         latency_ms = round((time.perf_counter() - t) * 1000, 2)
         if resp.status_code < 500:
-            return {"status": "ok", "latency_ms": latency_ms, "http_status": resp.status_code}
-        return {"status": "degraded", "latency_ms": latency_ms, "http_status": resp.status_code}
+            return {
+                "status": "ok",
+                "latency_ms": latency_ms,
+                "http_status": resp.status_code,
+            }
+        return {
+            "status": "degraded",
+            "latency_ms": latency_ms,
+            "http_status": resp.status_code,
+        }
     except httpx.TimeoutException:
         return {"status": "timeout", "detail": "Evolution API não respondeu em 5s"}
     except Exception as e:
@@ -95,6 +116,7 @@ async def _check_celery_workers() -> dict[str, Any]:
     def _inspect_sync() -> dict[str, Any]:
         try:
             from feature_1_ia_personalizada.workers.celery_app import celery_app
+
             inspector = celery_app.control.inspect(timeout=3.0)
             respostas = inspector.ping()
             if respostas:
@@ -108,25 +130,34 @@ async def _check_celery_workers() -> dict[str, Any]:
             asyncio.to_thread(_inspect_sync),
             timeout=_CHECK_TIMEOUT,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status": "timeout", "detail": "Inspect Celery não respondeu em 5s"}
 
 
 async def _check_google_sheets() -> dict[str, Any]:
     """Verifica conectividade com o Google Sheets lendo a célula A1 da aba Clientes."""
     if not settings.GOOGLE_CREDENTIALS_PATH or not settings.GOOGLE_SHEETS_ID:
-        return {"status": "skipped", "detail": "GOOGLE_CREDENTIALS_PATH ou GOOGLE_SHEETS_ID não configurados"}
+        return {
+            "status": "skipped",
+            "detail": "GOOGLE_CREDENTIALS_PATH ou GOOGLE_SHEETS_ID não configurados",
+        }
 
     def _ping_sync() -> dict[str, Any]:
         try:
-            from feature_1_ia_personalizada.services.integrations.google_sheets import GoogleSheetsClient
+            from feature_1_ia_personalizada.services.integrations.google_sheets import (
+                GoogleSheetsClient,
+            )
+
             t = time.perf_counter()
             client = GoogleSheetsClient(
                 credentials_path=settings.GOOGLE_CREDENTIALS_PATH,
                 spreadsheet_id=settings.GOOGLE_SHEETS_ID,
             )
             client._ler_intervalo("Clientes!A1:A1")
-            return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
+            return {
+                "status": "ok",
+                "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+            }
         except Exception as e:
             return {"status": "error", "detail": str(e)}
 
@@ -135,13 +166,14 @@ async def _check_google_sheets() -> dict[str, Any]:
             asyncio.to_thread(_ping_sync),
             timeout=_CHECK_TIMEOUT + 5,  # Sheets pode ser mais lento
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status": "timeout", "detail": "Google Sheets não respondeu em 10s"}
 
 
 # ------------------------------------------------------------------
 # Rotas
 # ------------------------------------------------------------------
+
 
 @router.get("")
 async def health_basic():
@@ -161,7 +193,9 @@ async def health_ready(db: AsyncSession = Depends(get_db)):
 
     if pg["status"] != "ok" or rd["status"] != "ok":
         health["status"] = "error"
-        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=health)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=health
+        )
 
     return health
 
@@ -185,9 +219,9 @@ async def health_detailed(db: AsyncSession = Depends(get_db)):
     )
 
     checks: dict[str, dict[str, Any]] = {
-        "postgresql":    pg,
-        "redis":         rd,
-        "claude_api":    claude,
+        "postgresql": pg,
+        "redis": rd,
+        "claude_api": claude,
         "evolution_api": evolution,
         "celery_workers": celery_w,
         "google_sheets": sheets,
@@ -220,6 +254,8 @@ async def health_detailed(db: AsyncSession = Depends(get_db)):
     )
 
     if not critical_ok:
-        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=result)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=result
+        )
 
     return result

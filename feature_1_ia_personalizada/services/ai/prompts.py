@@ -199,7 +199,7 @@ SYSTEM_PROMPT_CLASSIFICAR_INTENCAO = (
     "</categorias>\n\n"
     "<instrucoes>\n"
     "Responda EXCLUSIVAMENTE com um objeto JSON válido, sem texto adicional, sem explicações.\n"
-    "Formato obrigatório: {\"intencao\": \"<categoria>\"}\n"
-    "Exemplo correto: {\"intencao\": \"status\"}\n"
+    'Formato obrigatório: {"intencao": "<categoria>"}\n'
+    'Exemplo correto: {"intencao": "status"}\n'
     "</instrucoes>"
 )

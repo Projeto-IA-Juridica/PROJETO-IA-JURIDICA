@@ -1,4 +1,4 @@
-# 
+#
 # Templates de mensagens formatáveis usando .format(**kwargs)
 
 # -----------------------------------------------------------
@@ -22,8 +22,7 @@ TEMPLATE_BOAS_VINDAS = (
 # -----------------------------------------------------------
 
 TEMPLATE_NOVO_ANDAMENTO = (
-    "📄 Atualização no seu processo {numero}!\n\n"
-    "{resumo_traduzido}"
+    "📄 Atualização no seu processo {numero}!\n\n" "{resumo_traduzido}"
 )
 
 TEMPLATE_SEM_MOVIMENTACAO = (

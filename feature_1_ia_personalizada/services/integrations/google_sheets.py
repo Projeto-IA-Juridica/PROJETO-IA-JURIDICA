@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
-from typing import Optional
 
 import structlog
 from google.oauth2 import service_account
@@ -37,7 +36,7 @@ def _retry_http(fn, max_tentativas: int = _MAX_TENTATIVAS):
         except HttpError as exc:
             if tentativa == max_tentativas - 1:
                 raise
-            espera = 2 ** tentativa
+            espera = 2**tentativa
             logger.warning(
                 "google_sheets_retry",
                 tentativa=tentativa + 1,
@@ -47,7 +46,7 @@ def _retry_http(fn, max_tentativas: int = _MAX_TENTATIVAS):
             time.sleep(espera)
 
 
-def _parse_data(texto: str) -> Optional[str]:
+def _parse_data(texto: str) -> str | None:
     """
     Converte data de DD/MM/YYYY ou YYYY-MM-DD → YYYY-MM-DD.
     Retorna None se o texto for inválido ou vazio.
@@ -102,6 +101,7 @@ class GoogleSheetsClient:
 
     def _ler_intervalo(self, intervalo: str) -> list[list[str]]:
         """Lê um intervalo e retorna lista de linhas (lista de strings)."""
+
         def _fetch():
             resposta = (
                 self._sheet.values()
@@ -111,7 +111,9 @@ class GoogleSheetsClient:
             return resposta.get("values", [])
 
         resultado = _retry_http(_fetch)
-        logger.debug("google_sheets_leitura", intervalo=intervalo, linhas=len(resultado))
+        logger.debug(
+            "google_sheets_leitura", intervalo=intervalo, linhas=len(resultado)
+        )
         return resultado
 
     # ------------------------------------------------------------------
@@ -129,7 +131,9 @@ class GoogleSheetsClient:
             linhas = self._ler_intervalo("Clientes!A2:I")
         except Exception as exc:
             _google_sheets_requests_total.labels(operacao="get", sucesso="false").inc()
-            logger.error("google_sheets_get_clientes_falhou", erro=str(exc), exc_info=True)
+            logger.error(
+                "google_sheets_get_clientes_falhou", erro=str(exc), exc_info=True
+            )
             raise
         clientes: list[dict] = []
 
@@ -158,7 +162,11 @@ class GoogleSheetsClient:
             )
 
         _google_sheets_requests_total.labels(operacao="get", sucesso="true").inc()
-        logger.info("google_sheets_clientes_lidos", total=len(clientes), duracao_s=round(time.perf_counter() - _inicio, 3))
+        logger.info(
+            "google_sheets_clientes_lidos",
+            total=len(clientes),
+            duracao_s=round(time.perf_counter() - _inicio, 3),
+        )
         return clientes
 
     def get_datas_comemorativas(self) -> list[dict]:
@@ -197,7 +205,11 @@ class GoogleSheetsClient:
             )
 
         _google_sheets_requests_total.labels(operacao="get", sucesso="true").inc()
-        logger.info("google_sheets_datas_lidas", total=len(datas), duracao_s=round(time.perf_counter() - _inicio, 3))
+        logger.info(
+            "google_sheets_datas_lidas",
+            total=len(datas),
+            duracao_s=round(time.perf_counter() - _inicio, 3),
+        )
         return datas
 
     def registrar_log_envio(
@@ -207,7 +219,7 @@ class GoogleSheetsClient:
         cliente_id: int,
         detalhe: str,
         sucesso: bool = True,
-        erro: Optional[str] = None,
+        erro: str | None = None,
     ) -> None:
         """
         Registra envio na aba "Log" (append em A:E).
@@ -235,8 +247,16 @@ class GoogleSheetsClient:
         try:
             _retry_http(_append)
         except Exception as exc:
-            _google_sheets_requests_total.labels(operacao="append", sucesso="false").inc()
-            logger.error("google_sheets_append_falhou", tipo=tipo, cliente_id=cliente_id, erro=str(exc), exc_info=True)
+            _google_sheets_requests_total.labels(
+                operacao="append", sucesso="false"
+            ).inc()
+            logger.error(
+                "google_sheets_append_falhou",
+                tipo=tipo,
+                cliente_id=cliente_id,
+                erro=str(exc),
+                exc_info=True,
+            )
             raise
 
         _google_sheets_requests_total.labels(operacao="append", sucesso="true").inc()

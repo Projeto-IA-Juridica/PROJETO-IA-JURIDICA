@@ -19,7 +19,7 @@ Uso:
 
 import asyncio
 import sys
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -92,7 +92,7 @@ CLIENTES_SEED = [
         "empresa_atual": "Construtora ABC Ltda",
         "cargo": "Gerente de Projetos",
         "aceite_lgpd": True,
-        "data_aceite_lgpd": datetime(2024, 1, 10, 9, 0, tzinfo=timezone.utc),
+        "data_aceite_lgpd": datetime(2024, 1, 10, 9, 0, tzinfo=UTC),
         "preferencia_horario_notificacao": "comercial",
     },
     {
@@ -105,7 +105,7 @@ CLIENTES_SEED = [
         "empresa_atual": "Banco Nacional S.A.",
         "cargo": "Gerente de Conta",
         "aceite_lgpd": True,
-        "data_aceite_lgpd": datetime(2024, 2, 5, 10, 30, tzinfo=timezone.utc),
+        "data_aceite_lgpd": datetime(2024, 2, 5, 10, 30, tzinfo=UTC),
         "preferencia_horario_notificacao": "comercial",
     },
     {
@@ -135,8 +135,8 @@ PROCESSOS_SEED = [
         "polo_cliente": "autor",
         "status": "ativo",
         "ultimo_andamento": "Citação realizada. Aguardando contestação do réu.",
-        "data_ultimo_andamento": datetime(2024, 6, 10, 14, 0, tzinfo=timezone.utc),
-        "data_distribuicao": datetime(2023, 3, 20, tzinfo=timezone.utc),
+        "data_ultimo_andamento": datetime(2024, 6, 10, 14, 0, tzinfo=UTC),
+        "data_distribuicao": datetime(2023, 3, 20, tzinfo=UTC),
         "valor_causa": 45000.00,
         "cliente_idx": 0,
     },
@@ -149,8 +149,8 @@ PROCESSOS_SEED = [
         "polo_cliente": "autor",
         "status": "ativo",
         "ultimo_andamento": "Perícia agendada para o próximo mês.",
-        "data_ultimo_andamento": datetime(2024, 5, 20, tzinfo=timezone.utc),
-        "data_distribuicao": datetime(2022, 11, 5, tzinfo=timezone.utc),
+        "data_ultimo_andamento": datetime(2024, 5, 20, tzinfo=UTC),
+        "data_distribuicao": datetime(2022, 11, 5, tzinfo=UTC),
         "valor_causa": None,
         "cliente_idx": 1,
     },
@@ -163,8 +163,8 @@ PROCESSOS_SEED = [
         "polo_cliente": "autor",
         "status": "ativo",
         "ultimo_andamento": "Processo distribuído. Aguardando despacho inicial.",
-        "data_ultimo_andamento": datetime(2024, 1, 15, tzinfo=timezone.utc),
-        "data_distribuicao": datetime(2024, 1, 10, tzinfo=timezone.utc),
+        "data_ultimo_andamento": datetime(2024, 1, 15, tzinfo=UTC),
+        "data_distribuicao": datetime(2024, 1, 10, tzinfo=UTC),
         "valor_causa": 120000.00,
         "cliente_idx": 1,
     },
@@ -177,8 +177,8 @@ PROCESSOS_SEED = [
         "polo_cliente": "reu",
         "status": "ativo",
         "ultimo_andamento": "Audiência de conciliação designada.",
-        "data_ultimo_andamento": datetime(2024, 4, 8, tzinfo=timezone.utc),
-        "data_distribuicao": datetime(2023, 7, 18, tzinfo=timezone.utc),
+        "data_ultimo_andamento": datetime(2024, 4, 8, tzinfo=UTC),
+        "data_distribuicao": datetime(2023, 7, 18, tzinfo=UTC),
         "valor_causa": 28500.00,
         "cliente_idx": 0,
     },
@@ -191,8 +191,8 @@ PROCESSOS_SEED = [
         "polo_cliente": "autor",
         "status": "arquivado",
         "ultimo_andamento": "Acordo celebrado em audiência. Processo encerrado.",
-        "data_ultimo_andamento": datetime(2023, 12, 1, tzinfo=timezone.utc),
-        "data_distribuicao": datetime(2022, 5, 10, tzinfo=timezone.utc),
+        "data_ultimo_andamento": datetime(2023, 12, 1, tzinfo=UTC),
+        "data_distribuicao": datetime(2022, 5, 10, tzinfo=UTC),
         "valor_causa": 15000.00,
         "cliente_idx": 2,
     },
@@ -202,6 +202,7 @@ PROCESSOS_SEED = [
 # ---------------------------------------------------------------------------
 # Funções de inserção
 # ---------------------------------------------------------------------------
+
 
 async def seed_escritorio(session) -> Escritorio:
     result = await session.execute(
@@ -333,6 +334,7 @@ async def seed_processos(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 async def main() -> None:
     print("=" * 50)

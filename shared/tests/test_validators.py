@@ -34,7 +34,7 @@ from shared.utils.validators import (
 # CPF 529.982.247-25 — dígitos verificadores calculados pelo algoritmo oficial
 CPF_VALIDO = "529.982.247-25"
 CPF_VALIDO_RAW = "52998224725"
-CPF_INVALIDO = "123.456.789-00"      # dígito verificador errado
+CPF_INVALIDO = "123.456.789-00"  # dígito verificador errado
 
 # CNPJ 11.222.333/0001-81 — dígitos verificadores calculados pelo algoritmo oficial
 CNPJ_VALIDO = "11.222.333/0001-81"
@@ -268,7 +268,8 @@ class TestNormalizarTelefone:
 
     def test_11_digitos_comecando_com_5_nao_adiciona_prefixo(self):
         """11 dígitos começando com '5' não entram no branch de adição de prefixo
-        (condição digits[0] != '5' é False) — resultado continua com 11 dígitos e falha."""
+        (condição digits[0] != '5' é False) — resultado continua com 11 dígitos e falha.
+        """
         with pytest.raises(ValueError, match="Telefone inválido"):
             normalizar_telefone("55987654321")
 

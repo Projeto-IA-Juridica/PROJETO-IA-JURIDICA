@@ -44,7 +44,7 @@ PROCESSO = {
 }
 
 ANDAMENTO_A = {"texto": "Despacho ordinatório", "data": "2024-01-20"}
-ANDAMENTO_B = {"texto": "Conclusão ao juiz",   "data": "2024-01-25"}
+ANDAMENTO_B = {"texto": "Conclusão ao juiz", "data": "2024-01-25"}
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +54,7 @@ ANDAMENTO_B = {"texto": "Conclusão ao juiz",   "data": "2024-01-25"}
 #   JusbrasilClient, DataJudClient, DataCleaner, JuridicalTranslator
 # usando patch(..., create=True) — sem alterar o código de produção.
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def fase3():
@@ -89,6 +90,7 @@ def fase3():
 # Constantes
 # ---------------------------------------------------------------------------
 
+
 class TestConstantes:
     def test_tamanho_lote(self):
         assert TAMANHO_LOTE == 10
@@ -104,6 +106,7 @@ class TestConstantes:
 # extrair_valor
 # ---------------------------------------------------------------------------
 
+
 class TestExtrairValor:
     def test_dict_chave_presente(self):
         assert extrair_valor({"a": 1}, "a") == 1
@@ -117,22 +120,26 @@ class TestExtrairValor:
     def test_objeto_attr_presente(self):
         class Obj:
             texto = "conteudo"
+
         assert extrair_valor(Obj(), "texto") == "conteudo"
 
     def test_objeto_attr_ausente_retorna_none(self):
         class Obj:
             pass
+
         assert extrair_valor(Obj(), "inexistente") is None
 
     def test_objeto_attr_ausente_retorna_padrao_customizado(self):
         class Obj:
             pass
+
         assert extrair_valor(Obj(), "inexistente", "default") == "default"
 
 
 # ---------------------------------------------------------------------------
 # converter_para_iso
 # ---------------------------------------------------------------------------
+
 
 class TestConverterParaIso:
     def test_none_retorna_none(self):
@@ -153,9 +160,12 @@ class TestConverterParaIso:
 # extrair_texto_e_data_do_andamento
 # ---------------------------------------------------------------------------
 
+
 class TestExtrairTextoEData:
     def test_dict_com_texto_e_data_string(self):
-        texto, data = extrair_texto_e_data_do_andamento({"texto": "Despacho", "data": "2024-01-20"})
+        texto, data = extrair_texto_e_data_do_andamento(
+            {"texto": "Despacho", "data": "2024-01-20"}
+        )
         assert texto == "Despacho"
         assert data == "2024-01-20"
 
@@ -176,6 +186,7 @@ class TestExtrairTextoEData:
         class Andamento:
             texto = "Sentença"
             data = "2024-06-01"
+
         texto, data = extrair_texto_e_data_do_andamento(Andamento())
         assert texto == "Sentença"
         assert data == "2024-06-01"
@@ -184,6 +195,7 @@ class TestExtrairTextoEData:
 # ---------------------------------------------------------------------------
 # buscar_andamentos_jusbrasil / buscar_andamentos_datajud
 # ---------------------------------------------------------------------------
+
 
 class TestBuscarAndamentos:
     def test_jusbrasil_delega_ao_cliente(self):
@@ -217,6 +229,7 @@ class TestBuscarAndamentos:
 # processar_processo_individual
 # ---------------------------------------------------------------------------
 
+
 class TestProcessarProcessoIndividual:
     def test_sem_andamentos_retorna_sucesso_com_zero(self, fase3):
         with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[]):
@@ -227,13 +240,19 @@ class TestProcessarProcessoIndividual:
         assert r["fonte"] == "jusbrasil"
 
     def test_com_andamentos_conta_corretamente(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A, ANDAMENTO_B]):
+        with patch(
+            f"{MODULE}.buscar_andamentos_jusbrasil",
+            return_value=[ANDAMENTO_A, ANDAMENTO_B],
+        ):
             r = processar_processo_individual(PROCESSO)
         assert r["novos_andamentos"] == 2
         assert r["sucesso"] is True
 
     def test_envia_task_celery_por_andamento(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A, ANDAMENTO_B]):
+        with patch(
+            f"{MODULE}.buscar_andamentos_jusbrasil",
+            return_value=[ANDAMENTO_A, ANDAMENTO_B],
+        ):
             processar_processo_individual(PROCESSO)
         assert fase3["celery"].send_task.call_count == 2
 
@@ -253,7 +272,9 @@ class TestProcessarProcessoIndividual:
 
     def test_andamento_sem_data_nao_atualiza_banco(self, fase3):
         andamento_sem_data = {"texto": "Decisão sem data"}
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[andamento_sem_data]):
+        with patch(
+            f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[andamento_sem_data]
+        ):
             processar_processo_individual(PROCESSO)
         fase3["atualizar"].assert_not_called()
 
@@ -264,8 +285,13 @@ class TestProcessarProcessoIndividual:
 
     def test_jusbrasil_falha_usa_datajud_como_fallback(self, fase3):
         with (
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", side_effect=ConnectionError("down")),
-            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[]) as mock_datajud,
+            patch(
+                f"{MODULE}.buscar_andamentos_jusbrasil",
+                side_effect=ConnectionError("down"),
+            ),
+            patch(
+                f"{MODULE}.buscar_andamentos_datajud", return_value=[]
+            ) as mock_datajud,
         ):
             r = processar_processo_individual(PROCESSO)
         mock_datajud.assert_called_once()
@@ -273,7 +299,10 @@ class TestProcessarProcessoIndividual:
 
     def test_fallback_datajud_com_andamentos(self, fase3):
         with (
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", side_effect=ConnectionError("down")),
+            patch(
+                f"{MODULE}.buscar_andamentos_jusbrasil",
+                side_effect=ConnectionError("down"),
+            ),
             patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
         ):
             r = processar_processo_individual(PROCESSO)
@@ -282,8 +311,14 @@ class TestProcessarProcessoIndividual:
 
     def test_ambas_apis_falham_propaga_excecao(self, fase3):
         with (
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", side_effect=ConnectionError("jusbrasil")),
-            patch(f"{MODULE}.buscar_andamentos_datajud", side_effect=ConnectionError("datajud")),
+            patch(
+                f"{MODULE}.buscar_andamentos_jusbrasil",
+                side_effect=ConnectionError("jusbrasil"),
+            ),
+            patch(
+                f"{MODULE}.buscar_andamentos_datajud",
+                side_effect=ConnectionError("datajud"),
+            ),
             pytest.raises(ConnectionError),
         ):
             processar_processo_individual(PROCESSO)
@@ -292,6 +327,7 @@ class TestProcessarProcessoIndividual:
 # ---------------------------------------------------------------------------
 # monitorar_processos  (Celery task)
 # ---------------------------------------------------------------------------
+
 
 class TestMonitorarProcessos:
     def test_lista_vazia_retorna_sucesso(self):
@@ -306,14 +342,21 @@ class TestMonitorarProcessos:
         assert r["resumo_primeiros_20"] == []
 
     def test_erro_no_banco_retorna_sucesso_false(self):
-        with patch(f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")):
+        with patch(
+            f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")
+        ):
             r = monitorar_processos()
         assert r["sucesso"] is False
         assert "DB down" in r["erro"]
 
     def test_processa_todos_com_sucesso(self, fase3):
         processos = [PROCESSO, {**PROCESSO, "id": 2}]
-        mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
+        mock_ok = {
+            "id_processo": 1,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": "jusbrasil",
+        }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
@@ -327,7 +370,10 @@ class TestMonitorarProcessos:
     def test_soft_time_limit_contado_como_erro(self, fase3):
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=[PROCESSO]),
-            patch(f"{MODULE}.processar_processo_individual", side_effect=SoftTimeLimitExceeded()),
+            patch(
+                f"{MODULE}.processar_processo_individual",
+                side_effect=SoftTimeLimitExceeded(),
+            ),
             patch(f"{MODULE}.time.sleep"),
         ):
             r = monitorar_processos()
@@ -340,7 +386,10 @@ class TestMonitorarProcessos:
     def test_excecao_generica_contada_como_erro(self, fase3):
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=[PROCESSO]),
-            patch(f"{MODULE}.processar_processo_individual", side_effect=ValueError("bad data")),
+            patch(
+                f"{MODULE}.processar_processo_individual",
+                side_effect=ValueError("bad data"),
+            ),
             patch(f"{MODULE}.time.sleep"),
         ):
             r = monitorar_processos()
@@ -351,7 +400,12 @@ class TestMonitorarProcessos:
 
     def test_resumo_truncado_em_20(self, fase3):
         processos = [{**PROCESSO, "id": i} for i in range(25)]
-        mock_ok = {"id_processo": 0, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
+        mock_ok = {
+            "id_processo": 0,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": "jusbrasil",
+        }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
@@ -363,7 +417,12 @@ class TestMonitorarProcessos:
 
     def test_sleep_chamado_uma_vez_por_processo(self, fase3):
         processos = [PROCESSO, {**PROCESSO, "id": 2}]
-        mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
+        mock_ok = {
+            "id_processo": 1,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": "jusbrasil",
+        }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
@@ -375,7 +434,12 @@ class TestMonitorarProcessos:
 
     def test_mixed_success_and_errors(self, fase3):
         """2 processos OK + 1 SoftTimeLimitExceeded + 1 ValueError."""
-        mock_ok = {"id_processo": 0, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
+        mock_ok = {
+            "id_processo": 0,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": "jusbrasil",
+        }
         processos = [{**PROCESSO, "id": i} for i in range(4)]
         side_effects = [mock_ok, SoftTimeLimitExceeded(), mock_ok, ValueError("err")]
         with (
@@ -392,6 +456,7 @@ class TestMonitorarProcessos:
 # monitorar_processo_individual  (Celery task)
 # ---------------------------------------------------------------------------
 
+
 class TestMonitorarProcessoIndividual:
     def test_processo_nao_encontrado(self):
         with patch(f"{MODULE}.query_processo_por_id", return_value=None):
@@ -401,7 +466,12 @@ class TestMonitorarProcessoIndividual:
         assert r["id_processo"] == 99
 
     def test_processo_encontrado_retorna_sucesso(self, fase3):
-        mock_ok = {"id_processo": 1, "sucesso": True, "novos_andamentos": 0, "fonte": "jusbrasil"}
+        mock_ok = {
+            "id_processo": 1,
+            "sucesso": True,
+            "novos_andamentos": 0,
+            "fonte": "jusbrasil",
+        }
         with (
             patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
             patch(f"{MODULE}.processar_processo_individual", return_value=mock_ok),
@@ -412,7 +482,10 @@ class TestMonitorarProcessoIndividual:
     def test_soft_time_limit_retorna_erro_estruturado(self):
         with (
             patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
-            patch(f"{MODULE}.processar_processo_individual", side_effect=SoftTimeLimitExceeded()),
+            patch(
+                f"{MODULE}.processar_processo_individual",
+                side_effect=SoftTimeLimitExceeded(),
+            ),
         ):
             r = monitorar_processo_individual(1)
         assert r["sucesso"] is False
@@ -422,7 +495,10 @@ class TestMonitorarProcessoIndividual:
     def test_excecao_generica_retorna_erro_estruturado(self):
         with (
             patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
-            patch(f"{MODULE}.processar_processo_individual", side_effect=RuntimeError("falha inesperada")),
+            patch(
+                f"{MODULE}.processar_processo_individual",
+                side_effect=RuntimeError("falha inesperada"),
+            ),
         ):
             r = monitorar_processo_individual(1)
         assert r["sucesso"] is False
@@ -433,6 +509,7 @@ class TestMonitorarProcessoIndividual:
 # ---------------------------------------------------------------------------
 # processar_processo_individual — fluxo cache-aside
 # ---------------------------------------------------------------------------
+
 
 class TestCacheAside:
     def test_cache_hit_nao_chama_api(self, fase3):
@@ -484,7 +561,10 @@ class TestCacheAside:
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=None),
             patch(f"{MODULE}.set_andamentos_sync") as mock_set,
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", side_effect=ConnectionError("down")),
+            patch(
+                f"{MODULE}.buscar_andamentos_jusbrasil",
+                side_effect=ConnectionError("down"),
+            ),
             patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
         ):
             r = processar_processo_individual(PROCESSO)

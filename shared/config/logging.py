@@ -68,25 +68,41 @@ from shared.config.settings import settings
 
 # Chaves cujo VALOR é sempre mascarado por completo, independente do formato.
 # Cobre CPF/telefone sem formatação, senhas, tokens e chaves de API específicas do projeto.
-_SENSITIVE_KEYS = frozenset({
-    # Identificadores pessoais (LGPD)
-    "cpf", "cnpj", "telefone", "phone",
-    # Credenciais de autenticação
-    "password", "senha", "secret",
-    # Tokens e chaves de API
-    "token", "api_key", "access_token", "refresh_token", "authorization",
-    # Chaves de criptografia específicas do projeto
-    "encryption_key", "jwt_secret_key", "fernet_key",
-})
+_SENSITIVE_KEYS = frozenset(
+    {
+        # Identificadores pessoais (LGPD)
+        "cpf",
+        "cnpj",
+        "telefone",
+        "phone",
+        # Credenciais de autenticação
+        "password",
+        "senha",
+        "secret",
+        # Tokens e chaves de API
+        "token",
+        "api_key",
+        "access_token",
+        "refresh_token",
+        "authorization",
+        # Chaves de criptografia específicas do projeto
+        "encryption_key",
+        "jwt_secret_key",
+        "fernet_key",
+    }
+)
 
 # Padrões regex aplicados a valores de string em chaves NÃO sensíveis
 # (ex: CPF/CNPJ que aparece interpolado dentro de uma mensagem de texto).
 _PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"\d{3}\.\d{3}\.\d{3}-\d{2}"), "***.***.***-**"),           # CPF formatado
-    (re.compile(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"), "**.***.***/****-**"), # CNPJ formatado
-    (re.compile(r"sk-ant-[A-Za-z0-9\-_]+"), "sk-ant-***"),                   # Anthropic key
-    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "sk-***"),                          # OpenAI key
-    (re.compile(r"Bearer [A-Za-z0-9._\-]+"), "Bearer ***"),                  # JWT header
+    (re.compile(r"\d{3}\.\d{3}\.\d{3}-\d{2}"), "***.***.***-**"),  # CPF formatado
+    (
+        re.compile(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"),
+        "**.***.***/****-**",
+    ),  # CNPJ formatado
+    (re.compile(r"sk-ant-[A-Za-z0-9\-_]+"), "sk-ant-***"),  # Anthropic key
+    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "sk-***"),  # OpenAI key
+    (re.compile(r"Bearer [A-Za-z0-9._\-]+"), "Bearer ***"),  # JWT header
 ]
 
 
@@ -146,9 +162,9 @@ _NIVEL_LOG = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 # ---------------------------------------------------------------------------
 
 _PROCESSADORES_BASE: list = [
-    merge_contextvars,                          # propaga bind_contextvars
-    structlog.stdlib.add_log_level,             # campo "level"
-    structlog.stdlib.add_logger_name,           # campo "logger"
+    merge_contextvars,  # propaga bind_contextvars
+    structlog.stdlib.add_log_level,  # campo "level"
+    structlog.stdlib.add_logger_name,  # campo "logger"
     structlog.processors.CallsiteParameterAdder(  # caller info
         [
             structlog.processors.CallsiteParameter.FILENAME,
@@ -157,15 +173,16 @@ _PROCESSADORES_BASE: list = [
         ]
     ),
     structlog.processors.TimeStamper(fmt="iso", utc=True),  # "timestamp" UTC ISO-8601
-    structlog.processors.StackInfoRenderer(),               # stack_info opcional
-    structlog.processors.UnicodeDecoder(),                  # garante strings UTF-8
-    structlog.processors.ExceptionRenderer(),               # serializa exc_info nos dois ambientes
-    _mask_sensitive,                                        # mascara CPF, tokens, chaves de API
+    structlog.processors.StackInfoRenderer(),  # stack_info opcional
+    structlog.processors.UnicodeDecoder(),  # garante strings UTF-8
+    structlog.processors.ExceptionRenderer(),  # serializa exc_info nos dois ambientes
+    _mask_sensitive,  # mascara CPF, tokens, chaves de API
 ]
 
 # ---------------------------------------------------------------------------
 # Configuração por ambiente
 # ---------------------------------------------------------------------------
+
 
 def _configurar_development() -> None:
     """
@@ -173,7 +190,8 @@ def _configurar_development() -> None:
     Facilita leitura durante o desenvolvimento local.
     """
     structlog.configure(
-        processors=_PROCESSADORES_BASE + [
+        processors=_PROCESSADORES_BASE
+        + [
             structlog.dev.ConsoleRenderer(colors=True),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(_NIVEL_LOG),
@@ -189,8 +207,9 @@ def _configurar_producao() -> None:
     Ideal para ingestão por agregadores de log (Datadog, Loki, etc.).
     """
     structlog.configure(
-        processors=_PROCESSADORES_BASE + [
-            structlog.processors.JSONRenderer(),        # linha JSON por evento
+        processors=_PROCESSADORES_BASE
+        + [
+            structlog.processors.JSONRenderer(),  # linha JSON por evento
         ],
         wrapper_class=structlog.make_filtering_bound_logger(_NIVEL_LOG),
         context_class=dict,
@@ -202,6 +221,7 @@ def _configurar_producao() -> None:
 # ---------------------------------------------------------------------------
 # Inicialização — executada na importação do módulo
 # ---------------------------------------------------------------------------
+
 
 def _inicializar() -> None:
     # Silencia loggers muito verbosos de libs externas
@@ -227,6 +247,7 @@ if not os.getenv("DISABLE_LOG_INIT"):
 # ---------------------------------------------------------------------------
 # API pública
 # ---------------------------------------------------------------------------
+
 
 def get_logger(nome_modulo: str) -> structlog.stdlib.BoundLogger:
     """

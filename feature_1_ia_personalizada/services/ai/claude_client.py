@@ -11,7 +11,11 @@ import anthropic
 import structlog
 from prometheus_client import Counter, Histogram
 
-from shared.config.constants import MAX_TOKENS_RESPOSTA, MODELO_CLAUDE, TEMPERATURA_CLAUDE
+from shared.config.constants import (
+    MAX_TOKENS_RESPOSTA,
+    MODELO_CLAUDE,
+    TEMPERATURA_CLAUDE,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -40,7 +44,7 @@ _erros = Counter(
 # Referência: https://www.anthropic.com/pricing
 # ---------------------------------------------------------------------------
 
-_CUSTO_INPUT_POR_MILHAO = Decimal("3.00")   # USD
+_CUSTO_INPUT_POR_MILHAO = Decimal("3.00")  # USD
 _CUSTO_OUTPUT_POR_MILHAO = Decimal("15.00")  # USD
 
 _MAX_TENTATIVAS = 3
@@ -86,19 +90,28 @@ async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
             _erros.labels(tipo_erro="rate_limit").inc()
             ultimo_erro = exc
             espera = _backoff(tentativa)
-            logger.warning("claude_rate_limit", tentativa=tentativa, espera_s=round(espera, 2))
+            logger.warning(
+                "claude_rate_limit", tentativa=tentativa, espera_s=round(espera, 2)
+            )
             await asyncio.sleep(espera)
         except anthropic.APITimeoutError as exc:
             _erros.labels(tipo_erro="timeout").inc()
             ultimo_erro = exc
             espera = _backoff(tentativa)
-            logger.warning("claude_timeout", tentativa=tentativa, espera_s=round(espera, 2))
+            logger.warning(
+                "claude_timeout", tentativa=tentativa, espera_s=round(espera, 2)
+            )
             await asyncio.sleep(espera)
         except anthropic.APIError as exc:
             _erros.labels(tipo_erro="api_error").inc()
             ultimo_erro = exc
             espera = _backoff(tentativa)
-            logger.warning("claude_api_error", tentativa=tentativa, status=exc.status_code, espera_s=round(espera, 2))
+            logger.warning(
+                "claude_api_error",
+                tentativa=tentativa,
+                status=exc.status_code,
+                espera_s=round(espera, 2),
+            )
             await asyncio.sleep(espera)
 
     logger.error(
@@ -199,6 +212,7 @@ class ClaudeClient:
         Raises:
             RuntimeError: Se todas as tentativas falharem.
         """
+
         async def _chamar() -> anthropic.types.Message:
             return await self._client.messages.create(
                 model=MODELO_CLAUDE,

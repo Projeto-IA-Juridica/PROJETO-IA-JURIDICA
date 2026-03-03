@@ -52,6 +52,7 @@ dev = [
     "pytest-asyncio==0.23.3",
     "pytest-cov==4.1.0",
     "httpx==0.26.0",
+    "aiosqlite==0.20.0",      # driver SQLite async — obrigatório para sqlite+aiosqlite:///:memory: nos testes
     "ruff==0.2.1",
     "black==24.1.1",
     "mypy==1.8.0",
@@ -77,11 +78,16 @@ testpaths = [
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=. --cov-report=term-missing --cov-report=html"
+addopts = "-v --cov=feature_1_ia_personalizada --cov=shared --cov-report=term-missing --cov-report=html --cov-fail-under=70"
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# Excluir pastas que não são código de produção: scripts utilitários,
+# migrations Alembic e experimentos isolados têm padrões próprios (E402, etc.)
+exclude = ["scripts", "alembic", "teste_datajud"]
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -96,7 +102,15 @@ ignore = [
     "B008",  # do not perform function calls in default arguments (FastAPI depends on this)
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.per-file-ignores]
+# conftest e arquivos de teste que carregam env vars antes dos imports de app —
+# E402 é intencional nesses arquivos para garantir que os mocks são injetados primeiro
+"**/tests/**/conftest.py" = ["E402"]
+"**/tests/**/*.py" = ["E402"]
+# workers/celery_app.py importa tasks no final do arquivo (padrão Celery)
+"**/workers/celery_app.py" = ["E402"]
+
+[tool.ruff.lint.isort]
 known-first-party = ["shared", "feature_1_ia_personalizada"]
 
 [tool.mypy]

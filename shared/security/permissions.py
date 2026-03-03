@@ -6,7 +6,6 @@ Fornece dependências (Dependencies) do FastAPI para injetar o usuário atual.
 """
 
 from enum import Enum
-from typing import List
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -25,6 +24,7 @@ class Role(str, Enum):
     """
     Perfis de usuário do sistema.
     """
+
     ADMIN = "admin"
     ADVOGADO = "advogado"
     ASSISTENTE = "assistente"
@@ -32,8 +32,7 @@ class Role(str, Enum):
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), 
-    db: AsyncSession = Depends(get_db)
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
 ) -> Usuario:
     """
     Dependency do FastAPI responsável por:
@@ -48,7 +47,7 @@ async def get_current_user(
             detail="Token de autenticação ausente",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     try:
         payload = validar_token(token)
         user_id_str: str = payload.get("sub")
@@ -60,7 +59,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     # Buscando o usuário no DB para revalidação de status
     stmt = select(Usuario).where(Usuario.id == user_id)
@@ -72,7 +71,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário associado ao token não encontrado",
         )
-    
+
     if not user.ativo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -82,27 +81,30 @@ async def get_current_user(
     return user
 
 
-def require_role(roles_permitidas: List[Role]):
+def require_role(roles_permitidas: list[Role]):
     """
     Decorator / Dependency provider para FastAPI.
     Filtra o acesso à rota apenas para usuários que tenham uma das roles permitidas.
-    
+
     Exemplo de uso na Rota:
     @app.delete("/processos/{id}")
     async def deletar(user=Depends(require_role([Role.ADMIN]))):
         ...
     """
-    async def role_checker(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+
+    async def role_checker(
+        current_user: Usuario = Depends(get_current_user),
+    ) -> Usuario:
         # Uma conversão segura entre Enum e Str
         roles_str = [r.value for r in roles_permitidas]
-        
+
         if current_user.role not in roles_str:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operação não permitida para o perfil: {current_user.role}",
             )
         return current_user
-        
+
     return role_checker
 
 

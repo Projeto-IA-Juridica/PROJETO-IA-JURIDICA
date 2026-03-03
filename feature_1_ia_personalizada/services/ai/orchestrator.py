@@ -34,7 +34,7 @@ import asyncio
 import json
 import re
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from prometheus_client import Counter
@@ -62,9 +62,15 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_TRADUZIR_TERMO,
 )
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
-from feature_1_ia_personalizada.services.legal_data.cache_manager import LegalDataCacheManager
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
-from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
+from feature_1_ia_personalizada.services.legal_data.cache_manager import (
+    LegalDataCacheManager,
+)
+from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
+    JusbrasilClient,
+)
+from feature_1_ia_personalizada.services.messaging.evolution_client import (
+    EvolutionClient,
+)
 from feature_1_ia_personalizada.services.messaging.templates import (
     TEMPLATE_CLIENTE_SEM_PROCESSO,
     TEMPLATE_ERRO_GENERICO,
@@ -77,7 +83,9 @@ from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
 
-_TIMEOUT_FLUXO_SEGUNDOS = 60.0  # guarda-chuva contra nós travados (Jusbrasil, Evolution, Claude)
+_TIMEOUT_FLUXO_SEGUNDOS = (
+    60.0  # guarda-chuva contra nós travados (Jusbrasil, Evolution, Claude)
+)
 
 # ---------------------------------------------------------------------------
 # Métricas Prometheus
@@ -107,22 +115,23 @@ _ia_fallback_used_total = Counter(
 # State Schema — CÉREBRO do fluxo
 # ---------------------------------------------------------------------------
 
+
 class ConversationState(TypedDict):
     escritorio_id: int
     cliente_id: int
-    processo_id: Optional[int]
+    processo_id: int | None
     mensagem_original: str
-    tipo_mensagem: str           # texto | audio_transcrito
+    tipo_mensagem: str  # texto | audio_transcrito
     historico: list[dict]
-    intencao: str                # status | duvida_termo | agendamento | saudacao | reclamacao | outro
-    dados_processo: Optional[dict]
-    resposta_ia: Optional[str]
-    resposta_verificada: Optional[str]
+    intencao: str  # status | duvida_termo | agendamento | saudacao | reclamacao | outro
+    dados_processo: dict | None
+    resposta_ia: str | None
+    resposta_verificada: str | None
     tokens_usados: dict
-    erro: Optional[str]
+    erro: str | None
     tentativas_correcao: int
     usando_fallback: bool
-    precisa_regenerar: bool      # sinal interno: verificar_resposta → gerar_resposta
+    precisa_regenerar: bool  # sinal interno: verificar_resposta → gerar_resposta
 
 
 # ---------------------------------------------------------------------------
@@ -130,26 +139,41 @@ class ConversationState(TypedDict):
 # ---------------------------------------------------------------------------
 
 _KEYWORDS: list[tuple[str, re.Pattern]] = [
-    ("status", re.compile(
-        r"\b(status|andamento|situa[çc][aã]o|processo|como est[aá]|o que aconteceu|movimenta[çc][aã]o)\b",
-        re.IGNORECASE,
-    )),
-    ("duvida_termo", re.compile(
-        r"\b(significa|quer dizer|o que [eé]|o que significa|defini[çc][aã]o|explica|me explica)\b",
-        re.IGNORECASE,
-    )),
-    ("agendamento", re.compile(
-        r"\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|cancelar agendamento)\b",
-        re.IGNORECASE,
-    )),
-    ("saudacao", re.compile(
-        r"\b(oi|ol[aá]|boa tarde|bom dia|boa noite|tudo bem|hey|hi)\b",
-        re.IGNORECASE,
-    )),
-    ("reclamacao", re.compile(
-        r"\b(reclama[çc][aã]o|insatisfeito|demora|p[eé]ssimo|terr[ií]vel|problema|absurdo)\b",
-        re.IGNORECASE,
-    )),
+    (
+        "status",
+        re.compile(
+            r"\b(status|andamento|situa[çc][aã]o|processo|como est[aá]|o que aconteceu|movimenta[çc][aã]o)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "duvida_termo",
+        re.compile(
+            r"\b(significa|quer dizer|o que [eé]|o que significa|defini[çc][aã]o|explica|me explica)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "agendamento",
+        re.compile(
+            r"\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|cancelar agendamento)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "saudacao",
+        re.compile(
+            r"\b(oi|ol[aá]|boa tarde|bom dia|boa noite|tudo bem|hey|hi)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "reclamacao",
+        re.compile(
+            r"\b(reclama[çc][aã]o|insatisfeito|demora|p[eé]ssimo|terr[ií]vel|problema|absurdo)\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 
@@ -163,6 +187,7 @@ def _classificar_por_keywords(mensagem: str) -> str:
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
+
 
 class ConversationOrchestrator:
     """
@@ -200,7 +225,9 @@ class ConversationOrchestrator:
             logger.info("orchestrator_iniciado", modo="langgraph")
         else:
             self._graph = None
-            logger.warning("orchestrator_iniciado", modo="fallback_simples_sem_langgraph")
+            logger.warning(
+                "orchestrator_iniciado", modo="fallback_simples_sem_langgraph"
+            )
 
     # -----------------------------------------------------------------------
     # API pública
@@ -252,7 +279,7 @@ class ConversationOrchestrator:
                 else self._fluxo_sequencial(initial_state)
             )
             final_state = await asyncio.wait_for(coro, timeout=_TIMEOUT_FLUXO_SEGUNDOS)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             log = logger.bind(escritorio_id=escritorio_id, cliente_id=cliente_id)
             log.error("fluxo_timeout", timeout_s=_TIMEOUT_FLUXO_SEGUNDOS)
             _erros_total.labels(no="timeout_global").inc()
@@ -296,7 +323,9 @@ class ConversationOrchestrator:
     # DB / adapters
     # -----------------------------------------------------------------------
 
-    async def _buscar_resumo_processo_para_fact_checker(self, processo_id: str) -> dict[str, Any]:
+    async def _buscar_resumo_processo_para_fact_checker(
+        self, processo_id: str
+    ) -> dict[str, Any]:
         """Adapter para FactChecker — lê dados reais do processo no banco."""
         try:
             async with self._session_factory() as session:
@@ -437,7 +466,12 @@ class ConversationOrchestrator:
     def _rota_apos_classificacao(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
-        if state.get("intencao") in ("status", "duvida_termo", "agendamento", "reclamacao"):
+        if state.get("intencao") in (
+            "status",
+            "duvida_termo",
+            "agendamento",
+            "reclamacao",
+        ):
             return "buscar_dados"
         return "gerar_resposta"
 
@@ -477,7 +511,14 @@ class ConversationOrchestrator:
             )
             parsed = json.loads(raw)
             intencao = parsed.get("intencao", "outro")
-            categorias_validas = {"status", "duvida_termo", "agendamento", "saudacao", "reclamacao", "outro"}
+            categorias_validas = {
+                "status",
+                "duvida_termo",
+                "agendamento",
+                "saudacao",
+                "reclamacao",
+                "outro",
+            }
             if intencao not in categorias_validas:
                 intencao = "outro"
             log.info("intencao_classificada_claude", intencao=intencao)
@@ -520,20 +561,25 @@ class ConversationOrchestrator:
                 log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
 
             ultimo_andamento = (
-                andamentos[0].get("descricao", "") if andamentos
+                andamentos[0].get("descricao", "")
+                if andamentos
                 else (processo.ultimo_andamento or "sem movimentação recente")
             )
             data_ultimo = (
-                andamentos[0].get("data", "") if andamentos
+                andamentos[0].get("data", "")
+                if andamentos
                 else (
                     processo.data_ultimo_andamento.isoformat()
-                    if processo.data_ultimo_andamento else "N/D"
+                    if processo.data_ultimo_andamento
+                    else "N/D"
                 )
             )
 
             # Detecta termos jurídicos no andamento e monta glossário contextual
             # para enriquecer o prompt de status sem custo extra de API
-            termos_detectados = self._translator.identificar_termos_tecnicos(ultimo_andamento)
+            termos_detectados = self._translator.identificar_termos_tecnicos(
+                ultimo_andamento
+            )
             glossario_andamento: dict[str, str] = {}
             for termo in termos_detectados:
                 trad = self._translator.traduzir_termo(termo)
@@ -579,7 +625,9 @@ class ConversationOrchestrator:
 
             # Tenta dicionário local antes do Claude (somente para duvida_termo)
             if intencao == "duvida_termo":
-                traducao_local = self._translator.traduzir_termo(state["mensagem_original"])
+                traducao_local = self._translator.traduzir_termo(
+                    state["mensagem_original"]
+                )
                 if traducao_local:
                     log.debug("termo_traduzido_dicionario_local")
                     return {
@@ -592,7 +640,8 @@ class ConversationOrchestrator:
                 escritorio = await session.get(Escritorio, state["escritorio_id"])
                 cliente = (
                     await session.get(Cliente, state["cliente_id"])
-                    if intencao == "saudacao" else None
+                    if intencao == "saudacao"
+                    else None
                 )
             nome_escritorio = escritorio.nome if escritorio else "Escritório"
             nome_cliente = cliente.nome if cliente else "cliente"
@@ -604,7 +653,9 @@ class ConversationOrchestrator:
                     numero_cnj=dados.get("numero_cnj", "N/D"),
                     tribunal=dados.get("tribunal", "N/D"),
                     vara=dados.get("vara", "N/D"),
-                    ultimo_andamento=dados.get("ultimo_andamento", "sem movimentação recente"),
+                    ultimo_andamento=dados.get(
+                        "ultimo_andamento", "sem movimentação recente"
+                    ),
                     data_ultimo_andamento=dados.get("data_ultimo_andamento", "N/D"),
                     polo_cliente=dados.get("polo_cliente", "N/D"),
                 )
@@ -614,9 +665,12 @@ class ConversationOrchestrator:
                 glossario = dados.get("glossario_andamento") or {}
                 if glossario:
                     linhas = "\n".join(
-                        f"- {termo}: {definicao}" for termo, definicao in glossario.items()
+                        f"- {termo}: {definicao}"
+                        for termo, definicao in glossario.items()
                     )
-                    system_prompt += f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
+                    system_prompt += (
+                        f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
+                    )
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
                     nome_escritorio=nome_escritorio,
@@ -634,7 +688,9 @@ class ConversationOrchestrator:
                         nome_cliente=nome_cliente,
                     )
             else:
-                system_prompt = SYSTEM_PROMPT_BASE.format(nome_escritorio=nome_escritorio)
+                system_prompt = SYSTEM_PROMPT_BASE.format(
+                    nome_escritorio=nome_escritorio
+                )
 
             resultado = await self._claude.enviar_mensagem(
                 system_prompt=system_prompt,
@@ -647,7 +703,8 @@ class ConversationOrchestrator:
             custo_anterior = Decimal(tokens_anteriores.get("custo_str", "0"))
             tokens_atualizados = {
                 "input": tokens_anteriores.get("input", 0) + resultado["tokens_input"],
-                "output": tokens_anteriores.get("output", 0) + resultado["tokens_output"],
+                "output": tokens_anteriores.get("output", 0)
+                + resultado["tokens_output"],
                 # custo_str preserva o Decimal calculado pelo ClaudeClient (sem aritmética float)
                 "custo_str": str(custo_anterior + resultado["custo"]),
             }
@@ -685,7 +742,9 @@ class ConversationOrchestrator:
                     "O escritório entrará em contato em breve."
                 )
             else:
-                fallback_msg = MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO)
+                fallback_msg = MENSAGENS_FALLBACK.get(
+                    "indisponivel", TEMPLATE_ERRO_GENERICO
+                )
 
             return {
                 "resposta_ia": fallback_msg,
@@ -753,7 +812,9 @@ class ConversationOrchestrator:
                     else:
                         # Esgotou as tentativas → usa fallback genérico
                         log.error("fact_check_max_tentativas_atingidas")
-                        resposta_filtrada = MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO)
+                        resposta_filtrada = MENSAGENS_FALLBACK.get(
+                            "indisponivel", TEMPLATE_ERRO_GENERICO
+                        )
 
             updates: dict[str, Any] = {
                 "resposta_verificada": resposta_filtrada,
@@ -807,13 +868,22 @@ class ConversationOrchestrator:
 
                 if instance and numero:
                     try:
-                        await self._evolution.enviar_texto(instance, numero, resposta_final)
-                        log.info("mensagem_enviada_whatsapp", numero_parcial=numero[:4] + "***")
+                        await self._evolution.enviar_texto(
+                            instance, numero, resposta_final
+                        )
+                        log.info(
+                            "mensagem_enviada_whatsapp",
+                            numero_parcial=numero[:4] + "***",
+                        )
                     except Exception as exc_wa:
                         # Falha no envio WhatsApp não interrompe o fluxo — só loga
                         log.warning("falha_envio_whatsapp", erro=str(exc_wa))
                 else:
-                    log.warning("instancia_ou_numero_ausente", instance=instance, numero=bool(numero))
+                    log.warning(
+                        "instancia_ou_numero_ausente",
+                        instance=instance,
+                        numero=bool(numero),
+                    )
 
                 # Atualiza memória de conversa no Redis
                 await self._memory.salvar_mensagem(
@@ -830,7 +900,9 @@ class ConversationOrchestrator:
                 )
 
                 # Persiste Interação no banco (custo vem do ClaudeClient, sem recálculo)
-                await self._salvar_interacao(session, state, resposta_final, tokens, custo)
+                await self._salvar_interacao(
+                    session, state, resposta_final, tokens, custo
+                )
 
             log.info(
                 "fluxo_concluido",
@@ -966,6 +1038,7 @@ class ConversationOrchestrator:
 # Factory — cria o orchestrador com todas as dependências
 # ---------------------------------------------------------------------------
 
+
 def criar_orchestrador(
     api_key_anthropic: str,
     redis_client: Redis,
@@ -1030,7 +1103,11 @@ _translator_singleton: JuridicalTranslator | None = None
 
 def _criar_translator() -> JuridicalTranslator:
     """Retorna o singleton se disponível, cria novo caso contrário (testes/scripts)."""
-    return _translator_singleton if _translator_singleton is not None else JuridicalTranslator()
+    return (
+        _translator_singleton
+        if _translator_singleton is not None
+        else JuridicalTranslator()
+    )
 
 
 def inicializar_orchestrador_worker() -> None:
@@ -1063,6 +1140,7 @@ def inicializar_orchestrador_worker() -> None:
 # Entry point síncrono para Celery workers
 # ---------------------------------------------------------------------------
 
+
 def executar_fluxo_orquestrador(
     id_escritorio: int,
     id_cliente: int,
@@ -1080,9 +1158,10 @@ def executar_fluxo_orquestrador(
     Returns:
         {"resposta": str, "intencao": str, "usando_fallback": bool, ...}
     """
+    import redis.asyncio as aioredis
+
     from shared.config.settings import settings
     from shared.database.connection import async_session_factory
-    import redis.asyncio as aioredis
 
     async def _run() -> dict[str, Any]:
         redis_client = aioredis.from_url(settings.REDIS_URL)
@@ -1099,7 +1178,9 @@ def executar_fluxo_orquestrador(
                 ),
                 session_factory=async_session_factory,
             )
-            return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo)
+            return await orchestrador.processar(
+                id_escritorio, id_cliente, mensagem, tipo
+            )
         finally:
             await redis_client.aclose()
 

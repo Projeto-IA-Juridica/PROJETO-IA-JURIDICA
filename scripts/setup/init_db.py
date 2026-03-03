@@ -17,10 +17,10 @@ from pathlib import Path
 # Garante que a raiz do projeto está no PYTHONPATH
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import text
 
+from alembic import command
+from alembic.config import Config
 from shared.database.connection import engine
 
 

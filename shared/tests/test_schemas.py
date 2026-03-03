@@ -10,14 +10,18 @@ Cobre:
 - Computed fields (pages)
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
 
 from shared.schemas.cliente import ClienteAceiteLGPD, ClienteCreate, ClienteUpdate
 from shared.schemas.escritorio import EscritorioCreate, EscritorioUpdate
-from shared.schemas.processo import AndamentoSchema, ProcessoComAndamentos, ProcessoCreate
+from shared.schemas.processo import (
+    AndamentoSchema,
+    ProcessoComAndamentos,
+    ProcessoCreate,
+)
 from shared.schemas.response import ErrorResponse, PaginatedResponse, SuccessResponse
 from shared.schemas.usuario import TokenResponse, UsuarioCreate, UsuarioLogin
 
@@ -346,16 +350,19 @@ class TestProcessoUpdate:
     def test_todos_campos_none(self):
         u = ProcessoCreate.__class__  # só verifica que instancia OK
         from shared.schemas.processo import ProcessoUpdate
+
         u = ProcessoUpdate()
         assert u.polo_cliente is None
 
     def test_frequencia_valida(self):
         from shared.schemas.processo import ProcessoUpdate
+
         u = ProcessoUpdate(frequencia_monitoramento="SEMANAL")
         assert u.frequencia_monitoramento == "semanal"
 
     def test_frequencia_invalida(self):
         from shared.schemas.processo import ProcessoUpdate
+
         with pytest.raises(ValidationError, match="Frequência inválida"):
             ProcessoUpdate(frequencia_monitoramento="mensal")
 
@@ -363,7 +370,7 @@ class TestProcessoUpdate:
 class TestAndamentoSchema:
     def test_tipo_valido(self):
         a = AndamentoSchema(
-            data=datetime.now(timezone.utc),
+            data=datetime.now(UTC),
             descricao="Juntada de documento",
             tipo="despacho",
         )
@@ -372,16 +379,24 @@ class TestAndamentoSchema:
     def test_tipo_invalido_rejeitado(self):
         with pytest.raises(ValidationError):
             AndamentoSchema(
-                data=datetime.now(timezone.utc),
+                data=datetime.now(UTC),
                 descricao="Algo",
                 tipo="recurso",  # não está no Literal
             )
 
     def test_todos_tipos_validos(self):
-        tipos = ["despacho", "sentença", "decisão", "petição", "certidão", "audiência", "outro"]
+        tipos = [
+            "despacho",
+            "sentença",
+            "decisão",
+            "petição",
+            "certidão",
+            "audiência",
+            "outro",
+        ]
         for tipo in tipos:
             a = AndamentoSchema(
-                data=datetime.now(timezone.utc),
+                data=datetime.now(UTC),
                 descricao="Teste",
                 tipo=tipo,
             )
@@ -390,7 +405,6 @@ class TestAndamentoSchema:
 
 class TestProcessoComAndamentos:
     def test_andamentos_default_lista_vazia(self):
-        from shared.schemas.processo import ProcessoResponse
         # ProcessoComAndamentos herda ProcessoResponse — testa o default
         p = ProcessoComAndamentos(
             id=1,
@@ -411,8 +425,8 @@ class TestProcessoComAndamentos:
             jusbrasil_id=None,
             monitoramento_ativo=True,
             frequencia_monitoramento="diario",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         assert p.andamentos == []
 
@@ -474,8 +488,8 @@ class TestUsuarioCreate:
 
 class TestUsuarioLogin:
     def test_valido(self):
-        l = UsuarioLogin(email="user@ex.com", senha="qualquercoisa")
-        assert l.email == "user@ex.com"
+        obj = UsuarioLogin(email="user@ex.com", senha="qualquercoisa")
+        assert obj.email == "user@ex.com"
 
     def test_senha_vazia_rejeitada(self):
         with pytest.raises(ValidationError):

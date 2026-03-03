@@ -13,22 +13,21 @@ Arquitetura testada:
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from shared.database.worker_queries import (
     ClienteWorker,
     ProcessoWorker,
+    query_clientes_para_pesquisa,
     query_processo_e_cliente,
     query_processos_sem_movimentacao,
-    query_clientes_para_pesquisa,
 )
-
 
 # --------------------------------------------------------------------------- #
 # Fábrica de objetos ORM mock
 # --------------------------------------------------------------------------- #
+
 
 def _make_processo(
     *,
@@ -91,6 +90,7 @@ def _mock_session(scalar_result=None, scalars_result=None):
 # --------------------------------------------------------------------------- #
 # 1. query_processo_e_cliente
 # --------------------------------------------------------------------------- #
+
 
 def test_query_processo_e_cliente_retorna_tupla(monkeypatch):
     """Quando processo e cliente existem, retorna (ProcessoWorker, ClienteWorker)."""
@@ -161,11 +161,14 @@ def test_query_processo_e_cliente_retorna_none_sem_cliente(monkeypatch):
 # 2. query_processos_sem_movimentacao
 # --------------------------------------------------------------------------- #
 
+
 def test_query_processos_sem_movimentacao_retorna_lista(monkeypatch):
     """Retorna lista de ProcessoWorker para processos sem andamento há > 30 dias."""
-    data_antiga = datetime.now(timezone.utc) - timedelta(days=45)
+    data_antiga = datetime.now(UTC) - timedelta(days=45)
     cliente_orm = _make_cliente()
-    processo_orm = _make_processo(data_ultimo_andamento=data_antiga, cliente=cliente_orm)
+    processo_orm = _make_processo(
+        data_ultimo_andamento=data_antiga, cliente=cliente_orm
+    )
 
     session = _mock_session(scalars_result=[processo_orm])
 
@@ -226,6 +229,7 @@ def test_query_processos_sem_movimentacao_lista_vazia(monkeypatch):
 # --------------------------------------------------------------------------- #
 # 3. query_clientes_para_pesquisa
 # --------------------------------------------------------------------------- #
+
 
 def test_query_clientes_para_pesquisa_retorna_clientes(monkeypatch):
     """Retorna ClienteWorker para clientes ativos com aceite_lgpd=True."""
@@ -294,15 +298,16 @@ def test_query_clientes_para_pesquisa_multiplos(monkeypatch):
 # 4. Integração rasa: send_notifications delega corretamente
 # --------------------------------------------------------------------------- #
 
+
 def test_send_notifications_delega_para_worker_queries():
     """
     Garante que as funções de send_notifications são apenas wrappers
     sobre as funções de worker_queries (sem lógica extra).
     """
     from feature_1_ia_personalizada.workers.send_notifications import (
+        buscar_clientes_para_pesquisa,
         buscar_processo_e_cliente,
         buscar_processos_sem_movimentacao,
-        buscar_clientes_para_pesquisa,
     )
 
     with patch(

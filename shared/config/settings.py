@@ -1,8 +1,8 @@
 # shared/config/settings.py
-#testado
-from typing import Optional, Literal
+# testado
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -28,15 +28,15 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str  # Fernet key (base64 urlsafe)
 
     # Observabilidade
-    SENTRY_DSN: Optional[str] = None
+    SENTRY_DSN: str | None = None
 
     # Celery
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
 
     # Google Sheets (opcional no MVP local)
-    GOOGLE_SHEETS_ID: Optional[str] = None
-    GOOGLE_CREDENTIALS_PATH: Optional[str] = None
+    GOOGLE_SHEETS_ID: str | None = None
+    GOOGLE_CREDENTIALS_PATH: str | None = None
 
     # Ambiente
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"

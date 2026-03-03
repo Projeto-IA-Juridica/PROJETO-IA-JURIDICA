@@ -12,8 +12,9 @@ da IA de interpretação jurídica.
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -21,13 +22,14 @@ logger = structlog.get_logger(__name__)
 
 class DataJudClientError(Exception):
     """Exceção para erros originários da API Pública do CNJ / DataJud."""
+
     pass
 
 
 class DataJudClient:
     """Client assíncrono padrão para recuperar e higienizar processos via CNJ."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         No MVP e ambiente local, simularemos a resposta DataJud para
         termos redundância com o Jusbrasil.
@@ -36,11 +38,11 @@ class DataJudClient:
         self._base_url = "https://api-publica.datajud.cnj.jus.br"
         logger.info("datajud_client_iniciado", mode="MOCK_MVP")
 
-    async def consultar_processo(self, numero_cnj: str) -> Dict[str, Any]:
+    async def consultar_processo(self, numero_cnj: str) -> dict[str, Any]:
         """
         Retorna tanto a capa do processo (metadados) quanto a lista unificada de
         movimentos (andamentos) no formato REST do DataJud.
-        
+
         Args:
             numero_cnj (str): O número CNJ padrão do processo.
         """
@@ -66,19 +68,21 @@ class DataJudClient:
                                     "nome": "Sentença com Resolução de Mérito",
                                     "dataHora": datetime.now().isoformat(),
                                     "complementosTabelados": [
-                                        {"nome": "Descrição", "valor": "Julgado improcedente o pedido."}
-                                    ]
+                                        {
+                                            "nome": "Descrição",
+                                            "valor": "Julgado improcedente o pedido.",
+                                        }
+                                    ],
                                 },
                                 {
                                     "nome": "Conclusão ao Juiz",
-                                    "dataHora": "2026-01-10T09:00:00Z"
-                                }
-                            ]
+                                    "dataHora": "2026-01-10T09:00:00Z",
+                                },
+                            ],
                         }
                     }
                 ]
             }
         }
-        
-        return payload_mock
 
+        return payload_mock

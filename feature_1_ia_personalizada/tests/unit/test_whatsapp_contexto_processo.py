@@ -11,15 +11,16 @@ Testa:
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from feature_1_ia_personalizada.services.messaging.whatsapp import WhatsAppService
+import pytest
 
+from feature_1_ia_personalizada.services.messaging.whatsapp import WhatsAppService
 
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
+
 
 @pytest.fixture
 def service() -> WhatsAppService:
@@ -46,6 +47,7 @@ def _mock_session_ctx(row=None):
 # --------------------------------------------------------------------------- #
 # 1. _obter_contexto_processo — processo existe
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.asyncio
 async def test_obter_contexto_processo_retorna_tupla(service: WhatsAppService):
@@ -88,6 +90,7 @@ async def test_obter_contexto_processo_ids_corretos(service: WhatsAppService):
 # 2. _obter_contexto_processo — processo NÃO existe
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 async def test_obter_contexto_processo_retorna_none_quando_nao_existe(
     service: WhatsAppService, caplog
@@ -107,6 +110,7 @@ async def test_obter_contexto_processo_retorna_none_quando_nao_existe(
 # --------------------------------------------------------------------------- #
 # 3. enviar_notificacao_andamento usa _obter_contexto_processo
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.asyncio
 async def test_enviar_notificacao_andamento_retorna_erro_processo_nao_encontrado(
@@ -138,15 +142,18 @@ async def test_enviar_notificacao_andamento_delega_para_enviar_mensagem(
 
     ctx = _mock_session_ctx(row=row)
 
-    with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
-        return_value=ctx,
-    ), patch.object(
-        service,
-        "enviar_mensagem",
-        new_callable=AsyncMock,
-        return_value={"ok": True},
-    ) as mock_enviar:
+    with (
+        patch(
+            "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+            return_value=ctx,
+        ),
+        patch.object(
+            service,
+            "enviar_mensagem",
+            new_callable=AsyncMock,
+            return_value={"ok": True},
+        ) as mock_enviar,
+    ):
         resultado = await service.enviar_notificacao_andamento(
             processo_id=1, andamento="Despacho publicado."
         )
@@ -154,8 +161,8 @@ async def test_enviar_notificacao_andamento_delega_para_enviar_mensagem(
     mock_enviar.assert_called_once()
     args, kwargs = mock_enviar.call_args
     # primeiro arg = escritorio_id, segundo = cliente_id
-    assert args[0] == 1   # escritorio_id
-    assert args[1] == 2   # cliente_id
+    assert args[0] == 1  # escritorio_id
+    assert args[1] == 2  # cliente_id
     assert "Despacho publicado." in args[2]  # texto contém o andamento
     assert kwargs.get("processo_id") == 1
     assert resultado == {"ok": True}
@@ -164,6 +171,7 @@ async def test_enviar_notificacao_andamento_delega_para_enviar_mensagem(
 # --------------------------------------------------------------------------- #
 # 4. enviar_sem_movimentacao usa _obter_contexto_processo
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.asyncio
 async def test_enviar_sem_movimentacao_retorna_erro_processo_nao_encontrado(
@@ -190,15 +198,18 @@ async def test_enviar_sem_movimentacao_texto_correto(service: WhatsAppService):
 
     ctx = _mock_session_ctx(row=row)
 
-    with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
-        return_value=ctx,
-    ), patch.object(
-        service,
-        "enviar_mensagem",
-        new_callable=AsyncMock,
-        return_value={"ok": True},
-    ) as mock_enviar:
+    with (
+        patch(
+            "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+            return_value=ctx,
+        ),
+        patch.object(
+            service,
+            "enviar_mensagem",
+            new_callable=AsyncMock,
+            return_value={"ok": True},
+        ) as mock_enviar,
+    ):
         await service.enviar_sem_movimentacao(processo_id=5)
 
     _, kwargs = mock_enviar.call_args

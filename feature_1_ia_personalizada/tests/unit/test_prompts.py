@@ -3,11 +3,11 @@
 Testes estruturais dos prompts.
 Verificam contratos de segurança, placeholders, tags XML e ausência de bugs de formatação.
 """
-import re
 
 import pytest
 
 from feature_1_ia_personalizada.services.ai.prompts import (
+    _FORMATO_WHATSAPP,
     SYSTEM_PROMPT_BASE,
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
@@ -15,7 +15,6 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_SEM_MOVIMENTACAO,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
-    _FORMATO_WHATSAPP,
 )
 from shared.config.constants import DISCLAIMER_OAB
 
@@ -66,11 +65,17 @@ class TestSeguranca:
 
 class TestPlaceholders:
     def test_status_contem_todos_placeholders_processo(self):
-        for placeholder in ["{numero_cnj}", "{tribunal}", "{vara}",
-                             "{ultimo_andamento}", "{data_ultimo_andamento}", "{polo_cliente}"]:
-            assert placeholder in SYSTEM_PROMPT_STATUS_PROCESSO, (
-                f"Placeholder {placeholder} ausente no STATUS"
-            )
+        for placeholder in [
+            "{numero_cnj}",
+            "{tribunal}",
+            "{vara}",
+            "{ultimo_andamento}",
+            "{data_ultimo_andamento}",
+            "{polo_cliente}",
+        ]:
+            assert (
+                placeholder in SYSTEM_PROMPT_STATUS_PROCESSO
+            ), f"Placeholder {placeholder} ausente no STATUS"
 
     def test_boas_vindas_contem_placeholder_nome_cliente(self):
         assert "{nome_cliente}" in SYSTEM_PROMPT_BOAS_VINDAS
@@ -79,10 +84,14 @@ class TestPlaceholders:
         assert "{nome_cliente}" in SYSTEM_PROMPT_PESQUISA_SATISFACAO
 
     def test_sem_movimentacao_contem_placeholders_processo(self):
-        for placeholder in ["{numero_cnj}", "{ultimo_andamento}", "{dias_sem_movimentacao}"]:
-            assert placeholder in SYSTEM_PROMPT_SEM_MOVIMENTACAO, (
-                f"Placeholder {placeholder} ausente em SEM_MOVIMENTACAO"
-            )
+        for placeholder in [
+            "{numero_cnj}",
+            "{ultimo_andamento}",
+            "{dias_sem_movimentacao}",
+        ]:
+            assert (
+                placeholder in SYSTEM_PROMPT_SEM_MOVIMENTACAO
+            ), f"Placeholder {placeholder} ausente em SEM_MOVIMENTACAO"
 
     def test_nome_escritorio_nao_resolvido_em_geracao(self):
         """
@@ -90,18 +99,18 @@ class TestPlaceholders:
         é resolvido em runtime pelo orchestrator.
         """
         for prompt in _PROMPTS_GERACAO:
-            assert "{nome_escritorio}" in prompt, (
-                f"{prompt[:60]}... não tem {{nome_escritorio}}"
-            )
+            assert (
+                "{nome_escritorio}" in prompt
+            ), f"{prompt[:60]}... não tem {{nome_escritorio}}"
 
 
 class TestFormatoWhatsApp:
     def test_formato_whatsapp_presente_em_todos_prompts_geracao(self):
         """_FORMATO_WHATSAPP deve estar embutido em todos os prompts que geram texto."""
         for prompt in _PROMPTS_GERACAO:
-            assert _FORMATO_WHATSAPP in prompt or "formato_saida" in prompt, (
-                f"Formato WhatsApp ausente em: {prompt[:60]}..."
-            )
+            assert (
+                _FORMATO_WHATSAPP in prompt or "formato_saida" in prompt
+            ), f"Formato WhatsApp ausente em: {prompt[:60]}..."
 
     def test_formato_instrui_negrito_whatsapp(self):
         """WhatsApp usa *negrito*, não **markdown**."""
@@ -117,9 +126,16 @@ class TestFormatoWhatsApp:
 
 class TestTagsXML:
     def test_tags_xml_abertas_e_fechadas_no_base(self):
-        for tag in ["tom_e_estilo", "regras_oab", "disclaimer_obrigatorio", "acoes_permitidas"]:
+        for tag in [
+            "tom_e_estilo",
+            "regras_oab",
+            "disclaimer_obrigatorio",
+            "acoes_permitidas",
+        ]:
             assert f"<{tag}>" in SYSTEM_PROMPT_BASE, f"Tag <{tag}> ausente no BASE"
-            assert f"</{tag}>" in SYSTEM_PROMPT_BASE, f"Tag </{tag}> não fechada no BASE"
+            assert (
+                f"</{tag}>" in SYSTEM_PROMPT_BASE
+            ), f"Tag </{tag}> não fechada no BASE"
 
     def test_tags_xml_no_status(self):
         assert "<dados_processo>" in SYSTEM_PROMPT_STATUS_PROCESSO
@@ -138,11 +154,17 @@ class TestTagsXML:
 
 class TestClassificador:
     def test_todas_seis_categorias_presentes(self):
-        for categoria in ["status", "duvida_termo", "agendamento",
-                          "saudacao", "reclamacao", "outro"]:
-            assert categoria in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO, (
-                f"Categoria '{categoria}' ausente no classificador"
-            )
+        for categoria in [
+            "status",
+            "duvida_termo",
+            "agendamento",
+            "saudacao",
+            "reclamacao",
+            "outro",
+        ]:
+            assert (
+                categoria in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
+            ), f"Categoria '{categoria}' ausente no classificador"
 
     def test_instrucao_resposta_exclusiva(self):
         assert "EXCLUSIVAMENTE" in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
@@ -153,15 +175,18 @@ class TestClassificador:
 
 
 class TestConteudoMinimo:
-    @pytest.mark.parametrize("nome,prompt", [
-        ("BASE", SYSTEM_PROMPT_BASE),
-        ("STATUS", SYSTEM_PROMPT_STATUS_PROCESSO),
-        ("TRADUZIR_TERMO", SYSTEM_PROMPT_TRADUZIR_TERMO),
-        ("BOAS_VINDAS", SYSTEM_PROMPT_BOAS_VINDAS),
-        ("SEM_MOVIMENTACAO", SYSTEM_PROMPT_SEM_MOVIMENTACAO),
-        ("PESQUISA_SATISFACAO", SYSTEM_PROMPT_PESQUISA_SATISFACAO),
-        ("CLASSIFICAR_INTENCAO", SYSTEM_PROMPT_CLASSIFICAR_INTENCAO),
-    ])
+    @pytest.mark.parametrize(
+        "nome,prompt",
+        [
+            ("BASE", SYSTEM_PROMPT_BASE),
+            ("STATUS", SYSTEM_PROMPT_STATUS_PROCESSO),
+            ("TRADUZIR_TERMO", SYSTEM_PROMPT_TRADUZIR_TERMO),
+            ("BOAS_VINDAS", SYSTEM_PROMPT_BOAS_VINDAS),
+            ("SEM_MOVIMENTACAO", SYSTEM_PROMPT_SEM_MOVIMENTACAO),
+            ("PESQUISA_SATISFACAO", SYSTEM_PROMPT_PESQUISA_SATISFACAO),
+            ("CLASSIFICAR_INTENCAO", SYSTEM_PROMPT_CLASSIFICAR_INTENCAO),
+        ],
+    )
     def test_prompt_nao_vazio(self, nome: str, prompt: str):
         assert isinstance(prompt, str)
         assert len(prompt) > 50, f"Prompt {nome} muito curto ({len(prompt)} chars)"

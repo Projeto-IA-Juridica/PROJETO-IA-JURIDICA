@@ -12,8 +12,7 @@ Estratégia:
 """
 from __future__ import annotations
 
-import time
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from googleapiclient.errors import HttpError
@@ -25,10 +24,10 @@ from feature_1_ia_personalizada.services.integrations.google_sheets import (
     _retry_http,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixture: cliente com API mockada
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def cliente() -> GoogleSheetsClient:
@@ -52,6 +51,7 @@ def cliente() -> GoogleSheetsClient:
 # ---------------------------------------------------------------------------
 # _parse_data
 # ---------------------------------------------------------------------------
+
 
 class TestParseData:
     def test_formato_dd_mm_yyyy(self):
@@ -80,6 +80,7 @@ class TestParseData:
 # _int_seguro
 # ---------------------------------------------------------------------------
 
+
 class TestIntSeguro:
     def test_string_numerica(self):
         assert _int_seguro("42") == 42
@@ -104,6 +105,7 @@ class TestIntSeguro:
 # _retry_http
 # ---------------------------------------------------------------------------
 
+
 class TestRetryHttp:
     def test_sucesso_na_primeira_tentativa(self):
         fn = MagicMock(return_value="ok")
@@ -117,7 +119,9 @@ class TestRetryHttp:
         erro = HttpError(resp=resp_mock, content=b"error")
         fn = MagicMock(side_effect=[erro, "ok"])
 
-        with patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"):
+        with patch(
+            "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
+        ):
             resultado = _retry_http(fn, max_tentativas=3)
 
         assert resultado == "ok"
@@ -130,7 +134,9 @@ class TestRetryHttp:
         fn = MagicMock(side_effect=erro)
 
         with (
-            patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"),
+            patch(
+                "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
+            ),
             pytest.raises(HttpError),
         ):
             _retry_http(fn, max_tentativas=3)
@@ -163,10 +169,13 @@ class TestRetryHttp:
 # _ler_intervalo  (testado diretamente para cobrir a camada HTTP interna)
 # ---------------------------------------------------------------------------
 
+
 class TestLerIntervalo:
     def _mock_execute(self, cliente, payload: dict):
         """Configura self._sheet para retornar payload no execute()."""
-        cliente._sheet.values.return_value.get.return_value.execute.return_value = payload
+        cliente._sheet.values.return_value.get.return_value.execute.return_value = (
+            payload
+        )
 
     def test_retorna_linhas_da_api(self, cliente):
         self._mock_execute(cliente, {"values": [["a", "b"], ["c", "d"]]})
@@ -188,11 +197,32 @@ class TestLerIntervalo:
 # get_clientes
 # ---------------------------------------------------------------------------
 
+
 class TestGetClientes:
     def test_retorna_lista_de_dicts(self, cliente):
         linhas = [
-            ["1", "João Silva", "5511999990001", "123.456.789-00", "15/03/1985", "Bancário", "Banco X", "ativo", "2024-01-10"],
-            ["2", "Maria Costa", "5511999990002", "987.654.321-00", "22/07/1990", "Professora", "Escola Y", "ativo", ""],
+            [
+                "1",
+                "João Silva",
+                "5511999990001",
+                "123.456.789-00",
+                "15/03/1985",
+                "Bancário",
+                "Banco X",
+                "ativo",
+                "2024-01-10",
+            ],
+            [
+                "2",
+                "Maria Costa",
+                "5511999990002",
+                "987.654.321-00",
+                "22/07/1990",
+                "Professora",
+                "Escola Y",
+                "ativo",
+                "",
+            ],
         ]
         with patch.object(cliente, "_ler_intervalo", return_value=linhas):
             resultado = cliente.get_clientes()
@@ -205,7 +235,17 @@ class TestGetClientes:
 
     def test_parse_data_nascimento_dd_mm_yyyy(self, cliente):
         linhas = [
-            ["1", "João", "5511999990001", "111.222.333-44", "25/12/1980", "Eng.", "Emp.", "ativo", ""],
+            [
+                "1",
+                "João",
+                "5511999990001",
+                "111.222.333-44",
+                "25/12/1980",
+                "Eng.",
+                "Emp.",
+                "ativo",
+                "",
+            ],
         ]
         with patch.object(cliente, "_ler_intervalo", return_value=linhas):
             resultado = cliente.get_clientes()
@@ -214,8 +254,17 @@ class TestGetClientes:
 
     def test_pula_linhas_com_menos_de_8_colunas(self, cliente):
         linhas = [
-            ["1", "João", "55119"],                          # 3 colunas → ignorada
-            ["2", "Ana", "5511999990002", "cpf", "nasc", "prof", "emp", "ativo"],  # 8 colunas → ok
+            ["1", "João", "55119"],  # 3 colunas → ignorada
+            [
+                "2",
+                "Ana",
+                "5511999990002",
+                "cpf",
+                "nasc",
+                "prof",
+                "emp",
+                "ativo",
+            ],  # 8 colunas → ok
         ]
         with patch.object(cliente, "_ler_intervalo", return_value=linhas):
             resultado = cliente.get_clientes()
@@ -238,7 +287,17 @@ class TestGetClientes:
 
     def test_data_invalida_retorna_none(self, cliente):
         linhas = [
-            ["3", "Carlos", "5511999990003", "cpf", "nao-e-data", "prof", "emp", "ativo", ""],
+            [
+                "3",
+                "Carlos",
+                "5511999990003",
+                "cpf",
+                "nao-e-data",
+                "prof",
+                "emp",
+                "ativo",
+                "",
+            ],
         ]
         with patch.object(cliente, "_ler_intervalo", return_value=linhas):
             resultado = cliente.get_clientes()
@@ -256,7 +315,9 @@ class TestGetClientes:
     def test_get_clientes_propaga_excecao_da_api(self, cliente):
         """Erro na API deve ser propagado (não silenciado)."""
         with (
-            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
+            patch.object(
+                cliente, "_ler_intervalo", side_effect=RuntimeError("API down")
+            ),
             pytest.raises(RuntimeError),
         ):
             cliente.get_clientes()
@@ -265,6 +326,7 @@ class TestGetClientes:
 # ---------------------------------------------------------------------------
 # get_datas_comemorativas
 # ---------------------------------------------------------------------------
+
 
 class TestGetDatasComemorativas:
     def test_retorna_lista_de_dicts(self, cliente):
@@ -284,7 +346,7 @@ class TestGetDatasComemorativas:
 
     def test_pula_linhas_com_menos_de_3_colunas(self, cliente):
         linhas = [
-            ["bancario", "5"],                               # 2 colunas → ignorada
+            ["bancario", "5"],  # 2 colunas → ignorada
             ["professor", "15", "10", "Dia do Professor"],  # 4 colunas → ok
         ]
         with patch.object(cliente, "_ler_intervalo", return_value=linhas):
@@ -318,7 +380,9 @@ class TestGetDatasComemorativas:
 
     def test_get_datas_propaga_excecao_da_api(self, cliente):
         with (
-            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
+            patch.object(
+                cliente, "_ler_intervalo", side_effect=RuntimeError("API down")
+            ),
             pytest.raises(RuntimeError),
         ):
             cliente.get_datas_comemorativas()
@@ -327,6 +391,7 @@ class TestGetDatasComemorativas:
 # ---------------------------------------------------------------------------
 # registrar_log_envio
 # ---------------------------------------------------------------------------
+
 
 class TestRegistrarLogEnvio:
     def _mock_sheet(self, cliente):
@@ -357,7 +422,7 @@ class TestRegistrarLogEnvio:
         linha = kwargs["body"]["values"][0]
         assert linha[0] == "42"
         assert linha[1] == "aniversario"
-        assert linha[3] == "Sim"    # sucesso padrão = True
+        assert linha[3] == "Sim"  # sucesso padrão = True
 
     def test_sucesso_false_registra_nao(self, cliente):
         mock_values = self._mock_sheet(cliente)
@@ -428,7 +493,9 @@ class TestRegistrarLogEnvio:
         cliente._sheet.values.return_value = mock_values
 
         with (
-            patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"),
+            patch(
+                "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
+            ),
             pytest.raises(HttpError),
         ):
             cliente.registrar_log_envio(tipo="test", cliente_id=1, detalhe="test")

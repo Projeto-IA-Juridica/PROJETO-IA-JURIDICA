@@ -13,8 +13,8 @@ import os
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
-from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from alembic import context
 
@@ -87,16 +87,13 @@ def do_run_migrations(connection) -> None:
 async def run_async_migrations() -> None:
     """Cria engine assíncrona e executa migrations com run_sync."""
     url = get_database_url()
-    
+
     connect_args = {}
     if "supabase.com" in url:
         connect_args["ssl"] = "require"
-        
+
     connectable = create_async_engine(
-        url, 
-        poolclass=NullPool, 
-        echo=False,
-        connect_args=connect_args
+        url, poolclass=NullPool, echo=False, connect_args=connect_args
     )
 
     async with connectable.connect() as connection:

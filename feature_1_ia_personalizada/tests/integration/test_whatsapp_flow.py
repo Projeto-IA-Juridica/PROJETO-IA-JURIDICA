@@ -9,24 +9,22 @@ Cobre o endpoint POST /webhook/whatsapp de ponta a ponta:
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+import sys
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.models.cliente import Cliente
-from shared.models.escritorio import Escritorio
-
-import sys
-
 # routes/__init__.py faz `from .webhook_whatsapp import router as webhook_whatsapp`,
 # o que shadowa o submodulo com o APIRouter no namespace do pacote.
 # `import a.b.c as x` em Python usa attribute traversal (a.b.c), não sys.modules,
 # e portanto retorna o APIRouter. A forma correta de obter o módulo real é via
 # sys.modules — garantido porque routes/__init__.py já o importou durante seu carregamento.
-import feature_1_ia_personalizada.api.routes  # garante que o submodulo está em sys.modules
+from shared.models.cliente import Cliente
+from shared.models.escritorio import Escritorio
+
 _wh_module = sys.modules["feature_1_ia_personalizada.api.routes.webhook_whatsapp"]
 
 # ---------------------------------------------------------------------------
@@ -49,7 +47,7 @@ def _payload_texto(
     instance: str = INSTANCIA,
     remote_jid: str = TELEFONE_JID,
     from_me: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Payload padrão de mensagem de texto simples (conversation)."""
     return {
         "event": "messages.upsert",
@@ -65,7 +63,7 @@ def _payload_extended_text(
     mensagem: str = "Texto com link https://exemplo.com",
     instance: str = INSTANCIA,
     remote_jid: str = TELEFONE_JID,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "event": "messages.upsert",
         "instance": instance,
@@ -80,7 +78,7 @@ def _payload_imagem(
     caption: str = "Foto do documento",
     instance: str = INSTANCIA,
     remote_jid: str = TELEFONE_JID,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "event": "messages.upsert",
         "instance": instance,
@@ -94,7 +92,7 @@ def _payload_imagem(
 def _payload_audio(
     instance: str = INSTANCIA,
     remote_jid: str = TELEFONE_JID,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "event": "messages.upsert",
         "instance": instance,
@@ -131,6 +129,7 @@ async def escritorio_com_instancia(db_session: AsyncSession) -> Escritorio:
     o kwarg webhook_whatsapp_instance para o construtor do model.
     """
     from faker import Faker
+
     fake = Faker("pt_BR")
     escritorio = Escritorio(
         nome=fake.company(),
@@ -148,7 +147,9 @@ async def escritorio_com_instancia(db_session: AsyncSession) -> Escritorio:
 
 
 @pytest.fixture
-async def cliente_cadastrado(db_session: AsyncSession, escritorio_com_instancia: Escritorio) -> Cliente:
+async def cliente_cadastrado(
+    db_session: AsyncSession, escritorio_com_instancia: Escritorio
+) -> Cliente:
     """Cliente vinculado ao escritório com telefone conhecido."""
     cliente = Cliente(
         escritorio_id=escritorio_com_instancia.id,
@@ -392,6 +393,7 @@ class TestWebhookMultiTenant:
         não deve ser encontrado.
         """
         from faker import Faker
+
         fake = Faker("pt_BR")
         # Cria escritório B diretamente para garantir que a instância é gravada
         escritorio_b = Escritorio(
@@ -431,6 +433,7 @@ class TestWebhookMultiTenant:
         O roteamento deve usar o escritório da instância do payload.
         """
         from faker import Faker
+
         fake = Faker("pt_BR")
         escritorio_b = Escritorio(
             nome=fake.company(),

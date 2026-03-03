@@ -1,18 +1,13 @@
-
-
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 from celery import current_app
-
 
 # importa as SUAS tasks
 from feature_1_ia_personalizada.workers.send_notifications import (
     enviar_notificacao_andamento,
-    enviar_lote_sem_movimentacao,
     enviar_pesquisa_satisfacao,
     processar_mensagem_recebida,
 )
@@ -61,13 +56,13 @@ class MessageScheduler:
 
         if dt >= fim:
             amanha = dt + timedelta(days=1)
-            return amanha.replace(hour=self.hora_inicio, minute=0, second=0, microsecond=0)
+            return amanha.replace(
+                hour=self.hora_inicio, minute=0, second=0, microsecond=0
+            )
 
         return dt
 
-   
     # Agendamentos das SUAS tasks
-   
 
     def agendar_notificacao_andamento(
         self,

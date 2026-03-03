@@ -1,16 +1,18 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.usuario import Usuario
-from shared.schemas.usuario import UsuarioLogin, UsuarioResponse, TokenResponse
+from shared.schemas.usuario import TokenResponse, UsuarioLogin, UsuarioResponse
 from shared.security.encryption import verificar_senha
-from shared.security.jwt import criar_token, criar_refresh_token, validar_token
-from shared.config.settings import settings
+from shared.security.jwt import criar_refresh_token, criar_token, validar_token
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
@@ -30,7 +32,7 @@ async def login(credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
             detail="E-mail ou senha incorretos.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     # 3. Verifica se a conta está ativa (se tivermos essa flag, por enquanto só vamos em frente)
     # se hasattr(usuario, "ativo") and not usuario.ativo: ...
 
@@ -40,16 +42,14 @@ async def login(credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
 
     # 5. Gera os Tokens
     access_token = criar_token(
-        user_id=usuario.id, 
-        escritorio_id=usuario.escritorio_id, 
-        role=usuario.role
+        user_id=usuario.id, escritorio_id=usuario.escritorio_id, role=usuario.role
     )
     refresh_token = criar_refresh_token(user_id=usuario.id)
 
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_in=settings.JWT_EXPIRATION_MINUTES * 60
+        expires_in=settings.JWT_EXPIRATION_MINUTES * 60,
     )
 
 
@@ -61,42 +61,44 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-         raise HTTPException(status_code=401, detail="Refresh Token ausente")
-         
+        raise HTTPException(status_code=401, detail="Refresh Token ausente")
+
     token = auth_header.split(" ")[1]
-    
+
     try:
         # Decodifica o token antigo
         payload = validar_token(token)
-        
+
         # O refresh token viaja leve, verificamos explicitamente a flag:
         if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Token fornecido não é um Refresh Token")
-            
+            raise HTTPException(
+                status_code=401, detail="Token fornecido não é um Refresh Token"
+            )
+
         user_id = int(payload.get("sub"))
-        
+
         # Precisamos ler o banco de novo para puxar as roles e escritorio_id atualizadas
         usuario = await db.get(Usuario, user_id)
         if not usuario:
-            raise HTTPException(status_code=401, detail="Usuário do token não existe mais")
-            
+            raise HTTPException(
+                status_code=401, detail="Usuário do token não existe mais"
+            )
+
         # Gera novo par (isso invalida a ideia de que o refresh vive pra sempre, entregamos um novo access)
         access_token = criar_token(
-            user_id=usuario.id, 
-            escritorio_id=usuario.escritorio_id, 
-            role=usuario.role
+            user_id=usuario.id, escritorio_id=usuario.escritorio_id, role=usuario.role
         )
         # Opcional: Rotacionar o refresh token também ou só devolver o mesmo
         new_refresh = criar_refresh_token(user_id=usuario.id)
-        
+
         return TokenResponse(
             access_token=access_token,
             refresh_token=new_refresh,
-            expires_in=settings.JWT_EXPIRATION_MINUTES * 60
+            expires_in=settings.JWT_EXPIRATION_MINUTES * 60,
         )
-        
+
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        raise HTTPException(status_code=401, detail=str(e)) from e
 
 
 @router.get("/me", response_model=UsuarioResponse)
@@ -107,13 +109,14 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db)):
     """
     # Se o Dev não colocou o Auth Middleware global, vamos nos blindar
     if not hasattr(request.state, "user_payload"):
-         raise HTTPException(status_code=401, detail="Não autenticado")
-         
+        raise HTTPException(status_code=401, detail="Não autenticado")
+
     user_id = int(request.state.user_payload.get("sub"))
-    
+
     usuario = await db.get(Usuario, user_id)
     if not usuario:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado no banco de dados")
-        
-    return usuario
+        raise HTTPException(
+            status_code=404, detail="Usuário não encontrado no banco de dados"
+        )
 
+    return usuario

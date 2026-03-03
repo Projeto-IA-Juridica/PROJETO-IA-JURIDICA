@@ -22,7 +22,9 @@ import time
 from typing import Any
 
 # Garante que o root do projeto esteja no path, independente de onde o script é chamado
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -35,18 +37,26 @@ _CHECK_TIMEOUT = 5.0
 # Verificações individuais (sem dependência do FastAPI)
 # ------------------------------------------------------------------
 
+
 async def _check_postgresql(database_url: str) -> dict[str, Any]:
     try:
-        from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
 
-        engine = create_async_engine(database_url, pool_size=1, max_overflow=0, pool_pre_ping=True)
+        engine = create_async_engine(
+            database_url, pool_size=1, max_overflow=0, pool_pre_ping=True
+        )
         t = time.perf_counter()
         async with engine.connect() as conn:
-            await asyncio.wait_for(conn.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT)
+            await asyncio.wait_for(
+                conn.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT
+            )
         await engine.dispose()
-        return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
-    except asyncio.TimeoutError:
+        return {
+            "status": "ok",
+            "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+        }
+    except TimeoutError:
         return {"status": "timeout", "detail": "PostgreSQL não respondeu em 5s"}
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}
@@ -60,8 +70,11 @@ async def _check_redis(redis_url: str) -> dict[str, Any]:
         r = aioredis.from_url(redis_url, decode_responses=True)
         t = time.perf_counter()
         await asyncio.wait_for(r.ping(), timeout=_CHECK_TIMEOUT)
-        return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
-    except asyncio.TimeoutError:
+        return {
+            "status": "ok",
+            "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+        }
+    except TimeoutError:
         return {"status": "timeout", "detail": "Redis não respondeu em 5s"}
     except Exception as exc:
         return {"status": "error", "detail": str(exc)}
@@ -99,8 +112,16 @@ async def _check_evolution_api(url: str, api_key: str) -> dict[str, Any]:
             resp = await client.get(f"{url}/instance/fetchInstances")
         latency_ms = round((time.perf_counter() - t) * 1000, 2)
         if resp.status_code < 500:
-            return {"status": "ok", "latency_ms": latency_ms, "http_status": resp.status_code}
-        return {"status": "degraded", "latency_ms": latency_ms, "http_status": resp.status_code}
+            return {
+                "status": "ok",
+                "latency_ms": latency_ms,
+                "http_status": resp.status_code,
+            }
+        return {
+            "status": "degraded",
+            "latency_ms": latency_ms,
+            "http_status": resp.status_code,
+        }
     except httpx.TimeoutException:
         return {"status": "timeout", "detail": "Evolution API não respondeu em 5s"}
     except Exception as exc:
@@ -126,7 +147,7 @@ async def _check_celery_workers(broker_url: str) -> dict[str, Any]:
             asyncio.to_thread(_inspect_sync),
             timeout=_CHECK_TIMEOUT,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status": "timeout", "detail": "Inspect Celery não respondeu em 5s"}
 
 
@@ -152,7 +173,10 @@ async def _check_google_sheets(
                 spreadsheet_id=spreadsheet_id,
             )
             client._ler_intervalo("Clientes!A1:A1")
-            return {"status": "ok", "latency_ms": round((time.perf_counter() - t) * 1000, 2)}
+            return {
+                "status": "ok",
+                "latency_ms": round((time.perf_counter() - t) * 1000, 2),
+            }
         except Exception as exc:
             return {"status": "error", "detail": str(exc)}
 
@@ -161,7 +185,7 @@ async def _check_google_sheets(
             asyncio.to_thread(_ping_sync),
             timeout=_CHECK_TIMEOUT + 5,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status": "timeout", "detail": "Google Sheets não respondeu em 10s"}
 
 
@@ -169,7 +193,13 @@ async def _check_google_sheets(
 # Main
 # ------------------------------------------------------------------
 
-_STATUS_ICON = {"ok": "✓", "degraded": "~", "skipped": "~", "timeout": "✗", "error": "✗"}
+_STATUS_ICON = {
+    "ok": "✓",
+    "degraded": "~",
+    "skipped": "~",
+    "timeout": "✗",
+    "error": "✗",
+}
 
 
 async def run(output_json: bool) -> int:
@@ -183,16 +213,18 @@ async def run(output_json: bool) -> int:
         _check_claude_api(settings.ANTHROPIC_API_KEY),
         _check_evolution_api(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY),
         _check_celery_workers(settings.CELERY_BROKER_URL),
-        _check_google_sheets(settings.GOOGLE_CREDENTIALS_PATH, settings.GOOGLE_SHEETS_ID),
+        _check_google_sheets(
+            settings.GOOGLE_CREDENTIALS_PATH, settings.GOOGLE_SHEETS_ID
+        ),
     )
 
     checks: dict[str, dict[str, Any]] = {
-        "postgresql":     pg,
-        "redis":          rd,
-        "claude_api":     claude,
-        "evolution_api":  evolution,
+        "postgresql": pg,
+        "redis": rd,
+        "claude_api": claude,
+        "evolution_api": evolution,
         "celery_workers": celery_w,
-        "google_sheets":  sheets,
+        "google_sheets": sheets,
     }
 
     total_ms = round((time.perf_counter() - t_total) * 1000, 2)
@@ -230,7 +262,9 @@ async def run(output_json: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Health check standalone dos serviços")
-    parser.add_argument("--json", action="store_true", help="Saída em JSON (para integração CI/CD)")
+    parser.add_argument(
+        "--json", action="store_true", help="Saída em JSON (para integração CI/CD)"
+    )
     args = parser.parse_args()
 
     sys.exit(asyncio.run(run(output_json=args.json)))

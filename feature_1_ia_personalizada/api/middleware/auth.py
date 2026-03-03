@@ -10,8 +10,8 @@ valida e injeta os dados do usuário em `request.state.current_user`.
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from jose import JWTError
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from shared.security.jwt import validar_token
 
@@ -20,13 +20,14 @@ ROTAS_PUBLICAS = [
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/health",           # O health check básico é open
-    "/health/ready",     # O detailed também, para pods k8s conseguirem ler
-    "/auth/login",       # Obviamente, pra gerar o token
-    "/auth/refresh",     # Pra renovar
-    "/webhook/whatsapp", # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
-    "/metrics",          # Prometheus scraper não usa JWT
+    "/health",  # O health check básico é open
+    "/health/ready",  # O detailed também, para pods k8s conseguirem ler
+    "/auth/login",  # Obviamente, pra gerar o token
+    "/auth/refresh",  # Pra renovar
+    "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
+    "/metrics",  # Prometheus scraper não usa JWT
 ]
+
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -41,7 +42,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         if not auth_header or not auth_header.startswith("Bearer "):
             return JSONResponse(
                 status_code=401,
-                content={"detail": "Token JWT ausente ou mal formatado. Use 'Authorization: Bearer <token>'"}
+                content={
+                    "detail": "Token JWT ausente ou mal formatado. Use 'Authorization: Bearer <token>'"
+                },
             )
 
         token = auth_header.split(" ")[1]
@@ -52,14 +55,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             # Injeta os dados do payload no request state para as rotas usarem (se precisarem)
             request.state.user_payload = payload
         except ValueError as e:
+            return JSONResponse(status_code=401, content={"detail": str(e)})
+        except JWTError:
             return JSONResponse(
-                status_code=401,
-                content={"detail": str(e)}
-            )
-        except JWTError as e:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Token JWT inválido"}
+                status_code=401, content={"detail": "Token JWT inválido"}
             )
 
         # 4. Autorizado! Deixa a requisição seguir seu fluxo normal

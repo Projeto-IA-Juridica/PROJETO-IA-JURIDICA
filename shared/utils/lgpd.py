@@ -15,7 +15,7 @@ Uso:
     from shared.utils.lgpd import registrar_acesso, anonimizar_dados_cliente
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -61,7 +61,7 @@ def registrar_acesso(
         recurso=recurso,
         acao=acao,
         ip=ip,
-        timestamp=datetime.now(tz=timezone.utc).isoformat(),
+        timestamp=datetime.now(tz=UTC).isoformat(),
     )
 
 
@@ -121,19 +121,27 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
     interacoes = resultado_interacoes.scalars().all()
 
     return {
-        "exportado_em": datetime.now(tz=timezone.utc).isoformat(),
+        "exportado_em": datetime.now(tz=UTC).isoformat(),
         "cliente": {
             "id": cliente.id,
             "nome": cliente.nome,
-            "cpf_presente": bool(cliente.cpf),  # CPF é criptografado — indica presença sem expor
+            "cpf_presente": bool(
+                cliente.cpf
+            ),  # CPF é criptografado — indica presença sem expor
             "email": cliente.email,
             "telefone_whatsapp": cliente.telefone_whatsapp,
-            "data_nascimento": cliente.data_nascimento.isoformat() if cliente.data_nascimento else None,
+            "data_nascimento": (
+                cliente.data_nascimento.isoformat() if cliente.data_nascimento else None
+            ),
             "profissao": cliente.profissao,
             "empresa_atual": cliente.empresa_atual,
             "cargo": cliente.cargo,
             "aceite_lgpd": cliente.aceite_lgpd,
-            "data_aceite_lgpd": cliente.data_aceite_lgpd.isoformat() if cliente.data_aceite_lgpd else None,
+            "data_aceite_lgpd": (
+                cliente.data_aceite_lgpd.isoformat()
+                if cliente.data_aceite_lgpd
+                else None
+            ),
             "preferencia_horario_notificacao": cliente.preferencia_horario_notificacao,
             "ativo": cliente.ativo,
             "criado_em": cliente.created_at.isoformat(),
@@ -247,7 +255,7 @@ async def anonimizar_dados_cliente(
         "lgpd.dados_anonimizados",
         cliente_id=cliente_id,
         solicitado_por=solicitado_por,
-        timestamp=datetime.now(tz=timezone.utc).isoformat(),
+        timestamp=datetime.now(tz=UTC).isoformat(),
     )
 
     # Registra no audit trail quem executou a operação

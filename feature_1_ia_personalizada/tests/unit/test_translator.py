@@ -25,8 +25,14 @@ def translator() -> JuridicalTranslator:
 def translator_custom(tmp_path: Path) -> JuridicalTranslator:
     """Translator apontando para um JSON temporário controlado pelo teste."""
     dados = {
-        "sentença": {"traducao": "Decisão final do juiz", "exemplo": "O juiz deu a sentença."},
-        "agravo de instrumento": {"traducao": "Recurso contra decisão parcial", "exemplo": ""},
+        "sentença": {
+            "traducao": "Decisão final do juiz",
+            "exemplo": "O juiz deu a sentença.",
+        },
+        "agravo de instrumento": {
+            "traducao": "Recurso contra decisão parcial",
+            "exemplo": "",
+        },
         "agravo": {"traducao": "Recurso genérico", "exemplo": ""},
         "tutela antecipada": {"traducao": "Decisão provisória urgente", "exemplo": ""},
         "tutela de urgência": {"traducao": "Proteção imediata", "exemplo": ""},
@@ -49,6 +55,7 @@ def translator_custom(tmp_path: Path) -> JuridicalTranslator:
 # Carregamento do dicionário
 # ---------------------------------------------------------------------------
 
+
 class TestCarregamento:
     def test_dicionario_disponivel_apos_carga(self, translator: JuridicalTranslator):
         assert translator.dicionario_disponivel is True
@@ -62,7 +69,9 @@ class TestCarregamento:
         t._original = {}
         t._disponivel = False
 
-        with patch.object(translator_mod, "_TERMOS_JSON", Path("/caminho/inexistente/traducoes.json")):
+        with patch.object(
+            translator_mod, "_TERMOS_JSON", Path("/caminho/inexistente/traducoes.json")
+        ):
             t._carregar_dicionario()
 
         assert t.dicionario_disponivel is False
@@ -87,6 +96,7 @@ class TestCarregamento:
 # traduzir_termo
 # ---------------------------------------------------------------------------
 
+
 class TestTraduzirTermo:
     def test_termo_exato_encontrado(self, translator: JuridicalTranslator):
         resultado = translator.traduzir_termo("sentença")
@@ -96,7 +106,9 @@ class TestTraduzirTermo:
     def test_termo_uppercase_encontrado(self, translator_custom: JuridicalTranslator):
         assert translator_custom.traduzir_termo("SENTENÇA") is not None
 
-    def test_termo_capitalizado_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_capitalizado_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         assert translator_custom.traduzir_termo("Sentença") is not None
 
     def test_termo_sem_acento_encontrado(self, translator_custom: JuridicalTranslator):
@@ -120,19 +132,25 @@ class TestTraduzirTermo:
         t._disponivel = False
         assert t.traduzir_termo("sentença") is None
 
-    def test_retorno_inclui_exemplo_quando_presente(self, translator_custom: JuridicalTranslator):
+    def test_retorno_inclui_exemplo_quando_presente(
+        self, translator_custom: JuridicalTranslator
+    ):
         resultado = translator_custom.traduzir_termo("sentença")
         assert resultado is not None
         assert "Exemplo:" in resultado
         assert "O juiz deu a sentença." in resultado
 
-    def test_retorno_sem_exemplo_nao_tem_label_exemplo(self, translator_custom: JuridicalTranslator):
+    def test_retorno_sem_exemplo_nao_tem_label_exemplo(
+        self, translator_custom: JuridicalTranslator
+    ):
         # penhora tem "exemplo": "" no fixture — sem exemplo preenchido, label não deve aparecer
         resultado = translator_custom.traduzir_termo("penhora")
         assert resultado is not None
         assert "Exemplo:" not in resultado
 
-    def test_termo_com_espacos_extras_nao_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_com_espacos_extras_nao_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         """_normalizar não faz strip: '  sentença  ' não bate com 'sentença'. Documenta o comportamento atual."""
         assert translator_custom.traduzir_termo("  sentença  ") is None
 
@@ -140,6 +158,7 @@ class TestTraduzirTermo:
 # ---------------------------------------------------------------------------
 # identificar_termos_tecnicos
 # ---------------------------------------------------------------------------
+
 
 class TestIdentificarTermos:
     def test_identifica_termo_simples(self, translator: JuridicalTranslator):
@@ -149,10 +168,14 @@ class TestIdentificarTermos:
     def test_texto_vazio_retorna_lista_vazia(self, translator: JuridicalTranslator):
         assert translator.identificar_termos_tecnicos("") == []
 
-    def test_texto_sem_termos_juridicos_retorna_lista_vazia(self, translator: JuridicalTranslator):
+    def test_texto_sem_termos_juridicos_retorna_lista_vazia(
+        self, translator: JuridicalTranslator
+    ):
         assert translator.identificar_termos_tecnicos("Bom dia, como vai você?") == []
 
-    def test_termo_composto_prioritario_sobre_subtermo(self, translator_custom: JuridicalTranslator):
+    def test_termo_composto_prioritario_sobre_subtermo(
+        self, translator_custom: JuridicalTranslator
+    ):
         """'agravo de instrumento' deve aparecer, 'agravo' separado NÃO deve."""
         termos = translator_custom.identificar_termos_tecnicos(
             "Foi apresentado um agravo de instrumento."
@@ -160,37 +183,53 @@ class TestIdentificarTermos:
         assert "agravo de instrumento" in termos
         assert "agravo" not in termos
 
-    def test_dois_termos_distintos_encontrados(self, translator_custom: JuridicalTranslator):
+    def test_dois_termos_distintos_encontrados(
+        self, translator_custom: JuridicalTranslator
+    ):
         termos = translator_custom.identificar_termos_tecnicos(
             "A penhora e a tutela antecipada foram deferidas."
         )
         assert "penhora" in termos
         assert "tutela antecipada" in termos
 
-    def test_tutela_antecipada_e_tutela_urgencia_sao_distintos(self, translator_custom: JuridicalTranslator):
+    def test_tutela_antecipada_e_tutela_urgencia_sao_distintos(
+        self, translator_custom: JuridicalTranslator
+    ):
         termos = translator_custom.identificar_termos_tecnicos(
             "Pediu tutela antecipada e tutela de urgência."
         )
         assert "tutela antecipada" in termos
         assert "tutela de urgência" in termos
 
-    def test_retorna_termos_com_acento_original(self, translator_custom: JuridicalTranslator):
+    def test_retorna_termos_com_acento_original(
+        self, translator_custom: JuridicalTranslator
+    ):
         """Deve retornar 'sentença' (com acento), não 'sentenca' (normalizado)."""
-        termos = translator_custom.identificar_termos_tecnicos("O juiz prolatou a sentença.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "O juiz prolatou a sentença."
+        )
         assert "sentença" in termos
 
-    def test_mesmo_termo_nao_aparece_duplicado(self, translator_custom: JuridicalTranslator):
+    def test_mesmo_termo_nao_aparece_duplicado(
+        self, translator_custom: JuridicalTranslator
+    ):
         termos = translator_custom.identificar_termos_tecnicos(
             "A sentença foi proferida. Após a sentença, cabe recurso."
         )
         assert termos.count("sentença") == 1
 
-    def test_termo_uppercase_no_texto_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_uppercase_no_texto_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         """Texto com termos em maiúscula deve ser identificado."""
-        termos = translator_custom.identificar_termos_tecnicos("A PENHORA foi decretada.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "A PENHORA foi decretada."
+        )
         assert "penhora" in termos
 
-    def test_regex_chars_no_texto_nao_causam_crash(self, translator: JuridicalTranslator):
+    def test_regex_chars_no_texto_nao_causam_crash(
+        self, translator: JuridicalTranslator
+    ):
         """Texto com caracteres especiais de regex não deve levantar exceção."""
         texto_perigoso = "O prazo é (.*) dias? [urgente!] {imediato}"
         resultado = translator.identificar_termos_tecnicos(texto_perigoso)
@@ -212,9 +251,12 @@ class TestIdentificarTermos:
         self, translator_custom: JuridicalTranslator
     ):
         """identificar_termos_tecnicos não verifica _disponivel — usa o dicionário diretamente.
-        Documenta que _disponivel=False com dicionário populado ainda retorna matches."""
+        Documenta que _disponivel=False com dicionário populado ainda retorna matches.
+        """
         translator_custom._disponivel = False
-        termos = translator_custom.identificar_termos_tecnicos("A penhora foi decretada.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "A penhora foi decretada."
+        )
         assert "penhora" in termos
 
     def test_termo_parcial_nao_encontrado(self, translator_custom: JuridicalTranslator):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 from prometheus_client import Counter
 
@@ -12,7 +13,7 @@ _fact_check_corrections_total = Counter(
 )
 
 # Tipos auxiliares
-BuscarDadosProcessoFn = Callable[[str], Awaitable[Dict[str, Any]]]
+BuscarDadosProcessoFn = Callable[[str], Awaitable[dict[str, Any]]]
 UtcNowFn = Callable[[], datetime]
 
 
@@ -28,13 +29,13 @@ class FactChecker:
     def __init__(
         self,
         buscar_dados_processo: BuscarDadosProcessoFn,
-        utcnow: Optional[UtcNowFn] = None,
+        utcnow: UtcNowFn | None = None,
     ) -> None:
         self._buscar_dados_processo = buscar_dados_processo
         self._utcnow = utcnow or datetime.utcnow
 
         # Frases/padrões que soam como parecer jurídico ou promessa de resultado
-        self._padroes_proibidos: List[re.Pattern] = [
+        self._padroes_proibidos: list[re.Pattern] = [
             re.compile(r"\bvocê deve\b", re.IGNORECASE),
             re.compile(r"\brecomendo que\b", re.IGNORECASE),
             re.compile(r"\ba estratégia é\b", re.IGNORECASE),
@@ -47,15 +48,14 @@ class FactChecker:
             "Para estratégia jurídica e conclusões definitivas, consulte seu advogado(a)."
         )
 
-   
     # 1) Status do processo
-    
+
     async def verificar_status_processo(
         self,
         processo_id: str,
         afirmacao_ia: str,
         interacao: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Compara o que a IA disse com dados reais do processo.
 
@@ -74,15 +74,19 @@ class FactChecker:
         tribunal = (dados_reais.get("tribunal") or "").strip()
         ultimo_andamento = (dados_reais.get("ultimo_andamento") or "").strip()
 
-        correcoes: List[str] = []
+        correcoes: list[str] = []
 
         # Checagens simples por presença textual (você pode sofisticar depois)
         if numero_cnj and numero_cnj not in afirmacao_ia:
             correcoes.append("Número CNJ não confere com o cadastro do processo.")
         if tribunal and tribunal not in afirmacao_ia:
-            correcoes.append("Tribunal mencionado não confere com o cadastro do processo.")
+            correcoes.append(
+                "Tribunal mencionado não confere com o cadastro do processo."
+            )
         if ultimo_andamento and ultimo_andamento not in afirmacao_ia:
-            correcoes.append("Último andamento mencionado não confere com o cadastro do processo.")
+            correcoes.append(
+                "Último andamento mencionado não confere com o cadastro do processo."
+            )
 
         resultado = {
             "verificado": len(correcoes) == 0,
@@ -108,27 +112,28 @@ class FactChecker:
 
         return resultado
 
- 
     # 2) Prazo
-   
+
     async def verificar_prazo(
         self,
         processo_id: str,
         prazo_mencionado: str,
         interacao: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Verifica se o prazo mencionado é factível comparando com o prazo real (se existir).
         """
         dados_reais = await self._buscar_dados_processo(processo_id)
         prazo_real = (dados_reais.get("prazo") or "").strip()
 
-        correcoes: List[str] = []
+        correcoes: list[str] = []
 
         if prazo_real:
             # Checagem simples: string igual (você pode evoluir para datas/regex)
             if prazo_mencionado.strip() != prazo_real:
-                correcoes.append("Prazo mencionado não corresponde ao prazo real cadastrado.")
+                correcoes.append(
+                    "Prazo mencionado não corresponde ao prazo real cadastrado."
+                )
         # Se não há prazo real, não reprova (apenas não verifica)
         resultado = {
             "verificado": len(correcoes) == 0,
@@ -149,9 +154,8 @@ class FactChecker:
 
         return resultado
 
-   
     # 3) Filtro de linguagem
-   
+
     def filtrar_resposta(
         self,
         resposta_ia: str,
@@ -165,7 +169,7 @@ class FactChecker:
         original = resposta_ia
         ajustada = resposta_ia
 
-        motivos: List[str] = []
+        motivos: list[str] = []
 
         # Substitui padrões proibidos por linguagem neutra
         for padrao in self._padroes_proibidos:
@@ -195,10 +199,11 @@ class FactChecker:
 
         return ajustada
 
-    
     # 4) Logger em metadata_json
-   
-    def _logar_metadata_json(self, interacao: Any, evento: str, payload: Dict[str, Any]) -> None:
+
+    def _logar_metadata_json(
+        self, interacao: Any, evento: str, payload: dict[str, Any]
+    ) -> None:
         """
         Registra dados em interacao.metadata_json.
 
@@ -232,4 +237,4 @@ class FactChecker:
         _fact_check_corrections_total.inc()
 
         # grava de volta no objeto
-        setattr(interacao, "metadata_json", metadata)
+        interacao.metadata_json = metadata

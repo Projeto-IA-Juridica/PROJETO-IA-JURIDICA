@@ -21,6 +21,7 @@ class Base(DeclarativeBase):
     Todos os models herdam desta classe.
     O Alembic usa o metadata desta classe para gerar migrations.
     """
+
     pass
 
 
@@ -31,6 +32,7 @@ class TimestampMixin:
     - created_at: preenchido automaticamente na inserção (server_default)
     - updated_at: atualizado automaticamente em cada UPDATE (onupdate)
     """
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -52,6 +54,7 @@ class TenantMixin:
     TODA query que usa este mixin DEVE filtrar por escritorio_id
     (extraído do JWT do usuário autenticado) para garantir isolamento de dados.
     """
+
     escritorio_id: Mapped[int] = mapped_column(
         ForeignKey("escritorios.id", ondelete="CASCADE"),
         nullable=False,

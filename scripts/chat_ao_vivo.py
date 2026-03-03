@@ -30,6 +30,7 @@ sys.path.insert(0, _ROOT)
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(os.path.join(_ROOT, ".env"), override=False)
 except ImportError:
     pass  # sem python-dotenv — usa variáveis do ambiente
@@ -48,11 +49,14 @@ from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.orchestrator import ConversationOrchestrator
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
+from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
+    JusbrasilClient,
+)
 
 # ---------------------------------------------------------------------------
 # Memória em RAM (substitui Redis)
 # ---------------------------------------------------------------------------
+
 
 class _MemoriaEmRam(ConversationMemory):
     """Histórico mantido numa lista Python — sem Redis."""
@@ -79,6 +83,7 @@ class _MemoriaEmRam(ConversationMemory):
 # Entidades fake
 # ---------------------------------------------------------------------------
 
+
 def _fake_escritorio(nome: str) -> MagicMock:
     obj = MagicMock()
     obj.id = 1
@@ -91,7 +96,7 @@ def _fake_cliente(nome: str) -> MagicMock:
     obj = MagicMock()
     obj.id = 1
     obj.nome = nome
-    obj.telefone_whatsapp = None          # None → Evolution não é chamado
+    obj.telefone_whatsapp = None  # None → Evolution não é chamado
     obj.escritorio_id = 1
     return obj
 
@@ -115,7 +120,10 @@ def _fake_processo() -> MagicMock:
 # Session factory (async context manager que retorna session fake)
 # ---------------------------------------------------------------------------
 
-def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escritorio: str):
+
+def _make_session_factory(
+    *, com_processo: bool, nome_cliente: str, nome_escritorio: str
+):
     escritorio = _fake_escritorio(nome_escritorio)
     cliente = _fake_cliente(nome_cliente)
     processo = _fake_processo()
@@ -151,15 +159,18 @@ def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escrito
 # Jusbrasil fake (retorna andamento simulado para não pagar API)
 # ---------------------------------------------------------------------------
 
+
 def _jusbrasil_fake(com_processo: bool) -> JusbrasilClient:
     client = AsyncMock(spec=JusbrasilClient)
     if com_processo:
-        client.sincronizar_andamentos = AsyncMock(return_value=[
-            {
-                "descricao": "Concluso para sentença. Aguardando decisão do juiz.",
-                "data": "2024-03-15",
-            }
-        ])
+        client.sincronizar_andamentos = AsyncMock(
+            return_value=[
+                {
+                    "descricao": "Concluso para sentença. Aguardando decisão do juiz.",
+                    "data": "2024-03-15",
+                }
+            ]
+        )
     else:
         client.sincronizar_andamentos = AsyncMock(return_value=[])
     return client
@@ -168,6 +179,7 @@ def _jusbrasil_fake(com_processo: bool) -> JusbrasilClient:
 # ---------------------------------------------------------------------------
 # Cache manager fake (sempre cache miss — vai direto ao Jusbrasil fake)
 # ---------------------------------------------------------------------------
+
 
 def _cache_fake() -> MagicMock:
     cache = AsyncMock()
@@ -180,6 +192,7 @@ def _cache_fake() -> MagicMock:
 # Evolution client fake (no-op — sem envio WhatsApp)
 # ---------------------------------------------------------------------------
 
+
 def _evolution_fake() -> MagicMock:
     client = AsyncMock()
     client.enviar_texto = AsyncMock()
@@ -189,6 +202,7 @@ def _evolution_fake() -> MagicMock:
 # ---------------------------------------------------------------------------
 # Construtor
 # ---------------------------------------------------------------------------
+
 
 def _criar_orchestrator(
     *,
@@ -228,6 +242,7 @@ _VERMELHO = "\033[31m"
 # Loop interativo
 # ---------------------------------------------------------------------------
 
+
 async def chat(
     *,
     com_processo: bool,
@@ -244,9 +259,13 @@ async def chat(
     print(f"{_BOLD}{'─' * 58}{_R}")
     print(f"{_BOLD}  Escritório : {nome_escritorio}{_R}")
     print(f"  Cliente    : {nome_cliente}")
-    print(f"  Processo   : {'✅ ativo (TJSP 0001234-56.2023.8.26.0001)' if com_processo else '❌ sem processo cadastrado'}")
+    print(
+        f"  Processo   : {'✅ ativo (TJSP 0001234-56.2023.8.26.0001)' if com_processo else '❌ sem processo cadastrado'}"
+    )
     print(f"{_BOLD}{'─' * 58}{_R}")
-    print(f"{_CINZA}  Comandos: 'sair' para encerrar | 'limpar' para resetar histórico{_R}")
+    print(
+        f"{_CINZA}  Comandos: 'sair' para encerrar | 'limpar' para resetar histórico{_R}"
+    )
     print()
 
     while True:
@@ -280,10 +299,10 @@ async def chat(
             print(f"{_VERMELHO}  [erro no agente: {exc}]{_R}\n")
             continue
 
-        resposta   = resultado["resposta"]
-        intencao   = resultado.get("intencao", "?")
-        tokens     = resultado.get("tokens_usados", {})
-        fallback   = resultado.get("usando_fallback", False)
+        resposta = resultado["resposta"]
+        intencao = resultado.get("intencao", "?")
+        tokens = resultado.get("tokens_usados", {})
+        fallback = resultado.get("usando_fallback", False)
 
         print()
         print(f"{_AZUL}{_BOLD}Agente:{_R} {resposta}")
@@ -292,7 +311,9 @@ async def chat(
         # linha de metadados
         partes = [f"intenção: {intencao}"]
         if tokens.get("input") or tokens.get("output"):
-            partes.append(f"tokens: {tokens.get('input', 0)}↑ {tokens.get('output', 0)}↓")
+            partes.append(
+                f"tokens: {tokens.get('input', 0)}↑ {tokens.get('output', 0)}↓"
+            )
         if fallback:
             partes.append(f"{_AMARELO}⚠ fallback ativo{_CINZA}")
         print(f"{_CINZA}  [{' | '.join(partes)}]{_R}")
@@ -303,8 +324,10 @@ async def chat(
 # Argumentos de linha de comando
 # ---------------------------------------------------------------------------
 
+
 def _parse_args():
     import argparse
+
     p = argparse.ArgumentParser(
         description="Chat ao vivo com o agente jurídico (sem infraestrutura)",
         formatter_class=argparse.RawDescriptionHelpFormatter,

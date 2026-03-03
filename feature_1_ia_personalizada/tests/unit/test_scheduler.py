@@ -12,8 +12,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from feature_1_ia_personalizada.services.messaging.scheduler import (
     Agendamento,
     MessageScheduler,
@@ -39,6 +37,7 @@ def _scheduler(**kwargs) -> MessageScheduler:
 # ---------------------------------------------------------------------------
 # _ajustar_para_horario_comercial
 # ---------------------------------------------------------------------------
+
 
 class TestAjustarHorarioComercial:
     def test_dentro_do_horario_mantem_hora(self):
@@ -98,6 +97,7 @@ class TestAjustarHorarioComercial:
 # agendar_notificacao_andamento
 # ---------------------------------------------------------------------------
 
+
 class TestAgendarNotificacaoAndamento:
     def test_chama_apply_async_com_args_corretos(self):
         sched = _scheduler()
@@ -110,7 +110,7 @@ class TestAgendarNotificacaoAndamento:
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             horario = _dt(hora=10)
-            agendamento = sched.agendar_notificacao_andamento(
+            sched.agendar_notificacao_andamento(
                 id_processo=42,
                 descricao_andamento="Audiência marcada.",
                 horario_envio=horario,
@@ -164,6 +164,7 @@ class TestAgendarNotificacaoAndamento:
 # agendar_pesquisa_satisfacao
 # ---------------------------------------------------------------------------
 
+
 class TestAgendarPesquisaSatisfacao:
     def test_chama_apply_async_sem_args_de_processo(self):
         sched = _scheduler()
@@ -200,6 +201,7 @@ class TestAgendarPesquisaSatisfacao:
 # agendar_processar_mensagem
 # ---------------------------------------------------------------------------
 
+
 class TestAgendarProcessarMensagem:
     def test_chama_apply_async_com_todos_args(self):
         sched = _scheduler()
@@ -220,7 +222,12 @@ class TestAgendarProcessarMensagem:
             )
 
         call_kwargs = mock_task.apply_async.call_args
-        assert call_kwargs.kwargs["args"] == [5, 99, "Qual o status do meu processo?", "chat"]
+        assert call_kwargs.kwargs["args"] == [
+            5,
+            99,
+            "Qual o status do meu processo?",
+            "chat",
+        ]
         assert agendamento.task_id == "msg-uuid"
 
     def test_eta_passada_corretamente(self):
@@ -249,6 +256,7 @@ class TestAgendarProcessarMensagem:
 # ---------------------------------------------------------------------------
 # cancelar_agendamento
 # ---------------------------------------------------------------------------
+
 
 class TestCancelarAgendamento:
     def test_chama_revoke_com_task_id(self):

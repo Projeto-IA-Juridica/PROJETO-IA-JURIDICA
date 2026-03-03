@@ -17,21 +17,16 @@ Nota: testes async NÃO usam @pytest.mark.asyncio — dependem de
 asyncio_mode = "auto" configurado em pyproject.toml ([tool.pytest.ini_options]).
 """
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from shared.utils.validators import (
-    normalizar_cnpj,
-    normalizar_cpf,
-    normalizar_numero_processo,
-    normalizar_telefone,
-    validar_cnpj,
-    validar_cpf,
-    validar_numero_processo,
-    validar_telefone_whatsapp,
+from shared.utils.audio_handler import (
+    converter_ogg_para_mp3,
+    transcrever_audio,
+    validar_duracao_audio,
 )
 from shared.utils.formatters import (
     formatar_data_br,
@@ -45,10 +40,15 @@ from shared.utils.lgpd import (
     registrar_acesso,
     verificar_aceite_lgpd,
 )
-from shared.utils.audio_handler import (
-    converter_ogg_para_mp3,
-    transcrever_audio,
-    validar_duracao_audio,
+from shared.utils.validators import (
+    normalizar_cnpj,
+    normalizar_cpf,
+    normalizar_numero_processo,
+    normalizar_telefone,
+    validar_cnpj,
+    validar_cpf,
+    validar_numero_processo,
+    validar_telefone_whatsapp,
 )
 
 # ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ CNPJ_SEQUENCIAL = "00.000.000/0000-00"
 # Telefone WhatsApp válido: 55 + DDD + 9 + 8 dígitos
 TEL_VALIDO = "5511987654321"
 TEL_VALIDO_FORMATADO = "+55 (11) 98765-4321"
-TEL_FIXO = "551132345678"   # sem o dígito 9 obrigatório
+TEL_FIXO = "551132345678"  # sem o dígito 9 obrigatório
 
 
 def _make_cnj(nnnnnnn="0001234", aaaa="2024", j="8", tt="26", oooo="0100") -> str:
@@ -81,7 +81,7 @@ def _make_cnj(nnnnnnn="0001234", aaaa="2024", j="8", tt="26", oooo="0100") -> st
 
 
 CNJ_VALIDO = _make_cnj()
-CNJ_DIGITOS = "00012345620248260100"   # 20 dígitos do CNJ_VALIDO sem pontuação
+CNJ_DIGITOS = "00012345620248260100"  # 20 dígitos do CNJ_VALIDO sem pontuação
 CNJ_FORMATO_ERRADO = "1234567-890"
 CNJ_DIGITO_ERRADO = "0001234-99.2024.8.26.0100"
 
@@ -237,10 +237,10 @@ class TestFormatarDataBr:
 
 class TestFormatarDataRelativa:
     def _dt_dias_atras(self, dias: int) -> datetime:
-        return datetime.now(tz=timezone.utc) - timedelta(days=dias)
+        return datetime.now(tz=UTC) - timedelta(days=dias)
 
     def _dt_horas_atras(self, horas: int) -> datetime:
-        return datetime.now(tz=timezone.utc) - timedelta(hours=horas)
+        return datetime.now(tz=UTC) - timedelta(hours=horas)
 
     def test_hoje(self):
         assert formatar_data_relativa(self._dt_horas_atras(1)) == "hoje"
@@ -249,7 +249,7 @@ class TestFormatarDataRelativa:
         # 23:59 de ontem vs 00:01 de hoje — deve ser "ontem", não "hoje"
         # A comparação é por data calendário, não janela de 24h
         # Simulamos com exatamente 1 dia e 1 minuto atrás
-        dt = datetime.now(tz=timezone.utc) - timedelta(days=1, minutes=1)
+        dt = datetime.now(tz=UTC) - timedelta(days=1, minutes=1)
         assert formatar_data_relativa(dt) == "ontem"
 
     def test_ontem(self):
@@ -277,7 +277,7 @@ class TestFormatarDataRelativa:
         assert formatar_data_relativa(self._dt_dias_atras(730)) == "há 2 anos"
 
     def test_futuro(self):
-        dt = datetime.now(tz=timezone.utc) + timedelta(hours=1)
+        dt = datetime.now(tz=UTC) + timedelta(hours=1)
         assert formatar_data_relativa(dt) == "em breve"
 
     def test_naive_datetime_tratado_como_utc(self):
@@ -311,7 +311,9 @@ class TestFormatarMoedaBrl:
 
 class TestFormatarNumeroProcesso:
     def test_de_20_digitos(self):
-        digitos = normalizar_numero_processo(CNJ_VALIDO).replace("-", "").replace(".", "")
+        digitos = (
+            normalizar_numero_processo(CNJ_VALIDO).replace("-", "").replace(".", "")
+        )
         resultado = formatar_numero_processo(digitos)
         assert "-" in resultado and resultado.count(".") == 4
 
@@ -335,7 +337,9 @@ class TestFormatarNumeroProcesso:
 class TestRegistrarAcesso:
     def test_loga_evento_estruturado(self):
         with patch("shared.utils.lgpd.logger") as mock_logger:
-            registrar_acesso(user_id=1, recurso="cliente:42", acao="leitura", ip="1.2.3.4")
+            registrar_acesso(
+                user_id=1, recurso="cliente:42", acao="leitura", ip="1.2.3.4"
+            )
             mock_logger.info.assert_called_once()
             args, kwargs = mock_logger.info.call_args
             assert args[0] == "lgpd.acesso_dados_sensiveis"
@@ -390,11 +394,11 @@ class TestExportarDadosCliente:
         cliente.empresa_atual = "Tech Ltda"
         cliente.cargo = "Senior"
         cliente.aceite_lgpd = True
-        cliente.data_aceite_lgpd = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        cliente.data_aceite_lgpd = datetime(2024, 1, 1, tzinfo=UTC)
         cliente.preferencia_horario_notificacao = "comercial"
         cliente.ativo = True
-        cliente.created_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        cliente.updated_at = datetime(2024, 6, 1, tzinfo=timezone.utc)
+        cliente.created_at = datetime(2024, 1, 1, tzinfo=UTC)
+        cliente.updated_at = datetime(2024, 6, 1, tzinfo=UTC)
         return cliente
 
     async def test_exporta_estrutura_completa(self):
@@ -578,7 +582,9 @@ class TestConverterOggParaMp3:
 
         audio_mock.export.side_effect = lambda *args, **_: args[0].write(mp3_bytes)
 
-        with patch("shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock):
+        with patch(
+            "shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock
+        ):
             resultado = converter_ogg_para_mp3(b"ogg_bytes")
 
         assert resultado == mp3_bytes
@@ -596,7 +602,9 @@ class TestConverterOggParaMp3:
         audio_mock = MagicMock()
         audio_mock.export.side_effect = Exception("ffmpeg não encontrado")
 
-        with patch("shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock):
+        with patch(
+            "shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock
+        ):
             with pytest.raises(ValueError, match="Falha ao exportar"):
                 converter_ogg_para_mp3(b"ogg_bytes")
 
@@ -607,7 +615,9 @@ class TestTranscreverAudio:
         resposta_mock.text = "  Olá, como posso ajudar?  "
 
         with patch("shared.utils.audio_handler._openai_client") as mock_client:
-            mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+            mock_client.audio.transcriptions.create = AsyncMock(
+                return_value=resposta_mock
+            )
             resultado = await transcrever_audio(b"mp3_bytes")
 
         assert resultado == "Olá, como posso ajudar?"
@@ -641,7 +651,9 @@ class TestTranscreverAudio:
         resposta_mock.text = "   "  # só espaços
 
         with patch("shared.utils.audio_handler._openai_client") as mock_client:
-            mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+            mock_client.audio.transcriptions.create = AsyncMock(
+                return_value=resposta_mock
+            )
             with pytest.raises(ValueError, match="vazia"):
                 await transcrever_audio(b"mp3_bytes")
 
@@ -651,7 +663,9 @@ class TestTranscreverAudio:
 
         with patch("shared.utils.audio_handler.Path.unlink") as mock_unlink:
             with patch("shared.utils.audio_handler._openai_client") as mock_client:
-                mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+                mock_client.audio.transcriptions.create = AsyncMock(
+                    return_value=resposta_mock
+                )
                 await transcrever_audio(b"mp3_bytes")
 
         mock_unlink.assert_called_once_with(missing_ok=True)

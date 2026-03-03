@@ -15,7 +15,6 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
@@ -98,9 +97,7 @@ class Processo(Base, TimestampMixin, TenantMixin):
     data_distribuicao: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    valor_causa: Mapped[Decimal | None] = mapped_column(
-        Numeric(15, 2), nullable=True
-    )
+    valor_causa: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
 
     # --- Integração Jusbrasil ---
     jusbrasil_id: Mapped[str | None] = mapped_column(

@@ -50,7 +50,9 @@ class AndamentoSchema(BaseModel):
     """
 
     data: datetime = Field(description="Data e hora do andamento")
-    descricao: str = Field(min_length=1, description="Texto do andamento (já limpo pelo DataCleaner)")
+    descricao: str = Field(
+        min_length=1, description="Texto do andamento (já limpo pelo DataCleaner)"
+    )
     tipo: TipoAndamento = Field(
         description=(
             "Classificação do andamento: despacho | sentença | decisão | petição"

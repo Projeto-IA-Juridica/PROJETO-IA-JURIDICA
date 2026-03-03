@@ -1,16 +1,13 @@
-
-
 from __future__ import annotations
 
 import asyncio
-import structlog
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
+import structlog
 
 logger = structlog.get_logger(__name__)
-
 
 
 # Exceções
@@ -45,7 +42,6 @@ class EvolutionConfig:
     backoff_max_seconds: float = 4.0
 
 
-
 # Client
 
 
@@ -58,7 +54,9 @@ class EvolutionClient:
     - tratamento de erros (conexão, timeout, instância offline)
     """
 
-    def __init__(self, base_url: str, api_key: str, timeout_seconds: float = 15.0) -> None:
+    def __init__(
+        self, base_url: str, api_key: str, timeout_seconds: float = 15.0
+    ) -> None:
         base_url = base_url.rstrip("/")
         self._config = EvolutionConfig(
             base_url=base_url,
@@ -81,16 +79,15 @@ class EvolutionClient:
         await self._client.aclose()
 
         # Helpers (retry/backoff)
-    
 
     async def _request_com_retry(
         self,
         method: str,
         url: str,
-        json: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        ultima_excecao: Optional[Exception] = None
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        ultima_excecao: Exception | None = None
 
         for tentativa in range(1, self._config.max_tentativas + 1):
             try:
@@ -111,50 +108,80 @@ class EvolutionClient:
 
                 # Se você souber exatamente o status/erro que a sua Evolution usa para offline, dá pra refinar aqui.
                 if resp.status_code in (408, 409, 423, 424, 503):
-                    raise EvolutionOfflineError(f"Instância possivelmente offline: HTTP {resp.status_code} | {texto}")
+                    raise EvolutionOfflineError(
+                        f"Instância possivelmente offline: HTTP {resp.status_code} | {texto}"
+                    )
 
                 raise EvolutionRequestError(f"Erro HTTP {resp.status_code} | {texto}")
 
             except httpx.ReadTimeout as e:
                 ultima_excecao = e
-                logger.warning("evolution_timeout", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
+                logger.warning(
+                    "evolution_timeout",
+                    tentativa=tentativa,
+                    max_tentativas=self._config.max_tentativas,
+                    erro=str(e),
+                )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionTimeoutError("Timeout ao chamar Evolution API") from e
+                    raise EvolutionTimeoutError(
+                        "Timeout ao chamar Evolution API"
+                    ) from e
 
             except httpx.ConnectError as e:
                 ultima_excecao = e
-                logger.warning("evolution_connect_error", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
+                logger.warning(
+                    "evolution_connect_error",
+                    tentativa=tentativa,
+                    max_tentativas=self._config.max_tentativas,
+                    erro=str(e),
+                )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionRequestError("Falha de conexão com Evolution API") from e
+                    raise EvolutionRequestError(
+                        "Falha de conexão com Evolution API"
+                    ) from e
 
             except EvolutionOfflineError as e:
                 ultima_excecao = e
-                logger.warning("evolution_instancia_offline", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
+                logger.warning(
+                    "evolution_instancia_offline",
+                    tentativa=tentativa,
+                    max_tentativas=self._config.max_tentativas,
+                    erro=str(e),
+                )
                 if tentativa == self._config.max_tentativas:
                     raise
 
             except httpx.HTTPError as e:
                 ultima_excecao = e
-                logger.warning("evolution_http_error", tentativa=tentativa, max_tentativas=self._config.max_tentativas, erro=str(e))
+                logger.warning(
+                    "evolution_http_error",
+                    tentativa=tentativa,
+                    max_tentativas=self._config.max_tentativas,
+                    erro=str(e),
+                )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionRequestError("Erro HTTP ao chamar Evolution API") from e
+                    raise EvolutionRequestError(
+                        "Erro HTTP ao chamar Evolution API"
+                    ) from e
 
             # backoff antes da próxima tentativa
             await asyncio.sleep(self._calcular_backoff(tentativa))
 
         # não deve chegar aqui
-        raise EvolutionRequestError("Falha inesperada em _request_com_retry") from ultima_excecao
+        raise EvolutionRequestError(
+            "Falha inesperada em _request_com_retry"
+        ) from ultima_excecao
 
     def _calcular_backoff(self, tentativa: int) -> float:
         # tentativa=1 => backoff_base*1, tentativa=2 => *2, tentativa=3 => *4
         delay = self._config.backoff_base_seconds * (2 ** (tentativa - 1))
         return min(delay, self._config.backoff_max_seconds)
 
- 
     # Métodos do enunciado
-    
 
-    async def enviar_texto(self, instance: str, numero: str, texto: str) -> Dict[str, Any]:
+    async def enviar_texto(
+        self, instance: str, numero: str, texto: str
+    ) -> dict[str, Any]:
         """
         POST /message/sendText/{instance}
         """
@@ -162,7 +189,9 @@ class EvolutionClient:
             "number": numero,
             "text": texto,
         }
-        return await self._request_com_retry("POST", f"/message/sendText/{instance}", json=payload)
+        return await self._request_com_retry(
+            "POST", f"/message/sendText/{instance}", json=payload
+        )
 
     async def enviar_botoes(
         self,
@@ -170,7 +199,7 @@ class EvolutionClient:
         numero: str,
         texto: str,
         botoes: list[dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Envia mensagem com botões interativos.
         OBS: o formato exato do payload pode variar conforme sua Evolution.
@@ -180,7 +209,9 @@ class EvolutionClient:
             "text": texto,
             "buttons": botoes,
         }
-        return await self._request_com_retry("POST", f"/message/sendButtons/{instance}", json=payload)
+        return await self._request_com_retry(
+            "POST", f"/message/sendButtons/{instance}", json=payload
+        )
 
     async def enviar_lista(
         self,
@@ -189,7 +220,7 @@ class EvolutionClient:
         titulo: str,
         secoes: list[dict[str, Any]],
         texto: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Envia mensagem com lista de opções.
         OBS: o endpoint também pode variar conforme sua versão.
@@ -200,14 +231,18 @@ class EvolutionClient:
             "text": texto,
             "sections": secoes,
         }
-        return await self._request_com_retry("POST", f"/message/sendList/{instance}", json=payload)
+        return await self._request_com_retry(
+            "POST", f"/message/sendList/{instance}", json=payload
+        )
 
     async def buscar_status_mensagem(self, instance: str, message_id: str) -> str:
         """
         Verifica se foi entregue/lida.
         Endpoint varia muito; deixei como exemplo.
         """
-        data = await self._request_com_retry("GET", f"/message/status/{instance}", params={"messageId": message_id})
+        data = await self._request_com_retry(
+            "GET", f"/message/status/{instance}", params={"messageId": message_id}
+        )
 
         # tenta padronizar retorno
         status = (
@@ -225,10 +260,14 @@ class EvolutionClient:
         Aqui deixo como "GET bytes" (se seu endpoint retornar JSON/base64, me fala que eu ajusto).
         """
         try:
-            resp = await self._client.get(f"/message/downloadMedia/{instance}", params={"messageId": message_id})
+            resp = await self._client.get(
+                f"/message/downloadMedia/{instance}", params={"messageId": message_id}
+            )
             if 200 <= resp.status_code < 300:
                 return resp.content
-            raise EvolutionRequestError(f"Erro ao baixar mídia: HTTP {resp.status_code} | {resp.text}")
+            raise EvolutionRequestError(
+                f"Erro ao baixar mídia: HTTP {resp.status_code} | {resp.text}"
+            )
         except httpx.ReadTimeout as e:
             raise EvolutionTimeoutError("Timeout ao baixar mídia") from e
         except httpx.HTTPError as e:

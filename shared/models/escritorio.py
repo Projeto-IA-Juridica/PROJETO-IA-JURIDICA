@@ -72,9 +72,7 @@ class Escritorio(Base, TimestampMixin):
     )
 
     # --- Constraints ---
-    __table_args__ = (
-        UniqueConstraint("cnpj", name="uq_escritorios_cnpj"),
-    )
+    __table_args__ = (UniqueConstraint("cnpj", name="uq_escritorios_cnpj"),)
 
     def __repr__(self) -> str:
         return f"<Escritorio id={self.id} nome={self.nome!r} plano={self.plano!r}>"

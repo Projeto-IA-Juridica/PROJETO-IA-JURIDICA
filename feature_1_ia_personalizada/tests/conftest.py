@@ -34,6 +34,7 @@ for _key, _value in _FAKE_ENV.items():
 # FakeRedis — simula Redis em memória sem dependência externa
 # ---------------------------------------------------------------------------
 
+
 class _FakeStore:
     def __init__(self) -> None:
         self.lists: dict[str, list] = {}
@@ -68,19 +69,19 @@ class _FakePipeline:
         self._store = store
         self._cmds: list = []
 
-    def rpush(self, key: str, *values) -> "_FakePipeline":
+    def rpush(self, key: str, *values) -> _FakePipeline:
         self._cmds.append(("rpush", key, values))
         return self
 
-    def ltrim(self, key: str, start: int, end: int) -> "_FakePipeline":
+    def ltrim(self, key: str, start: int, end: int) -> _FakePipeline:
         self._cmds.append(("ltrim", key, start, end))
         return self
 
-    def expire(self, key: str, seconds: int) -> "_FakePipeline":
+    def expire(self, key: str, seconds: int) -> _FakePipeline:
         self._cmds.append(("expire", key, seconds))
         return self
 
-    def lrange(self, key: str, start: int, end: int) -> "_FakePipeline":
+    def lrange(self, key: str, start: int, end: int) -> _FakePipeline:
         self._cmds.append(("lrange", key, start, end))
         return self
 
@@ -141,24 +142,23 @@ class FakeRedis:
 def fake_redis() -> FakeRedis:
     return FakeRedis()
 
+
 # ---------------------------------------------------------------------------
 # Database e API Mocks
 # ---------------------------------------------------------------------------
 
 from faker import Faker
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from shared.models.base import Base
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Dependências reais/modelos
 from shared.database.session import get_db
+from shared.models.base import Base
 from shared.models.escritorio import Escritorio
 from shared.models.usuario import Usuario
-from shared.models.cliente import Cliente
-from shared.models.processo import Processo
 from shared.security.encryption import hash_senha
 from shared.security.jwt import criar_token
 
-fake = Faker('pt_BR')
+fake = Faker("pt_BR")
 
 # Engine in-memory para SQLite Async
 # Como o Postgres exigiria um banco de dados real rodando e limpar as tabelas,
@@ -169,16 +169,18 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 from sqlalchemy.pool import StaticPool
 
+
 @pytest.fixture(scope="session")
 def engine():
     _engine = create_async_engine(
-        TEST_DATABASE_URL, 
+        TEST_DATABASE_URL,
         echo=False,
         poolclass=StaticPool,
-        connect_args={'check_same_thread': False}
+        connect_args={"check_same_thread": False},
     )
     yield _engine
     _engine.sync_engine.dispose()
+
 
 @pytest.fixture(scope="function")
 async def init_db(engine):
@@ -188,11 +190,13 @@ async def init_db(engine):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
+
 @pytest.fixture(scope="function")
 async def db_session(engine, init_db) -> AsyncSession:
     Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
     async with Session() as session:
         yield session
+
 
 # Factory para Escritório
 @pytest.fixture
@@ -210,12 +214,16 @@ async def escritorio_factory(db_session):
         await db_session.commit()
         await db_session.refresh(escritorio)
         return escritorio
+
     return _criar_escritorio
+
 
 # Factory para Usuário
 @pytest.fixture
 async def usuario_factory(db_session):
-    async def _criar_usuario(escritorio_id: int, senha_plana: str = "Senha123!", **kwargs):
+    async def _criar_usuario(
+        escritorio_id: int, senha_plana: str = "Senha123!", **kwargs
+    ):
         hashed = hash_senha(senha_plana)
         usuario = Usuario(
             escritorio_id=escritorio_id,
@@ -228,7 +236,9 @@ async def usuario_factory(db_session):
         await db_session.commit()
         await db_session.refresh(usuario)
         return usuario
+
     return _criar_usuario
+
 
 # Token de autenticação válido
 @pytest.fixture
@@ -236,14 +246,16 @@ def auth_token():
     def _gerar_token(user_id: int, escritorio_id: int, role: str = "admin"):
         # usa _TEST_FERNET_KEY de teste definida no topo
         return criar_token(user_id=user_id, escritorio_id=escritorio_id, role=role)
+
     return _gerar_token
+
 
 # AsyncClient (TestClient) para bater nas rotas da API
 @pytest.fixture
 async def async_client(db_session):
-    from httpx import AsyncClient
+    from httpx import ASGITransport, AsyncClient
+
     from feature_1_ia_personalizada.api.app import app
-    from httpx import ASGITransport
 
     # Override the get_db dependency to use our isolated test transaction
     async def override_get_db():

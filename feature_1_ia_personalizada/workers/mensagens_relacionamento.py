@@ -3,12 +3,12 @@ from __future__ import annotations
 import os
 import time
 import unicodedata
-import structlog
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Any
 
 import redis
+import structlog
 from celery import shared_task
 from prometheus_client import Counter
 
@@ -17,9 +17,13 @@ from feature_1_ia_personalizada.services.integrations.google_sheets import (
 )
 from shared.database.worker_queries import (
     enviar_mensagem_whatsapp as _enviar_whatsapp,
+)
+from shared.database.worker_queries import (
     insert_interacao,
-    query_processo_ativo_do_cliente as _orm_processo_ativo,
     query_ultima_interacao_batch,
+)
+from shared.database.worker_queries import (
+    query_processo_ativo_do_cliente as _orm_processo_ativo,
 )
 
 logger = structlog.get_logger(__name__)
@@ -35,7 +39,9 @@ URL_REDIS = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
 
 TAMANHO_LOTE = 10
-TEMPO_ALERTA_POR_CLIENTE = 15  # limiar de observabilidade; não interrompe o processamento
+TEMPO_ALERTA_POR_CLIENTE = (
+    15  # limiar de observabilidade; não interrompe o processamento
+)
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
 
@@ -67,8 +73,8 @@ class Cliente:
     nome: str
     telefone: str
     status: str
-    data_nascimento: Optional[str] = None
-    profissao: Optional[str] = None
+    data_nascimento: str | None = None
+    profissao: str | None = None
 
 
 @dataclass
@@ -89,7 +95,8 @@ def normalizar_texto(texto: str) -> str:
         return ""
     texto = texto.strip().lower()
     return "".join(
-        c for c in unicodedata.normalize("NFD", texto)
+        c
+        for c in unicodedata.normalize("NFD", texto)
         if unicodedata.category(c) != "Mn"
     )
 
@@ -116,10 +123,11 @@ def dia_mes_hoje() -> tuple[int, int]:
 
 
 def dividir_em_lotes(itens: list[Any], tamanho: int) -> list[list[Any]]:
-    return [itens[i:i + tamanho] for i in range(0, len(itens), tamanho)]
+    return [itens[i : i + tamanho] for i in range(0, len(itens), tamanho)]
 
 
 # ====== INTEGRAÇÕES ======
+
 
 def _criar_sheets_client() -> _RealGoogleSheetsClient:
     """Instancia o cliente real a partir das variáveis de ambiente."""
@@ -176,7 +184,7 @@ class WhatsAppService:
         _enviar_whatsapp(id_cliente, telefone, texto)
 
 
-def buscar_processo_ativo_do_cliente(id_cliente: int) -> Optional[Processo]:
+def buscar_processo_ativo_do_cliente(id_cliente: int) -> Processo | None:
     dado = _orm_processo_ativo(id_cliente)
     if dado is None:
         return None
@@ -188,7 +196,9 @@ def buscar_processo_ativo_do_cliente(id_cliente: int) -> Optional[Processo]:
     )
 
 
-def salvar_interacao(*, id_cliente: int, id_processo: Optional[int], texto: str, metadata_json: dict):
+def salvar_interacao(
+    *, id_cliente: int, id_processo: int | None, texto: str, metadata_json: dict
+):
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -198,6 +208,7 @@ def salvar_interacao(*, id_cliente: int, id_processo: Optional[int], texto: str,
 
 
 # ====== TASKS ======
+
 
 @shared_task(bind=True)
 def verificar_aniversarios_diarios(self) -> dict:
@@ -224,7 +235,9 @@ def verificar_aniversarios_diarios(self) -> dict:
         for cliente in lote:
             inicio = time.time()
 
-            chave_envio = chave("relacionamento:aniversario", cliente.id, f"{dia:02d}-{mes:02d}")
+            chave_envio = chave(
+                "relacionamento:aniversario", cliente.id, f"{dia:02d}-{mes:02d}"
+            )
             if ja_enviado_recentemente(chave_envio):
                 ignorados += 1
                 continue
@@ -237,19 +250,21 @@ def verificar_aniversarios_diarios(self) -> dict:
             processo = buscar_processo_ativo_do_cliente(cliente.id)
 
             texto = TEMPLATE_ANIVERSARIO.format(nome=cliente.nome)
-            WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
+            WhatsAppService.enviar_mensagem(
+                id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
+            )
 
             GoogleSheetsClient.registrar_log_envio(
                 tipo="aniversario",
                 cliente_id=cliente.id,
-                detalhe=f"processo={processo.numero if processo else 'nenhum'}"
+                detalhe=f"processo={processo.numero if processo else 'nenhum'}",
             )
 
             salvar_interacao(
                 id_cliente=cliente.id,
                 id_processo=processo.id if processo else None,
                 texto=texto,
-                metadata_json={"tipo_relacionamento": "aniversario"}
+                metadata_json={"tipo_relacionamento": "aniversario"},
             )
 
             _mensagens_relacionamento_enviadas_total.labels(tipo="aniversario").inc()
@@ -257,11 +272,18 @@ def verificar_aniversarios_diarios(self) -> dict:
             enviados += 1
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
-                logger.warning("timeout_por_cliente", tipo="aniversario", cliente_id=cliente.id)
+                logger.warning(
+                    "timeout_por_cliente", tipo="aniversario", cliente_id=cliente.id
+                )
 
         time.sleep(1)
 
-    return {"status": "ok", "enviados": enviados, "ignorados": ignorados, "total": len(aniversariantes)}
+    return {
+        "status": "ok",
+        "enviados": enviados,
+        "ignorados": ignorados,
+        "total": len(aniversariantes),
+    }
 
 
 @shared_task(bind=True)
@@ -272,7 +294,11 @@ def verificar_datas_comemorativas(self) -> dict:
     datas = GoogleSheetsClient.get_datas_comemorativas()
     dia, mes = dia_mes_hoje()
 
-    datas_hoje = [d for d in datas if int(d.get("dia", -1)) == dia and int(d.get("mes", -1)) == mes]
+    datas_hoje = [
+        d
+        for d in datas
+        if int(d.get("dia", -1)) == dia and int(d.get("mes", -1)) == mes
+    ]
     if not datas_hoje:
         return {"status": "ok", "enviados": 0, "ignorados": 0, "datas": 0}
 
@@ -281,12 +307,15 @@ def verificar_datas_comemorativas(self) -> dict:
 
     for data_info in datas_hoje:
         nome_data = str(data_info.get("nome", "Data comemorativa")).strip()
-        profissao_alvo = normalizar_texto(str(data_info.get("profissao_alvo", "")).strip())
+        profissao_alvo = normalizar_texto(
+            str(data_info.get("profissao_alvo", "")).strip()
+        )
         template = str(data_info.get("template", "")).strip()
 
         if profissao_alvo:
             clientes_filtrados = [
-                c for c in clientes_ativos
+                c
+                for c in clientes_ativos
                 if normalizar_texto(c.profissao or "") == profissao_alvo
             ]
         else:
@@ -296,12 +325,19 @@ def verificar_datas_comemorativas(self) -> dict:
             for cliente in lote:
                 inicio = time.time()
 
-                chave_envio = chave("relacionamento:data", cliente.id, f"{dia:02d}-{mes:02d}", normalizar_texto(nome_data))
+                chave_envio = chave(
+                    "relacionamento:data",
+                    cliente.id,
+                    f"{dia:02d}-{mes:02d}",
+                    normalizar_texto(nome_data),
+                )
                 if ja_enviado_recentemente(chave_envio):
                     ignorados += 1
                     continue
 
-                chave_bloqueio = chave("lock:data", cliente.id, normalizar_texto(nome_data))
+                chave_bloqueio = chave(
+                    "lock:data", cliente.id, normalizar_texto(nome_data)
+                )
                 if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
                     ignorados += 1
                     continue
@@ -311,33 +347,51 @@ def verificar_datas_comemorativas(self) -> dict:
                 if template == "TEMPLATE_DIA_BANCARIO":
                     texto = TEMPLATE_DIA_BANCARIO.format(nome_data=nome_data)
                 else:
-                    texto = TEMPLATE_DATA_COMEMORATIVA_GENERICA.format(nome_data=nome_data)
+                    texto = TEMPLATE_DATA_COMEMORATIVA_GENERICA.format(
+                        nome_data=nome_data
+                    )
 
-                WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
+                WhatsAppService.enviar_mensagem(
+                    id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
+                )
 
                 GoogleSheetsClient.registrar_log_envio(
                     tipo="data_comemorativa",
                     cliente_id=cliente.id,
-                    detalhe=f"data={nome_data} processo={processo.numero if processo else 'nenhum'}"
+                    detalhe=f"data={nome_data} processo={processo.numero if processo else 'nenhum'}",
                 )
 
                 salvar_interacao(
                     id_cliente=cliente.id,
                     id_processo=processo.id if processo else None,
                     texto=texto,
-                    metadata_json={"tipo_relacionamento": "data_comemorativa", "nome_data": nome_data}
+                    metadata_json={
+                        "tipo_relacionamento": "data_comemorativa",
+                        "nome_data": nome_data,
+                    },
                 )
 
-                _mensagens_relacionamento_enviadas_total.labels(tipo="data_comemorativa").inc()
+                _mensagens_relacionamento_enviadas_total.labels(
+                    tipo="data_comemorativa"
+                ).inc()
                 marcar_enviado(chave_envio, TEMPO_30_DIAS)
                 enviados += 1
 
                 if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
-                    logger.warning("timeout_por_cliente", tipo="data_comemorativa", cliente_id=cliente.id)
+                    logger.warning(
+                        "timeout_por_cliente",
+                        tipo="data_comemorativa",
+                        cliente_id=cliente.id,
+                    )
 
             time.sleep(1)
 
-    return {"status": "ok", "enviados": enviados, "ignorados": ignorados, "datas": len(datas_hoje)}
+    return {
+        "status": "ok",
+        "enviados": enviados,
+        "ignorados": ignorados,
+        "datas": len(datas_hoje),
+    }
 
 
 @shared_task(bind=True)
@@ -381,19 +435,21 @@ def verificar_clientes_sem_contato(self) -> dict:
             processo = buscar_processo_ativo_do_cliente(cliente.id)
 
             texto = TEMPLATE_MENSAGEM_TRIMESTRAL.format(nome=cliente.nome)
-            WhatsAppService.enviar_mensagem(id_cliente=cliente.id, telefone=cliente.telefone, texto=texto)
+            WhatsAppService.enviar_mensagem(
+                id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
+            )
 
             GoogleSheetsClient.registrar_log_envio(
                 tipo="check_in",
                 cliente_id=cliente.id,
-                detalhe=f"processo={processo.numero if processo else 'nenhum'}"
+                detalhe=f"processo={processo.numero if processo else 'nenhum'}",
             )
 
             salvar_interacao(
                 id_cliente=cliente.id,
                 id_processo=processo.id if processo else None,
                 texto=texto,
-                metadata_json={"tipo_relacionamento": "check_in"}
+                metadata_json={"tipo_relacionamento": "check_in"},
             )
 
             _mensagens_relacionamento_enviadas_total.labels(tipo="check_in").inc()
@@ -401,8 +457,15 @@ def verificar_clientes_sem_contato(self) -> dict:
             enviados += 1
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
-                logger.warning("timeout_por_cliente", tipo="check_in", cliente_id=cliente.id)
+                logger.warning(
+                    "timeout_por_cliente", tipo="check_in", cliente_id=cliente.id
+                )
 
         time.sleep(1)
 
-    return {"status": "ok", "enviados": enviados, "ignorados": ignorados, "candidatos": len(candidatos)}
+    return {
+        "status": "ok",
+        "enviados": enviados,
+        "ignorados": ignorados,
+        "candidatos": len(candidatos),
+    }

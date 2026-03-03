@@ -2,37 +2,39 @@
 
 from __future__ import annotations
 
-import structlog
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
+import structlog
 from celery.exceptions import SoftTimeLimitExceeded
 from prometheus_client import Gauge
-# from feature_1_ia_personalizada.workers.celery_app import celery_app
-from .celery_app import celery_app
+
+from feature_1_ia_personalizada.services.legal_data.cache_manager import (
+    get_andamentos_sync,
+    set_andamentos_sync,
+)
+
 # from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
 # from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 # from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 # from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
 # deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
 from shared.database.worker_queries import (
-    query_processos_monitorados,
     query_processo_por_id,
+    query_processos_monitorados,
     update_ultimo_andamento,
 )
-from feature_1_ia_personalizada.services.legal_data.cache_manager import (
-    get_andamentos_sync,
-    set_andamentos_sync,
-)
+
+# from feature_1_ia_personalizada.workers.celery_app import celery_app
+from .celery_app import celery_app
+
 logger = structlog.get_logger(__name__)
 
 _processos_monitorados_total = Gauge(
     "processos_monitorados_total",
     "Número atual de processos com monitoramento ativo",
 )
-
-
 
 
 # CONFIGURAÇÕES
@@ -47,7 +49,7 @@ _LIMITE_BUSCA_PROCESSOS = 10_000  # máximo de processos por execução da task
 # FUNÇÕES AUXILIARES
 
 
-Andamento = Union[Dict[str, Any], Any]
+Andamento = dict[str, Any] | Any
 
 
 def extrair_valor(objeto: Andamento, chave: str, valor_padrao: Any = None) -> Any:
@@ -56,7 +58,7 @@ def extrair_valor(objeto: Andamento, chave: str, valor_padrao: Any = None) -> An
     return getattr(objeto, chave, valor_padrao)
 
 
-def converter_para_iso(data: Any) -> Optional[str]:
+def converter_para_iso(data: Any) -> str | None:
     if data is None:
         return None
     if isinstance(data, datetime):
@@ -66,7 +68,7 @@ def converter_para_iso(data: Any) -> Optional[str]:
 
 def extrair_texto_e_data_do_andamento(
     andamento: Andamento,
-) -> Tuple[str, Optional[str]]:
+) -> tuple[str, str | None]:
     texto = extrair_valor(andamento, "texto", "")
     data = extrair_valor(andamento, "data", None)
     return str(texto), converter_para_iso(data)
@@ -74,9 +76,9 @@ def extrair_texto_e_data_do_andamento(
 
 def buscar_andamentos_jusbrasil(
     numero_processo: str,
-    data_referencia_iso: Optional[str],
-    cliente_jusbrasil: JusbrasilClient,
-) -> List[Any]:
+    data_referencia_iso: str | None,
+    cliente_jusbrasil: JusbrasilClient,  # noqa: F821 — import comentado aguarda Fase 3
+) -> list[Any]:
     return cliente_jusbrasil.buscar_novos_andamentos(
         numero_processo, data_referencia_iso
     )
@@ -84,19 +86,16 @@ def buscar_andamentos_jusbrasil(
 
 def buscar_andamentos_datajud(
     numero_processo: str,
-    data_referencia_iso: Optional[str],
-    cliente_datajud: DataJudClient,
-) -> List[Any]:
-    return cliente_datajud.buscar_novos_andamentos(
-        numero_processo, data_referencia_iso
-    )
+    data_referencia_iso: str | None,
+    cliente_datajud: DataJudClient,  # noqa: F821 — import comentado aguarda Fase 3
+) -> list[Any]:
+    return cliente_datajud.buscar_novos_andamentos(numero_processo, data_referencia_iso)
+
 
 # PROCESSAMENTO DE UM PROCESSO
 
 
-def processar_processo_individual(
-    dados_processo: Dict[str, Any]
-) -> Dict[str, Any]:
+def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, Any]:
 
     id_processo = int(dados_processo["id"])
     numero_processo = str(dados_processo["numero"])
@@ -109,8 +108,8 @@ def processar_processo_individual(
     lista_andamentos = get_andamentos_sync(numero_processo)
 
     if lista_andamentos is None:
-        cliente_jusbrasil = JusbrasilClient()
-        cliente_datajud = DataJudClient()
+        cliente_jusbrasil = JusbrasilClient()  # noqa: F821
+        cliente_datajud = DataJudClient()  # noqa: F821
         fonte_utilizada = "jusbrasil"
 
         try:
@@ -155,8 +154,10 @@ def processar_processo_individual(
 
         texto_original, data_iso = extrair_texto_e_data_do_andamento(andamento)
 
-        texto_limpo = DataCleaner.limpar_andamento(texto_original)
-        texto_traduzido = JuridicalTranslator.traduzir_andamento(texto_limpo)
+        texto_limpo = DataCleaner.limpar_andamento(texto_original)  # noqa: F821
+        texto_traduzido = JuridicalTranslator.traduzir_andamento(  # noqa: F821
+            texto_limpo
+        )
 
         celery_app.send_task(
             "workers.enviar_notificacao_andamento",
@@ -191,7 +192,7 @@ def processar_processo_individual(
     soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
     time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
 )
-def monitorar_processos() -> Dict[str, Any]:
+def monitorar_processos() -> dict[str, Any]:
 
     resultados = []
     total_processados = 0
@@ -254,7 +255,7 @@ def monitorar_processos() -> Dict[str, Any]:
     soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
     time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
 )
-def monitorar_processo_individual(id_processo: int) -> Dict[str, Any]:
+def monitorar_processo_individual(id_processo: int) -> dict[str, Any]:
 
     processo = query_processo_por_id(int(id_processo))
 
@@ -281,9 +282,3 @@ def monitorar_processo_individual(id_processo: int) -> Dict[str, Any]:
             "erro": str(erro),
             "id_processo": id_processo,
         }
-        
-        
-        
-
-
-

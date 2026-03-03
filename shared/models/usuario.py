@@ -73,9 +73,7 @@ class Usuario(Base, TimestampMixin, TenantMixin):
     )
 
     # --- Constraints ---
-    __table_args__ = (
-        UniqueConstraint("email", name="uq_usuarios_email"),
-    )
+    __table_args__ = (UniqueConstraint("email", name="uq_usuarios_email"),)
 
     def __repr__(self) -> str:
         return f"<Usuario id={self.id} email={self.email!r} role={self.role!r}>"

@@ -6,24 +6,24 @@ asyncio.sleep é patchado globalmente neste módulo para testes sem delay real.
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import anthropic
 import httpx
 import pytest
 
 from feature_1_ia_personalizada.services.ai.claude_client import (
-    ClaudeClient,
     _MAX_TENTATIVAS,
+    ClaudeClient,
     _backoff,
     _calcular_custo,
     _extrair_texto,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers para criar objetos mock do SDK Anthropic
 # ---------------------------------------------------------------------------
+
 
 def _bloco_texto(texto: str) -> MagicMock:
     b = MagicMock()
@@ -38,7 +38,9 @@ def _bloco_tool_use() -> MagicMock:
     return b
 
 
-def _mock_resposta(texto: str = "resposta ok", input_tokens: int = 100, output_tokens: int = 50) -> MagicMock:
+def _mock_resposta(
+    texto: str = "resposta ok", input_tokens: int = 100, output_tokens: int = 50
+) -> MagicMock:
     r = MagicMock()
     r.content = [_bloco_texto(texto)]
     r.usage = MagicMock()
@@ -70,12 +72,15 @@ def _server_error() -> anthropic.InternalServerError:
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = 500
     resp.headers = httpx.Headers({})
-    return anthropic.InternalServerError(message="server error", response=resp, body=None)
+    return anthropic.InternalServerError(
+        message="server error", response=resp, body=None
+    )
 
 
 # ---------------------------------------------------------------------------
 # Fixture: cliente com _client mockado + sleep patchado
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def client() -> ClaudeClient:
@@ -96,6 +101,7 @@ async def no_sleep():
 # ---------------------------------------------------------------------------
 # Testes de _extrair_texto (helper puro)
 # ---------------------------------------------------------------------------
+
 
 class TestExtrairTexto:
     def test_retorna_texto_do_primeiro_bloco_text(self):
@@ -134,6 +140,7 @@ class TestExtrairTexto:
 # Testes de _calcular_custo (helper puro)
 # ---------------------------------------------------------------------------
 
+
 class TestCalcularCusto:
     def test_custo_zero_tokens(self):
         assert _calcular_custo(0, 0) == Decimal("0")
@@ -160,6 +167,7 @@ class TestCalcularCusto:
 # Testes de _backoff (helper puro)
 # ---------------------------------------------------------------------------
 
+
 class TestBackoff:
     def test_jitter_presente(self):
         """Duas chamadas com mesmo input devem raramente retornar valores iguais."""
@@ -183,9 +191,12 @@ class TestBackoff:
 # Testes de enviar_mensagem (integração com retry)
 # ---------------------------------------------------------------------------
 
+
 class TestEnviarMensagem:
     async def test_sucesso_retorna_estrutura_correta(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta("oi", 100, 50))
+        client._client.messages.create = AsyncMock(
+            return_value=_mock_resposta("oi", 100, 50)
+        )
         resultado = await client.enviar_mensagem("system", [], "mensagem")
         assert resultado["resposta"] == "oi"
         assert resultado["tokens_input"] == 100
@@ -241,6 +252,7 @@ class TestEnviarMensagem:
 
     async def test_usa_modelo_correto(self, client: ClaudeClient):
         from shared.config.constants import MODELO_CLAUDE
+
         client._client.messages.create = AsyncMock(return_value=_mock_resposta())
         await client.enviar_mensagem("system", [], "msg")
         kwargs = client._client.messages.create.call_args.kwargs
@@ -250,6 +262,7 @@ class TestEnviarMensagem:
 # ---------------------------------------------------------------------------
 # Testes de classificar_intencao
 # ---------------------------------------------------------------------------
+
 
 class TestClassificarIntencao:
     async def test_retorna_texto_bruto_do_claude(self, client: ClaudeClient):
@@ -276,7 +289,9 @@ class TestClassificarIntencao:
         client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))
         await client.classificar_intencao("system prompt aqui", "mensagem do cliente")
         kwargs = client._client.messages.create.call_args.kwargs
-        assert kwargs["messages"] == [{"role": "user", "content": "mensagem do cliente"}]
+        assert kwargs["messages"] == [
+            {"role": "user", "content": "mensagem do cliente"}
+        ]
 
     async def test_retry_em_rate_limit_na_classificacao(self, client: ClaudeClient):
         """Classificação é a porta de entrada — deve ter retry."""

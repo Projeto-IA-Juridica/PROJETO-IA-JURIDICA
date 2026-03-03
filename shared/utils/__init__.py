@@ -27,18 +27,6 @@ colaterais em testes unitários e em qualquer código que não precise de
     from shared.utils.audio_handler import transcrever_audio
 """
 
-from shared.utils.validators import (
-    normalizar_cnpj,
-    normalizar_cpf,
-    normalizar_numero_processo,
-    normalizar_telefone,
-    validar_cnpj,
-    validar_cpf,
-    validar_numero_processo,
-    validar_oab,
-    validar_telefone_br,
-    validar_telefone_whatsapp,
-)
 from shared.utils.formatters import (
     formatar_data_br,
     formatar_data_relativa,
@@ -50,6 +38,18 @@ from shared.utils.lgpd import (
     exportar_dados_cliente,
     registrar_acesso,
     verificar_aceite_lgpd,
+)
+from shared.utils.validators import (
+    normalizar_cnpj,
+    normalizar_cpf,
+    normalizar_numero_processo,
+    normalizar_telefone,
+    validar_cnpj,
+    validar_cpf,
+    validar_numero_processo,
+    validar_oab,
+    validar_telefone_br,
+    validar_telefone_whatsapp,
 )
 
 __all__ = [

@@ -7,7 +7,8 @@ Utiliza a engine assíncrona do SQLAlchemy (asyncpg) para garantir alta performa
 na aplicação FastAPI, permitindo concorrência sem bloquear a thread principal.
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
 from shared.config.settings import settings
 
 # ⚠️ O SQLAlchemy + asyncpg exige que a URL comece com "postgresql+asyncpg://"
@@ -27,10 +28,12 @@ if "supabase.com" in db_url:
 engine = create_async_engine(
     db_url,
     connect_args=connect_args,
-    echo=(settings.ENVIRONMENT == "development"),  # Loga queries SQL no console apenas em dev
-    pool_size=20,       # Mantém 20 conexões abertas no pool (prontas para uso)
-    max_overflow=10,    # Se as 20 estiverem em uso, cria até mais 10 temporárias
-    pool_timeout=30,    # Espera até 30s por uma conexão livre antes de dar erro
+    echo=(
+        settings.ENVIRONMENT == "development"
+    ),  # Loga queries SQL no console apenas em dev
+    pool_size=20,  # Mantém 20 conexões abertas no pool (prontas para uso)
+    max_overflow=10,  # Se as 20 estiverem em uso, cria até mais 10 temporárias
+    pool_timeout=30,  # Espera até 30s por uma conexão livre antes de dar erro
 )
 
 # =====================================================================
@@ -40,5 +43,5 @@ engine = create_async_engine(
 async_session_factory = async_sessionmaker(
     bind=engine,
     expire_on_commit=False,  # Evita expirar objetos da memória após o commit
-    autoflush=False,         # Só envia as mudanças pro banco quando damos commit() explícito
+    autoflush=False,  # Só envia as mudanças pro banco quando damos commit() explícito
 )

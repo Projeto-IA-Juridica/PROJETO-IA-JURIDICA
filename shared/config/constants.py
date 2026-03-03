@@ -4,9 +4,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
-
 # 1) Texto do disclaimer (OAB / jurídico)
-# reformular essas mensagens 
+# reformular essas mensagens
 DISCLAIMER_OAB: Final[str] = (
     "Aviso: Sou uma IA e não substituo um(a) advogado(a). "
     "Posso ajudar com informações gerais e organização de ideias, "
@@ -43,7 +42,7 @@ MODELO_CLAUDE: Final[str] = "claude-sonnet-4-20250514"
 
 # 4) Cache e retenção
 
-CACHE_TTL_PROCESSO: Final[int] = 3600   # 1 hora
+CACHE_TTL_PROCESSO: Final[int] = 3600  # 1 hora
 CACHE_TTL_ANDAMENTO: Final[int] = 1800  # 30 min
 
 RETENCAO_DADOS_ANOS: Final[int] = 5

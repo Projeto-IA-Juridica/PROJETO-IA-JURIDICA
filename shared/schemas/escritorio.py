@@ -60,9 +60,7 @@ class EscritorioCreate(BaseModel):
     def validar_oab_responsavel(cls, v: str) -> str:
         normalizado = v.upper().strip()
         if not validar_oab(normalizado):
-            raise ValueError(
-                "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
-            )
+            raise ValueError("OAB inválida — formato esperado: UFNNNNN (ex: SP123456)")
         return normalizado
 
     @field_validator("telefone")
@@ -102,9 +100,7 @@ class EscritorioUpdate(BaseModel):
             return v
         normalizado = v.upper().strip()
         if not validar_oab(normalizado):
-            raise ValueError(
-                "OAB inválida — formato esperado: UFNNNNN (ex: SP123456)"
-            )
+            raise ValueError("OAB inválida — formato esperado: UFNNNNN (ex: SP123456)")
         return normalizado
 
     @field_validator("telefone")

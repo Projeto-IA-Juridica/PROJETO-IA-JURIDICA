@@ -13,9 +13,8 @@ Uso:
 """
 
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-
 
 # ---------------------------------------------------------------------------
 # Data
@@ -50,11 +49,11 @@ def formatar_data_relativa(dt: datetime) -> str:
 
     O datetime de entrada pode ser naive (assume UTC) ou aware.
     """
-    agora = datetime.now(tz=timezone.utc)
+    agora = datetime.now(tz=UTC)
 
     # Normaliza para aware UTC
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     if agora < dt:
         return "em breve"
