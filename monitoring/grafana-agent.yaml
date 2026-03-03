@@ -1,0 +1,22 @@
+server:
+  log_level: info
+
+metrics:
+  global:
+    scrape_interval: 30s
+    external_labels:
+      service: concierge-juridico
+      env: production
+  configs:
+    - name: concierge
+      scrape_configs:
+        - job_name: fastapi
+          static_configs:
+            - targets: ["localhost:8000"]
+          metrics_path: /metrics
+
+      remote_write:
+        - url: "${GRAFANA_CLOUD_PROMETHEUS_URL}"
+          basic_auth:
+            username: "${GRAFANA_CLOUD_PROMETHEUS_USERNAME}"
+            password: "${GRAFANA_CLOUD_API_KEY}"

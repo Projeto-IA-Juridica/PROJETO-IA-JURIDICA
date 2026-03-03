@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import redis.asyncio as redis
 import structlog
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from shared.config.settings import settings
 from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
@@ -91,6 +92,18 @@ app.include_router(auth)
 app.include_router(processos)
 app.include_router(chat)
 app.include_router(webhook_whatsapp)
+
+# ==========================================
+# INSTRUMENTAÇÃO HTTP (Prometheus)
+# ==========================================
+# Adiciona métricas HTTP automáticas:
+#   http_requests_total{method, handler, status}
+#   http_request_duration_seconds{method, handler, status}
+#   http_requests_in_progress{method, handler}
+Instrumentator(
+    should_group_status_codes=False,     # separa 200, 201, 404, etc.
+    excluded_handlers=["/metrics"],      # não mede o endpoint de métricas em si
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 # ==========================================

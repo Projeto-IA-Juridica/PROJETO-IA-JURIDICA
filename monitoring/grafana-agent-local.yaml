@@ -1,0 +1,23 @@
+server:
+  log_level: info
+
+metrics:
+  global:
+    scrape_interval: 15s
+    external_labels:
+      service: concierge-juridico
+      env: development
+  configs:
+    - name: concierge-local
+      scrape_configs:
+        - job_name: fastapi_local
+          static_configs:
+            - targets: ["host.docker.internal:8000"]   # macOS/Windows
+            # - targets: ["172.17.0.1:8000"]           # Linux (IP da bridge docker)
+          metrics_path: /metrics
+
+      remote_write:
+        - url: "${GRAFANA_CLOUD_PROMETHEUS_URL}"
+          basic_auth:
+            username: "${GRAFANA_CLOUD_PROMETHEUS_USERNAME}"
+            password: "${GRAFANA_CLOUD_API_KEY}"
