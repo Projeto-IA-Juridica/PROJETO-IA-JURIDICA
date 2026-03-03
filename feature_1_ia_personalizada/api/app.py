@@ -8,9 +8,11 @@ registra todos os roteadores de domínio e define tratadores de eventos de ciclo
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import redis.asyncio as redis
+import structlog
 
 from shared.config.settings import settings
 from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
@@ -47,6 +49,8 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, "redis_client"):
         await app.state.redis_client.aclose()
 
+
+logger = structlog.get_logger(__name__)
 
 # Instanciando o App com o ciclo de vida
 app = FastAPI(
@@ -87,3 +91,15 @@ app.include_router(auth)
 app.include_router(processos)
 app.include_router(chat)
 app.include_router(webhook_whatsapp)
+
+
+# ==========================================
+# ERROR HANDLER GLOBAL
+# ==========================================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Erro interno do servidor"},
+    )

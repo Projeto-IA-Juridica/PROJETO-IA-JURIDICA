@@ -9,6 +9,7 @@ import redis
 from celery import shared_task
 
 from shared.database.worker_queries import (
+    enviar_mensagem_whatsapp,
     insert_interacao,
     query_clientes_para_pesquisa,
     query_processo_e_cliente,
@@ -106,13 +107,6 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
 
 
 
-# INTEGRAÇÕES (SUBSTITUIR)
-
-
-class ServicoWhatsApp:
-    @staticmethod
-    def enviar_mensagem(telefone: str, texto: str, botoes: Optional[list[dict]] = None):
-        logger.info("whatsapp_enviando_mensagem", telefone=telefone)
 
 
 def buscar_processo_e_cliente(id_processo: int):
@@ -132,6 +126,7 @@ def registrar_interacao(id_cliente: int, id_processo: Optional[int],
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
+        tipo=tipo,
         metadata_json={"tipo_atividade": tipo, **dados},
     )
 
@@ -165,7 +160,7 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         descricao_andamento=descricao_andamento.strip()
     )
 
-    ServicoWhatsApp.enviar_mensagem(cliente.telefone, mensagem)
+    enviar_mensagem_whatsapp(cliente.id, cliente.telefone, mensagem)
 
     registrar_interacao(
         id_cliente=cliente.id,
@@ -198,10 +193,7 @@ def enviar_lote_sem_movimentacao(self):
 
         cliente = processo.cliente
 
-        ServicoWhatsApp.enviar_mensagem(
-            cliente.telefone,
-            MENSAGEM_SEM_MOVIMENTACAO
-        )
+        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO)
 
         registrar_interacao(
             id_cliente=cliente.id,
@@ -237,13 +229,7 @@ def enviar_pesquisa_satisfacao(self):
         if envio_recente(chave):
             continue
 
-        botoes = [{"id": str(i), "title": str(i)} for i in range(1, 6)]
-
-        ServicoWhatsApp.enviar_mensagem(
-            cliente.telefone,
-            MENSAGEM_PESQUISA_SATISFACAO,
-            botoes=botoes
-        )
+        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO)
 
         registrar_interacao(
             id_cliente=cliente.id,
