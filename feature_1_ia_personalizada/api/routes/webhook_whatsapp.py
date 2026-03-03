@@ -1,11 +1,12 @@
 import structlog
 import re
 import time
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import Counter, Histogram
 
+from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.escritorio import Escritorio
 from shared.models.cliente import Cliente
@@ -26,13 +27,21 @@ _webhook_processing_time = Histogram(
 router = APIRouter(prefix="/webhook/whatsapp", tags=["Webhooks Evolution"])
 
 @router.post("")
-async def receive_message(request: Request, db: AsyncSession = Depends(get_db)):
+async def receive_message(
+    request: Request,
+    apikey: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Recebe os eventos da Evolution API.
     Filtra as mensagens recebidas de clientes (messages.upsert),
     localiza o Escritório e o Cliente correspondentes no banco de dados,
     e envia a tarefa pesada de I.A. para a fila do Celery.
     """
+    if not apikey or apikey != settings.EVOLUTION_API_KEY:
+        logger.warning("webhook_auth_failed", apikey_received=bool(apikey))
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     _inicio = time.perf_counter()
     try:
         body = await request.json()

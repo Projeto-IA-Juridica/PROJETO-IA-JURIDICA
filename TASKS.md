@@ -1320,8 +1320,8 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Implementar `salvar_interacao()` — INSERT em `interacoes` com ORM
 - [ ] Implementar `buscar_data_ultima_interacao(id_cliente)` — SELECT MAX(created_at) FROM interacoes
 
-#### `services/messaging/whatsapp.py` — NotImplementedError de contexto [PIJ-195]
-- [ ] Implementar resolução `processo_id → (escritorio_id, cliente_id)` nas linhas 241 e 293
+#### `services/messaging/whatsapp.py` — NotImplementedError de contexto [PIJ-195] ✅
+- [x] Implementar resolução `processo_id → (escritorio_id, cliente_id)` nas linhas 241 e 293
 
 #### `workers/celery_app.py` — Testar Beat
 - [ ] Testar Celery Beat localmente: subir worker + beat, verificar no Flower que cron jobs disparam
@@ -1340,9 +1340,9 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Adicionar variável `CORS_ALLOWED_ORIGINS` ao `settings.py` e ao `.env.example`
 - [ ] Criar `@app.exception_handler(Exception)` global — retornar mensagem genérica sem stack trace para o cliente
 
-#### `api/routes/webhook_whatsapp.py` — Autenticação [PIJ-197]
-- [ ] Adicionar validação do header `apikey` comparando com `settings.EVOLUTION_API_KEY`
-- [ ] Retornar 401 se apikey ausente ou incorreto
+#### `api/routes/webhook_whatsapp.py` — Autenticação [PIJ-197] ✅
+- [x] Adicionar validação do header `apikey` comparando com `settings.EVOLUTION_API_KEY`
+- [x] Retornar 401 se apikey ausente ou incorreto
 
 #### `shared/config/settings.py` — Validação de chaves
 - [ ] Adicionar `Field(min_length=32)` ao `JWT_SECRET_KEY`
