@@ -1355,18 +1355,18 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 
 ### 9.3 Sprint 3–4 — Testes e CI/CD
 
-#### Testes HTTP das rotas (`tests/integration/test_api_routes.py`) — arquivo novo [PIJ-201]
-- [ ] Criar `tests/integration/test_api_routes.py` com `httpx.AsyncClient` + `ASGITransport`
-- [ ] Testar `GET /health` → 200
-- [ ] Testar `GET /health/ready` → 200 (com DB/Redis mockados como up)
-- [ ] Testar `GET /health/ready` → 503 (com DB mockado como down)
-- [ ] Testar `POST /auth/login` com credenciais válidas → 200 + tokens
-- [ ] Testar `POST /auth/login` com senha errada → 401
-- [ ] Testar `GET /chat/history/{id}` sem token → 401
-- [ ] Testar `GET /chat/history/{id}` com token válido → 200
-- [ ] Testar `POST /webhook/whatsapp` sem header `apikey` → 401
-- [ ] Testar `POST /webhook/whatsapp` com payload válido e apikey correto → 200
-- [ ] Testar `GET /metrics` → 200 com content-type Prometheus
+#### Testes HTTP das rotas (`tests/integration/test_api_routes.py`) — arquivo novo [PIJ-201] ✅
+- [x] Criar `tests/integration/test_api_routes.py` com `httpx.AsyncClient` + `ASGITransport`
+- [x] Testar `GET /health` → 200
+- [x] Testar `GET /health/ready` → 200 (com DB/Redis mockados como up)
+- [x] Testar `GET /health/ready` → 503 (com DB mockado como down)
+- [x] Testar `POST /auth/login` com credenciais válidas → 200 + tokens
+- [x] Testar `POST /auth/login` com senha errada → 401
+- [x] Testar `GET /chat/history/{id}` sem token → 401
+- [x] Testar `GET /chat/history/{id}` com token válido → 200
+- [x] Testar `POST /webhook/whatsapp` sem header `apikey` → 401
+- [x] Testar `POST /webhook/whatsapp` com payload válido e apikey correto → 200
+- [x] Testar `GET /metrics` → 200 com content-type Prometheus
 
 #### Testes ausentes (unitários)
 - [x] Criar `tests/unit/test_encryption.py` (shared) — criptografar/descriptografar, hash_senha, mascarar_cpf
