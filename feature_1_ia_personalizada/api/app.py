@@ -99,7 +99,23 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
+)  
+
+# if settings.ENVIRONMENT == "development": A SER IMPLEMENTADO, CORS ACIMA DEVE SER APAGADO ;
+#     allowed_origins = ["*"]
+# else:
+#     allowed_origins = [
+#         "https://app.conciergejuridico.com",
+#         "https://admin.conciergejuridico.com",
+#     ]
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=allowed_origins,
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
 # Fluxo ideal ao receber requisição: 1. Rate Limit -> 2. Autenticação JWT -> 3. Rotas
