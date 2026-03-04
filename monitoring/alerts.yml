@@ -1,0 +1,214 @@
+# =============================================================================
+# Concierge Jurídico — Regras de Alerta Prometheus [PIJ-206]
+# =============================================================================
+# Compatível com Grafana Cloud (Mimir) e Prometheus self-hosted.
+#
+# Para aplicar no Grafana Cloud via mimirtool:
+#   mimirtool rules load monitoring/alerts.yml \
+#     --address=https://prometheus-prod-40-prod-sa-east-1.grafana.net \
+#     --id=3014192 \
+#     --key=<GRAFANA_CLOUD_API_KEY>
+#
+# Ou importar manualmente em: Grafana Cloud → Alerting → Alert Rules → Import
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # 1. DISPONIBILIDADE DA API
+  # ---------------------------------------------------------------------------
+  - name: concierge.disponibilidade
+    rules:
+
+      - alert: APIDown
+        expr: up{job="fastapi"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          servico: api
+        annotations:
+          summary: "🚨 API Concierge FORA DO AR"
+          description: |
+            A API FastAPI não está respondendo há mais de 1 minuto.
+            Instância: {{ $labels.instance }}
+            Verificar: sudo systemctl status grafana-agent && curl http://localhost:8000/health
+
+      - alert: APIReiniciandoFrequentemente
+        # Detecta se o processo reiniciou mais de 3 vezes nos últimos 30 minutos
+        expr: changes(process_start_time_seconds{job="fastapi"}[30m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+          servico: api
+        annotations:
+          summary: "⚠️ API reiniciando com frequência anormal"
+          description: |
+            A API reiniciou {{ $value | humanize }} vezes nos últimos 30 minutos.
+            Possível causa: erro de memória, exception não tratada, OOM killer.
+
+  # ---------------------------------------------------------------------------
+  # 2. TAXA DE ERROS DA IA
+  # ---------------------------------------------------------------------------
+  - name: concierge.ia
+    rules:
+
+      - alert: TaxaErroIAAlta
+        # Alerta se >5% das requests de IA resultam em erro nos últimos 5 minutos
+        expr: |
+          (
+            rate(http_requests_total{handler=~"/webhook.*", status=~"5.."}[5m])
+            /
+            rate(http_requests_total{handler=~"/webhook.*"}[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          servico: ia
+        annotations:
+          summary: "🚨 Taxa de erro da IA acima de 5%"
+          description: |
+            {{ $value | humanizePercentage }} das requisições ao webhook estão falhando nos últimos 5 minutos.
+            Verificar logs: sudo journalctl -u grafana-agent -f
+
+      - alert: FallbackIAAtivado
+        # Alerta quando o fallback pré-definido (Claude fora do ar) é ativado
+        expr: increase(ia_fallback_used_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          servico: ia
+        annotations:
+          summary: "⚠️ Fallback de IA ativado — Claude pode estar fora do ar"
+          description: |
+            O sistema usou respostas pré-definidas (fallback) {{ $value | humanize }} vezes nos últimos 10 minutos.
+            Verificar status da API Anthropic e credenciais.
+
+      - alert: ErrosIACriticos
+        # Alerta se ia_errors_total aumenta mais de 5 em 10 minutos
+        expr: increase(ia_errors_total[10m]) > 5
+        for: 0m
+        labels:
+          severity: critical
+          servico: ia
+        annotations:
+          summary: "🚨 Múltiplos erros críticos na IA"
+          description: |
+            {{ $value | humanize }} erros de IA registrados nos últimos 10 minutos.
+            Investigar imediatamente os logs do Celery worker.
+
+  # ---------------------------------------------------------------------------
+  # 3. LATÊNCIA
+  # ---------------------------------------------------------------------------
+  - name: concierge.latencia
+    rules:
+
+      - alert: LatenciaWebhookAlta
+        # Alerta se o p95 de latência do webhook ultrapassar 2 segundos
+        expr: |
+          histogram_quantile(0.95,
+            rate(webhook_processing_time_seconds_bucket[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          servico: webhook
+        annotations:
+          summary: "⚠️ Latência do webhook acima de 2s (p95)"
+          description: |
+            O percentil 95 de latência do processamento de webhook é {{ $value | humanizeDuration }}.
+            Possível causa: banco lento, Celery sobrecarregado ou lock de DB.
+
+      - alert: LatenciaAPIAlta
+        # Alerta se o p95 de qualquer rota HTTP ultrapassar 1 segundo
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_highr_seconds_bucket{job="fastapi"}[5m])
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          servico: api
+        annotations:
+          summary: "⚠️ Latência geral da API acima de 1s (p95)"
+          description: |
+            O percentil 95 de latência das rotas HTTP é {{ $value | humanizeDuration }}.
+            Verificar queries lentas no banco (Supabase) e uso de CPU.
+
+  # ---------------------------------------------------------------------------
+  # 4. CELERY WORKERS
+  # ---------------------------------------------------------------------------
+  - name: concierge.workers
+    rules:
+
+      - alert: WorkerCelarySemResposta
+        # Alerta se nenhuma mensagem tiver sido processada pelo webhook em 2h durante horário comercial
+        # (indica que o worker Celery pode estar morto)
+        expr: |
+          (
+            hour() >= 8 and hour() <= 20
+          )
+          and
+          increase(whatsapp_messages_received_total[2h]) == 0
+          and
+          up{job="fastapi"} == 1
+        for: 0m
+        labels:
+          severity: warning
+          servico: celery
+        annotations:
+          summary: "⚠️ Nenhum webhook processado em 2h (Worker Celery pode estar parado)"
+          description: |
+            A API está no ar mas nenhuma mensagem WhatsApp foi processada nas últimas 2 horas.
+            Verificar: celery -A feature_1_ia_personalizada.workers.celery_app inspect active
+
+      - alert: MensagensWebhookZeroHorarioComercial
+        # Similar ao anterior mas mais simples — conta total de webhooks hoje
+        expr: |
+          (hour() >= 9 and hour() <= 18)
+          and on()
+          sum(increase(whatsapp_messages_received_total[8h])) == 0
+        for: 30m
+        labels:
+          severity: info
+          servico: celery
+        annotations:
+          summary: "ℹ️ Nenhuma mensagem WhatsApp recebida hoje"
+          description: |
+            Nenhum webhook de WhatsApp foi recebido nas últimas 8 horas em horário comercial.
+            Pode indicar que a instância Evolution API está desconectada ou o QR Code expirou.
+
+  # ---------------------------------------------------------------------------
+  # 5. RECURSOS DO SERVIDOR
+  # ---------------------------------------------------------------------------
+  - name: concierge.recursos
+    rules:
+
+      - alert: MemoriaAltaAPI
+        # Alerta se a API estiver consumindo mais de 512MB de RAM
+        expr: process_resident_memory_bytes{job="fastapi"} > 536870912
+        for: 10m
+        labels:
+          severity: warning
+          servico: api
+        annotations:
+          summary: "⚠️ API consumindo mais de 512MB de RAM"
+          description: |
+            Uso atual de memória: {{ $value | humanize1024 }}B.
+            Possível memory leak ou carga anormalmente alta.
+
+      - alert: DescritoresArquivoEsgotando
+        # Alerta se os file descriptors abertos passarem de 80% do limite
+        expr: |
+          process_open_fds{job="fastapi"}
+          /
+          process_max_fds{job="fastapi"} > 0.80
+        for: 5m
+        labels:
+          severity: critical
+          servico: api
+        annotations:
+          summary: "🚨 File descriptors quase esgotados (>80%)"
+          description: |
+            {{ $value | humanizePercentage }} dos file descriptors estão em uso.
+            Abertos: {{ with query "process_open_fds{job='fastapi'}" }}{{ . | first | value | humanize }}{{ end }}
+            Máximo: {{ with query "process_max_fds{job='fastapi'}" }}{{ . | first | value | humanize }}{{ end }}

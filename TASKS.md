@@ -1390,7 +1390,7 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 #### Prometheus + Grafana + Alertmanager [PIJ-205]
 - [ ] Adicionar serviços `prometheus`, `grafana`, `alertmanager` ao `docker-compose.yml`
 - [ ] Criar `infrastructure/docker/prometheus/prometheus.yml` com scrape do `/metrics` da API
-- [ ] Criar `infrastructure/docker/prometheus/alerts.yml` com regras: `APIDown`, `TaxaErroIAAlta`, `LatenciaAlta`, `WorkerCelarySemResposta` [PIJ-206]
+- [x] Criar `monitoring/alerts.yml` com regras: `APIDown`, `TaxaErroIAAlta`, `LatenciaAlta`, `WorkerCelarySemResposta` + 7 regras adicionais [PIJ-206] ✅
 - [ ] Criar `infrastructure/docker/grafana/dashboards/concierge.json` com painéis de requests/min, taxa de erro, latência p95, processos monitorados
 
 #### Sentry em produção

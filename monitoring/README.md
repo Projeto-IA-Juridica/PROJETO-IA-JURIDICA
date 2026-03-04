@@ -195,6 +195,58 @@ sudo journalctl -u grafana-agent --since "5 minutes ago"
 
 ---
 
+## Regras de Alerta (PIJ-206)
+
+As regras de alerta estão em `monitoring/alerts.yml` e cobrem:
+
+| Alerta | Severidade | Condição |
+|---|---|---|
+| `APIDown` | 🔴 Critical | API sem resposta por 1 min |
+| `APIReiniciandoFrequentemente` | ⚠️ Warning | >3 restarts em 30 min |
+| `TaxaErroIAAlta` | 🔴 Critical | >5% de erros no webhook |
+| `FallbackIAAtivado` | ⚠️ Warning | Fallback ativado (Claude fora) |
+| `ErrosIACriticos` | 🔴 Critical | >5 erros de IA em 10 min |
+| `LatenciaWebhookAlta` | ⚠️ Warning | p95 webhook > 2s |
+| `LatenciaAPIAlta` | ⚠️ Warning | p95 HTTP > 1s por 10 min |
+| `WorkerCelarySemResposta` | ⚠️ Warning | 0 webhooks em 2h (horário comercial) |
+| `MensagensWebhookZeroHorarioComercial` | ℹ️ Info | 0 mensagens em 8h úteis |
+| `MemoriaAltaAPI` | ⚠️ Warning | RAM > 512MB por 10 min |
+| `DescritoresArquivoEsgotando` | 🔴 Critical | >80% dos file descriptors |
+
+### Opção 1 — Importar no Grafana Cloud (sem instalação)
+
+1. Acesse [grafana.com](https://grafana.com) → **My Grafana → Alerting → Alert rules**
+2. Clique em **"New alert rule"** ou **"Import"**
+3. Cole o conteúdo de `monitoring/alerts.yml`
+
+### Opção 2 — Aplicar via `mimirtool` (CLI)
+
+```bash
+# Instalar mimirtool
+curl -fLo mimirtool https://github.com/grafana/mimir/releases/latest/download/mimirtool-linux-amd64
+chmod +x mimirtool && sudo mv mimirtool /usr/local/bin/
+
+# Carregar as regras no Grafana Cloud
+mimirtool rules load monitoring/alerts.yml \
+  --address=https://prometheus-prod-40-prod-sa-east-1.grafana.net \
+  --id=3014192 \
+  --key="${GRAFANA_CLOUD_API_KEY}"
+
+# Confirmar que foram carregadas
+mimirtool rules list \
+  --address=https://prometheus-prod-40-prod-sa-east-1.grafana.net \
+  --id=3014192 \
+  --key="${GRAFANA_CLOUD_API_KEY}"
+```
+
+### Configurar canal de notificação (e-mail/WhatsApp)
+
+No Grafana Cloud → **Alerting → Contact points → Add contact point**
+- Escolha: Email, Slack, Telegram, PagerDuty, ou Webhook
+- Os alertas serão disparados quando as condições acima forem atingidas
+
+---
+
 ## Dashboards recomendados (importar no Grafana Cloud)
 
 Após os dados chegarem, importe os dashboards prontos:
