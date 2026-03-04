@@ -1,0 +1,302 @@
+# ==============================================================================
+# CD — Concierge Jurídico Digital
+# ==============================================================================
+# Pipeline de deploy contínuo. Roda automaticamente após o CI passar em main.
+# Também pode ser disparado manualmente para rollback ou deploy de tag específica.
+#
+# Pré-requisitos no GitHub (Settings > Secrets > Actions):
+#   SSH_PRIVATE_KEY      → chave privada para SSH no servidor de produção
+#   PRODUCTION_HOST      → IP ou hostname do servidor (ex: 203.0.113.10)
+#   PRODUCTION_USER      → usuário SSH (ex: ubuntu, deploy)
+#
+# Pré-requisitos no servidor de produção:
+#   - Docker + Docker Compose v2 instalados
+#   - Repositório clonado em /opt/concierge
+#   - Arquivo /opt/concierge/.env com todas as variáveis de produção
+#   - Autenticado no GHCR:
+#       echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_USER --password-stdin
+# ==============================================================================
+
+name: Deploy — Produção
+
+on:
+  # Dispara automaticamente quando o CI passa em main
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+  # Disparo manual: útil para rollback ou deploy de tag semântica
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Tag da imagem para deploy (ex: sha-abc1234, v1.2.0, latest)"
+        required: false
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: beatrizsamaha/projeto-ia-juridica/concierge-f1
+  DEPLOY_DIR: /opt/concierge
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Build e push da imagem para GHCR
+  # Gera três tags:
+  #   sha-abc1234 — referência imutável para auditoria e rollback
+  #   latest      — sempre aponta para o commit mais recente de main
+  #   v1.x.x      — quando uma tag semântica é criada no repositório
+  # ----------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+
+    # Só roda se o CI passou (ou se foi disparado manualmente)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          # Em workflow_run, usa o SHA que disparou o CI — não o HEAD atual de main
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extrair metadata (tags e labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build e push da imagem
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.f1
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache via GitHub Actions cache (acelera builds subsequentes)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Resumo do build
+        run: |
+          echo "### Imagem publicada" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Deploy no servidor de produção via SSH
+  # Passos: pull imagem → migrations → rolling restart → health check local
+  # ----------------------------------------------------------------------------
+  deploy:
+    name: Deploy em Produção
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: production
+      url: https://${{ secrets.PRODUCTION_HOST }}
+
+    steps:
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.PRODUCTION_HOST }}" >> ~/.ssh/known_hosts
+
+      # Em workflow_dispatch manual, usa a tag informada; caso contrário usa o sha gerado
+      - name: Resolver tag da imagem
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            echo "tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ needs.build-and-push.outputs.image_tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy no servidor
+        env:
+          FULL_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          HOST: ${{ secrets.PRODUCTION_HOST }}
+          SSH_USER: ${{ secrets.PRODUCTION_USER }}
+          DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
+        run: |
+          # As variáveis ${FULL_IMAGE}, ${DEPLOY_DIR} expandem aqui no runner
+          # O servidor recebe os valores já resolvidos
+          ssh -o StrictHostKeyChecking=no "${SSH_USER}@${HOST}" << ENDSSH
+            set -euo pipefail
+
+            IMAGE="${FULL_IMAGE}"
+            DEPLOY_DIR="${DEPLOY_DIR}"
+
+            echo "============================================"
+            echo "  Deploy: \$IMAGE"
+            echo "============================================"
+
+            # ------------------------------------------------------------------
+            # 1. Pull da nova imagem
+            # ------------------------------------------------------------------
+            echo ""
+            echo "==> [1/4] Pull da imagem..."
+            docker pull "\$IMAGE"
+
+            # ------------------------------------------------------------------
+            # 2. Salvar imagem atual para rollback emergencial
+            # ------------------------------------------------------------------
+            PREV_IMAGE=\$(docker inspect --format='{{.Config.Image}}' concierge-app-f1 2>/dev/null || echo "")
+            if [ -n "\$PREV_IMAGE" ]; then
+              echo "    Imagem anterior: \$PREV_IMAGE (salva para rollback)"
+            fi
+
+            # ------------------------------------------------------------------
+            # 3. Rodar migrations Alembic antes de reiniciar a API
+            #    Usa a nova imagem conectada à rede do compose existente
+            # ------------------------------------------------------------------
+            echo ""
+            echo "==> [2/4] Executando migrations Alembic..."
+            docker run --rm \
+              --env-file "\$DEPLOY_DIR/.env" \
+              --network concierge_concierge-net \
+              "\$IMAGE" \
+              alembic upgrade head
+            echo "    Migrations concluídas."
+
+            # ------------------------------------------------------------------
+            # 4. Rolling restart: API primeiro, workers depois
+            #    --pull never evita pull redundante (já fizemos acima)
+            # ------------------------------------------------------------------
+            echo ""
+            echo "==> [3/4] Reiniciando serviços..."
+
+            # Atualizar a tag da imagem no .env do servidor
+            if grep -q "^CONCIERGE_IMAGE=" "\$DEPLOY_DIR/.env"; then
+              sed -i "s|^CONCIERGE_IMAGE=.*|CONCIERGE_IMAGE=\$IMAGE|" "\$DEPLOY_DIR/.env"
+            else
+              echo "CONCIERGE_IMAGE=\$IMAGE" >> "\$DEPLOY_DIR/.env"
+            fi
+
+            cd "\$DEPLOY_DIR"
+
+            # API — reinicia primeiro, aguarda health antes de continuar
+            docker compose -f infrastructure/docker/docker-compose.prod.yml \
+              up -d --no-deps --pull never app-f1
+
+            echo "    Aguardando API responder ao health check..."
+            timeout 60 bash -c 'until curl -sf http://localhost:8000/health; do sleep 3; done'
+            echo "    API saudável."
+
+            # Workers — reinicia após API estar OK
+            docker compose -f infrastructure/docker/docker-compose.prod.yml \
+              up -d --no-deps --pull never celery-worker celery-beat
+
+            echo ""
+            echo "==> [4/4] Deploy concluído."
+            echo "    Imagem ativa: \$IMAGE"
+          ENDSSH
+
+  # ----------------------------------------------------------------------------
+  # Job 3: Smoke test contra produção
+  # Valida os endpoints críticos após o deploy
+  # ----------------------------------------------------------------------------
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Aguardar estabilização dos containers
+        run: sleep 15
+
+      - name: GET /health → 200
+        run: |
+          curl -f --retry 5 --retry-delay 5 --retry-connrefused \
+            "https://${{ secrets.PRODUCTION_HOST }}/health"
+
+      - name: GET /health/ready → 200
+        run: |
+          curl -f --retry 3 --retry-delay 5 \
+            "https://${{ secrets.PRODUCTION_HOST }}/health/ready"
+
+      - name: POST /auth/login com credenciais inválidas → 401
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://${{ secrets.PRODUCTION_HOST }}/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"smoke-test@nao-existe.com","password":"wrongpassword"}')
+          [ "$status" = "401" ] || { echo "Esperado 401, recebeu $status"; exit 1; }
+
+      - name: POST /webhook/whatsapp sem apikey → 401
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://${{ secrets.PRODUCTION_HOST }}/webhook/whatsapp" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          [ "$status" = "401" ] || { echo "Esperado 401, recebeu $status"; exit 1; }
+
+      - name: GET /metrics → 200 (Prometheus)
+        run: |
+          curl -f --retry 2 \
+            "https://${{ secrets.PRODUCTION_HOST }}/metrics"
+
+  # ----------------------------------------------------------------------------
+  # Job 4: Resumo final no GitHub Actions
+  # Sempre executa — registra sucesso ou falha de cada etapa
+  # ----------------------------------------------------------------------------
+  notify:
+    name: Resumo do Deploy
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy, smoke-test]
+    if: always()
+
+    steps:
+      - name: Escrever resumo
+        run: |
+          # Determinar status geral
+          if [ "${{ needs.smoke-test.result }}" = "success" ]; then
+            STATUS="**SUCESSO**"
+          else
+            STATUS="**FALHA**"
+          fi
+
+          echo "## $STATUS — Deploy em Produção" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build & Push | ${{ needs.build-and-push.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy SSH | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Imagem:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ needs.build-and-push.outputs.image_digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.event.workflow_run.head_sha || github.sha }}\`" >> $GITHUB_STEP_SUMMARY

@@ -484,41 +484,141 @@ jobs:
         run: docker build -t concierge-f1:test -f infrastructure/docker/Dockerfile.f1 .
 ```
 
-### 4.4 GitHub Actions — Deploy (CD)
+### 4.4 GitHub Actions — Deploy (CD) ✅ IMPLEMENTADO
 
-Criar `.github/workflows/deploy.yml` para push em `main`:
+**Arquivo criado:** `.github/workflows/deploy.yml`
 
-```yaml
-name: Deploy
+O pipeline de CD possui 4 jobs em sequência:
 
-on:
-  push:
-    branches: [main]
-    tags: ["v*"]
+| Job | O que faz |
+|---|---|
+| **Build & Push** | Constrói a imagem Docker e publica no GHCR com tags `sha-xxxxx`, `latest` e `vX.Y.Z` |
+| **Deploy SSH** | Conecta no servidor de produção via SSH, faz pull da imagem, roda migrations Alembic e reinicia os serviços (rolling: API → workers) |
+| **Smoke Test** | Valida `/health`, `/health/ready`, login 401, webhook 401 e `/metrics` contra produção |
+| **Notify** | Gera resumo com status de cada etapa + digest da imagem no painel do GitHub Actions |
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+**Disparo automático:** após o CI passar em `main`.
+**Disparo manual:** via `workflow_dispatch` — permite informar uma tag específica para rollback (ex: `sha-abc1234`).
 
-      - name: Login no registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io  # ou ECR, Docker Hub
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+**3 secrets que precisam ser configurados no GitHub** (Settings → Secrets → Actions):
 
-      - name: Build e push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: infrastructure/docker/Dockerfile.f1
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/concierge-f1:latest
-            ghcr.io/${{ github.repository }}/concierge-f1:${{ github.sha }}
+| Secret | Valor |
+|---|---|
+| `SSH_PRIVATE_KEY` | Chave privada SSH para acessar o servidor de produção |
+| `PRODUCTION_HOST` | IP ou hostname do servidor (ex: `203.0.113.10`) |
+| `PRODUCTION_USER` | Usuário SSH (ex: `ubuntu`, `deploy`) |
+
+---
+
+#### O que o time de infra precisa configurar no servidor
+
+> Esta seção é responsabilidade da infra — o código do CD está pronto, mas ele só funciona se o servidor estiver preparado.
+
+**1. Instalar Docker e Docker Compose v2**
+
+```bash
+# Ubuntu/Debian
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Verificar
+docker compose version  # deve ser >= 2.0
 ```
+
+**2. Clonar o repositório em `/opt/concierge`**
+
+```bash
+sudo mkdir -p /opt/concierge
+sudo chown $USER:$USER /opt/concierge
+git clone https://github.com/BeatrizSamaha/PROJETO-IA-JURIDICA.git /opt/concierge
+```
+
+**3. Criar o arquivo `/opt/concierge/.env` com as variáveis de produção**
+
+O CD escreve a variável `CONCIERGE_IMAGE` nesse arquivo automaticamente a cada deploy. As demais precisam estar presentes antes do primeiro deploy:
+
+```bash
+# Variável gerenciada pelo CD (não editar manualmente)
+CONCIERGE_IMAGE=ghcr.io/beatrizsamaha/projeto-ia-juridica/concierge-f1:latest
+
+# Banco de dados
+POSTGRES_PASSWORD=<senha forte aleatória>
+DATABASE_URL=postgresql+asyncpg://concierge:<POSTGRES_PASSWORD>@postgres:5432/concierge_prod
+
+# Redis
+REDIS_PASSWORD=<senha forte aleatória>
+REDIS_URL=redis://:<REDIS_PASSWORD>@redis:6379/0
+CELERY_BROKER_URL=redis://:<REDIS_PASSWORD>@redis:6379/1
+CELERY_RESULT_BACKEND=redis://:<REDIS_PASSWORD>@redis:6379/2
+
+# Auth
+JWT_SECRET_KEY=<mínimo 32 caracteres aleatórios>
+ENCRYPTION_KEY=<chave Fernet válida — gerar com Fernet.generate_key()>
+
+# Evolution API (WhatsApp)
+EVOLUTION_API_URL=http://evolution-api:8080
+EVOLUTION_API_KEY=<chave configurada na Evolution API>
+PRODUCTION_HOST=<domínio ou IP do servidor>
+
+# Flower (UI Celery)
+FLOWER_USER=admin
+FLOWER_PASSWORD=<senha forte>
+
+# Observabilidade
+SENTRY_DSN=<DSN do projeto no Sentry>
+ENVIRONMENT=production
+
+# IA
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+
+# Google Sheets (opcional — para workers de relacionamento)
+GOOGLE_CREDENTIALS_PATH=/opt/concierge/credentials/google.json
+GOOGLE_SHEETS_ID=<ID da planilha>
+```
+
+**4. Autenticar o servidor no GHCR para fazer pull das imagens**
+
+```bash
+# Gerar um Personal Access Token (PAT) no GitHub com escopo read:packages
+# Settings → Developer settings → Personal access tokens → Tokens (classic)
+echo "<SEU_PAT>" | docker login ghcr.io -u <SEU_USUARIO_GITHUB> --password-stdin
+```
+
+**5. Criar a rede Docker e subir a infraestrutura base (primeira vez apenas)**
+
+```bash
+cd /opt/concierge
+
+# Primeira vez: subir postgres e redis para criar volumes e rede
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d postgres redis
+
+# Aguardar postgres ficar healthy
+docker compose -f infrastructure/docker/docker-compose.prod.yml ps
+
+# Rodar migrations iniciais manualmente
+docker run --rm \
+  --env-file /opt/concierge/.env \
+  --network concierge_concierge-net \
+  ghcr.io/beatrizsamaha/projeto-ia-juridica/concierge-f1:latest \
+  alembic upgrade head
+
+# Subir todos os serviços
+docker compose -f infrastructure/docker/docker-compose.prod.yml up -d
+```
+
+**6. Criar o `docker-compose.prod.yml` ❌ NÃO IMPLEMENTADO**
+
+> **Responsabilidade da infra.** Este arquivo não foi criado no repositório — é parte da Sprint 7–8 (Infraestrutura de Produção). O CD já está pronto para usá-lo, mas o primeiro deploy não vai funcionar enquanto ele não existir.
+
+O arquivo deve ficar em `infrastructure/docker/docker-compose.prod.yml`. Diferenças obrigatórias em relação ao `docker-compose.yml` (dev):
+
+- `image: ${CONCIERGE_IMAGE}` em vez de `build: context: ...` (usa imagem pré-buildada do GHCR)
+- Sem volume de hot-reload (`- ../..:/app`)
+- Sem `--reload` no uvicorn
+- Banco de dados `concierge_prod` em vez de `concierge_dev`
+- Redis com senha (`--requirepass ${REDIS_PASSWORD}`)
+- Resource limits em todos os containers (ver Sprint 7–8, seção 6.2)
+- Portas internas apenas (`expose:` em vez de `ports:`) — o Nginx/proxy gerencia o acesso externo
 
 ### Critério de aceite da Sprint 3–4
 
@@ -526,6 +626,8 @@ jobs:
 - [x] PR em `main` bloqueia merge se testes falham ✅ (.github/workflows/ci.yml criado)
 - [x] Build Docker passa no CI para cada PR ✅ (job docker-build no ci.yml)
 - [x] `black --check` e `ruff check` passam no CI ✅ (jobs lint no ci.yml)
+- [x] Pipeline de CD criado ✅ (.github/workflows/deploy.yml — build/push GHCR, deploy SSH, smoke test)
+- [ ] `docker-compose.prod.yml` criado no repositório ❌ (pendente — responsabilidade da infra, Sprint 7–8)
 
 ---
 
