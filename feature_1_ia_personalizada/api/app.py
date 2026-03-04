@@ -20,7 +20,47 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from shared.config.settings import settings
+from shared.config.settings import settings 
+# Validar formato das chaves no startup 
+import re
+
+
+def _validar_config_no_startup() -> None:
+    erros: list[str] = []
+
+    def _req(cond: bool, msg: str) -> None:
+        if not cond:
+            erros.append(msg)
+
+    # Obrigatórias para subir o core
+    _req(bool(settings.REDIS_URL), "REDIS_URL ausente.")
+    _req(settings.REDIS_URL.startswith("redis://"), "REDIS_URL inválida (esperado 'redis://').")
+
+    _req(bool(settings.DATABASE_URL), "DATABASE_URL ausente.")
+    _req(
+        settings.DATABASE_URL.startswith("postgresql+asyncpg://"),
+        "DATABASE_URL inválida (esperado 'postgresql+asyncpg://').",
+    )
+
+    _req(bool(settings.JWT_SECRET_KEY), "JWT_SECRET_KEY ausente.")
+    _req(len(settings.JWT_SECRET_KEY) >= 32, "JWT_SECRET_KEY muito curta (mínimo 32 caracteres).")
+
+    _req(bool(settings.ENCRYPTION_KEY), "ENCRYPTION_KEY ausente.")
+    _req(len(settings.ENCRYPTION_KEY) >= 32, "ENCRYPTION_KEY muito curta (mínimo 32 caracteres).")
+
+    _req(bool(settings.EVOLUTION_API_URL), "EVOLUTION_API_URL ausente.")
+    _req(bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)), "EVOLUTION_API_URL inválida (esperado http:// ou https://).")
+    _req(bool(settings.EVOLUTION_API_KEY), "EVOLUTION_API_KEY ausente.")
+
+    # IA (pode ajustar se o MVP permite rodar sem uma delas)
+    _req(bool(settings.OPENAI_API_KEY), "OPENAI_API_KEY ausente.")
+    _req(settings.OPENAI_API_KEY.startswith("sk-"), "OPENAI_API_KEY inválida (esperado iniciar com 'sk-').")
+
+    _req(bool(settings.ANTHROPIC_API_KEY), "ANTHROPIC_API_KEY ausente.")
+    _req(settings.ANTHROPIC_API_KEY.startswith("sk-ant-"), "ANTHROPIC_API_KEY inválida (esperado iniciar com 'sk-ant-').")
+
+    if erros:
+        raise RuntimeError("Config inválida no startup:\n- " + "\n- ".join(erros))
 
 # ==========================================
 # SENTRY — rastreamento de erros em produção
@@ -61,6 +101,26 @@ async def lifespan(app: FastAPI):
     # Executado ao iniciar o servidor (Startup)
     print("🚀 Iniciando o Concierge Jurídico Digital...")
 
+    _validar_config_no_startup()  # valida formato das chaves/URLs
+
+    # Ligando o Redis para o Rate Limit
+    app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+    try:
+        await app.state.redis_client.ping()
+        print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
+    except Exception as e:
+        print(f"❌ Erro ao conectar no Redis: {e}")
+
+    yield
+
+    # Executado ao desligar o servidor (Shutdown)
+    print("🛑 Encerrando o servidor de forma graciosa...")
+    if hasattr(app.state, "redis_client"):
+        await app.state.redis_client.aclose()
+    
+    
+
     # 1. Ligando o Redis para o Rate Limit
     app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
     try:
@@ -100,22 +160,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )  
-
-# if settings.ENVIRONMENT == "development": A SER IMPLEMENTADO, CORS ACIMA DEVE SER APAGADO ;
+# if settings.ENVIRONMENT == "development":
 #     allowed_origins = ["*"]
+#     allow_credentials = False  # evita conflito com "*" em browsers
 # else:
 #     allowed_origins = [
 #         "https://app.conciergejuridico.com",
 #         "https://admin.conciergejuridico.com",
 #     ]
+#     allow_credentials = True
 
 # app.add_middleware(
 #     CORSMiddleware,
 #     allow_origins=allowed_origins,
-#     allow_credentials=True,
-#     allow_methods=["*"],
+#     allow_credentials=allow_credentials,
+#     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 #     allow_headers=["*"],
 # )
+#  A SER IMPLEMENTADO, CORS ACIMA DEVE SER APAGADO ;
+
 
 # Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
 # Fluxo ideal ao receber requisição: 1. Rate Limit -> 2. Autenticação JWT -> 3. Rotas
