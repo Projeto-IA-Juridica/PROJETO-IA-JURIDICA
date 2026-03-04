@@ -1,0 +1,113 @@
+# ==============================================================================
+# Backup Automático — Concierge Jurídico [PIJ-213]
+# ==============================================================================
+# Roda automaticamente todo dia às 03:00 UTC (00:00 horário de Brasília).
+#
+# Backups ficam disponíveis em:
+#   GitHub Actions → Run → Artifacts → "backup-postgresql-YYYY-MM-DD"
+#   (retidos por 90 dias automaticamente pelo GitHub)
+#
+# Pré-requisitos (GitHub Secrets):
+#   DATABASE_URL → URL completa do banco Supabase com credenciais
+#   S3_BUCKET    → (opcional) bucket AWS para backup adicional
+#   AWS_ACCESS_KEY_ID     → (opcional, se S3_BUCKET definido)
+#   AWS_SECRET_ACCESS_KEY → (opcional, se S3_BUCKET definido)
+# ==============================================================================
+
+name: Backup PostgreSQL
+
+on:
+  # Roda todo dia às 03:00 UTC = 00:00 horário de Brasília (UTC-3)
+  schedule:
+    - cron: "0 3 * * *"
+
+  # Permite disparo manual para backup emergencial
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Executar em modo dry-run (sem criar arquivos reais)?"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  backup:
+    name: Backup do Banco de Dados
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Instalar cliente PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Criar diretório de backup
+        run: mkdir -p /tmp/concierge-backups
+
+      - name: Executar backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_DIR: /tmp/concierge-backups
+          RETENTION_DAYS: 90
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: sa-east-1
+        run: |
+          chmod +x infrastructure/scripts/backup.sh
+
+          # Verificar se é dry-run (manual ou padrão)
+          DRY_RUN_FLAG=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          ./infrastructure/scripts/backup.sh $DRY_RUN_FLAG
+
+      - name: Verificar tamanho do backup
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          BACKUP_FILE=$(ls -t /tmp/concierge-backups/concierge_backup_*.sql.gz 2>/dev/null | head -1)
+          if [ -z "$BACKUP_FILE" ]; then
+            echo "❌ Nenhum arquivo de backup encontrado"
+            exit 1
+          fi
+          SIZE=$(du -sh "$BACKUP_FILE" | cut -f1)
+          echo "✅ Backup gerado: $(basename $BACKUP_FILE) ($SIZE)"
+          echo "BACKUP_FILE=$BACKUP_FILE" >> $GITHUB_ENV
+          echo "BACKUP_FILENAME=$(basename $BACKUP_FILE)" >> $GITHUB_ENV
+
+      # Salvar backup como artefato do GitHub Actions (retido por 90 dias)
+      - name: Upload do backup como artefato
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-postgresql-${{ github.run_id }}
+          path: /tmp/concierge-backups/concierge_backup_*.sql.gz
+          retention-days: 90
+
+      - name: Resumo no GitHub Actions
+        if: always()
+        run: |
+          echo "## 💾 Backup PostgreSQL" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Data/hora | $(date '+%d/%m/%Y %H:%M:%S') UTC |" >> $GITHUB_STEP_SUMMARY
+          echo "| Modo | ${{ github.event.inputs.dry_run == 'true' && 'DRY-RUN' || 'Normal' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Arquivo | ${BACKUP_FILENAME:-N/A} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Artefato | Disponível em Actions → Run #${{ github.run_id }} → Artifacts |" >> $GITHUB_STEP_SUMMARY
+          echo "| Retenção | 90 dias |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Como restaurar" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# 1. Baixe o artefato desta run" >> $GITHUB_STEP_SUMMARY
+          echo "# 2. Execute:" >> $GITHUB_STEP_SUMMARY
+          echo 'gunzip -c concierge_backup_*.sql.gz | psql "$DATABASE_URL"' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
