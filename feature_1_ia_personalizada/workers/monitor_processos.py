@@ -14,6 +14,7 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     get_andamentos_sync,
     set_andamentos_sync,
 )
+import pybreaker
 
 # from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
 # from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
@@ -36,6 +37,9 @@ _processos_monitorados_total = Gauge(
     "Número atual de processos com monitoramento ativo",
 )
 
+# CIRCUIT BREAKERS (Compartilhados por todos os processos neste worker)
+_jusbrasil_breaker = pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)
+_datajud_breaker = pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)
 
 # CONFIGURAÇÕES
 
@@ -80,6 +84,7 @@ def extrair_texto_e_data_do_andamento(
     return str(texto), converter_para_iso(data)
 
 
+@_jusbrasil_breaker
 def buscar_andamentos_jusbrasil(
     numero_processo: str,
     data_referencia_iso: str | None,
@@ -90,6 +95,7 @@ def buscar_andamentos_jusbrasil(
     )
 
 
+@_datajud_breaker
 def buscar_andamentos_datajud(
     numero_processo: str,
     data_referencia_iso: str | None,
@@ -124,9 +130,21 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
                 data_ultimo_andamento_salvo,
                 cliente_jusbrasil,
             )
+        except pybreaker.CircuitBreakerError as erro:
+            logger.warning(
+                "jusbrasil_circuit_open_fallback_datajud",
+                id_processo=id_processo,
+                erro=str(erro),
+            )
+            fonte_utilizada = "datajud"
+            lista_andamentos = buscar_andamentos_datajud(
+                numero_processo,
+                data_ultimo_andamento_salvo,
+                cliente_datajud,
+            )
         except Exception as erro:
             logger.warning(
-                "jusbrasil_fallback_datajud",
+                "jusbrasil_erro_fallback_datajud",
                 id_processo=id_processo,
                 erro=str(erro),
                 exc_info=True,

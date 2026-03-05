@@ -1427,9 +1427,9 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [ ] Implementar lógica de redirecionar tasks para DLQ após retries esgotados
 
 #### Circuit Breaker para APIs externas [PIJ-216]
-- [ ] Adicionar `pybreaker` ao `requirements-f1.txt`
-- [ ] Envolver chamadas ao JusbrasilClient e DataJudClient com `CircuitBreaker(fail_max=5, reset_timeout=60)`
-- [ ] Tratar `CircuitBreakerError` no monitor de processos — fazer fallback para DataJud quando Jusbrasil circuit está aberto
+- [x] Adicionar `pybreaker` ao `requirements-f1.txt`
+- [x] Envolver chamadas ao JusbrasilClient e DataJudClient com `CircuitBreaker(fail_max=5, reset_timeout=60)`
+- [x] Tratar `CircuitBreakerError` no monitor de processos — fazer fallback para DataJud quando Jusbrasil circuit está aberto
 
 #### Cache de dados jurídicos
 - [ ] Implementar cache Redis para andamentos nos workers (TTL 1h) — evitar chamar Jusbrasil desnecessariamente

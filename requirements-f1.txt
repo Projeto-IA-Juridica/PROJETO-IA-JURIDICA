@@ -23,6 +23,9 @@ flower==2.0.1             # Interface web de monitoramento Celery
 # HTTP async
 aiohttp==3.9.3
 
+# Resiliência
+pybreaker==1.2.0
+
 # Audio
 pydub==0.25.1             # Conversão ogg→mp3 (requer ffmpeg instalado no SO)
 # ffmpeg: instalado via apt no Dockerfile.f1 / brew install ffmpeg localmente
