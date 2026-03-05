@@ -22,6 +22,7 @@ from shared.database.worker_queries import (
     insert_interacao,
     query_ultima_interacao_batch,
 )
+from shared.config.settings import settings
 from shared.database.worker_queries import (
     query_processo_ativo_do_cliente as _orm_processo_ativo,
 )
@@ -35,8 +36,7 @@ _mensagens_relacionamento_enviadas_total = Counter(
 )
 
 FUSO_HORARIO_PADRAO = int(os.getenv("FUSO_HORARIO_PADRAO", "-3"))
-URL_REDIS = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
+cliente_redis = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 TAMANHO_LOTE = 10
 TEMPO_ALERTA_POR_CLIENTE = (
@@ -253,23 +253,30 @@ def verificar_aniversarios_diarios(self) -> dict:
             WhatsAppService.enviar_mensagem(
                 id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
             )
-
-            GoogleSheetsClient.registrar_log_envio(
-                tipo="aniversario",
-                cliente_id=cliente.id,
-                detalhe=f"processo={processo.numero if processo else 'nenhum'}",
-            )
-
-            salvar_interacao(
-                id_cliente=cliente.id,
-                id_processo=processo.id if processo else None,
-                texto=texto,
-                metadata_json={"tipo_relacionamento": "aniversario"},
-            )
-
-            _mensagens_relacionamento_enviadas_total.labels(tipo="aniversario").inc()
+            # Marca ANTES das operações não-críticas: se Sheets ou DB falharem
+            # e a task for reexecutada, o cliente não recebe a mensagem de novo.
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
+            _mensagens_relacionamento_enviadas_total.labels(tipo="aniversario").inc()
             enviados += 1
+
+            try:
+                GoogleSheetsClient.registrar_log_envio(
+                    tipo="aniversario",
+                    cliente_id=cliente.id,
+                    detalhe=f"processo={processo.numero if processo else 'nenhum'}",
+                )
+            except Exception as e:
+                logger.warning("log_sheets_falhou", tipo="aniversario", cliente_id=cliente.id, erro=str(e))
+
+            try:
+                salvar_interacao(
+                    id_cliente=cliente.id,
+                    id_processo=processo.id if processo else None,
+                    texto=texto,
+                    metadata_json={"tipo_relacionamento": "aniversario"},
+                )
+            except Exception as e:
+                logger.warning("salvar_interacao_falhou", tipo="aniversario", cliente_id=cliente.id, erro=str(e))
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
                 logger.warning(
@@ -354,28 +361,33 @@ def verificar_datas_comemorativas(self) -> dict:
                 WhatsAppService.enviar_mensagem(
                     id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
                 )
-
-                GoogleSheetsClient.registrar_log_envio(
-                    tipo="data_comemorativa",
-                    cliente_id=cliente.id,
-                    detalhe=f"data={nome_data} processo={processo.numero if processo else 'nenhum'}",
-                )
-
-                salvar_interacao(
-                    id_cliente=cliente.id,
-                    id_processo=processo.id if processo else None,
-                    texto=texto,
-                    metadata_json={
-                        "tipo_relacionamento": "data_comemorativa",
-                        "nome_data": nome_data,
-                    },
-                )
-
+                marcar_enviado(chave_envio, TEMPO_30_DIAS)
                 _mensagens_relacionamento_enviadas_total.labels(
                     tipo="data_comemorativa"
                 ).inc()
-                marcar_enviado(chave_envio, TEMPO_30_DIAS)
                 enviados += 1
+
+                try:
+                    GoogleSheetsClient.registrar_log_envio(
+                        tipo="data_comemorativa",
+                        cliente_id=cliente.id,
+                        detalhe=f"data={nome_data} processo={processo.numero if processo else 'nenhum'}",
+                    )
+                except Exception as e:
+                    logger.warning("log_sheets_falhou", tipo="data_comemorativa", cliente_id=cliente.id, erro=str(e))
+
+                try:
+                    salvar_interacao(
+                        id_cliente=cliente.id,
+                        id_processo=processo.id if processo else None,
+                        texto=texto,
+                        metadata_json={
+                            "tipo_relacionamento": "data_comemorativa",
+                            "nome_data": nome_data,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning("salvar_interacao_falhou", tipo="data_comemorativa", cliente_id=cliente.id, erro=str(e))
 
                 if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
                     logger.warning(
@@ -438,23 +450,28 @@ def verificar_clientes_sem_contato(self) -> dict:
             WhatsAppService.enviar_mensagem(
                 id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
             )
-
-            GoogleSheetsClient.registrar_log_envio(
-                tipo="check_in",
-                cliente_id=cliente.id,
-                detalhe=f"processo={processo.numero if processo else 'nenhum'}",
-            )
-
-            salvar_interacao(
-                id_cliente=cliente.id,
-                id_processo=processo.id if processo else None,
-                texto=texto,
-                metadata_json={"tipo_relacionamento": "check_in"},
-            )
-
-            _mensagens_relacionamento_enviadas_total.labels(tipo="check_in").inc()
             marcar_enviado(chave_envio, TEMPO_30_DIAS)
+            _mensagens_relacionamento_enviadas_total.labels(tipo="check_in").inc()
             enviados += 1
+
+            try:
+                GoogleSheetsClient.registrar_log_envio(
+                    tipo="check_in",
+                    cliente_id=cliente.id,
+                    detalhe=f"processo={processo.numero if processo else 'nenhum'}",
+                )
+            except Exception as e:
+                logger.warning("log_sheets_falhou", tipo="check_in", cliente_id=cliente.id, erro=str(e))
+
+            try:
+                salvar_interacao(
+                    id_cliente=cliente.id,
+                    id_processo=processo.id if processo else None,
+                    texto=texto,
+                    metadata_json={"tipo_relacionamento": "check_in"},
+                )
+            except Exception as e:
+                logger.warning("salvar_interacao_falhou", tipo="check_in", cliente_id=cliente.id, erro=str(e))
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
                 logger.warning(

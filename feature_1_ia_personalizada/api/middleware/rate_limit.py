@@ -56,6 +56,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         redis_key = f"{prefix}{identifier}"
 
         # Lógica atômica no Redis: incrementa e seta expiração se for nova
+        current_count = 0
         try:
             current_count = await r.incr(redis_key)
             if current_count == 1:

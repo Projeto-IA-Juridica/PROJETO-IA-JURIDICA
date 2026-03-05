@@ -42,7 +42,13 @@ _processos_monitorados_total = Gauge(
 
 TAMANHO_LOTE = 10
 INTERVALO_ENTRE_REQUISICOES_SEGUNDOS = 0.4
+# Tempo máximo por processo individual (task monitorar_processo_individual).
+# A task monitorar_processos usa TEMPO_MAXIMO_TASK_SEGUNDOS (separado).
 TEMPO_MAXIMO_PROCESSO_SEGUNDOS = 30
+# Tempo máximo para a task que varre todos os processos.
+# Com 0.4s de sleep por processo: 600s suporta ~1.500 processos por ciclo.
+# Ajustar conforme o volume real do banco em produção.
+TEMPO_MAXIMO_TASK_SEGUNDOS = 600
 _LIMITE_BUSCA_PROCESSOS = 10_000  # máximo de processos por execução da task
 
 
@@ -189,8 +195,8 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
 # TASK: MONITORAR TODOS
 @celery_app.task(
     name="workers.monitorar_processos",
-    soft_time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
-    time_limit=TEMPO_MAXIMO_PROCESSO_SEGUNDOS + 5,
+    soft_time_limit=TEMPO_MAXIMO_TASK_SEGUNDOS,
+    time_limit=TEMPO_MAXIMO_TASK_SEGUNDOS + 30,
 )
 def monitorar_processos() -> dict[str, Any]:
 

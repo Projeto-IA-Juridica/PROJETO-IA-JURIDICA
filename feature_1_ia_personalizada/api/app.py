@@ -46,7 +46,14 @@ def _validar_config_no_startup() -> None:
     _req(len(settings.JWT_SECRET_KEY) >= 32, "JWT_SECRET_KEY muito curta (mínimo 32 caracteres).")
 
     _req(bool(settings.ENCRYPTION_KEY), "ENCRYPTION_KEY ausente.")
-    _req(len(settings.ENCRYPTION_KEY) >= 32, "ENCRYPTION_KEY muito curta (mínimo 32 caracteres).")
+    try:
+        from cryptography.fernet import Fernet as _Fernet
+        _Fernet(settings.ENCRYPTION_KEY.encode())
+    except Exception:
+        erros.append(
+            "ENCRYPTION_KEY inválida (deve ser uma chave Fernet válida — "
+            "44 chars base64url, gerada com Fernet.generate_key())."
+        )
 
     _req(bool(settings.EVOLUTION_API_URL), "EVOLUTION_API_URL ausente.")
     _req(bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)), "EVOLUTION_API_URL inválida (esperado http:// ou https://).")
@@ -118,23 +125,6 @@ async def lifespan(app: FastAPI):
     print("🛑 Encerrando o servidor de forma graciosa...")
     if hasattr(app.state, "redis_client"):
         await app.state.redis_client.aclose()
-    
-    
-
-    # 1. Ligando o Redis para o Rate Limit
-    app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    try:
-        await app.state.redis_client.ping()
-        print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
-    except Exception as e:
-        print(f"❌ Erro ao conectar no Redis: {e}")
-
-    yield
-
-    # Executado ao desligar o servidor (Shutdown)
-    print("🛑 Encerrando o servidor de forma graciosa...")
-    if hasattr(app.state, "redis_client"):
-        await app.state.redis_client.aclose()
 
 
 logger = structlog.get_logger(__name__)
@@ -152,32 +142,22 @@ app = FastAPI(
 # ==========================================
 # MIDDLEWARES GLOBAIS
 # ==========================================
-# CORS: Permite que um frontend (ex: painel web Vue/React) consuma esta API
+# CORS: em development permite qualquer origem; em staging/production restringe
+# aos domínios declarados em CORS_ALLOWED_ORIGINS (separados por vírgula no .env)
+if settings.ENVIRONMENT == "development":
+    _cors_origins = ["*"]
+    _cors_credentials = False  # allow_credentials=True é incompatível com allow_origins=["*"]
+else:
+    _cors_origins = [o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
+    _cors_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, trocar para domínios específicos
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)  
-# if settings.ENVIRONMENT == "development":
-#     allowed_origins = ["*"]
-#     allow_credentials = False  # evita conflito com "*" em browsers
-# else:
-#     allowed_origins = [
-#         "https://app.conciergejuridico.com",
-#         "https://admin.conciergejuridico.com",
-#     ]
-#     allow_credentials = True
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=allowed_origins,
-#     allow_credentials=allow_credentials,
-#     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-#     allow_headers=["*"],
-# )
-#  A SER IMPLEMENTADO, CORS ACIMA DEVE SER APAGADO ;
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 # Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)

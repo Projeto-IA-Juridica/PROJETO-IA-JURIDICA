@@ -1,5 +1,7 @@
+import hmac
 import re
 import time
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -42,7 +44,7 @@ async def receive_message(
     localiza o Escritório e o Cliente correspondentes no banco de dados,
     e envia a tarefa pesada de I.A. para a fila do Celery.
     """
-    if not apikey or apikey != settings.EVOLUTION_API_KEY:
+    if not apikey or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY):
         logger.warning("webhook_auth_failed", apikey_received=bool(apikey))
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -60,8 +62,6 @@ async def receive_message(
     if event != "messages.upsert":
         # Retornamos OK para a Evolution não ficar tentando reenviar indefinidamente eventos de status
         return {"status": "ignored", "reason": f"Event '{event}' not processing"}
-
-    from typing import Any
 
     raw_data: Any = body.get("data", {})
     data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
@@ -93,6 +93,8 @@ async def receive_message(
     # Extrair telefone puro
     telefone_str = remote_jid.split("@")[0]
     telefone_digitos = re.sub(r"\D", "", telefone_str)
+    if not telefone_digitos:
+        return {"status": "ignored", "reason": "Invalid phone format"}
 
     # Extrair conteúdo da mensagem
     msg_content: dict[str, Any] = (

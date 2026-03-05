@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     GOOGLE_SHEETS_ID: str | None = None
     GOOGLE_CREDENTIALS_PATH: str | None = None
 
+    # CORS
+    CORS_ALLOWED_ORIGINS: str = "https://app.conciergejuridico.com,https://admin.conciergejuridico.com"
+
     # Ambiente
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     LOG_LEVEL: str = "INFO"

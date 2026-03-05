@@ -122,7 +122,7 @@ def _mask_value(key: str, value: object) -> object:
     - Se o valor é list → mascara recursivamente cada elemento.
     - Outros tipos (int, float, bool, None) → retorna sem alteração.
     """
-    if key in _SENSITIVE_KEYS:
+    if key.lower() in _SENSITIVE_KEYS:
         return "***"
     if isinstance(value, str):
         return _apply_patterns(value)

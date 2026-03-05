@@ -27,15 +27,6 @@ Notificações (send_notifications.py):
     query_clientes_para_pesquisa()
     update_ultimo_andamento(id_processo, texto, data_iso)
 
-Relacionamento (mensagens_relacionamento.py):
-    query_processo_ativo_do_cliente(id_cliente)
-    insert_interacao(id_cliente, id_processo, texto, metadata_json, tipo, direcao)
-    query_ultima_interacao_batch(ids_clientes)
-
-Notificações (send_notifications.py):
-    query_processo_e_cliente(id_processo)
-    query_processos_sem_movimentacao()
-    query_clientes_para_pesquisa()
 """
 
 from __future__ import annotations
@@ -45,8 +36,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
+
+logger = structlog.get_logger(__name__)
 
 from shared.database.connection import async_session_factory
 from shared.models.cliente import Cliente as ClienteModel
@@ -199,7 +193,8 @@ async def _insert_interacao(
         )
         escritorio_id = result.scalar_one_or_none()
         if escritorio_id is None:
-            return  # cliente não existe no banco — não persiste
+            logger.warning("insert_interacao_cliente_nao_encontrado", id_cliente=id_cliente)
+            return
 
         interacao = Interacao(
             cliente_id=id_cliente,
@@ -393,9 +388,7 @@ async def _enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) 
         instance = result.scalar_one_or_none()
 
     if not instance:
-        import structlog as _structlog
-
-        _structlog.get_logger(__name__).warning(
+        logger.warning(
             "instancia_whatsapp_nao_configurada",
             id_cliente=id_cliente,
             telefone=telefone,
