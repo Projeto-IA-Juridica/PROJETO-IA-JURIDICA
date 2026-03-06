@@ -44,7 +44,10 @@ def _validar_config_no_startup() -> None:
 
     # Obrigatórias para subir o core
     _req(bool(settings.REDIS_URL), "REDIS_URL ausente.")
-    _req(settings.REDIS_URL.startswith("redis://"), "REDIS_URL inválida (esperado 'redis://').")
+    _req(
+    settings.REDIS_URL.startswith(("redis://", "rediss://")),
+    "REDIS_URL inválida (esperado 'redis://' ou 'rediss://').",
+)
 
     _req(bool(settings.DATABASE_URL), "DATABASE_URL ausente.")
     _req(
