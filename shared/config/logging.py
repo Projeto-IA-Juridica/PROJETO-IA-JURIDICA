@@ -60,7 +60,24 @@ import sys
 import structlog
 from structlog.contextvars import merge_contextvars
 
+
+import structlog
+import logging
+
+
 from shared.config.settings import settings
+
+
+def configure_logging():
+    logging.basicConfig(level=logging.INFO)
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(),
+            structlog.processors.JSONRenderer(),
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+    )
 
 # ---------------------------------------------------------------------------
 # Mascaramento de dados sensíveis (Sprint 2 — 3.6 production-readiness.md)

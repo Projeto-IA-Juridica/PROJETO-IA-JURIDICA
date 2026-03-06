@@ -217,3 +217,17 @@ services:
       celery -A feature_1_ia_personalizada.workers.celery_app flower
       --port=5555
       --basic_auth=admin:admin
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
