@@ -99,7 +99,9 @@ class ProcessoCreate(BaseModel):
     def validar_polo(cls, v: str) -> str:
         normalizado = v.lower().strip()
         if normalizado not in _POLOS_VALIDOS:
-            raise ValueError(f"Polo inválido — opções: {', '.join(sorted(_POLOS_VALIDOS))}")
+            raise ValueError(
+                f"Polo inválido — opções: {', '.join(sorted(_POLOS_VALIDOS))}"
+            )
         return normalizado
 
 
@@ -123,7 +125,9 @@ class ProcessoUpdate(BaseModel):
             return v
         normalizado = v.lower().strip()
         if normalizado not in _POLOS_VALIDOS:
-            raise ValueError(f"Polo inválido — opções: {', '.join(sorted(_POLOS_VALIDOS))}")
+            raise ValueError(
+                f"Polo inválido — opções: {', '.join(sorted(_POLOS_VALIDOS))}"
+            )
         return normalizado
 
     @field_validator("frequencia_monitoramento")

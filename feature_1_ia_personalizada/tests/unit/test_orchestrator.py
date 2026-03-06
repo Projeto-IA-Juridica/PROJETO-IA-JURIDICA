@@ -15,7 +15,6 @@ Nota sobre async:
   Se o projeto migrar para asyncio_mode = "strict", adicionar o decorator em
   cada método async ou usar @pytest.mark.asyncio no nível da classe.
 """
-
 from __future__ import annotations
 
 import asyncio
@@ -210,8 +209,12 @@ def _make_orchestrator(
 ) -> ConversationOrchestrator:
     """Cria um ConversationOrchestrator com todas as dependências mockadas."""
     if session is None:
-        session = _make_session(processos=processos, escritorio=escritorio, cliente=cliente)
-    with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        session = _make_session(
+            processos=processos, escritorio=escritorio, cliente=cliente
+        )
+    with patch(
+        "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+    ):
         orq = ConversationOrchestrator(
             claude_client=claude or _mock_claude(),
             memory=memory or _mock_memory(),
@@ -266,7 +269,9 @@ class TestClassificarPorKeywords:
         assert _classificar_por_keywords("olá, bom dia!") == "saudacao"
 
     def test_reclamacao(self):
-        assert _classificar_por_keywords("estou insatisfeito com a demora") == "reclamacao"
+        assert (
+            _classificar_por_keywords("estou insatisfeito com a demora") == "reclamacao"
+        )
 
     def test_mensagem_sem_keywords_retorna_outro(self):
         assert _classificar_por_keywords("aaaaa bbbbb") == "outro"
@@ -283,7 +288,9 @@ class TestClassificarPorKeywords:
 class TestNodeClassificarIntencao:
     async def test_sucesso_retorna_intencao_do_claude(self):
         claude = _mock_claude()
-        claude.classificar_intencao = AsyncMock(return_value='{"intencao": "agendamento"}')
+        claude.classificar_intencao = AsyncMock(
+            return_value='{"intencao": "agendamento"}'
+        )
         orq = _make_orchestrator(claude=claude)
         result = await orq._node_classificar_intencao(_base_state())
         assert result["intencao"] == "agendamento"
@@ -306,7 +313,9 @@ class TestNodeClassificarIntencao:
 
     async def test_intencao_desconhecida_normalizada_para_outro(self):
         claude = _mock_claude()
-        claude.classificar_intencao = AsyncMock(return_value='{"intencao": "xpto_invalido"}')
+        claude.classificar_intencao = AsyncMock(
+            return_value='{"intencao": "xpto_invalido"}'
+        )
         orq = _make_orchestrator(claude=claude)
         result = await orq._node_classificar_intencao(_base_state())
         assert result["intencao"] == "outro"
@@ -321,7 +330,9 @@ class TestNodeClassificarIntencao:
             "outro",
         ):
             claude = _mock_claude()
-            claude.classificar_intencao = AsyncMock(return_value=f'{{"intencao": "{intencao}"}}')
+            claude.classificar_intencao = AsyncMock(
+                return_value=f'{{"intencao": "{intencao}"}}'
+            )
             orq = _make_orchestrator(claude=claude)
             result = await orq._node_classificar_intencao(_base_state())
             assert result["intencao"] == intencao
@@ -359,7 +370,9 @@ class TestNodeBuscarDados:
 
     async def test_cache_miss_chama_jusbrasil_e_salva_cache(self):
         cache = _mock_cache(andamentos=None)
-        jusbrasil = _mock_jusbrasil([{"descricao": "Despacho judicial.", "data": "2024-06-01"}])
+        jusbrasil = _mock_jusbrasil(
+            [{"descricao": "Despacho judicial.", "data": "2024-06-01"}]
+        )
         orq = _make_orchestrator(cache=cache, jusbrasil=jusbrasil)
         result = await orq._node_buscar_dados(_base_state())
         jusbrasil.sincronizar_andamentos.assert_called_once()
@@ -373,14 +386,19 @@ class TestNodeBuscarDados:
         orq = _make_orchestrator(cache=cache, jusbrasil=jusbrasil)
         result = await orq._node_buscar_dados(_base_state())
         # _Processo.ultimo_andamento = "Audiência agendada para 10/02/2025."
-        assert result["dados_processo"]["ultimo_andamento"] == "Audiência agendada para 10/02/2025."
+        assert (
+            result["dados_processo"]["ultimo_andamento"]
+            == "Audiência agendada para 10/02/2025."
+        )
 
     async def test_excecao_retorna_chave_erro(self):
         cm = MagicMock()
         cm.__aenter__ = AsyncMock(side_effect=RuntimeError("DB offline"))
         cm.__aexit__ = AsyncMock(return_value=False)
         factory = MagicMock(return_value=cm)
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
@@ -404,14 +422,18 @@ class TestNodeBuscarDados:
             "despacho": "Decisão judicial de mero expediente.\n\nExemplo: Cite-se o réu.",
             "tutela": "Medida judicial protetiva.",
         }
-        translator = _mock_translator(termos=["despacho", "tutela"], traducoes=traducoes)
+        translator = _mock_translator(
+            termos=["despacho", "tutela"], traducoes=traducoes
+        )
         andamentos = [
             {
                 "descricao": "Despacho concedendo tutela antecipada.",
                 "data": "2024-06-01",
             }
         ]
-        orq = _make_orchestrator(translator=translator, cache=_mock_cache(andamentos=andamentos))
+        orq = _make_orchestrator(
+            translator=translator, cache=_mock_cache(andamentos=andamentos)
+        )
         result = await orq._node_buscar_dados(_base_state())
         glossario = result["dados_processo"]["glossario_andamento"]
         assert "despacho" in glossario
@@ -446,10 +468,14 @@ class TestNodeBuscarDados:
 class TestNodeGerarResposta:
     async def test_duvida_termo_com_traducao_local_nao_chama_claude(self):
         translator = _mock_translator()
-        translator.traduzir_termo = MagicMock(return_value="Recurso para questões processuais.")
+        translator.traduzir_termo = MagicMock(
+            return_value="Recurso para questões processuais."
+        )
         claude = _mock_claude()
         orq = _make_orchestrator(claude=claude, translator=translator)
-        state = _base_state(intencao="duvida_termo", mensagem_original="o que é agravo?")
+        state = _base_state(
+            intencao="duvida_termo", mensagem_original="o que é agravo?"
+        )
         result = await orq._node_gerar_resposta(state)
         claude.enviar_mensagem.assert_not_called()
         assert result["resposta_ia"] == "Recurso para questões processuais."
@@ -461,7 +487,9 @@ class TestNodeGerarResposta:
         translator.traduzir_termo = MagicMock(return_value=None)
         claude = _mock_claude("Agravo é um recurso judicial.")
         orq = _make_orchestrator(claude=claude, translator=translator)
-        state = _base_state(intencao="duvida_termo", mensagem_original="o que é agravo?")
+        state = _base_state(
+            intencao="duvida_termo", mensagem_original="o que é agravo?"
+        )
         result = await orq._node_gerar_resposta(state)
         claude.enviar_mensagem.assert_called_once()
         assert result["resposta_ia"] == "Agravo é um recurso judicial."
@@ -478,7 +506,9 @@ class TestNodeGerarResposta:
         }
         claude = _mock_claude()
         orq = _make_orchestrator(claude=claude)
-        await orq._node_gerar_resposta(_base_state(intencao="status", dados_processo=dados))
+        await orq._node_gerar_resposta(
+            _base_state(intencao="status", dados_processo=dados)
+        )
         prompt = claude.enviar_mensagem.call_args.kwargs["system_prompt"]
         assert "<glossario_termos>" not in prompt
 
@@ -494,7 +524,9 @@ class TestNodeGerarResposta:
         }
         claude = _mock_claude()
         orq = _make_orchestrator(claude=claude)
-        await orq._node_gerar_resposta(_base_state(intencao="status", dados_processo=dados))
+        await orq._node_gerar_resposta(
+            _base_state(intencao="status", dados_processo=dados)
+        )
         prompt = claude.enviar_mensagem.call_args.kwargs["system_prompt"]
         assert "<glossario_termos>" in prompt
         assert "- despacho: Decisão do juiz" in prompt
@@ -516,7 +548,9 @@ class TestNodeGerarResposta:
         }
         claude = _mock_claude()
         orq = _make_orchestrator(claude=claude)
-        await orq._node_gerar_resposta(_base_state(intencao="status", dados_processo=dados))
+        await orq._node_gerar_resposta(
+            _base_state(intencao="status", dados_processo=dados)
+        )
         prompt = claude.enviar_mensagem.call_args.kwargs["system_prompt"]
         assert "- despacho: Decisão do juiz" in prompt
         assert "- tutela: Medida protetiva" in prompt
@@ -549,11 +583,15 @@ class TestNodeGerarResposta:
             "glossario_andamento": {},
         }
         orq = _make_orchestrator(session=session, claude=claude)
-        await orq._node_gerar_resposta(_base_state(intencao="status", dados_processo=dados))
+        await orq._node_gerar_resposta(
+            _base_state(intencao="status", dados_processo=dados)
+        )
         # Compara a classe real (não o nome como string) — imune a refactoring de kwargs
         classes_consultadas = {c.args[0] for c in session.get.call_args_list if c.args}
         assert ClienteModel not in classes_consultadas
-        assert EscritorioModel in classes_consultadas  # sanity: Escritorio foi consultado
+        assert (
+            EscritorioModel in classes_consultadas
+        )  # sanity: Escritorio foi consultado
 
     async def test_tokens_acumulados_corretamente(self):
         claude = _mock_claude()
@@ -566,7 +604,9 @@ class TestNodeGerarResposta:
             }
         )
         orq = _make_orchestrator(claude=claude)
-        state = _base_state(tokens_usados={"input": 50, "output": 20, "custo_str": "0.002"})
+        state = _base_state(
+            tokens_usados={"input": 50, "output": 20, "custo_str": "0.002"}
+        )
         result = await orq._node_gerar_resposta(state)
         tokens = result["tokens_usados"]
         assert tokens["input"] == 250
@@ -585,13 +625,17 @@ class TestNodeGerarResposta:
             }
         )
         orq = _make_orchestrator(claude=claude)
-        state = _base_state(tokens_usados={"input": 0, "output": 0, "custo_str": "0.000003"})
+        state = _base_state(
+            tokens_usados={"input": 0, "output": 0, "custo_str": "0.000003"}
+        )
         result = await orq._node_gerar_resposta(state)
         assert Decimal(result["tokens_usados"]["custo_str"]) == Decimal("0.000018")
 
     async def test_runtime_error_do_claude_ativa_fallback_sem_erro(self):
         claude = _mock_claude()
-        claude.enviar_mensagem = AsyncMock(side_effect=RuntimeError("Claude indisponível"))
+        claude.enviar_mensagem = AsyncMock(
+            side_effect=RuntimeError("Claude indisponível")
+        )
         orq = _make_orchestrator(claude=claude)
         result = await orq._node_gerar_resposta(_base_state(intencao="status"))
         assert result.get("usando_fallback") is True
@@ -659,7 +703,9 @@ class TestNodeVerificarResposta:
         orq._fact_checker.filtrar_resposta = MagicMock(
             return_value="Texto já filtrado pelo FactChecker."
         )
-        state = _base_state(resposta_ia="Resposta original da IA.", usando_fallback=False)
+        state = _base_state(
+            resposta_ia="Resposta original da IA.", usando_fallback=False
+        )
         result = await orq._node_verificar_resposta(state)
         orq._fact_checker.filtrar_resposta.assert_called_once()
         assert result["resposta_verificada"] == "Texto já filtrado pelo FactChecker."
@@ -922,7 +968,9 @@ class TestNodeTratarErro:
         session = _make_session(escritorio=None, cliente=None)
         evolution = _mock_evolution()
         orq = _make_orchestrator(session=session, evolution=evolution)
-        result = await orq._node_tratar_erro(_base_state(erro="buscar_dados:DB offline"))
+        result = await orq._node_tratar_erro(
+            _base_state(erro="buscar_dados:DB offline")
+        )
         evolution.enviar_texto.assert_not_called()
         session.add.assert_called_once()
         assert result == {"usando_fallback": True}
@@ -937,7 +985,9 @@ class TestNodeTratarErro:
         cm.__aenter__ = AsyncMock(side_effect=RuntimeError("PG connection refused"))
         cm.__aexit__ = AsyncMock(return_value=False)
         factory = MagicMock(return_value=cm)
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
@@ -963,43 +1013,56 @@ class TestRotas:
     # _rota_apos_classificacao
     def test_classificacao_status_vai_para_buscar_dados(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="status", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="status", erro=None)
+            )
             == "buscar_dados"
         )
 
     def test_classificacao_duvida_termo_vai_para_buscar_dados(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="duvida_termo", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="duvida_termo", erro=None)
+            )
             == "buscar_dados"
         )
 
     def test_classificacao_agendamento_vai_para_buscar_dados(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="agendamento", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="agendamento", erro=None)
+            )
             == "buscar_dados"
         )
 
     def test_classificacao_reclamacao_vai_para_buscar_dados(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="reclamacao", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="reclamacao", erro=None)
+            )
             == "buscar_dados"
         )
 
     def test_classificacao_saudacao_vai_para_gerar_resposta(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="saudacao", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="saudacao", erro=None)
+            )
             == "gerar_resposta"
         )
 
     def test_classificacao_outro_vai_para_gerar_resposta(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(intencao="outro", erro=None))
+            self._orq()._rota_apos_classificacao(
+                _base_state(intencao="outro", erro=None)
+            )
             == "gerar_resposta"
         )
 
     def test_classificacao_com_erro_vai_para_tratar_erro(self):
         assert (
-            self._orq()._rota_apos_classificacao(_base_state(erro="falha_claude")) == "tratar_erro"
+            self._orq()._rota_apos_classificacao(_base_state(erro="falha_claude"))
+            == "tratar_erro"
         )
 
     # _rota_apos_busca_dados
@@ -1009,19 +1072,26 @@ class TestRotas:
 
     def test_busca_sem_erro_vai_para_gerar_resposta(self):
         assert (
-            self._orq()._rota_apos_busca_dados(_base_state(erro=None, resposta_verificada=None))
+            self._orq()._rota_apos_busca_dados(
+                _base_state(erro=None, resposta_verificada=None)
+            )
             == "gerar_resposta"
         )
 
     def test_busca_com_erro_vai_para_tratar_erro(self):
         assert (
-            self._orq()._rota_apos_busca_dados(_base_state(erro="buscar_dados:DB offline"))
+            self._orq()._rota_apos_busca_dados(
+                _base_state(erro="buscar_dados:DB offline")
+            )
             == "tratar_erro"
         )
 
     # _rota_apos_gerar_resposta
     def test_gerar_sem_erro_vai_para_verificar(self):
-        assert self._orq()._rota_apos_gerar_resposta(_base_state(erro=None)) == "verificar_resposta"
+        assert (
+            self._orq()._rota_apos_gerar_resposta(_base_state(erro=None))
+            == "verificar_resposta"
+        )
 
     def test_gerar_com_erro_vai_para_tratar_erro(self):
         assert (
@@ -1050,7 +1120,10 @@ class TestRotas:
         assert self._orq()._rota_apos_verificacao(state) == "enviar_resposta"
 
     def test_verificacao_com_erro_vai_para_tratar_erro(self):
-        assert self._orq()._rota_apos_verificacao(_base_state(erro="verificar:x")) == "tratar_erro"
+        assert (
+            self._orq()._rota_apos_verificacao(_base_state(erro="verificar:x"))
+            == "tratar_erro"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1096,7 +1169,9 @@ class TestSingletonTranslator:
             patch(
                 "feature_1_ia_personalizada.services.ai.orchestrator.JuridicalTranslator"
             ) as MockT,
-            patch("feature_1_ia_personalizada.services.ai.orchestrator.ClaudeClient") as MockClaude,
+            patch(
+                "feature_1_ia_personalizada.services.ai.orchestrator.ClaudeClient"
+            ) as MockClaude,
             patch(
                 "feature_1_ia_personalizada.services.ai.orchestrator.EvolutionClient"
             ) as MockEvolution,
@@ -1212,7 +1287,9 @@ class TestFluxoSequencial:
         evolution = _mock_evolution()
         memory = _mock_memory()
 
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=claude,
                 memory=memory,
@@ -1234,7 +1311,9 @@ class TestFluxoSequencial:
         claude.classificar_intencao = AsyncMock(return_value='{"intencao": "status"}')
         evolution = _mock_evolution()
 
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=claude,
                 memory=_mock_memory(),
@@ -1257,7 +1336,9 @@ class TestFluxoSequencial:
         claude.classificar_intencao = AsyncMock(return_value='{"intencao": "status"}')
         evolution = _mock_evolution()
 
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=claude,
                 memory=_mock_memory(),
@@ -1275,7 +1356,9 @@ class TestFluxoSequencial:
 
     async def test_fluxo_timeout_retorna_mensagem_fallback(self):
         """asyncio.TimeoutError → retorna resposta de timeout, usando_fallback=True."""
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
@@ -1290,7 +1373,9 @@ class TestFluxoSequencial:
             result = await orq.processar(1, 1, "qualquer mensagem")
 
         assert result["usando_fallback"] is True
-        assert result["resposta"] == MENSAGENS_FALLBACK.get("timeout", TEMPLATE_ERRO_GENERICO)
+        assert result["resposta"] == MENSAGENS_FALLBACK.get(
+            "timeout", TEMPLATE_ERRO_GENERICO
+        )
 
     async def test_fluxo_com_fallback_claude_nao_seta_erro(self):
         """RuntimeError no Claude ativa fallback — o fluxo termina normalmente."""
@@ -1298,7 +1383,9 @@ class TestFluxoSequencial:
         claude.classificar_intencao = AsyncMock(return_value='{"intencao": "outro"}')
         claude.enviar_mensagem = AsyncMock(side_effect=RuntimeError("Claude down"))
 
-        with patch("feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False):
+        with patch(
+            "feature_1_ia_personalizada.services.ai.orchestrator._LANGGRAPH_OK", False
+        ):
             orq = ConversationOrchestrator(
                 claude_client=claude,
                 memory=_mock_memory(),

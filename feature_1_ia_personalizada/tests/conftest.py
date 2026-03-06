@@ -3,7 +3,6 @@
 Configuração de ambiente para testes da feature_1.
 Define env vars FAKE antes de qualquer import de módulo de aplicação.
 """
-
 from __future__ import annotations
 
 import os
@@ -222,7 +221,9 @@ async def escritorio_factory(db_session):
 # Factory para Usuário
 @pytest.fixture
 async def usuario_factory(db_session):
-    async def _criar_usuario(escritorio_id: int, senha_plana: str = "Senha123!", **kwargs):
+    async def _criar_usuario(
+        escritorio_id: int, senha_plana: str = "Senha123!", **kwargs
+    ):
         hashed = hash_senha(senha_plana)
         usuario = Usuario(
             escritorio_id=escritorio_id,
@@ -262,7 +263,9 @@ async def async_client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         yield client
 
     app.dependency_overrides.clear()

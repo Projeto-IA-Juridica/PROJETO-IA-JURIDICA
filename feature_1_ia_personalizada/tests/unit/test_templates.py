@@ -8,7 +8,6 @@ Estratégia:
   - Verificar conteúdo mínimo esperado após a formatação.
   - Verificar que KeyError é levantado quando placeholder obrigatório está ausente.
 """
-
 from __future__ import annotations
 
 import pytest
@@ -53,7 +52,9 @@ class TestEstrutura:
     @pytest.mark.parametrize("nome,template", _TODOS_OS_TEMPLATES)
     def test_chaves_balanceadas(self, nome: str, template: str):
         """Toda { deve ter seu } — garante que .format() não quebra por sintaxe."""
-        assert template.count("{") == template.count("}"), f"{nome} tem chaves desbalanceadas"
+        assert template.count("{") == template.count(
+            "}"
+        ), f"{nome} tem chaves desbalanceadas"
 
 
 class TestBoasVindas:
@@ -78,7 +79,9 @@ class TestNovoAndamento:
     def test_formata_com_numero_e_resumo(self):
         numero = "0001234-56.2023.8.26.0001"
         resumo = "Audiência marcada para 10/03/2024."
-        resultado = TEMPLATE_NOVO_ANDAMENTO.format(numero=numero, resumo_traduzido=resumo)
+        resultado = TEMPLATE_NOVO_ANDAMENTO.format(
+            numero=numero, resumo_traduzido=resumo
+        )
         assert numero in resultado
         assert resumo in resultado
 
@@ -145,7 +148,9 @@ class TestAgendamento:
         assert "14h00" in resultado
 
     def test_contem_confirmacao(self):
-        resultado = TEMPLATE_AGENDAMENTO_CONFIRMADO.format(nome="X", data="X", horario="X")
+        resultado = TEMPLATE_AGENDAMENTO_CONFIRMADO.format(
+            nome="X", data="X", horario="X"
+        )
         assert "✅" in resultado or "confirm" in resultado.lower()
 
     def test_falta_qualquer_campo_levanta_key_error(self):

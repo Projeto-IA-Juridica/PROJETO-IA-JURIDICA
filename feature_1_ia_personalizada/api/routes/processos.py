@@ -139,7 +139,9 @@ async def create_processo(
 
 
 @router.get("/{processo_id}", response_model=ProcessoResponse)
-async def get_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+):
     """Detalha um processo específico, garantindo que pertença ao escritório do usuário."""
     escritorio_id = _get_escritorio_id(request)
 
@@ -150,7 +152,9 @@ async def get_processo(processo_id: int, request: Request, db: AsyncSession = De
             detail="Processo não encontrado ou sem permissão de acesso.",
         )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "leitura", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "leitura", _get_ip(request)
+    )
     return processo
 
 
@@ -166,9 +170,13 @@ async def update_processo(
 
     processo = await db.get(Processo, processo_id)
     if not processo or processo.escritorio_id != escritorio_id:
-        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
+        raise HTTPException(
+            status_code=404, detail="Processo não encontrado ou sem permissão."
+        )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "escrita", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "escrita", _get_ip(request)
+    )
 
     # Atualiza em lote usando pydantic exclude_unset pra não sobrescrever os Nones com None cego
     update_data = payload.model_dump(exclude_unset=True)
@@ -180,7 +188,9 @@ async def update_processo(
 
 
 @router.delete("/{processo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+):
     """
     Remove ('soft delete' transformando em arquivado/encerrado, ou hard delete) o processo.
     Para segurança no judiciário, faremos "Soft Delete" mudando o status e desativando o robô.
@@ -189,9 +199,13 @@ async def delete_processo(processo_id: int, request: Request, db: AsyncSession =
 
     processo = await db.get(Processo, processo_id)
     if not processo or processo.escritorio_id != escritorio_id:
-        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
+        raise HTTPException(
+            status_code=404, detail="Processo não encontrado ou sem permissão."
+        )
 
-    registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request))
+    registrar_acesso(
+        _get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request)
+    )
 
     # Soft Delete:
     processo.status = "arquivado"

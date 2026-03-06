@@ -43,10 +43,14 @@ class JuridicalTranslator:
     def _carregar_dicionario(self) -> None:
         try:
             raw = json.loads(_TERMOS_JSON.read_text(encoding="utf-8"))
-            self._dicionario = {_normalizar(termo): dados for termo, dados in raw.items()}
+            self._dicionario = {
+                _normalizar(termo): dados for termo, dados in raw.items()
+            }
             self._original = {_normalizar(termo): termo for termo in raw}
             self._disponivel = True
-            logger.info("tradutor_dicionario_carregado", total_termos=len(self._dicionario))
+            logger.info(
+                "tradutor_dicionario_carregado", total_termos=len(self._dicionario)
+            )
         except FileNotFoundError:
             logger.error("tradutor_dicionario_nao_encontrado", path=str(_TERMOS_JSON))
         except json.JSONDecodeError as exc:

@@ -311,7 +311,9 @@ class TestFormatarMoedaBrl:
 
 class TestFormatarNumeroProcesso:
     def test_de_20_digitos(self):
-        digitos = normalizar_numero_processo(CNJ_VALIDO).replace("-", "").replace(".", "")
+        digitos = (
+            normalizar_numero_processo(CNJ_VALIDO).replace("-", "").replace(".", "")
+        )
         resultado = formatar_numero_processo(digitos)
         assert "-" in resultado and resultado.count(".") == 4
 
@@ -335,7 +337,9 @@ class TestFormatarNumeroProcesso:
 class TestRegistrarAcesso:
     def test_loga_evento_estruturado(self):
         with patch("shared.utils.lgpd.logger") as mock_logger:
-            registrar_acesso(user_id=1, recurso="cliente:42", acao="leitura", ip="1.2.3.4")
+            registrar_acesso(
+                user_id=1, recurso="cliente:42", acao="leitura", ip="1.2.3.4"
+            )
             mock_logger.info.assert_called_once()
             args, kwargs = mock_logger.info.call_args
             assert args[0] == "lgpd.acesso_dados_sensiveis"
@@ -503,7 +507,9 @@ class TestAnonimizarDadosCliente:
 
         with patch("shared.utils.lgpd.registrar_acesso") as mock_audit:
             await anonimizar_dados_cliente(session, cliente_id=5, solicitado_por=99)
-            mock_audit.assert_called_once_with(user_id=99, recurso="cliente:5", acao="anonimizacao")
+            mock_audit.assert_called_once_with(
+                user_id=99, recurso="cliente:5", acao="anonimizacao"
+            )
 
     async def test_sem_solicitado_por_nao_chama_audit(self):
         session = AsyncMock()
@@ -576,7 +582,9 @@ class TestConverterOggParaMp3:
 
         audio_mock.export.side_effect = lambda *args, **_: args[0].write(mp3_bytes)
 
-        with patch("shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock):
+        with patch(
+            "shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock
+        ):
             resultado = converter_ogg_para_mp3(b"ogg_bytes")
 
         assert resultado == mp3_bytes
@@ -594,7 +602,9 @@ class TestConverterOggParaMp3:
         audio_mock = MagicMock()
         audio_mock.export.side_effect = Exception("ffmpeg não encontrado")
 
-        with patch("shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock):
+        with patch(
+            "shared.utils.audio_handler.AudioSegment.from_file", return_value=audio_mock
+        ):
             with pytest.raises(ValueError, match="Falha ao exportar"):
                 converter_ogg_para_mp3(b"ogg_bytes")
 
@@ -605,7 +615,9 @@ class TestTranscreverAudio:
         resposta_mock.text = "  Olá, como posso ajudar?  "
 
         with patch("shared.utils.audio_handler._openai_client") as mock_client:
-            mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+            mock_client.audio.transcriptions.create = AsyncMock(
+                return_value=resposta_mock
+            )
             resultado = await transcrever_audio(b"mp3_bytes")
 
         assert resultado == "Olá, como posso ajudar?"
@@ -639,7 +651,9 @@ class TestTranscreverAudio:
         resposta_mock.text = "   "  # só espaços
 
         with patch("shared.utils.audio_handler._openai_client") as mock_client:
-            mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+            mock_client.audio.transcriptions.create = AsyncMock(
+                return_value=resposta_mock
+            )
             with pytest.raises(ValueError, match="vazia"):
                 await transcrever_audio(b"mp3_bytes")
 
@@ -649,7 +663,9 @@ class TestTranscreverAudio:
 
         with patch("shared.utils.audio_handler.Path.unlink") as mock_unlink:
             with patch("shared.utils.audio_handler._openai_client") as mock_client:
-                mock_client.audio.transcriptions.create = AsyncMock(return_value=resposta_mock)
+                mock_client.audio.transcriptions.create = AsyncMock(
+                    return_value=resposta_mock
+                )
                 await transcrever_audio(b"mp3_bytes")
 
         mock_unlink.assert_called_once_with(missing_ok=True)

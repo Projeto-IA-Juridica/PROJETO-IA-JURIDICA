@@ -10,7 +10,6 @@ Estratégia:
     salvar_interacao, buscar_data_ultima_interacao).
   - time.sleep é patcheado para não atrasar a suite.
 """
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -104,7 +103,8 @@ class TestNormalizarTexto:
 class TestChave:
     def test_prefixo_e_uma_parte(self):
         assert (
-            chave("relacionamento:aniversario", 1, "01-03") == "relacionamento:aniversario:1:01-03"
+            chave("relacionamento:aniversario", 1, "01-03")
+            == "relacionamento:aniversario:1:01-03"
         )
 
     def test_sem_partes_adicionais(self):
@@ -213,7 +213,9 @@ class TestVerificarAniversarios:
 
     def test_cliente_inativo_e_ignorado(self):
         dia, mes = self._hoje()
-        cliente = _cliente(status="inativo", data_nascimento=f"1990-{mes:02d}-{dia:02d}")
+        cliente = _cliente(
+            status="inativo", data_nascimento=f"1990-{mes:02d}-{dia:02d}"
+        )
         result = self._run([cliente])
         assert result["enviados"] == 0
         assert result["total"] == 0
@@ -265,7 +267,9 @@ class TestVerificarDatasComemorativas:
         with (
             patch.object(mr, "cliente_redis", redis),
             patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=clientes),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=datas),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=datas
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem"),
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
@@ -317,7 +321,9 @@ class TestVerificarDatasComemorativas:
         with (
             patch.object(mr, "cliente_redis", redis),
             patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=[cliente]),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem") as mock_enviar,
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
@@ -343,7 +349,9 @@ class TestVerificarDatasComemorativas:
                 "get_clientes",
                 return_value=[bancario, professor],
             ),
-            patch.object(mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]),
+            patch.object(
+                mr.GoogleSheetsClient, "get_datas_comemorativas", return_value=[data]
+            ),
             patch.object(mr.GoogleSheetsClient, "registrar_log_envio"),
             patch.object(mr.WhatsAppService, "enviar_mensagem") as mock_enviar,
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),

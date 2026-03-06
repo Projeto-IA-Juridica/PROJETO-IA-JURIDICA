@@ -32,7 +32,9 @@ def test_hash_senha_sucesso():
     hash_gerado = hash_senha(senha_plana)
 
     assert hash_gerado != senha_plana
-    assert hash_gerado.startswith("$2b$") or hash_gerado.startswith("$2a$")  # Formato Bcrypt
+    assert hash_gerado.startswith("$2b$") or hash_gerado.startswith(
+        "$2a$"
+    )  # Formato Bcrypt
 
 
 def test_hash_senha_salts_diferentes():

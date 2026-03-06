@@ -28,7 +28,9 @@ if "supabase.com" in db_url:
 engine = create_async_engine(
     db_url,
     connect_args=connect_args,
-    echo=(settings.ENVIRONMENT == "development"),  # Loga queries SQL no console apenas em dev
+    echo=(
+        settings.ENVIRONMENT == "development"
+    ),  # Loga queries SQL no console apenas em dev
     pool_size=20,  # Mantém 20 conexões abertas no pool (prontas para uso)
     max_overflow=10,  # Se as 20 estiverem em uso, cria até mais 10 temporárias
     pool_timeout=30,  # Espera até 30s por uma conexão livre antes de dar erro

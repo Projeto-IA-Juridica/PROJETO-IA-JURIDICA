@@ -40,10 +40,10 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ALLOWED_ORIGINS: list[str] = [
-        "https://app.conciergejuridico.com",
-        "https://admin.conciergejuridico.com",
-    ]
-
+    "https://app.conciergejuridico.com",
+    "https://admin.conciergejuridico.com",
+]
+    
     APP_NAME: str = "Concierge Jurídico Digital"
     API_V1_PREFIX: str = "/api/v1"
 

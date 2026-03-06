@@ -42,7 +42,9 @@ class JusbrasilClient:
         """
         self.api_key = api_key
         self._is_mock = True  # Flag indicando uso de simulador
-        logger.info("jusbrasil_client_iniciado", mode="MOCK" if self._is_mock else "LIVE")
+        logger.info(
+            "jusbrasil_client_iniciado", mode="MOCK" if self._is_mock else "LIVE"
+        )
 
     async def buscar_dados_processo(self, numero_cnj: str) -> dict[str, Any]:
         """
@@ -58,7 +60,9 @@ class JusbrasilClient:
 
         # Simula latência de rede ir até a internet (1 a 2 segundos)
         await asyncio.sleep(1.5)
-        _jusbrasil_requests_total.labels(endpoint="buscar_dados_processo", status="ok").inc()
+        _jusbrasil_requests_total.labels(
+            endpoint="buscar_dados_processo", status="ok"
+        ).inc()
 
         # Retorno Simulado (MOCK) para o teste da IA
         return {
@@ -89,7 +93,9 @@ class JusbrasilClient:
 
         # Simula tempo de requisição e parsing da página/API
         await asyncio.sleep(2.0)
-        _jusbrasil_requests_total.labels(endpoint="sincronizar_andamentos", status="ok").inc()
+        _jusbrasil_requests_total.labels(
+            endpoint="sincronizar_andamentos", status="ok"
+        ).inc()
 
         # Gerando andamentos fictícios contextualizados
         hoje = datetime.now()

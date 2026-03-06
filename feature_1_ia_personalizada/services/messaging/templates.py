@@ -21,7 +21,9 @@ TEMPLATE_BOAS_VINDAS = (
 # PROCESSO
 # -----------------------------------------------------------
 
-TEMPLATE_NOVO_ANDAMENTO = "📄 Atualização no seu processo {numero}!\n\n{resumo_traduzido}"
+TEMPLATE_NOVO_ANDAMENTO = (
+    "📄 Atualização no seu processo {numero}!\n\n" "{resumo_traduzido}"
+)
 
 TEMPLATE_SEM_MOVIMENTACAO = (
     "Olá! Sobre o processo {numero}, até o momento não identifiquei "
@@ -56,7 +58,9 @@ TEMPLATE_AGENDAMENTO_CONFIRMADO = (
 # -----------------------------------------------------------
 
 TEMPLATE_PESQUISA_NPS = (
-    "Como você avalia nosso atendimento? (1 a 5)\n1 = Muito insatisfeito\n5 = Muito satisfeito"
+    "Como você avalia nosso atendimento? (1 a 5)\n"
+    "1 = Muito insatisfeito\n"
+    "5 = Muito satisfeito"
 )
 
 TEMPLATE_MENSAGEM_TRIMESTRAL = (
@@ -70,7 +74,8 @@ TEMPLATE_MENSAGEM_TRIMESTRAL = (
 # -----------------------------------------------------------
 
 TEMPLATE_ANIVERSARIO = (
-    "🎉 Feliz Aniversário, {nome}! A equipe do escritório {escritorio} deseja um excelente dia!"
+    "🎉 Feliz Aniversário, {nome}! "
+    "A equipe do escritório {escritorio} deseja um excelente dia!"
 )
 
 TEMPLATE_DIA_BANCARIO = (
@@ -79,7 +84,8 @@ TEMPLATE_DIA_BANCARIO = (
 )
 
 TEMPLATE_DIA_PROFESSOR = (
-    "📚 Feliz Dia do Professor! A equipe do escritório {escritorio} deseja um ótimo dia!"
+    "📚 Feliz Dia do Professor! "
+    "A equipe do escritório {escritorio} deseja um ótimo dia!"
 )
 
 # -----------------------------------------------------------

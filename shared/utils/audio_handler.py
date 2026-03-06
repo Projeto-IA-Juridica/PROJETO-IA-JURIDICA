@@ -97,7 +97,8 @@ def validar_duracao_audio(audio_bytes: bytes) -> int:
     if duracao_ms > _DURACAO_MAXIMA_SEGUNDOS * 1000:
         duracao_s = duracao_ms / 1000
         raise ValueError(
-            f"Áudio muito longo: {duracao_s:.1f}s (máximo permitido: {_DURACAO_MAXIMA_SEGUNDOS}s)"
+            f"Áudio muito longo: {duracao_s:.1f}s "
+            f"(máximo permitido: {_DURACAO_MAXIMA_SEGUNDOS}s)"
         )
 
     return duracao_ms // 1000

@@ -10,7 +10,6 @@ Cobre todas as funções públicas:
   - validar_oab
   - validar_telefone_br
 """
-
 from __future__ import annotations
 
 import pytest
