@@ -7,6 +7,7 @@ Estratégia:
   - Métodos agendar_*: apply_async das tasks é mockado; verifica args, eta e Agendamento retornado.
   - cancelar_agendamento: verifica chamada ao current_app.control.revoke.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -105,8 +106,7 @@ class TestAgendarNotificacaoAndamento:
         mock_result.id = "task-uuid-andamento"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".enviar_notificacao_andamento"
+            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_notificacao_andamento"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             horario = _dt(hora=10)
@@ -127,8 +127,7 @@ class TestAgendarNotificacaoAndamento:
         mock_result.id = "abc-123"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".enviar_notificacao_andamento"
+            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_notificacao_andamento"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             agendamento = sched.agendar_notificacao_andamento(
@@ -147,8 +146,7 @@ class TestAgendarNotificacaoAndamento:
         mock_result.id = "x"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".enviar_notificacao_andamento"
+            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_notificacao_andamento"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             agendamento = sched.agendar_notificacao_andamento(
@@ -172,8 +170,7 @@ class TestAgendarPesquisaSatisfacao:
         mock_result.id = "pesq-uuid"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".enviar_pesquisa_satisfacao"
+            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_pesquisa_satisfacao"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             agendamento = sched.agendar_pesquisa_satisfacao(horario_envio=_dt(hora=15))
@@ -187,8 +184,7 @@ class TestAgendarPesquisaSatisfacao:
         mock_result.id = "pesq-222"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".enviar_pesquisa_satisfacao"
+            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_pesquisa_satisfacao"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             ag = sched.agendar_pesquisa_satisfacao(horario_envio=_dt(hora=11))
@@ -209,8 +205,7 @@ class TestAgendarProcessarMensagem:
         mock_result.id = "msg-uuid"
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".processar_mensagem_recebida"
+            "feature_1_ia_personalizada.services.messaging.scheduler.processar_mensagem_recebida"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             agendamento = sched.agendar_processar_mensagem(
@@ -237,8 +232,7 @@ class TestAgendarProcessarMensagem:
         horario = _dt(hora=12, minuto=30)
 
         with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler"
-            ".processar_mensagem_recebida"
+            "feature_1_ia_personalizada.services.messaging.scheduler.processar_mensagem_recebida"
         ) as mock_task:
             mock_task.apply_async.return_value = mock_result
             ag = sched.agendar_processar_mensagem(
@@ -267,9 +261,7 @@ class TestCancelarAgendamento:
         ) as mock_app:
             sched.cancelar_agendamento("task-para-cancelar")
 
-        mock_app.control.revoke.assert_called_once_with(
-            "task-para-cancelar", terminate=False
-        )
+        mock_app.control.revoke.assert_called_once_with("task-para-cancelar", terminate=False)
 
     def test_nao_termina_processo_em_execucao(self):
         sched = _scheduler()

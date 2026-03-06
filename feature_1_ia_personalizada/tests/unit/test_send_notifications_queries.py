@@ -166,9 +166,7 @@ def test_query_processos_sem_movimentacao_retorna_lista(monkeypatch):
     """Retorna lista de ProcessoWorker para processos sem andamento há > 30 dias."""
     data_antiga = datetime.now(UTC) - timedelta(days=45)
     cliente_orm = _make_cliente()
-    processo_orm = _make_processo(
-        data_ultimo_andamento=data_antiga, cliente=cliente_orm
-    )
+    processo_orm = _make_processo(data_ultimo_andamento=data_antiga, cliente=cliente_orm)
 
     session = _mock_session(scalars_result=[processo_orm])
 

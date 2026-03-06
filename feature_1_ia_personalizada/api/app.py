@@ -7,6 +7,8 @@ Inicializa o aplicativo, configura middlewares (CORS),
 registra todos os roteadores de domínio e define tratadores de eventos de ciclo de vida.
 """
 
+# Validar formato das chaves no startup
+import re
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
@@ -20,18 +22,15 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
-from shared.config.settings import settings 
-# Validar formato das chaves no startup 
-import re
+from shared.config.settings import settings
 
 
 def _validar_config_no_startup() -> None:
     erros: list[str] = []
-    
-    
+
     if not settings.REDIS_URL.startswith(("redis://", "rediss://")):
         erros.append("REDIS_URL inválida (esperado 'redis://' ou 'rediss://').")
-        
+
     if not settings.CELERY_BROKER_URL.startswith(("redis://", "rediss://")):
         erros.append("CELERY_BROKER_URL inválida (esperado 'redis://' ou 'rediss://').")
 
@@ -45,9 +44,9 @@ def _validar_config_no_startup() -> None:
     # Obrigatórias para subir o core
     _req(bool(settings.REDIS_URL), "REDIS_URL ausente.")
     _req(
-    settings.REDIS_URL.startswith(("redis://", "rediss://")),
-    "REDIS_URL inválida (esperado 'redis://' ou 'rediss://').",
-)
+        settings.REDIS_URL.startswith(("redis://", "rediss://")),
+        "REDIS_URL inválida (esperado 'redis://' ou 'rediss://').",
+    )
 
     _req(bool(settings.DATABASE_URL), "DATABASE_URL ausente.")
     _req(
@@ -61,6 +60,7 @@ def _validar_config_no_startup() -> None:
     _req(bool(settings.ENCRYPTION_KEY), "ENCRYPTION_KEY ausente.")
     try:
         from cryptography.fernet import Fernet as _Fernet
+
         _Fernet(settings.ENCRYPTION_KEY.encode())
     except Exception:
         erros.append(
@@ -69,18 +69,28 @@ def _validar_config_no_startup() -> None:
         )
 
     _req(bool(settings.EVOLUTION_API_URL), "EVOLUTION_API_URL ausente.")
-    _req(bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)), "EVOLUTION_API_URL inválida (esperado http:// ou https://).")
+    _req(
+        bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)),
+        "EVOLUTION_API_URL inválida (esperado http:// ou https://).",
+    )
     _req(bool(settings.EVOLUTION_API_KEY), "EVOLUTION_API_KEY ausente.")
 
     # IA (pode ajustar se o MVP permite rodar sem uma delas)
     _req(bool(settings.OPENAI_API_KEY), "OPENAI_API_KEY ausente.")
-    _req(settings.OPENAI_API_KEY.startswith("sk-"), "OPENAI_API_KEY inválida (esperado iniciar com 'sk-').")
+    _req(
+        settings.OPENAI_API_KEY.startswith("sk-"),
+        "OPENAI_API_KEY inválida (esperado iniciar com 'sk-').",
+    )
 
     _req(bool(settings.ANTHROPIC_API_KEY), "ANTHROPIC_API_KEY ausente.")
-    _req(settings.ANTHROPIC_API_KEY.startswith("sk-ant-"), "ANTHROPIC_API_KEY inválida (esperado iniciar com 'sk-ant-').")
+    _req(
+        settings.ANTHROPIC_API_KEY.startswith("sk-ant-"),
+        "ANTHROPIC_API_KEY inválida (esperado iniciar com 'sk-ant-').",
+    )
 
     if erros:
         raise RuntimeError("Config inválida no startup:\n- " + "\n- ".join(erros))
+
 
 # ==========================================
 # SENTRY — rastreamento de erros em produção
@@ -211,9 +221,7 @@ Instrumentator(
 async def global_exception_handler(request: Request, exc: Exception):
     # Captura explícita necessária: o handler impede que o Sentry capture automaticamente
     sentry_sdk.capture_exception(exc)
-    logger.error(
-        "erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True
-    )
+    logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Erro interno do servidor"},

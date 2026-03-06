@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from typing import Any
 
+import pybreaker
 import structlog
 from celery.exceptions import SoftTimeLimitExceeded
 from prometheus_client import Gauge
@@ -14,7 +15,6 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     get_andamentos_sync,
     set_andamentos_sync,
 )
-import pybreaker
 
 # from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
 # from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
@@ -90,9 +90,7 @@ def buscar_andamentos_jusbrasil(
     data_referencia_iso: str | None,
     cliente_jusbrasil: JusbrasilClient,  # noqa: F821 — import comentado aguarda Fase 3
 ) -> list[Any]:
-    return cliente_jusbrasil.buscar_novos_andamentos(
-        numero_processo, data_referencia_iso
-    )
+    return cliente_jusbrasil.buscar_novos_andamentos(numero_processo, data_referencia_iso)
 
 
 @_datajud_breaker
@@ -175,7 +173,6 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     ultimo_texto_limpo = None
 
     for andamento in lista_andamentos:
-
         texto_original, data_iso = extrair_texto_e_data_do_andamento(andamento)
 
         texto_limpo = DataCleaner.limpar_andamento(texto_original)  # noqa: F821

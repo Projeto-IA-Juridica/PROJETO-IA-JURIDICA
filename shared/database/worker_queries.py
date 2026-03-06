@@ -109,9 +109,7 @@ def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
 
 async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(ProcessoModel).where(ProcessoModel.id == id_processo)
-        )
+        result = await session.execute(select(ProcessoModel).where(ProcessoModel.id == id_processo))
         p = result.scalar_one_or_none()
         if p is None:
             return None

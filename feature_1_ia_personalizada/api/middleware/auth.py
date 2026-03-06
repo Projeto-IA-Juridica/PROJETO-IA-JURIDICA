@@ -57,9 +57,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         except ValueError as e:
             return JSONResponse(status_code=401, content={"detail": str(e)})
         except JWTError:
-            return JSONResponse(
-                status_code=401, content={"detail": "Token JWT inválido"}
-            )
+            return JSONResponse(status_code=401, content={"detail": "Token JWT inválido"})
 
         # 4. Autorizado! Deixa a requisição seguir seu fluxo normal
         response = await call_next(request)

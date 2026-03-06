@@ -17,7 +17,6 @@ from typing import Any
 
 
 class LegalDataCleaner:
-
     @staticmethod
     def remover_tags_html(texto_bruto: str) -> str:
         """

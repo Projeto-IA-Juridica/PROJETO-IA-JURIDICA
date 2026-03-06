@@ -110,10 +110,7 @@ class Cliente(Base, TimestampMixin, TenantMixin):
         return (
             hoje.year
             - self.data_nascimento.year
-            - (
-                (hoje.month, hoje.day)
-                < (self.data_nascimento.month, self.data_nascimento.day)
-            )
+            - ((hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day))
         )
 
     @property

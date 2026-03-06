@@ -53,9 +53,7 @@ async def receive_message(
         body = await request.json()
     except Exception:
         # Pydantic/FastAPI request parsing fallbacks
-        raise HTTPException(
-            status_code=400, detail="Payload inválido ou não é JSON"
-        ) from None
+        raise HTTPException(status_code=400, detail="Payload inválido ou não é JSON") from None
 
     # Apenas processar mensagens novas
     event = body.get("event")
@@ -67,18 +65,14 @@ async def receive_message(
     data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
 
     # Se for lista (às vezes a wwebjs/Evolution envia array na upsert)
-    messages: Any = (
-        data.get("message", raw_data) if isinstance(raw_data, dict) else raw_data
-    )
+    messages: Any = data.get("message", raw_data) if isinstance(raw_data, dict) else raw_data
     if isinstance(messages, list):
         msg_obj: dict[str, Any] = messages[0] if messages else {}
     else:
         msg_obj = messages if isinstance(messages, dict) else {}
 
     # Estrutura típica da chave
-    key: dict[str, Any] = (
-        msg_obj.get("key", {}) if "key" in msg_obj else data.get("key", {})
-    )
+    key: dict[str, Any] = msg_obj.get("key", {}) if "key" in msg_obj else data.get("key", {})
     from_me = key.get("fromMe", False)
 
     # Não processa mensagens que nós mesmos mandamos (loop infinito)
@@ -98,9 +92,7 @@ async def receive_message(
 
     # Extrair conteúdo da mensagem
     msg_content: dict[str, Any] = (
-        msg_obj.get("message", msg_obj)
-        if isinstance(msg_obj.get("message", msg_obj), dict)
-        else {}
+        msg_obj.get("message", msg_obj) if isinstance(msg_obj.get("message", msg_obj), dict) else {}
     )
 
     # Pega texto simples ou caption de mídia
@@ -129,9 +121,7 @@ async def receive_message(
         return {"status": "error", "reason": "Missing instance"}
 
     # 1. Puxar o Escritório correspondente a essa instância da Evolution
-    stmt_esc = select(Escritorio).where(
-        Escritorio.webhook_whatsapp_instance == instance_name
-    )
+    stmt_esc = select(Escritorio).where(Escritorio.webhook_whatsapp_instance == instance_name)
     escritorio = (await db.execute(stmt_esc)).scalars().first()
 
     if not escritorio:
@@ -168,9 +158,7 @@ async def receive_message(
         tipo=tipo_mensagem,
     )
 
-    _mensagens_recebidas.labels(
-        escritorio_id=str(escritorio.id), tipo=tipo_mensagem
-    ).inc()
+    _mensagens_recebidas.labels(escritorio_id=str(escritorio.id), tipo=tipo_mensagem).inc()
     _webhook_processing_time.observe(time.perf_counter() - _inicio)
 
     logger.info(
