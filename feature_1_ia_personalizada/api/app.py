@@ -27,6 +27,16 @@ import re
 
 def _validar_config_no_startup() -> None:
     erros: list[str] = []
+    
+    
+    if not settings.REDIS_URL.startswith(("redis://", "rediss://")):
+        erros.append("REDIS_URL inválida (esperado 'redis://' ou 'rediss://').")
+        
+    if not settings.CELERY_BROKER_URL.startswith(("redis://", "rediss://")):
+        erros.append("CELERY_BROKER_URL inválida (esperado 'redis://' ou 'rediss://').")
+
+    if not settings.CELERY_RESULT_BACKEND.startswith(("redis://", "rediss://")):
+        erros.append("CELERY_RESULT_BACKEND inválida (esperado 'redis://' ou 'rediss://').")
 
     def _req(cond: bool, msg: str) -> None:
         if not cond:

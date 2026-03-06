@@ -39,7 +39,13 @@ class Settings(BaseSettings):
     GOOGLE_CREDENTIALS_PATH: str | None = None
 
     # CORS
-    CORS_ALLOWED_ORIGINS: str = "https://app.conciergejuridico.com,https://admin.conciergejuridico.com"
+    CORS_ALLOWED_ORIGINS: list[str] = [
+    "https://app.conciergejuridico.com",
+    "https://admin.conciergejuridico.com",
+]
+    
+    APP_NAME: str = "Concierge Jurídico Digital"
+    API_V1_PREFIX: str = "/api/v1"
 
     # Ambiente
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
