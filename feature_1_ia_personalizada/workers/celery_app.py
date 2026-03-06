@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import os
 
-from celery import Celery
+import structlog
+from celery import Celery, Task
 from celery.schedules import crontab
 from celery.signals import worker_process_init
 from kombu import Queue
+
+_dlq_logger = structlog.get_logger("workers.dlq")
 
 # (opcional) carregar .env automaticamente
 try:
@@ -36,6 +39,17 @@ celery_app.conf.update(
     task_time_limit=60 * 20,
     task_soft_time_limit=60 * 18,
     broker_connection_retry_on_startup=True,
+    # DLQ — garantia de entrega
+    # task_acks_late=True: a mensagem só é removida da fila APÓS a task concluir
+    # (sucesso ou falha definitiva). Se o worker cair durante a execução, a task
+    # volta à fila automaticamente.
+    # task_reject_on_worker_lost=True: complementa o acks_late — quando um worker
+    # é perdido (SIGKILL, OOM), as tasks em execução são rejeitadas (não acked)
+    # e redistribuídas para outros workers.
+    # Pré-requisito: todas as tasks devem ser idempotentes. As tasks existentes
+    # já usam locks Redis (nx=True) que garantem idempotência.
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
 )
 
 # Filas separadas
@@ -44,6 +58,10 @@ celery_app.conf.task_queues = (
     Queue("notificacoes", routing_key="notificacoes"),
     Queue("ia", routing_key="ia"),
     Queue("relacionamento", routing_key="relacionamento"),
+    # Dead Letter Queue: recebe tasks que esgotaram todos os retries.
+    # Worker dedicado recomendado para não misturar com filas normais:
+    #   celery -A ... worker -Q dead_letter -c 1 --prefetch-multiplier 1
+    Queue("dead_letter", routing_key="dead_letter"),
 )
 
 celery_app.conf.task_default_queue = "monitoramento"
@@ -92,6 +110,11 @@ celery_app.conf.task_routes = {
         "queue": "relacionamento",
         "routing_key": "relacionamento",
     },
+    # dead_letter.py
+    "workers.dead_letter.processar_dlq": {
+        "queue": "dead_letter",
+        "routing_key": "dead_letter",
+    },
 }
 
 #  BEAT: usar o NOME REAL da task (mesmo padrão)
@@ -123,6 +146,70 @@ celery_app.conf.beat_schedule = {
 }
 
 
+class DLQTask(Task):
+    """
+    Classe base para tasks que devem ser roteadas para o Dead Letter Queue
+    após esgotarem todos os retries.
+
+    Quando on_failure é chamado e self.request.retries >= self.max_retries,
+    a task é enviada para a fila "dead_letter" com todo o contexto necessário
+    para diagnóstico e re-execução manual.
+
+    Uso com @celery_app.task:
+        @celery_app.task(base=DLQTask, max_retries=3, autoretry_for=(Exception,))
+        def minha_task(...):
+            ...
+
+    Uso com @shared_task:
+        @shared_task(base=DLQTask, max_retries=3, autoretry_for=(Exception,))
+        def minha_task(...):
+            ...
+
+    Importante: max_retries deve ser declarado explicitamente no decorator.
+    Tasks sem max_retries definido não usam DLQ (esgotamento nunca é detectado).
+    """
+
+    abstract = True
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        max_retries = self.max_retries if self.max_retries is not None else 0
+
+        if self.request.retries >= max_retries:
+            try:
+                celery_app.send_task(
+                    "workers.dead_letter.processar_dlq",
+                    kwargs={
+                        "nome_task": self.name,
+                        "task_id": task_id,
+                        "args": list(args),
+                        "kwargs": kwargs,
+                        "erro": str(exc),
+                        "traceback": str(einfo),
+                        "tentativas": self.request.retries,
+                    },
+                    queue="dead_letter",
+                )
+                _dlq_logger.warning(
+                    "dlq.encaminhado",
+                    task=self.name,
+                    task_id=task_id,
+                    tentativas=self.request.retries,
+                    erro=str(exc),
+                )
+            except Exception as dlq_exc:
+                # Falha ao encaminhar para DLQ — loga mas não relança.
+                # O erro original já foi logado pelo Celery; não queremos
+                # mascarar a exceção primária com uma falha de infraestrutura.
+                _dlq_logger.error(
+                    "dlq.falha_ao_encaminhar",
+                    task=self.name,
+                    task_id=task_id,
+                    dlq_erro=str(dlq_exc),
+                )
+
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+
+
 # Inicializa o JuridicalTranslator (singleton síncrono seguro) em cada processo worker.
 # Clientes assíncronos (Redis, Claude, Evolution) são criados por task — ver orchestrator.py.
 @worker_process_init.connect
@@ -135,6 +222,7 @@ def _init_worker_process(**kwargs):
 
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
+import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
 import feature_1_ia_personalizada.workers.send_notifications  # noqa: F401

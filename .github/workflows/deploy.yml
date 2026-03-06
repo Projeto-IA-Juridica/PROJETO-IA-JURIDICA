@@ -31,18 +31,47 @@ on:
 
 jobs:
   # ----------------------------------------------------------------------------
-  # Job 1: Aguardar Railway concluir o deploy e validar saúde da aplicação
-  # Railway detecta o push e faz o build + deploy automaticamente.
-  # Aqui apenas esperamos a aplicação responder com saúde antes dos smoke tests.
+  # Job 1: Captura baseline de saúde ANTES do novo deploy subir.
+  # Falha silenciosa (continue-on-error) — produção pode estar em manutenção.
+  # O resultado é exibido no resumo final para comparação pré/pós.
+  # ----------------------------------------------------------------------------
+  pre-deploy-health:
+    name: Health Check Pré-Deploy
+    runs-on: ubuntu-latest
+
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    outputs:
+      pre_status: ${{ steps.capture.outputs.status }}
+
+    steps:
+      - name: Capturar estado atual de produção
+        id: capture
+        # continue-on-error: produção pode estar down antes de um deploy de recovery
+        continue-on-error: true
+        run: |
+          RESPONSE=$(curl -sf --max-time 10 \
+            "${{ secrets.RAILWAY_APP_URL }}/health/detailed" \
+            || echo '{"status":"unreachable"}')
+
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // "unknown"')
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "Saude pre-deploy: $STATUS"
+          echo "$RESPONSE" | jq -r '
+            .checks // {} | to_entries[] |
+            "  \(.key): \(.value.status)"
+          ' 2>/dev/null || true
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Aguardar Railway concluir o deploy e a API responder.
+  # Railway detecta o push e faz build + deploy automaticamente.
   # ----------------------------------------------------------------------------
   wait-for-deploy:
     name: Aguardar Deploy (Railway)
     runs-on: ubuntu-latest
-
-    # Só roda se o CI passou (ou se foi disparado manualmente)
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+    needs: pre-deploy-health
 
     outputs:
       app_url: ${{ steps.set-url.outputs.url }}
@@ -52,30 +81,24 @@ jobs:
         id: set-url
         run: echo "url=${{ secrets.RAILWAY_APP_URL }}" >> $GITHUB_OUTPUT
 
-      - name: Aguardar Railway iniciar deploy
-        # Railway leva alguns segundos para detectar o novo commit
+      - name: Aguardar API responder (polling /health)
         run: |
-          echo "⏳ Aguardando Railway detectar e iniciar o deploy..."
-          sleep 30
-
-      - name: Aguardar API responder (health check)
-        run: |
-          echo "🔍 Polling /health até a API responder..."
+          echo "Polling /health ate a API responder..."
           MAX_ATTEMPTS=20
           ATTEMPT=0
           until curl -sf "${{ secrets.RAILWAY_APP_URL }}/health" > /dev/null 2>&1; do
             ATTEMPT=$((ATTEMPT + 1))
             if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
-              echo "❌ API não respondeu após $MAX_ATTEMPTS tentativas"
+              echo "API nao respondeu apos $MAX_ATTEMPTS tentativas (${MAX_ATTEMPTS} x 15s = $((MAX_ATTEMPTS * 15))s)"
               exit 1
             fi
             echo "  Tentativa $ATTEMPT/$MAX_ATTEMPTS — aguardando 15s..."
             sleep 15
           done
-          echo "✅ API respondendo em ${{ secrets.RAILWAY_APP_URL }}"
+          echo "API respondendo em ${{ secrets.RAILWAY_APP_URL }}"
 
   # ----------------------------------------------------------------------------
-  # Job 2: Smoke tests — valida endpoints críticos após o deploy
+  # Job 3: Smoke tests — valida endpoints críticos após o deploy
   # ----------------------------------------------------------------------------
   smoke-test:
     name: Smoke Test
@@ -88,10 +111,54 @@ jobs:
           curl -f --retry 3 --retry-delay 5 \
             "${{ secrets.RAILWAY_APP_URL }}/health"
 
-      - name: GET /health/ready → 200
+      - name: GET /health/ready → 200 (PostgreSQL + Redis críticos)
         run: |
           curl -f --retry 3 --retry-delay 5 \
             "${{ secrets.RAILWAY_APP_URL }}/health/ready"
+
+      - name: GET /health/detailed → todos os 6 serviços saudáveis
+        # Falha se status == "error" (PostgreSQL ou Redis indisponíveis).
+        # Status "degraded" (serviços externos) gera aviso mas não bloqueia deploy.
+        run: |
+          RESPONSE=$(curl -sf --retry 3 --retry-delay 5 \
+            "${{ secrets.RAILWAY_APP_URL }}/health/detailed")
+
+          # Exibe status geral e latência
+          echo "$RESPONSE" | jq -r '"Status geral: \(.status)  (\(.total_ms)ms)"'
+
+          # Exibe cada serviço com marcador OK / WARN / FAIL
+          echo "$RESPONSE" | jq -r '
+            .checks | to_entries[] |
+            if   .value.status == "ok"       then "  [OK]   \(.key): \(.value.status)"
+            elif .value.status == "skipped"  then "  [OK]   \(.key): skipped"
+            elif .value.status == "degraded" then "  [WARN] \(.key): \(.value.status)"
+            else                                  "  [FAIL] \(.key): \(.value.status)"
+            end
+          '
+
+          # Extrai status geral para decisão
+          STATUS=$(echo "$RESPONSE" | jq -r '.status')
+
+          if [ "$STATUS" = "error" ]; then
+            FAILED=$(echo "$RESPONSE" | jq -r '
+              [.checks | to_entries[]
+               | select(.value.status != "ok" and .value.status != "skipped")
+               | .key] | join(", ")
+            ')
+            echo "FALHA: servicos criticos indisponiveis: $FAILED" >&2
+            exit 1
+          fi
+
+          if [ "$STATUS" = "degraded" ]; then
+            DEGRADED=$(echo "$RESPONSE" | jq -r '
+              [.checks | to_entries[]
+               | select(.value.status == "degraded")
+               | .key] | join(", ")
+            ')
+            echo "AVISO: servicos externos degradados (nao bloqueia deploy): $DEGRADED"
+          else
+            echo "Todos os servicos saudaveis."
+          fi
 
       - name: POST /auth/login com credenciais inválidas → 401
         run: |
@@ -115,27 +182,28 @@ jobs:
             "${{ secrets.RAILWAY_APP_URL }}/metrics"
 
   # ----------------------------------------------------------------------------
-  # Job 3: Resumo final
+  # Job 4: Resumo final — mostra saúde pré e pós-deploy lado a lado
   # ----------------------------------------------------------------------------
   notify:
     name: Resumo do Deploy
     runs-on: ubuntu-latest
-    needs: [wait-for-deploy, smoke-test]
+    needs: [pre-deploy-health, wait-for-deploy, smoke-test]
     if: always()
 
     steps:
       - name: Escrever resumo
         run: |
           if [ "${{ needs.smoke-test.result }}" = "success" ]; then
-            STATUS="✅ SUCESSO"
+            STATUS="SUCESSO"
           else
-            STATUS="❌ FALHA"
+            STATUS="FALHA"
           fi
 
           echo "## $STATUS — Deploy em Produção (Railway)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Etapa | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Health Pré-Deploy | ${{ needs.pre-deploy-health.outputs.pre_status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Aguardar Railway | ${{ needs.wait-for-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

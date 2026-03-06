@@ -8,6 +8,8 @@ import redis
 import structlog
 from celery import shared_task
 
+from feature_1_ia_personalizada.workers.celery_app import DLQTask
+
 from shared.database.worker_queries import (
     enviar_mensagem_whatsapp,
     insert_interacao,
@@ -137,9 +139,10 @@ def registrar_interacao(
 
 @shared_task(
     bind=True,
+    base=DLQTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 5},
+    max_retries=5,
 )
 def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: str):
 
@@ -254,9 +257,10 @@ def enviar_pesquisa_satisfacao(self):
 
 @shared_task(
     bind=True,
+    base=DLQTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
-    retry_kwargs={"max_retries": 3},
+    max_retries=3,
 )
 def processar_mensagem_recebida(
     self, id_escritorio: int, id_cliente: int, mensagem: str, tipo: str
