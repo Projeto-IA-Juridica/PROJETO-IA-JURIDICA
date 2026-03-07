@@ -316,7 +316,7 @@ services:
           memory: 64M
 
   # ---------------------------------------------------------------------------
-  # PROMTAIL — Coletor de logs dos containers
+  # PROMTAIL — Coletor de logs via Docker socket (WSL2 / Docker Desktop)
   # ---------------------------------------------------------------------------
   promtail:
     image: grafana/promtail:2.9.0
@@ -324,8 +324,7 @@ services:
     restart: always
     volumes:
       - ../../monitoring/promtail-config.yaml:/etc/promtail/config.yml:ro
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/log/docker-containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - concierge-net
