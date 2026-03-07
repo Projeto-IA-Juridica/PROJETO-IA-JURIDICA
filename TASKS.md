@@ -1432,11 +1432,11 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 - [x] Tratar `CircuitBreakerError` no monitor de processos — fazer fallback para DataJud quando Jusbrasil circuit está aberto
 
 #### Cache de dados jurídicos
-- [ ] Implementar cache Redis para andamentos nos workers (TTL 1h) — evitar chamar Jusbrasil desnecessariamente
+- [x] Implementar cache Redis para andamentos nos workers (TTL 1h) — evitar chamar Jusbrasil desnecessariamente
 
 #### Load Testing
-- [ ] Criar `tests/load/locustfile.py` com cenários: health check, histórico chat, webhook
-- [ ] Validar metas: p95 < 500ms para `/chat/history`, 0% erro com 50 usuários simultâneos
+- [x] Criar `tests/load/locustfile.py` com cenários: health check, histórico chat, webhook
+- [x] Validar metas: p95 < 500ms para `/chat/history`, 0% erro com 50 usuários simultâneos
 
 ---
 
