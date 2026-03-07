@@ -40,13 +40,14 @@ import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
-logger = structlog.get_logger(__name__)
-
 from shared.database.connection import async_session_factory
 from shared.models.cliente import Cliente as ClienteModel
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.models.processo import Processo as ProcessoModel
+
+logger = structlog.get_logger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Tipos de retorno (dataclasses leves, desacoplados do SQLAlchemy)
@@ -109,9 +110,7 @@ def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
 
 async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(ProcessoModel).where(ProcessoModel.id == id_processo)
-        )
+        result = await session.execute(select(ProcessoModel).where(ProcessoModel.id == id_processo))
         p = result.scalar_one_or_none()
         if p is None:
             return None

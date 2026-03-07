@@ -2,6 +2,7 @@
 """
 Testes de integração para /health/detailed e funções de validação de startup do app.
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch

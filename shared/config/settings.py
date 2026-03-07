@@ -77,8 +77,8 @@ class Settings(BaseSettings):
         except Exception as exc:
             raise ValueError(
                 "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe, 32 bytes). "
-                "Gere uma com: python -c \"from cryptography.fernet import Fernet; "
-                "print(Fernet.generate_key().decode())\""
+                'Gere uma com: python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"'
             ) from exc
         return v
 
@@ -97,7 +97,7 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET_KEY não pode ser um placeholder. "
                 "Gere uma chave segura com: "
-                "python -c \"import secrets; print(secrets.token_hex(32))\""
+                'python -c "import secrets; print(secrets.token_hex(32))"'
             )
         return v
 

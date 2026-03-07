@@ -36,10 +36,7 @@ def validar_cpf(cpf: str) -> bool:
         return False
 
     def _digito(parcial: str, peso_inicial: int) -> int:
-        total = sum(
-            int(d) * p
-            for d, p in zip(parcial, range(peso_inicial, 1, -1), strict=False)
-        )
+        total = sum(int(d) * p for d, p in zip(parcial, range(peso_inicial, 1, -1), strict=False))
         resto = total % 11
         return 0 if resto < 2 else 11 - resto
 
@@ -136,14 +133,9 @@ def normalizar_numero_processo(numero: str) -> str:
     """
     limpo = re.sub(r"[^0-9]", "", numero)
     if len(limpo) != 20:
-        raise ValueError(
-            f"Número de processo deve ter 20 dígitos, recebeu {len(limpo)}"
-        )
+        raise ValueError(f"Número de processo deve ter 20 dígitos, recebeu {len(limpo)}")
     # Reconstrói: NNNNNNN-DD.AAAA.J.TT.OOOO
-    return (
-        f"{limpo[:7]}-{limpo[7:9]}.{limpo[9:13]}"
-        f".{limpo[13]}.{limpo[14:16]}.{limpo[16:20]}"
-    )
+    return f"{limpo[:7]}-{limpo[7:9]}.{limpo[9:13]}.{limpo[13]}.{limpo[14:16]}.{limpo[16:20]}"
 
 
 # ---------------------------------------------------------------------------
@@ -183,9 +175,7 @@ def normalizar_telefone(telefone: str) -> str:
         digits = "55" + digits
 
     if not validar_telefone_whatsapp(digits):
-        raise ValueError(
-            "Telefone inválido — formato esperado: 5511999999999 (55 + DDD + número)"
-        )
+        raise ValueError("Telefone inválido — formato esperado: 5511999999999 (55 + DDD + número)")
     return digits
 
 

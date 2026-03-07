@@ -54,9 +54,7 @@ class EvolutionClient:
     - tratamento de erros (conexão, timeout, instância offline)
     """
 
-    def __init__(
-        self, base_url: str, api_key: str, timeout_seconds: float = 15.0
-    ) -> None:
+    def __init__(self, base_url: str, api_key: str, timeout_seconds: float = 15.0) -> None:
         base_url = base_url.rstrip("/")
         self._config = EvolutionConfig(
             base_url=base_url,
@@ -123,9 +121,7 @@ class EvolutionClient:
                     erro=str(e),
                 )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionTimeoutError(
-                        "Timeout ao chamar Evolution API"
-                    ) from e
+                    raise EvolutionTimeoutError("Timeout ao chamar Evolution API") from e
 
             except httpx.ConnectError as e:
                 ultima_excecao = e
@@ -136,9 +132,7 @@ class EvolutionClient:
                     erro=str(e),
                 )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionRequestError(
-                        "Falha de conexão com Evolution API"
-                    ) from e
+                    raise EvolutionRequestError("Falha de conexão com Evolution API") from e
 
             except EvolutionOfflineError as e:
                 ultima_excecao = e
@@ -160,17 +154,13 @@ class EvolutionClient:
                     erro=str(e),
                 )
                 if tentativa == self._config.max_tentativas:
-                    raise EvolutionRequestError(
-                        "Erro HTTP ao chamar Evolution API"
-                    ) from e
+                    raise EvolutionRequestError("Erro HTTP ao chamar Evolution API") from e
 
             # backoff antes da próxima tentativa
             await asyncio.sleep(self._calcular_backoff(tentativa))
 
         # não deve chegar aqui
-        raise EvolutionRequestError(
-            "Falha inesperada em _request_com_retry"
-        ) from ultima_excecao
+        raise EvolutionRequestError("Falha inesperada em _request_com_retry") from ultima_excecao
 
     def _calcular_backoff(self, tentativa: int) -> float:
         # tentativa=1 => backoff_base*1, tentativa=2 => *2, tentativa=3 => *4
@@ -179,9 +169,7 @@ class EvolutionClient:
 
     # Métodos do enunciado
 
-    async def enviar_texto(
-        self, instance: str, numero: str, texto: str
-    ) -> dict[str, Any]:
+    async def enviar_texto(self, instance: str, numero: str, texto: str) -> dict[str, Any]:
         """
         POST /message/sendText/{instance}
         """
@@ -189,9 +177,7 @@ class EvolutionClient:
             "number": numero,
             "text": texto,
         }
-        return await self._request_com_retry(
-            "POST", f"/message/sendText/{instance}", json=payload
-        )
+        return await self._request_com_retry("POST", f"/message/sendText/{instance}", json=payload)
 
     async def enviar_botoes(
         self,
@@ -231,9 +217,7 @@ class EvolutionClient:
             "text": texto,
             "sections": secoes,
         }
-        return await self._request_com_retry(
-            "POST", f"/message/sendList/{instance}", json=payload
-        )
+        return await self._request_com_retry("POST", f"/message/sendList/{instance}", json=payload)
 
     async def buscar_status_mensagem(self, instance: str, message_id: str) -> str:
         """

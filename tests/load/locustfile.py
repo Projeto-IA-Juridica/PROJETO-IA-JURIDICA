@@ -61,6 +61,7 @@ _TELEFONES_TESTE = [
 # Payloads de webhook Evolution API
 # ---------------------------------------------------------------------------
 
+
 def _payload_webhook_texto(telefone: str, texto: str, instance: str) -> dict:
     """Payload padrão messages.upsert com mensagem de texto."""
     return {
@@ -94,6 +95,7 @@ def _payload_webhook_evento_ignorado(instance: str) -> dict:
 # Usuário 1: Verificador de saúde (sem autenticação) — peso alto
 # Simula load balancer / Prometheus scraping / monitoramento externo
 # ---------------------------------------------------------------------------
+
 
 class HealthChecker(HttpUser):
     """
@@ -163,6 +165,7 @@ class HealthChecker(HttpUser):
 # Usuário 2: Advogado autenticado — peso principal
 # Simula o frontend do escritório jurídico navegando na aplicação
 # ---------------------------------------------------------------------------
+
 
 class AdvogadoAutenticado(HttpUser):
     """
@@ -397,6 +400,7 @@ class AdvogadoAutenticado(HttpUser):
 # Simula o fluxo de mensagens vindas do WhatsApp via Evolution API
 # ---------------------------------------------------------------------------
 
+
 class EvolutionWebhookSimulator(HttpUser):
     """
     Simula a Evolution API chamando o webhook a cada mensagem recebida.
@@ -482,6 +486,7 @@ class EvolutionWebhookSimulator(HttpUser):
 # Ativado com: locust --tags pico
 # ---------------------------------------------------------------------------
 
+
 class PicoDeMensagensUser(HttpUser):
     """
     Simula pico de mensagens (ex: envio em massa, evento especial).
@@ -529,6 +534,7 @@ class PicoDeMensagensUser(HttpUser):
 # ---------------------------------------------------------------------------
 # Hooks de relatório — sumário ao final do teste
 # ---------------------------------------------------------------------------
+
 
 @events.quitting.add_listener
 def on_quit(environment, **kwargs):

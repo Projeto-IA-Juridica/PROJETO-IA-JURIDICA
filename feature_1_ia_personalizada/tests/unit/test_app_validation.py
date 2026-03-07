@@ -3,12 +3,12 @@
 Testes unitários para _validar_config_no_startup e para os middlewares da API.
 Testa a lógica de validação do startup sem inicializar o servidor completo.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # _validar_config_no_startup
@@ -20,8 +20,9 @@ class TestValidarConfigNoStartup:
 
     def _rodar_validacao(self, **overrides):
         """Executa _validar_config_no_startup com settings mockados."""
-        from feature_1_ia_personalizada.api.app import _validar_config_no_startup
         from cryptography.fernet import Fernet
+
+        from feature_1_ia_personalizada.api.app import _validar_config_no_startup
 
         chave_fernet = Fernet.generate_key().decode()
 
@@ -202,7 +203,9 @@ class TestJWTAuthMiddleware:
 
 class TestRequestLoggingMiddleware:
     async def test_adiciona_x_request_id_ao_response(self):
-        from feature_1_ia_personalizada.api.middleware.request_logging import RequestLoggingMiddleware
+        from feature_1_ia_personalizada.api.middleware.request_logging import (
+            RequestLoggingMiddleware,
+        )
 
         mock_app = MagicMock()
         middleware = RequestLoggingMiddleware(mock_app)
@@ -224,7 +227,9 @@ class TestRequestLoggingMiddleware:
         assert len(response.headers["X-Request-ID"]) == 36  # UUID4
 
     async def test_request_4xx_loga_warning(self):
-        from feature_1_ia_personalizada.api.middleware.request_logging import RequestLoggingMiddleware
+        from feature_1_ia_personalizada.api.middleware.request_logging import (
+            RequestLoggingMiddleware,
+        )
 
         mock_app = MagicMock()
         middleware = RequestLoggingMiddleware(mock_app)
@@ -299,11 +304,12 @@ class TestRateLimitMiddleware:
         assert response.status_code == 200
 
     async def test_com_redis_acima_do_limite_retorna_429(self):
+        from fastapi.responses import JSONResponse
+
         from feature_1_ia_personalizada.api.middleware.rate_limit import (
             LIMIT_API_GERAL,
             RateLimitMiddleware,
         )
-        from fastapi.responses import JSONResponse
 
         mock_app = MagicMock()
         middleware = RateLimitMiddleware(mock_app)

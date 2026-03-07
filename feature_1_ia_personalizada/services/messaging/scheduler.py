@@ -56,9 +56,7 @@ class MessageScheduler:
 
         if dt >= fim:
             amanha = dt + timedelta(days=1)
-            return amanha.replace(
-                hour=self.hora_inicio, minute=0, second=0, microsecond=0
-            )
+            return amanha.replace(hour=self.hora_inicio, minute=0, second=0, microsecond=0)
 
         return dt
 

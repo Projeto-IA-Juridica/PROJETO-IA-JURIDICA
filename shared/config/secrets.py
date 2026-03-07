@@ -73,8 +73,7 @@ def _load_aws_secrets(secret_name: str, region: str) -> dict[str, str]:
         from botocore.exceptions import ClientError, NoCredentialsError
     except ImportError as exc:
         raise ImportError(
-            "boto3 é necessário para usar AWS Secrets Manager. "
-            "Instale com: pip install boto3"
+            "boto3 é necessário para usar AWS Secrets Manager. Instale com: pip install boto3"
         ) from exc
 
     try:
@@ -89,8 +88,7 @@ def _load_aws_secrets(secret_name: str, region: str) -> dict[str, str]:
         code = exc.response["Error"]["Code"]
         if code == "ResourceNotFoundException":
             raise RuntimeError(
-                f"Secret '{secret_name}' não encontrado no AWS Secrets Manager "
-                f"(region: {region})."
+                f"Secret '{secret_name}' não encontrado no AWS Secrets Manager (region: {region})."
             ) from exc
         if code in ("AccessDeniedException", "UnauthorizedException"):
             raise RuntimeError(
@@ -98,8 +96,7 @@ def _load_aws_secrets(secret_name: str, region: str) -> dict[str, str]:
                 "Verifique as policies IAM (secretsmanager:GetSecretValue)."
             ) from exc
         raise RuntimeError(
-            f"Erro ao buscar secret '{secret_name}' no AWS Secrets Manager "
-            f"[{code}]: {exc}"
+            f"Erro ao buscar secret '{secret_name}' no AWS Secrets Manager [{code}]: {exc}"
         ) from exc
 
     secret_string = response.get("SecretString")
@@ -141,8 +138,7 @@ def _load_vault_secrets(
         import httpx
     except ImportError as exc:
         raise ImportError(
-            "httpx é necessário para usar HashiCorp Vault. "
-            "Já deve estar em requirements-f1.txt."
+            "httpx é necessário para usar HashiCorp Vault. Já deve estar em requirements-f1.txt."
         ) from exc
 
     url = f"{vault_addr.rstrip('/')}/v1/{secret_path.lstrip('/')}"
@@ -159,9 +155,7 @@ def _load_vault_secrets(
             "Verifique VAULT_ADDR e a conectividade de rede."
         ) from exc
     except httpx.TimeoutException as exc:
-        raise RuntimeError(
-            f"Timeout ao conectar ao Vault em '{vault_addr}'."
-        ) from exc
+        raise RuntimeError(f"Timeout ao conectar ao Vault em '{vault_addr}'.") from exc
 
     if response.status_code == 403:
         raise RuntimeError(
@@ -175,8 +169,7 @@ def _load_vault_secrets(
         )
     if response.status_code != 200:
         raise RuntimeError(
-            f"Resposta inesperada do Vault [{response.status_code}] "
-            f"para o path '{secret_path}'."
+            f"Resposta inesperada do Vault [{response.status_code}] para o path '{secret_path}'."
         )
 
     body = response.json()
@@ -218,9 +211,7 @@ def load_secrets_to_env() -> None:
 
     vault_addr = os.getenv("VAULT_ADDR")
     vault_token = os.getenv("VAULT_TOKEN")
-    vault_path = os.getenv(
-        "VAULT_SECRET_PATH", "secret/data/concierge/production"
-    )
+    vault_path = os.getenv("VAULT_SECRET_PATH", "secret/data/concierge/production")
 
     secrets: dict[str, str] = {}
 
@@ -249,9 +240,7 @@ def load_secrets_to_env() -> None:
         )
 
     else:
-        logger.debug(
-            "secrets_manager.desabilitado — usando variaveis de ambiente / .env"
-        )
+        logger.debug("secrets_manager.desabilitado — usando variaveis de ambiente / .env")
         _LOADED = True
         return
 

@@ -9,6 +9,7 @@ NOTA sobre imports comentados:
   namespace via patch(..., create=True) para exercitar o fluxo sem alteração
   no código-fonte.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -22,7 +23,6 @@ from feature_1_ia_personalizada.workers.monitor_processos import (
     TAMANHO_LOTE,
     TEMPO_MAXIMO_PROCESSO_SEGUNDOS,
     buscar_andamentos_datajud,
-    buscar_andamentos_jusbrasil,
     converter_para_iso,
     extrair_texto_e_data_do_andamento,
     extrair_valor,
@@ -65,7 +65,6 @@ def fase3():
     mock_translator.traduzir_andamento.side_effect = lambda t: f"[tr] {t}"
 
     with (
-        patch(f"{MODULE}.JusbrasilClient", create=True),
         patch(f"{MODULE}.DataJudClient", create=True),
         patch(f"{MODULE}.DataCleaner", new=mock_cleaner, create=True),
         patch(f"{MODULE}.JuridicalTranslator", new=mock_translator, create=True),
@@ -163,9 +162,7 @@ class TestConverterParaIso:
 
 class TestExtrairTextoEData:
     def test_dict_com_texto_e_data_string(self):
-        texto, data = extrair_texto_e_data_do_andamento(
-            {"texto": "Despacho", "data": "2024-01-20"}
-        )
+        texto, data = extrair_texto_e_data_do_andamento({"texto": "Despacho", "data": "2024-01-20"})
         assert texto == "Despacho"
         assert data == "2024-01-20"
 
@@ -198,19 +195,6 @@ class TestExtrairTextoEData:
 
 
 class TestBuscarAndamentos:
-    def test_jusbrasil_delega_ao_cliente(self):
-        mock = MagicMock()
-        mock.buscar_novos_andamentos.return_value = [ANDAMENTO_A]
-        resultado = buscar_andamentos_jusbrasil("0001234", "2024-01-01", mock)
-        mock.buscar_novos_andamentos.assert_called_once_with("0001234", "2024-01-01")
-        assert resultado == [ANDAMENTO_A]
-
-    def test_jusbrasil_propaga_excecao(self):
-        mock = MagicMock()
-        mock.buscar_novos_andamentos.side_effect = ConnectionError("timeout")
-        with pytest.raises(ConnectionError):
-            buscar_andamentos_jusbrasil("0001234", None, mock)
-
     def test_datajud_delega_ao_cliente(self):
         mock = MagicMock()
         mock.buscar_novos_andamentos.return_value = [ANDAMENTO_B]
@@ -232,16 +216,16 @@ class TestBuscarAndamentos:
 
 class TestProcessarProcessoIndividual:
     def test_sem_andamentos_retorna_sucesso_com_zero(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[]):
+        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[]):
             r = processar_processo_individual(PROCESSO)
         assert r["sucesso"] is True
         assert r["novos_andamentos"] == 0
         assert r["id_processo"] == 1
-        assert r["fonte"] == "jusbrasil"
+        assert r["fonte"] == "datajud"
 
     def test_com_andamentos_conta_corretamente(self, fase3):
         with patch(
-            f"{MODULE}.buscar_andamentos_jusbrasil",
+            f"{MODULE}.buscar_andamentos_datajud",
             return_value=[ANDAMENTO_A, ANDAMENTO_B],
         ):
             r = processar_processo_individual(PROCESSO)
@@ -250,20 +234,20 @@ class TestProcessarProcessoIndividual:
 
     def test_envia_task_celery_por_andamento(self, fase3):
         with patch(
-            f"{MODULE}.buscar_andamentos_jusbrasil",
+            f"{MODULE}.buscar_andamentos_datajud",
             return_value=[ANDAMENTO_A, ANDAMENTO_B],
         ):
             processar_processo_individual(PROCESSO)
         assert fase3["celery"].send_task.call_count == 2
 
     def test_task_celery_enviada_para_fila_correta(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A]):
+        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]):
             processar_processo_individual(PROCESSO)
         call_kwargs = fase3["celery"].send_task.call_args
         assert call_kwargs.kwargs["queue"] == "notificacoes"
 
     def test_atualiza_banco_com_ultimo_andamento(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A]):
+        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]):
             processar_processo_individual(PROCESSO)
         fase3["atualizar"].assert_called_once()
         args = fase3["atualizar"].call_args.args
@@ -272,52 +256,20 @@ class TestProcessarProcessoIndividual:
 
     def test_andamento_sem_data_nao_atualiza_banco(self, fase3):
         andamento_sem_data = {"texto": "Decisão sem data"}
-        with patch(
-            f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[andamento_sem_data]
-        ):
+        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[andamento_sem_data]):
             processar_processo_individual(PROCESSO)
         fase3["atualizar"].assert_not_called()
 
     def test_data_atualizada_presente_no_resultado(self, fase3):
-        with patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A]):
+        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]):
             r = processar_processo_individual(PROCESSO)
         assert r.get("data_atualizada_para") == "2024-01-20"
 
-    def test_jusbrasil_falha_usa_datajud_como_fallback(self, fase3):
+    def test_datajud_falha_propaga_excecao(self, fase3):
         with (
-            patch(
-                f"{MODULE}.buscar_andamentos_jusbrasil",
-                side_effect=ConnectionError("down"),
-            ),
-            patch(
-                f"{MODULE}.buscar_andamentos_datajud", return_value=[]
-            ) as mock_datajud,
-        ):
-            r = processar_processo_individual(PROCESSO)
-        mock_datajud.assert_called_once()
-        assert r["fonte"] == "datajud"
-
-    def test_fallback_datajud_com_andamentos(self, fase3):
-        with (
-            patch(
-                f"{MODULE}.buscar_andamentos_jusbrasil",
-                side_effect=ConnectionError("down"),
-            ),
-            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
-        ):
-            r = processar_processo_individual(PROCESSO)
-        assert r["novos_andamentos"] == 1
-        assert r["fonte"] == "datajud"
-
-    def test_ambas_apis_falham_propaga_excecao(self, fase3):
-        with (
-            patch(
-                f"{MODULE}.buscar_andamentos_jusbrasil",
-                side_effect=ConnectionError("jusbrasil"),
-            ),
             patch(
                 f"{MODULE}.buscar_andamentos_datajud",
-                side_effect=ConnectionError("datajud"),
+                side_effect=ConnectionError("down"),
             ),
             pytest.raises(ConnectionError),
         ):
@@ -342,9 +294,7 @@ class TestMonitorarProcessos:
         assert r["resumo_primeiros_20"] == []
 
     def test_erro_no_banco_retorna_sucesso_false(self):
-        with patch(
-            f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")
-        ):
+        with patch(f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")):
             r = monitorar_processos()
         assert r["sucesso"] is False
         assert "DB down" in r["erro"]
@@ -355,7 +305,7 @@ class TestMonitorarProcessos:
             "id_processo": 1,
             "sucesso": True,
             "novos_andamentos": 0,
-            "fonte": "jusbrasil",
+            "fonte": "datajud",
         }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
@@ -404,7 +354,7 @@ class TestMonitorarProcessos:
             "id_processo": 0,
             "sucesso": True,
             "novos_andamentos": 0,
-            "fonte": "jusbrasil",
+            "fonte": "datajud",
         }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
@@ -421,7 +371,7 @@ class TestMonitorarProcessos:
             "id_processo": 1,
             "sucesso": True,
             "novos_andamentos": 0,
-            "fonte": "jusbrasil",
+            "fonte": "datajud",
         }
         with (
             patch(f"{MODULE}.query_processos_monitorados", return_value=processos),
@@ -438,7 +388,7 @@ class TestMonitorarProcessos:
             "id_processo": 0,
             "sucesso": True,
             "novos_andamentos": 0,
-            "fonte": "jusbrasil",
+            "fonte": "datajud",
         }
         processos = [{**PROCESSO, "id": i} for i in range(4)]
         side_effects = [mock_ok, SoftTimeLimitExceeded(), mock_ok, ValueError("err")]
@@ -470,7 +420,7 @@ class TestMonitorarProcessoIndividual:
             "id_processo": 1,
             "sucesso": True,
             "novos_andamentos": 0,
-            "fonte": "jusbrasil",
+            "fonte": "datajud",
         }
         with (
             patch(f"{MODULE}.query_processo_por_id", return_value=PROCESSO),
@@ -513,10 +463,10 @@ class TestMonitorarProcessoIndividual:
 
 class TestCacheAside:
     def test_cache_hit_nao_chama_api(self, fase3):
-        """Quando cache tem dados, não deve chamar Jusbrasil nem DataJud."""
+        """Quando cache tem dados, não deve chamar Datajud."""
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=[ANDAMENTO_A]),
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil") as mock_jb,
+            patch(f"{MODULE}.buscar_andamentos_datajud") as mock_jb,
         ):
             r = processar_processo_individual(PROCESSO)
         mock_jb.assert_not_called()
@@ -524,11 +474,11 @@ class TestCacheAside:
         assert r["novos_andamentos"] == 1
 
     def test_cache_miss_chama_api_e_salva(self, fase3):
-        """Quando cache miss, deve chamar Jusbrasil e salvar resultado no Redis."""
+        """Quando cache miss, deve chamar Datajud e salvar resultado no Redis."""
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=None),
             patch(f"{MODULE}.set_andamentos_sync") as mock_set,
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[ANDAMENTO_A]),
+            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
         ):
             processar_processo_individual(PROCESSO)
         mock_set.assert_called_once()
@@ -537,7 +487,7 @@ class TestCacheAside:
         """Cache hit com lista vazia é um hit válido — não deve chamar a API."""
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=[]),
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil") as mock_jb,
+            patch(f"{MODULE}.buscar_andamentos_datajud") as mock_jb,
         ):
             r = processar_processo_individual(PROCESSO)
         mock_jb.assert_not_called()
@@ -549,24 +499,10 @@ class TestCacheAside:
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=None),
             patch(f"{MODULE}.set_andamentos_sync") as mock_set,
-            patch(f"{MODULE}.buscar_andamentos_jusbrasil", return_value=[]),
+            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[]),
         ):
             r = processar_processo_individual(PROCESSO)
         # Lista vazia também é cacheada (is not None)
         mock_set.assert_called_once()
         assert r["novos_andamentos"] == 0
 
-    def test_cache_miss_com_fallback_datajud_tambem_salva(self, fase3):
-        """Quando Jusbrasil falha e DataJud retorna dados, salva no cache."""
-        with (
-            patch(f"{MODULE}.get_andamentos_sync", return_value=None),
-            patch(f"{MODULE}.set_andamentos_sync") as mock_set,
-            patch(
-                f"{MODULE}.buscar_andamentos_jusbrasil",
-                side_effect=ConnectionError("down"),
-            ),
-            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]),
-        ):
-            r = processar_processo_individual(PROCESSO)
-        mock_set.assert_called_once()
-        assert r["fonte"] == "datajud"

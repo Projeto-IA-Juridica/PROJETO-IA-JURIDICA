@@ -3,12 +3,10 @@
 Testes unitários das funções de verificação de saúde (health check helpers).
 Todas as dependências externas (DB, Redis, httpx, Celery, Google Sheets) são mockadas.
 """
+
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from feature_1_ia_personalizada.api.routes.health import (
     _check_celery_workers,
@@ -18,7 +16,6 @@ from feature_1_ia_personalizada.api.routes.health import (
     _check_postgresql,
     _check_redis,
 )
-
 
 # ---------------------------------------------------------------------------
 # _check_postgresql
@@ -37,9 +34,12 @@ class TestCheckPostgresql:
 
     async def test_timeout_retorna_timeout(self):
         mock_session = AsyncMock()
-        mock_session.execute = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_session.execute = AsyncMock(side_effect=TimeoutError())
 
-        with patch("feature_1_ia_personalizada.api.routes.health.asyncio.wait_for", side_effect=asyncio.TimeoutError()):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
+            side_effect=TimeoutError(),
+        ):
             result = await _check_postgresql(mock_session)
 
         assert result["status"] == "timeout"
@@ -87,7 +87,7 @@ class TestCheckRedis:
             mock_redis_module.from_url.return_value = mock_redis
             with patch(
                 "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
-                side_effect=asyncio.TimeoutError(),
+                side_effect=TimeoutError(),
             ):
                 result = await _check_redis()
 
@@ -116,7 +116,10 @@ class TestCheckClaudeApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_claude_api()
 
         assert result["status"] == "ok"
@@ -130,7 +133,10 @@ class TestCheckClaudeApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_claude_api()
 
         assert result["status"] == "ok"
@@ -143,7 +149,10 @@ class TestCheckClaudeApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_claude_api()
 
         assert result["status"] == "timeout"
@@ -154,7 +163,10 @@ class TestCheckClaudeApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_claude_api()
 
         assert result["status"] == "error"
@@ -174,7 +186,10 @@ class TestCheckEvolutionApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_evolution_api()
 
         assert result["status"] == "ok"
@@ -187,7 +202,10 @@ class TestCheckEvolutionApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_evolution_api()
 
         assert result["status"] == "degraded"
@@ -200,7 +218,10 @@ class TestCheckEvolutionApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_evolution_api()
 
         assert result["status"] == "timeout"
@@ -211,7 +232,10 @@ class TestCheckEvolutionApi:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             result = await _check_evolution_api()
 
         assert result["status"] == "error"
@@ -257,7 +281,7 @@ class TestCheckCeleryWorkers:
     async def test_timeout_retorna_timeout(self):
         with patch(
             "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
-            side_effect=asyncio.TimeoutError(),
+            side_effect=TimeoutError(),
         ):
             result = await _check_celery_workers()
 
@@ -271,9 +295,7 @@ class TestCheckCeleryWorkers:
 
 class TestCheckGoogleSheets:
     async def test_sem_credenciais_retorna_skipped(self):
-        with patch(
-            "feature_1_ia_personalizada.api.routes.health.settings"
-        ) as mock_settings:
+        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = ""
             mock_settings.GOOGLE_SHEETS_ID = ""
             result = await _check_google_sheets()
@@ -281,9 +303,7 @@ class TestCheckGoogleSheets:
         assert result["status"] == "skipped"
 
     async def test_sem_sheets_id_retorna_skipped(self):
-        with patch(
-            "feature_1_ia_personalizada.api.routes.health.settings"
-        ) as mock_settings:
+        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = ""
             result = await _check_google_sheets()
@@ -291,9 +311,7 @@ class TestCheckGoogleSheets:
         assert result["status"] == "skipped"
 
     async def test_sucesso_retorna_ok(self):
-        with patch(
-            "feature_1_ia_personalizada.api.routes.health.settings"
-        ) as mock_settings:
+        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = "sheet-id-123"
 
@@ -306,15 +324,13 @@ class TestCheckGoogleSheets:
         assert result["status"] == "ok"
 
     async def test_timeout_retorna_timeout(self):
-        with patch(
-            "feature_1_ia_personalizada.api.routes.health.settings"
-        ) as mock_settings:
+        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = "sheet-id-123"
 
             with patch(
                 "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
-                side_effect=asyncio.TimeoutError(),
+                side_effect=TimeoutError(),
             ):
                 result = await _check_google_sheets()
 

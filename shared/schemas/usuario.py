@@ -70,9 +70,7 @@ class UsuarioCreate(BaseModel):
     def validar_role(cls, v: str) -> str:
         normalizado = v.lower().strip()
         if normalizado not in _ROLES_VALIDAS:
-            raise ValueError(
-                f"Role inválida — opções: {', '.join(sorted(_ROLES_VALIDAS))}"
-            )
+            raise ValueError(f"Role inválida — opções: {', '.join(sorted(_ROLES_VALIDAS))}")
         return normalizado
 
     @field_validator("oab")

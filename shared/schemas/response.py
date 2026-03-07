@@ -10,7 +10,7 @@ Usados em todos os endpoints para padronizar o formato de retorno:
 """
 
 import math
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -33,7 +33,7 @@ class ErrorResponse(BaseModel):
     detail: str | None = Field(default=None, description="Detalhes adicionais do erro")
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """
     Resposta paginada genérica.
 
@@ -50,9 +50,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     """
 
     items: list[T]
-    total: int = Field(
-        ge=0, description="Total de registros encontrados (sem paginação)"
-    )
+    total: int = Field(ge=0, description="Total de registros encontrados (sem paginação)")
     page: int = Field(ge=1, description="Página atual (começa em 1)")
     per_page: int = Field(ge=1, le=100, description="Itens por página")
 

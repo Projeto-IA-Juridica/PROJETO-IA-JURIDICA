@@ -138,9 +138,7 @@ class Processo(Base, TimestampMixin, TenantMixin):
 
     # --- Constraints e Índices ---
     __table_args__ = (
-        UniqueConstraint(
-            "escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"
-        ),
+        UniqueConstraint("escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"),
     )
 
     def __repr__(self) -> str:

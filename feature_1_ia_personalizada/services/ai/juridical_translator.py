@@ -9,6 +9,7 @@ Uso:
 Em caso de falha (API indisponível, timeout, etc.) retorna o texto original
 sem interromper o pipeline de monitoramento.
 """
+
 from __future__ import annotations
 
 import structlog
@@ -39,8 +40,8 @@ class JuridicalTranslator:
             return texto
 
         try:
-            import anthropic
-            from shared.config.settings import settings
+            import anthropic  # noqa: I001
+            from shared.config.settings import settings  # noqa: I001
 
             client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
             resposta = client.messages.create(

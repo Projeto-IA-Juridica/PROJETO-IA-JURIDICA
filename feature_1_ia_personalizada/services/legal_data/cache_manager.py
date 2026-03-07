@@ -44,9 +44,7 @@ class LegalDataCacheManager:
     """Gerencia caching para as consultas de processos e andamentos judiciais."""
 
     # Configuração de Tempos (TTL - Time to Live)
-    TTL_CAPA_PROCESSO = int(
-        timedelta(hours=24).total_seconds()
-    )  # Capa muda muito pouco, 24 horas.
+    TTL_CAPA_PROCESSO = int(timedelta(hours=24).total_seconds())  # Capa muda muito pouco, 24 horas.
     TTL_ANDAMENTOS = int(
         timedelta(hours=6).total_seconds()
     )  # Andamentos mudam mais em dias úteis, 6 horas.
@@ -56,9 +54,7 @@ class LegalDataCacheManager:
         Recebe a instância injetada do redis.asyncio.Redis
         """
         self._redis = redis_client
-        logger.info(
-            "cache_manager_iniciado", ttl_andamentos_horas=self.TTL_ANDAMENTOS / 3600
-        )
+        logger.info("cache_manager_iniciado", ttl_andamentos_horas=self.TTL_ANDAMENTOS / 3600)
 
     @staticmethod
     def _key_capa(cnj: str) -> str:
@@ -87,9 +83,7 @@ class LegalDataCacheManager:
         """Salva a Capa no Redis pelo TTL designado."""
         try:
             payload = json.dumps(capa_data, ensure_ascii=False)
-            await self._redis.setex(
-                self._key_capa(cnj), self.TTL_CAPA_PROCESSO, payload
-            )
+            await self._redis.setex(self._key_capa(cnj), self.TTL_CAPA_PROCESSO, payload)
             logger.debug("cache_capa_salva", cnj=cnj)
         except Exception as e:
             logger.error("cache_write_error", error=str(e), key=self._key_capa(cnj))
@@ -105,25 +99,17 @@ class LegalDataCacheManager:
             logger.debug("cache_andamentos_miss", cnj=cnj)
             return None
         except Exception as e:
-            logger.error(
-                "cache_read_error", error=str(e), key=self._key_andamentos(cnj)
-            )
+            logger.error("cache_read_error", error=str(e), key=self._key_andamentos(cnj))
             return None
 
-    async def set_andamentos(
-        self, cnj: str, andamentos_list: list[dict[str, Any]]
-    ) -> None:
+    async def set_andamentos(self, cnj: str, andamentos_list: list[dict[str, Any]]) -> None:
         """Salva os andamentos judiciais no Redis."""
         try:
             payload = json.dumps(andamentos_list, ensure_ascii=False)
-            await self._redis.setex(
-                self._key_andamentos(cnj), self.TTL_ANDAMENTOS, payload
-            )
+            await self._redis.setex(self._key_andamentos(cnj), self.TTL_ANDAMENTOS, payload)
             logger.debug("cache_andamentos_salvo", cnj=cnj, qtd=len(andamentos_list))
         except Exception as e:
-            logger.error(
-                "cache_write_error", error=str(e), key=self._key_andamentos(cnj)
-            )
+            logger.error("cache_write_error", error=str(e), key=self._key_andamentos(cnj))
 
     async def invalidar_cache_processo(self, cnj: str) -> None:
         """Apaga forçadamente o cache de um CNJ quando o usuário clica em 'Sincronizar Agora'."""

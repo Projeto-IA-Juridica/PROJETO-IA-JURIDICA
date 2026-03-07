@@ -57,9 +57,7 @@ async def test_enviar_texto_payload_correto(client: EvolutionClient):
     resposta_esperada = {"key": "value", "messageId": "abc123"}
     mock_resp = _mock_response(200, resposta_esperada)
 
-    with patch.object(
-        client._client, "request", new_callable=AsyncMock
-    ) as mock_request:
+    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
         mock_request.return_value = mock_resp
 
         resultado = await client.enviar_texto(
@@ -90,9 +88,7 @@ async def test_enviar_texto_retorna_dict_vazio_sem_corpo(client: EvolutionClient
     resp.json.return_value = {}
     resp.text = ""
 
-    with patch.object(
-        client._client, "request", new_callable=AsyncMock
-    ) as mock_request:
+    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
         mock_request.return_value = resp
         resultado = await client.enviar_texto("inst", "5511999999999", "teste")
 
@@ -121,7 +117,6 @@ async def test_retry_em_timeout_3_tentativas(client: EvolutionClient):
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
     ):
-
         mock_req.side_effect = httpx.ReadTimeout("timeout")
 
         with pytest.raises(EvolutionTimeoutError):
@@ -158,7 +153,6 @@ async def test_retry_sucesso_na_segunda_tentativa(client: EvolutionClient):
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
-
         mock_req.side_effect = [httpx.ReadTimeout("t"), sucesso]
 
         resultado = await client.enviar_texto("inst", "5511999999999", "teste")
@@ -181,7 +175,6 @@ async def test_erro_400_levanta_evolution_request_error(client: EvolutionClient)
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
-
         mock_req.return_value = mock_resp
 
         with pytest.raises(EvolutionRequestError):
@@ -201,7 +194,6 @@ async def test_erro_500_levanta_evolution_request_error(client: EvolutionClient)
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
-
         mock_req.return_value = mock_resp
 
         with pytest.raises(EvolutionRequestError) as exc_info:
@@ -219,7 +211,6 @@ async def test_erro_503_levanta_evolution_offline_error(client: EvolutionClient)
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
-
         mock_req.return_value = mock_resp
 
         with pytest.raises(EvolutionOfflineError):
@@ -236,7 +227,6 @@ async def test_erro_conexao_levanta_evolution_request_error(client: EvolutionCli
         patch.object(client._client, "request", new_callable=AsyncMock) as mock_req,
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
-
         mock_req.side_effect = httpx.ConnectError("connection refused")
 
         with pytest.raises(EvolutionRequestError, match="Falha de conexão"):

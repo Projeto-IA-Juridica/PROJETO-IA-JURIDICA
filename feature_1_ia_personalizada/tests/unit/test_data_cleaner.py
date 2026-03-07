@@ -3,9 +3,8 @@
 Testes unitários para LegalDataCleaner.
 Cobre remover_tags_html, normalizar_espacos, limpar_andamento e processar_extrato.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
 
@@ -163,8 +162,7 @@ class TestProcessarExtrato:
         andamentos = [
             {
                 "descricao": (
-                    "<html><body><p>Conclusão ao Juiz&nbsp;"
-                    "<br/>Expedido ofício</p></body></html>"
+                    "<html><body><p>Conclusão ao Juiz&nbsp;<br/>Expedido ofício</p></body></html>"
                 )
             }
         ]

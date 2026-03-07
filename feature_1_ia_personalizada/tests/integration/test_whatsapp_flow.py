@@ -7,6 +7,7 @@ Cobre o endpoint POST /webhook/whatsapp de ponta a ponta:
   - task Celery mockada (evita dependência de broker em CI)
   - todas as ramificações de filtragem e resolução de tenant/cliente
 """
+
 from __future__ import annotations
 
 import sys
@@ -23,8 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # e portanto retorna o APIRouter. A forma correta de obter o módulo real é via
 # sys.modules. Importamos o pacote routes explicitamente para garantir que o módulo
 # webhook_whatsapp já está registrado em sys.modules antes de acessá-lo.
-import feature_1_ia_personalizada.api.routes  # noqa: F401 — garante carregamento do pacote
-
+import feature_1_ia_personalizada.api.routes  # noqa: F401
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 
@@ -187,9 +187,7 @@ class TestWebhookFiltros:
         mock_celery.delay.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_mensagem_from_me_e_ignorada(
-        self, async_client: AsyncClient, mock_celery
-    ):
+    async def test_mensagem_from_me_e_ignorada(self, async_client: AsyncClient, mock_celery):
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(from_me=True),
@@ -200,9 +198,7 @@ class TestWebhookFiltros:
         mock_celery.delay.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_mensagem_de_grupo_e_ignorada(
-        self, async_client: AsyncClient, mock_celery
-    ):
+    async def test_mensagem_de_grupo_e_ignorada(self, async_client: AsyncClient, mock_celery):
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(remote_jid=GRUPO_JID),
@@ -224,9 +220,7 @@ class TestWebhookFiltros:
         mock_celery.delay.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_instancia_ausente_retorna_error(
-        self, async_client: AsyncClient, mock_celery
-    ):
+    async def test_instancia_ausente_retorna_error(self, async_client: AsyncClient, mock_celery):
         payload = _payload_texto()
         del payload["instance"]
         response = await async_client.post("/webhook/whatsapp", json=payload, headers=_WH_HEADERS)

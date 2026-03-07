@@ -43,25 +43,25 @@ AMBIENTES: dict[str, dict] = {
 # Alterar aqui propaga automaticamente para o sumário de CI em locustfile.py.
 SLA_TARGETS: dict[tuple[str, str], int] = {
     # Health / infra
-    ("/health",                           "GET"):  200,
-    ("/health/ready",                     "GET"):  300,
-    ("/health/detailed",                  "GET"):  500,
-    ("/metrics",                          "GET"):  200,
+    ("/health", "GET"): 200,
+    ("/health/ready", "GET"): 300,
+    ("/health/detailed", "GET"): 500,
+    ("/metrics", "GET"): 200,
     # Auth
-    ("/auth/login",                       "POST"): 1000,
-    ("/auth/refresh",                     "POST"): 500,
-    ("/auth/me",                          "GET"):  300,
+    ("/auth/login", "POST"): 1000,
+    ("/auth/refresh", "POST"): 500,
+    ("/auth/me", "GET"): 300,
     # Chat — rota principal (p95 < 500ms)
-    ("/chat/history/{cliente_id}",        "GET"):  500,
-    ("/chat/stats/dashboard",             "GET"):  500,
-    ("/chat/send/{cliente_id}",           "POST"): 1000,  # enfileira no Celery
+    ("/chat/history/{cliente_id}", "GET"): 500,
+    ("/chat/stats/dashboard", "GET"): 500,
+    ("/chat/send/{cliente_id}", "POST"): 1000,  # enfileira no Celery
     # Processos
-    ("/processos (list)",                 "GET"):  500,
-    ("/processos/{id}",                   "GET"):  300,
-    ("/processos (create)",               "POST"): 800,
-    ("/processos/{id} (update)",          "PUT"):  500,
+    ("/processos (list)", "GET"): 500,
+    ("/processos/{id}", "GET"): 300,
+    ("/processos (create)", "POST"): 800,
+    ("/processos/{id} (update)", "PUT"): 500,
     # Webhook WhatsApp — p95 < 2s (meta do doc)
-    ("/webhook/whatsapp (texto)",         "POST"): 2000,
+    ("/webhook/whatsapp (texto)", "POST"): 2000,
     ("/webhook/whatsapp (evento ignorado)", "POST"): 500,
 }
 
@@ -125,7 +125,7 @@ CENARIOS: dict[str, dict] = {
             "EvolutionWebhookSimulator": {"weight": 3},
         },
         "total_users": 200,
-        "spawn_rate": 50,   # sobe rápido
+        "spawn_rate": 50,  # sobe rápido
         "run_time": "3m",
     },
 }

@@ -27,34 +27,55 @@ _BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 
 # Mapeamento TT → índice ElasticSearch para ramo Estadual (J=8)
 _TJ_INDICES: dict[str, str] = {
-    "01": "api_publica_tjac", "02": "api_publica_tjal", "03": "api_publica_tjap",
-    "04": "api_publica_tjam", "05": "api_publica_tjba", "06": "api_publica_tjce",
-    "07": "api_publica_tjdf", "08": "api_publica_tjes", "09": "api_publica_tjgo",
-    "10": "api_publica_tjma", "11": "api_publica_tjmt", "12": "api_publica_tjms",
-    "13": "api_publica_tjmg", "14": "api_publica_tjpa", "15": "api_publica_tjpb",
-    "16": "api_publica_tjpr", "17": "api_publica_tjpe", "18": "api_publica_tjpi",
-    "19": "api_publica_tjrj", "20": "api_publica_tjrn", "21": "api_publica_tjrs",
-    "22": "api_publica_tjro", "23": "api_publica_tjrr", "24": "api_publica_tjsc",
-    "25": "api_publica_tjse", "26": "api_publica_tjsp", "27": "api_publica_tjto",
+    "01": "api_publica_tjac",
+    "02": "api_publica_tjal",
+    "03": "api_publica_tjap",
+    "04": "api_publica_tjam",
+    "05": "api_publica_tjba",
+    "06": "api_publica_tjce",
+    "07": "api_publica_tjdf",
+    "08": "api_publica_tjes",
+    "09": "api_publica_tjgo",
+    "10": "api_publica_tjma",
+    "11": "api_publica_tjmt",
+    "12": "api_publica_tjms",
+    "13": "api_publica_tjmg",
+    "14": "api_publica_tjpa",
+    "15": "api_publica_tjpb",
+    "16": "api_publica_tjpr",
+    "17": "api_publica_tjpe",
+    "18": "api_publica_tjpi",
+    "19": "api_publica_tjrj",
+    "20": "api_publica_tjrn",
+    "21": "api_publica_tjrs",
+    "22": "api_publica_tjro",
+    "23": "api_publica_tjrr",
+    "24": "api_publica_tjsc",
+    "25": "api_publica_tjse",
+    "26": "api_publica_tjsp",
+    "27": "api_publica_tjto",
 }
 
 # Mapeamento TT → índice para TRF (J=5)
 _TRF_INDICES: dict[str, str] = {
-    "01": "api_publica_trf1", "02": "api_publica_trf2", "03": "api_publica_trf3",
-    "04": "api_publica_trf4", "05": "api_publica_trf5", "06": "api_publica_trf6",
+    "01": "api_publica_trf1",
+    "02": "api_publica_trf2",
+    "03": "api_publica_trf3",
+    "04": "api_publica_trf4",
+    "05": "api_publica_trf5",
+    "06": "api_publica_trf6",
 }
 
 # Mapeamento TT → índice para TRT (J=6)
 _TRT_INDICES: dict[str, str] = {f"{i:02d}": f"api_publica_trt{i}" for i in range(1, 25)}
 
-_CNJ_FORMATADO = re.compile(
-    r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$"
-)
+_CNJ_FORMATADO = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
 _CNJ_RAW = re.compile(r"^\d{20}$")
 
 
 class DataJudClientError(Exception):
     """Exceção para erros originários da API Pública do CNJ / DataJud."""
+
     pass
 
 
@@ -74,7 +95,7 @@ def _indice_para_cnj(numero_cnj: str) -> str:
     """
     digits = _normalizar_cnj(numero_cnj)
     # Estrutura: NNNNNNN(7) DD(2) AAAA(4) J(1) TT(2) OOOO(4)
-    j = digits[13]    # ramo da justiça
+    j = digits[13]  # ramo da justiça
     tt = digits[14:16]  # tribunal
 
     if j == "8":
@@ -97,9 +118,7 @@ def _indice_para_cnj(numero_cnj: str) -> str:
         indice = None
 
     if not indice:
-        raise DataJudClientError(
-            f"Tribunal não mapeado para CNJ {numero_cnj!r} (J={j}, TT={tt})"
-        )
+        raise DataJudClientError(f"Tribunal não mapeado para CNJ {numero_cnj!r} (J={j}, TT={tt})")
     return indice
 
 
@@ -133,13 +152,7 @@ class DataJudClient:
         # DataJud armazena o número sem formatação (20 dígitos puros)
         cnj_raw = _normalizar_cnj(numero_cnj)
 
-        query = {
-            "query": {
-                "match": {
-                    "numeroProcesso": cnj_raw
-                }
-            }
-        }
+        query = {"query": {"match": {"numeroProcesso": cnj_raw}}}
 
         logger.info("datajud_consultando", cnj=cnj_raw, indice=indice)
 
@@ -147,18 +160,18 @@ class DataJudClient:
             try:
                 response = await client.post(url, json=query, headers=self._headers())
             except httpx.TimeoutException as exc:
-                raise DataJudClientError(
-                    f"Timeout ao consultar DataJud para {numero_cnj}"
-                ) from exc
+                raise DataJudClientError(f"Timeout ao consultar DataJud para {numero_cnj}") from exc
             except httpx.RequestError as exc:
-                raise DataJudClientError(
-                    f"Erro de rede ao consultar DataJud: {exc}"
-                ) from exc
+                raise DataJudClientError(f"Erro de rede ao consultar DataJud: {exc}") from exc
 
         if response.status_code == 401:
-            raise DataJudClientError("DataJud: autenticação inválida (401). Verifique DATAJUD_API_KEY.")
+            raise DataJudClientError(
+                "DataJud: autenticação inválida (401). Verifique DATAJUD_API_KEY."
+            )
         if response.status_code == 404:
-            raise DataJudClientError(f"DataJud: índice não encontrado ({indice}). Tribunal pode não estar disponível.")
+            raise DataJudClientError(
+                f"DataJud: índice não encontrado ({indice}). Tribunal pode não estar disponível."
+            )
         if response.status_code != 200:
             raise DataJudClientError(
                 f"DataJud retornou HTTP {response.status_code}: {response.text[:300]}"

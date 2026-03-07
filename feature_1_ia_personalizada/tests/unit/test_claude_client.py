@@ -3,6 +3,7 @@
 Testes do ClaudeClient: retry, backoff, extração de blocos, custo e classificação.
 asyncio.sleep é patchado globalmente neste módulo para testes sem delay real.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -72,9 +73,7 @@ def _server_error() -> anthropic.InternalServerError:
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = 500
     resp.headers = httpx.Headers({})
-    return anthropic.InternalServerError(
-        message="server error", response=resp, body=None
-    )
+    return anthropic.InternalServerError(message="server error", response=resp, body=None)
 
 
 # ---------------------------------------------------------------------------
@@ -194,9 +193,7 @@ class TestBackoff:
 
 class TestEnviarMensagem:
     async def test_sucesso_retorna_estrutura_correta(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(
-            return_value=_mock_resposta("oi", 100, 50)
-        )
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta("oi", 100, 50))
         resultado = await client.enviar_mensagem("system", [], "mensagem")
         assert resultado["resposta"] == "oi"
         assert resultado["tokens_input"] == 100
@@ -289,9 +286,7 @@ class TestClassificarIntencao:
         client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))
         await client.classificar_intencao("system prompt aqui", "mensagem do cliente")
         kwargs = client._client.messages.create.call_args.kwargs
-        assert kwargs["messages"] == [
-            {"role": "user", "content": "mensagem do cliente"}
-        ]
+        assert kwargs["messages"] == [{"role": "user", "content": "mensagem do cliente"}]
 
     async def test_retry_em_rate_limit_na_classificacao(self, client: ClaudeClient):
         """Classificação é a porta de entrada — deve ter retry."""

@@ -5,7 +5,7 @@ Configuração de autorização, roles e permissionamento de rotas.
 Fornece dependências (Dependencies) do FastAPI para injetar o usuário atual.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -20,7 +20,7 @@ from shared.security.jwt import validar_token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     """
     Perfis de usuário do sistema.
     """

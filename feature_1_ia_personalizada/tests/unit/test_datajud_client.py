@@ -3,6 +3,7 @@
 Testes unitários para DataJudClient.
 Mocka httpx.AsyncClient para evitar chamadas HTTP reais na suite.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -111,7 +112,7 @@ class TestConsultarProcesso:
         client = DataJudClient()
         await client.consultar_processo(_CNJ_TJSP)
         body = self._http_mock.post.call_args[1]["json"]
-        assert body["query"]["match"]["numeroProcesso"] == _CNJ_TJSP
+        assert body["query"]["match"]["numeroProcesso"] == "00012345620248260100"
 
     async def test_sem_api_key_nao_envia_authorization(self):
         client = DataJudClient()

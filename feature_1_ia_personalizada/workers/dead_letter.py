@@ -95,9 +95,9 @@ def _resolver_id_cliente(nome_task: str, args: list) -> int | None:
     # falha silenciosa exatamente no caminho de recuperação de falhas.
     name="workers.dead_letter.processar_dlq",
     queue="dead_letter",
-    max_retries=0,        # DLQ não retenta — exige intervenção manual
+    max_retries=0,  # DLQ não retenta — exige intervenção manual
     ignore_result=False,  # mantém resultado visível no Flower para triagem
-    acks_late=False,      # DLQ deve ack imediatamente — não há recovery aqui
+    acks_late=False,  # DLQ deve ack imediatamente — não há recovery aqui
 )
 def processar_dlq(
     *,

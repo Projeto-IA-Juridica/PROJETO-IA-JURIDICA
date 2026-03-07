@@ -3,6 +3,7 @@
 Testes de integração para as rotas /processos.
 Usa async_client com DB in-memory SQLite, autenticado via JWT.
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -34,9 +35,7 @@ async def test_list_processos_sem_auth_retorna_401(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_processos_vazio(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
-):
+async def test_list_processos_vazio(async_client: AsyncClient, escritorio_factory, usuario_factory):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
@@ -83,7 +82,12 @@ async def test_create_processo_duplicado_retorna_400(
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(2)
-    payload = {"numero_cnj": cnj, "cliente_id": 999, "polo_cliente": "autor", "tipo_acao": "Cobrança"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 999,
+        "polo_cliente": "autor",
+        "tipo_acao": "Cobrança",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         # Primeiro cadastro
@@ -105,7 +109,12 @@ async def test_get_processo_existente(
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(3)
-    payload = {"numero_cnj": cnj, "cliente_id": 999, "polo_cliente": "reu", "tipo_acao": "Dano moral"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 999,
+        "polo_cliente": "reu",
+        "tipo_acao": "Dano moral",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         criado = await async_client.post("/processos", headers=headers, json=payload)
@@ -157,9 +166,7 @@ async def test_get_processo_de_outro_escritorio_retorna_404(
 
 
 @pytest.mark.asyncio
-async def test_update_processo(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
-):
+async def test_update_processo(async_client: AsyncClient, escritorio_factory, usuario_factory):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
