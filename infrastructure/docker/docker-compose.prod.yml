@@ -1,0 +1,319 @@
+# version: "3.9"
+
+# =============================================================================
+# CONCIERGE JURÍDICO DIGITAL — Docker Compose (Produção)
+# =============================================================================
+# Uso: docker compose -f infrastructure/docker/docker-compose.prod.yml up -d
+# Diferenças do dev:
+#   - Sem volumes de hot-reload
+#   - Sem portas expostas diretamente (exceto app e flower via proxy)
+#   - Resource limits em todos os serviços
+#   - restart: always
+#   - Sem --reload no uvicorn
+# =============================================================================
+
+networks:
+  concierge-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  evolution_data:
+    driver: local
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # BANCO DE DADOS — PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: concierge-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Em produção não expõe porta para o host — só acessível internamente
+    expose:
+      - "5432"
+    networks:
+      - concierge-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # CACHE + BROKER — Redis 7
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: concierge-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    networks:
+      - concierge-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+
+  # ---------------------------------------------------------------------------
+  # WHATSAPP — Evolution API (self-hosted)
+  # ---------------------------------------------------------------------------
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: concierge-evolution
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      SERVER_URL: ${EVOLUTION_API_URL}
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_PROVIDER: redis
+      DATABASE_CONNECTION_URI: redis://redis:6379/3
+      REDIS_URI: redis://redis:6379/4
+      DEL_INSTANCE: false
+    volumes:
+      - evolution_data:/evolution/instances
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 256M
+
+  # ---------------------------------------------------------------------------
+  # API — Feature 1: IA Personalizada
+  # ---------------------------------------------------------------------------
+  app-f1:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    image: concierge-f1:latest
+    container_name: concierge-app-f1
+    restart: always
+    ports:
+      - "8000:8000"   # exposto para o reverse proxy (nginx/caddy)
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      EVOLUTION_API_URL: http://evolution-api:8080
+      ENVIRONMENT: production
+    networks:
+      - concierge-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    # Sem volume de hot-reload e sem --reload
+    command: >
+      uvicorn feature_1_ia_personalizada.api.app:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+      --log-level info
+
+  # ---------------------------------------------------------------------------
+  # WORKER — Celery
+  # ---------------------------------------------------------------------------
+  celery-worker:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    image: concierge-f1:latest
+    container_name: concierge-celery-worker
+    restart: always
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      EVOLUTION_API_URL: http://evolution-api:8080
+      ENVIRONMENT: production
+    networks:
+      - concierge-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app worker
+      --loglevel=info
+      --queues=monitoramento,notificacoes,ia,relacionamento
+      --concurrency=4
+
+  # ---------------------------------------------------------------------------
+  # BEAT — Celery Beat
+  # ---------------------------------------------------------------------------
+  celery-beat:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    image: concierge-f1:latest
+    container_name: concierge-celery-beat
+    restart: always
+    env_file:
+      - ../../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ENVIRONMENT: production
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app beat
+      --loglevel=info
+      --schedule=/tmp/celerybeat-schedule
+
+  # ---------------------------------------------------------------------------
+  # FLOWER — Monitoramento Celery
+  # ---------------------------------------------------------------------------
+  flower:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.f1
+    image: concierge-f1:latest
+    container_name: concierge-flower
+    restart: always
+    ports:
+      - "5555:5555"
+    env_file:
+      - ../../.env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ENVIRONMENT: production
+    networks:
+      - concierge-net
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    command: >
+      celery -A feature_1_ia_personalizada.workers.celery_app flower
+      --port=5555
+      --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+
+  loki:
+    image: grafana/loki:2.9.0
+    expose:
+      - "3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - concierge-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - concierge-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M

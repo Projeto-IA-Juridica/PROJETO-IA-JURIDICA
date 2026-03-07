@@ -2,7 +2,7 @@
        migrate migrate-create migrate-down migrate-history seed create-admin init-db \
        lint format lint-check type-check \
        test test-unit test-integration test-fast test-file \
-       docker-up docker-down docker-logs docker-build docker-restart \
+       docker-up docker-up-prod docker-down docker-logs docker-build docker-restart \
        health clean verify-install help
 
 PYTHON := python3.12
@@ -127,6 +127,9 @@ test-file: ## Roda um arquivo de teste específico (use: make test-file FILE=tes
 docker-up: ## Sobe todos os serviços Docker (dev)
 	docker compose -f infrastructure/docker/docker-compose.yml up -d
 
+docker-up-prod: ## Sobe todos os serviços Docker (produção)
+	docker compose -f infrastructure/docker/docker-compose.prod.yml up -d
+
 docker-down: ## Para todos os serviços Docker
 	docker compose -f infrastructure/docker/docker-compose.yml down
 
@@ -165,6 +168,6 @@ verify-install: ## Verifica se todas as dependências estão instaladas
 
 help: ## Exibe esta ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "%-20s %s\n", $$1, $$2}'
 
 .DEFAULT_GOAL := help
