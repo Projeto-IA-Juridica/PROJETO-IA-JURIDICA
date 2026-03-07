@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     EVOLUTION_API_URL: str
     EVOLUTION_API_KEY: str
     JUSBRASIL_API_KEY: str
+    DATAJUD_API_KEY: str | None = None
 
     # Auth
     JWT_SECRET_KEY: str = Field(min_length=32)

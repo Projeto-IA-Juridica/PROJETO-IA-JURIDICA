@@ -16,11 +16,12 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 )
 import pybreaker
 
-# from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
-# from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
-# from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
-# from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
-# deixar de comentar ao terminar a fase 3.!!!!!!!!!!!!!!!
+from feature_1_ia_personalizada.services.legal_data.data_cleaner import (
+    LegalDataCleaner as DataCleaner,
+)
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
+from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
+from shared.config.settings import settings
 from shared.database.worker_queries import (
     query_processo_por_id,
     query_processos_monitorados,
@@ -37,8 +38,7 @@ _processos_monitorados_total = Gauge(
     "Número atual de processos com monitoramento ativo",
 )
 
-# CIRCUIT BREAKERS (Compartilhados por todos os processos neste worker)
-_jusbrasil_breaker = pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)
+# CIRCUIT BREAKER — DataJud (fonte primária no MVP)
 _datajud_breaker = pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)
 
 # CONFIGURAÇÕES
@@ -84,22 +84,11 @@ def extrair_texto_e_data_do_andamento(
     return str(texto), converter_para_iso(data)
 
 
-@_jusbrasil_breaker
-def buscar_andamentos_jusbrasil(
-    numero_processo: str,
-    data_referencia_iso: str | None,
-    cliente_jusbrasil: JusbrasilClient,  # noqa: F821 — import comentado aguarda Fase 3
-) -> list[Any]:
-    return cliente_jusbrasil.buscar_novos_andamentos(
-        numero_processo, data_referencia_iso
-    )
-
-
 @_datajud_breaker
 def buscar_andamentos_datajud(
     numero_processo: str,
     data_referencia_iso: str | None,
-    cliente_datajud: DataJudClient,  # noqa: F821 — import comentado aguarda Fase 3
+    cliente_datajud: DataJudClient,
 ) -> list[Any]:
     return cliente_datajud.buscar_novos_andamentos(numero_processo, data_referencia_iso)
 
@@ -120,41 +109,13 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     lista_andamentos = get_andamentos_sync(numero_processo)
 
     if lista_andamentos is None:
-        cliente_jusbrasil = JusbrasilClient()  # noqa: F821
-        cliente_datajud = DataJudClient()  # noqa: F821
-        fonte_utilizada = "jusbrasil"
-
-        try:
-            lista_andamentos = buscar_andamentos_jusbrasil(
-                numero_processo,
-                data_ultimo_andamento_salvo,
-                cliente_jusbrasil,
-            )
-        except pybreaker.CircuitBreakerError as erro:
-            logger.warning(
-                "jusbrasil_circuit_open_fallback_datajud",
-                id_processo=id_processo,
-                erro=str(erro),
-            )
-            fonte_utilizada = "datajud"
-            lista_andamentos = buscar_andamentos_datajud(
-                numero_processo,
-                data_ultimo_andamento_salvo,
-                cliente_datajud,
-            )
-        except Exception as erro:
-            logger.warning(
-                "jusbrasil_erro_fallback_datajud",
-                id_processo=id_processo,
-                erro=str(erro),
-                exc_info=True,
-            )
-            fonte_utilizada = "datajud"
-            lista_andamentos = buscar_andamentos_datajud(
-                numero_processo,
-                data_ultimo_andamento_salvo,
-                cliente_datajud,
-            )
+        cliente_datajud = DataJudClient(api_key=settings.DATAJUD_API_KEY)
+        fonte_utilizada = "datajud"
+        lista_andamentos = buscar_andamentos_datajud(
+            numero_processo,
+            data_ultimo_andamento_salvo,
+            cliente_datajud,
+        )
 
         # Grava no Redis para próximas execuções (TTL 6h, definido em LegalDataCacheManager).
         # Usa "is not None" para cachear também listas vazias [] — evita chamada à API
@@ -178,10 +139,8 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
 
         texto_original, data_iso = extrair_texto_e_data_do_andamento(andamento)
 
-        texto_limpo = DataCleaner.limpar_andamento(texto_original)  # noqa: F821
-        texto_traduzido = JuridicalTranslator.traduzir_andamento(  # noqa: F821
-            texto_limpo
-        )
+        texto_limpo = DataCleaner.limpar_andamento(texto_original)
+        texto_traduzido = JuridicalTranslator.traduzir_andamento(texto_limpo)
 
         celery_app.send_task(
             "feature_1_ia_personalizada.workers.send_notifications.enviar_notificacao_andamento",
