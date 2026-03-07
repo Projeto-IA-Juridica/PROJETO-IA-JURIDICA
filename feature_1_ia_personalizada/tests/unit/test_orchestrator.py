@@ -248,7 +248,7 @@ def _base_state(**overrides) -> ConversationState:
         "usando_fallback": False,
         "precisa_regenerar": False,
     }
-    state.update(overrides)
+    state.update(overrides)  # type: ignore[typeddict-item]
     return state
 
 

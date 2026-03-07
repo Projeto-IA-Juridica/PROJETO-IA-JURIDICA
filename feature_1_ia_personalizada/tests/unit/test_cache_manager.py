@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+from typing import Any, cast
 import pytest
 
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
@@ -109,18 +110,18 @@ class _ErrorPipeline:
 
 
 @pytest.fixture
-def redis() -> _FakeCacheRedis:
+def redis() -> Any:
     return _FakeCacheRedis()
 
 
 @pytest.fixture
-def cache(redis: _FakeCacheRedis) -> LegalDataCacheManager:
+def cache(redis: Any) -> LegalDataCacheManager:
     return LegalDataCacheManager(redis)
 
 
 @pytest.fixture
 def cache_error() -> LegalDataCacheManager:
-    return LegalDataCacheManager(_ErrorRedis())
+    return LegalDataCacheManager(cast(Any, _ErrorRedis()))
 
 
 # ---------------------------------------------------------------------------

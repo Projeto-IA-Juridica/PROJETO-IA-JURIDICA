@@ -22,7 +22,9 @@ from feature_1_ia_personalizada.tests.conftest import FakeRedis
 
 @pytest.fixture
 def memory(fake_redis: FakeRedis) -> ConversationMemory:
-    return ConversationMemory(fake_redis)
+    from typing import cast
+    from redis.asyncio import Redis
+    return ConversationMemory(cast(Redis, fake_redis))
 
 
 # ---------------------------------------------------------------------------

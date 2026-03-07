@@ -195,7 +195,7 @@ class TestBackoff:
 
 class TestEnviarMensagem:
     async def test_sucesso_retorna_estrutura_correta(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(
+        client._client.messages.create = AsyncMock(  # type: ignore[method-assign]
             return_value=_mock_resposta("oi", 100, 50)
         )
         resultado = await client.enviar_mensagem("system", [], "mensagem")
@@ -207,7 +207,7 @@ class TestEnviarMensagem:
     async def test_mensagem_usuario_adicionada_ao_historico(self, client: ClaudeClient):
         """A mensagem do usuário deve ser a última no array enviado ao Claude."""
         historico = [{"role": "user", "content": "anterior"}]
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta())
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta())  # type: ignore[method-assign]
 
         await client.enviar_mensagem("system", historico, "nova mensagem")
 
@@ -217,27 +217,27 @@ class TestEnviarMensagem:
         assert len(messages_enviadas) == 2
 
     async def test_retry_em_rate_limit_esgota_e_levanta(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(side_effect=_rate_limit_error())
+        client._client.messages.create = AsyncMock(side_effect=_rate_limit_error())  # type: ignore[method-assign]
         with pytest.raises(RuntimeError, match="indisponível"):
             await client.enviar_mensagem("system", [], "msg")
         assert client._client.messages.create.call_count == _MAX_TENTATIVAS
 
     async def test_retry_em_timeout_esgota_e_levanta(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(side_effect=_timeout_error())
+        client._client.messages.create = AsyncMock(side_effect=_timeout_error())  # type: ignore[method-assign]
         with pytest.raises(RuntimeError):
             await client.enviar_mensagem("system", [], "msg")
         assert client._client.messages.create.call_count == _MAX_TENTATIVAS
 
     async def test_auth_error_nao_faz_retry(self, client: ClaudeClient):
         """AuthenticationError deve falhar imediatamente — chave inválida não melhora com retry."""
-        client._client.messages.create = AsyncMock(side_effect=_auth_error())
+        client._client.messages.create = AsyncMock(side_effect=_auth_error())  # type: ignore[method-assign]
         with pytest.raises(RuntimeError, match="inválida"):
             await client.enviar_mensagem("system", [], "msg")
         assert client._client.messages.create.call_count == 1  # apenas 1 tentativa
 
     async def test_sucesso_na_segunda_tentativa(self, client: ClaudeClient):
         """Falha na 1ª tentativa deve ser recuperada na 2ª."""
-        client._client.messages.create = AsyncMock(
+        client._client.messages.create = AsyncMock(  # type: ignore[method-assign]
             side_effect=[_rate_limit_error(), _mock_resposta("recuperado")]
         )
         resultado = await client.enviar_mensagem("system", [], "msg")
@@ -246,7 +246,7 @@ class TestEnviarMensagem:
 
     async def test_api_error_generico_faz_retry(self, client: ClaudeClient):
         """Erros 5xx devem ser retentados."""
-        client._client.messages.create = AsyncMock(side_effect=_server_error())
+        client._client.messages.create = AsyncMock(side_effect=_server_error())  # type: ignore[method-assign]
         with pytest.raises(RuntimeError):
             await client.enviar_mensagem("system", [], "msg")
         assert client._client.messages.create.call_count == _MAX_TENTATIVAS
@@ -254,7 +254,7 @@ class TestEnviarMensagem:
     async def test_usa_modelo_correto(self, client: ClaudeClient):
         from shared.config.constants import MODELO_CLAUDE
 
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta())
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta())  # type: ignore[method-assign]
         await client.enviar_mensagem("system", [], "msg")
         kwargs = client._client.messages.create.call_args.kwargs
         assert kwargs["model"] == MODELO_CLAUDE

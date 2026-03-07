@@ -95,15 +95,20 @@ def chave_limite(prefixo: str, *valores: Any) -> str:
     return prefixo + ":" + ":".join(str(v) for v in valores)
 
 
-def registrar_envio_com_validade(chave: str, tempo_segundos: int):
-    cliente_redis.set(chave, "1", ex=tempo_segundos)
+def registrar_envio_com_validade(chave: str, tempo_segundos: int) -> None:
+    if cliente_redis:
+        cliente_redis.set(chave, "1", ex=tempo_segundos)
 
 
 def envio_recente(chave: str) -> bool:
-    return cliente_redis.exists(chave) == 1
+    if not cliente_redis:
+        return False
+    return bool(cliente_redis.exists(chave) == 1)
 
 
 def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
+    if not cliente_redis:
+        return False
     return bool(cliente_redis.set(chave, "1", nx=True, ex=tempo_segundos))
 
 

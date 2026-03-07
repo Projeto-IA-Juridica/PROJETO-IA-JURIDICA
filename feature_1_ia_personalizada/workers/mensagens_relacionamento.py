@@ -103,15 +103,20 @@ def chave(prefixo: str, *partes: Any) -> str:
 
 
 def adquirir_bloqueio(chave_bloqueio: str, tempo_segundos: int) -> bool:
+    if not cliente_redis:
+        return False
     return bool(cliente_redis.set(chave_bloqueio, "1", nx=True, ex=tempo_segundos))
 
 
 def ja_enviado_recentemente(chave_envio: str) -> bool:
-    return cliente_redis.exists(chave_envio) == 1
+    if not cliente_redis:
+        return False
+    return bool(cliente_redis.exists(chave_envio) == 1)
 
 
-def marcar_enviado(chave_envio: str, tempo_segundos: int):
-    cliente_redis.set(chave_envio, "1", ex=tempo_segundos)
+def marcar_enviado(chave_envio: str, tempo_segundos: int) -> None:
+    if cliente_redis:
+        cliente_redis.set(chave_envio, "1", ex=tempo_segundos)
 
 
 def dia_mes_hoje() -> tuple[int, int]:

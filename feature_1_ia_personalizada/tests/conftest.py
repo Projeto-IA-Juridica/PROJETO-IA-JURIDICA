@@ -86,8 +86,8 @@ class _FakePipeline:
         self._cmds.append(("lrange", key, start, end))
         return self
 
-    async def execute(self) -> list:
-        results = []
+    async def execute(self) -> list[Any]:
+        results: list[Any] = []
         for cmd in self._cmds:
             op = cmd[0]
             if op == "rpush":
@@ -193,7 +193,7 @@ async def init_db(engine):
 
 
 @pytest.fixture(scope="function")
-async def db_session(engine, init_db) -> AsyncSession:
+async def db_session(engine, init_db) -> AsyncGenerator[AsyncSession, None]:
     Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
     async with Session() as session:
         yield session
