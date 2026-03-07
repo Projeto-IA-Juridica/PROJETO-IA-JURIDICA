@@ -284,7 +284,8 @@ def upgrade() -> None:
     # O ORM já cuida disso via onupdate=func.now(), mas garantir no banco
     # protege contra updates diretos via SQL (migrations, seeds, scripts).
     # =========================================================================
-    op.execute("""
+    op.execute(
+        """
         CREATE OR REPLACE FUNCTION update_updated_at()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -292,14 +293,17 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
-    """)
+    """
+    )
 
     for tabela in ["escritorios", "usuarios", "clientes", "processos", "interacoes"]:
-        op.execute(f"""
+        op.execute(
+            f"""
             CREATE TRIGGER trg_{tabela}_updated_at
             BEFORE UPDATE ON {tabela}
             FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-        """)
+        """
+        )
 
 
 def downgrade() -> None:
