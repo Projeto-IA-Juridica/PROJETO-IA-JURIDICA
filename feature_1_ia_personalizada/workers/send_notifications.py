@@ -28,7 +28,18 @@ HORA_INICIO_ENVIO = int(os.getenv("HORA_INICIO_ENVIO", "8"))
 HORA_FIM_ENVIO = int(os.getenv("HORA_FIM_ENVIO", "20"))
 
 URL_REDIS = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
+
+# ✅ CORREÇÃO: conexão lazy — criada apenas na primeira chamada,
+# não no momento em que o módulo é importado.
+_cliente_redis: redis.Redis | None = None
+
+
+def get_redis() -> redis.Redis:
+    global _cliente_redis
+    if _cliente_redis is None:
+        _cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
+    return _cliente_redis
+
 
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
 TEMPO_32_DIAS = 32 * 24 * 60 * 60
@@ -96,20 +107,15 @@ def chave_limite(prefixo: str, *valores: Any) -> str:
 
 
 def registrar_envio_com_validade(chave: str, tempo_segundos: int) -> None:
-    if cliente_redis:
-        cliente_redis.set(chave, "1", ex=tempo_segundos)
+    get_redis().set(chave, "1", ex=tempo_segundos)
 
 
 def envio_recente(chave: str) -> bool:
-    if not cliente_redis:
-        return False
-    return bool(cliente_redis.exists(chave) == 1)
+    return bool(get_redis().exists(chave) == 1)
 
 
 def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
-    if not cliente_redis:
-        return False
-    return bool(cliente_redis.set(chave, "1", nx=True, ex=tempo_segundos))
+    return bool(get_redis().set(chave, "1", nx=True, ex=tempo_segundos))
 
 
 def buscar_processo_e_cliente(id_processo: int):
