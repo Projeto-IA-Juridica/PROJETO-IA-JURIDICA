@@ -1,0 +1,159 @@
+# =============================================================================
+# Concierge Jurídico — Promtail Configuration
+# =============================================================================
+# Coleta logs de todos os containers Docker do projeto e envia para o Loki.
+# Labels aplicadas: container, service, env — facilitam filtros no Grafana.
+# =============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  # Arquivo que persiste a posição de leitura dos logs (evita reprocessar)
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+
+  # ---------------------------------------------------------------------------
+  # Logs dos containers Docker via arquivo de log do daemon
+  # ---------------------------------------------------------------------------
+  - job_name: docker-containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          env: production
+          __path__: /var/log/docker-containers/*/*-json.log
+
+    pipeline_stages:
+      # Parseia o formato JSON do log do Docker
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+            tag: attrs.tag
+
+      # Extrai o nome do container do campo tag
+      - regex:
+          expression: '(?P<container_name>[^/]+)$'
+          source: tag
+
+      # Aplica labels úteis para filtrar no Grafana
+      - labels:
+          stream:
+          container_name:
+
+      # Define o timestamp correto do log
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      # Usa o campo log como output final
+      - output:
+          source: output
+
+  # ---------------------------------------------------------------------------
+  # Logs específicos da API FastAPI (app-f1)
+  # ---------------------------------------------------------------------------
+  - job_name: concierge-api
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: fastapi
+          service: concierge-api
+          env: production
+          __path__: /var/log/docker-containers/*concierge-app-f1*/*-json.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+
+      # Tenta parsear logs estruturados do structlog (JSON dentro do JSON)
+      - json:
+          expressions:
+            level: level
+            event: event
+            request_id: request_id
+          source: output
+
+      - labels:
+          level:
+          stream:
+
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      - output:
+          source: output
+
+  # ---------------------------------------------------------------------------
+  # Logs do Celery Worker
+  # ---------------------------------------------------------------------------
+  - job_name: concierge-celery-worker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: celery-worker
+          service: concierge-celery
+          env: production
+          __path__: /var/log/docker-containers/*concierge-celery-worker*/*-json.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+
+      - labels:
+          stream:
+
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      - output:
+          source: output
+
+  # ---------------------------------------------------------------------------
+  # Logs do Celery Beat
+  # ---------------------------------------------------------------------------
+  - job_name: concierge-celery-beat
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: celery-beat
+          service: concierge-celery
+          env: production
+          __path__: /var/log/docker-containers/*concierge-celery-beat*/*-json.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+
+      - labels:
+          stream:
+
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      - output:
+          source: output

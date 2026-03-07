@@ -1,4 +1,4 @@
-# version: "3.9"
+version: "3.9"
 
 # =============================================================================
 # CONCIERGE JURÍDICO DIGITAL — Docker Compose (Produção)
@@ -23,6 +23,8 @@ volumes:
     driver: local
   evolution_data:
     driver: local
+  loki_data:
+    driver: local
 
 services:
 
@@ -40,7 +42,6 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # Em produção não expõe porta para o host — só acessível internamente
     expose:
       - "5432"
     networks:
@@ -136,7 +137,7 @@ services:
     container_name: concierge-app-f1
     restart: always
     ports:
-      - "8000:8000"   # exposto para o reverse proxy (nginx/caddy)
+      - "8000:8000"
     env_file:
       - ../../.env
     environment:
@@ -166,7 +167,6 @@ services:
         reservations:
           cpus: "0.25"
           memory: 256M
-    # Sem volume de hot-reload e sem --reload
     command: >
       uvicorn feature_1_ia_personalizada.api.app:app
       --host 0.0.0.0
@@ -286,13 +286,26 @@ services:
       --port=5555
       --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
 
+  # ---------------------------------------------------------------------------
+  # LOKI — Agregador de logs
+  # ---------------------------------------------------------------------------
   loki:
     image: grafana/loki:2.9.0
+    container_name: concierge-loki
+    restart: always
     expose:
       - "3100"
+    volumes:
+      - ../../monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - concierge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -302,13 +315,23 @@ services:
           cpus: "0.05"
           memory: 64M
 
+  # ---------------------------------------------------------------------------
+  # PROMTAIL — Coletor de logs dos containers
+  # ---------------------------------------------------------------------------
   promtail:
     image: grafana/promtail:2.9.0
+    container_name: concierge-promtail
+    restart: always
     volumes:
-      - /var/log:/var/log
+      - ../../monitoring/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/log/docker-containers:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - concierge-net
+    depends_on:
+      loki:
+        condition: service_healthy
     deploy:
       resources:
         limits:
