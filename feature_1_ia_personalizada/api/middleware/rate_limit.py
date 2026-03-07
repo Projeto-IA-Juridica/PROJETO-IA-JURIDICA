@@ -6,9 +6,12 @@ Usa Redis para criar um Sliding Window / Fixed Window counter.
 """
 
 import redis.asyncio as redis
+import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+logger = structlog.get_logger(__name__)
 
 # Pool global de redis pro middleware
 # (Não usa o mesmo motor SQLAlchemy, conecta direto rápido)
@@ -71,10 +74,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         "limit": limit,
                     },
                 )
-        except Exception:
-            # Se o Redis cair por algum motivo, não vamos derrubar a API inteira
-            # Deixa passar, mas faríamos log disso idealmente
-            pass
+        except Exception as e:
+            #  CORREÇÃO: Redis indisponível não derruba a API, mas agora logamos
+            # o erro para que o problema seja visível no monitoramento.
+            logger.warning(
+                "rate_limit.redis_unavailable",
+                error=str(e),
+                path=path,
+                identifier=identifier,
+            )
 
         # Segue a request
         response = await call_next(request)
@@ -84,7 +92,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             remaining = str(max(0, limit - int(current_count)))
             response.headers["X-RateLimit-Limit"] = str(limit)
             response.headers["X-RateLimit-Remaining"] = remaining
-        except Exception:
-            pass
+        except Exception as e:
+            # ✅ CORREÇÃO: falha ao setar headers também merece log (nível debug,
+            # pois não afeta o fluxo principal)
+            logger.debug(
+                "rate_limit.headers_error",
+                error=str(e),
+                path=path,
+            )
 
         return response
