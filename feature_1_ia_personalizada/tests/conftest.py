@@ -7,6 +7,7 @@ Define env vars FAKE antes de qualquer import de módulo de aplicação.
 from __future__ import annotations
 
 import os
+from typing import Any, AsyncGenerator
 
 import pytest
 from cryptography.fernet import Fernet

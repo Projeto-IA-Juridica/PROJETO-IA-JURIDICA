@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import cast
 
 import pytest
+from redis.asyncio import Redis
 
 from feature_1_ia_personalizada.services.ai.memory import (
     _MAX_CONTENT_CHARS,
@@ -22,8 +24,6 @@ from feature_1_ia_personalizada.tests.conftest import FakeRedis
 
 @pytest.fixture
 def memory(fake_redis: FakeRedis) -> ConversationMemory:
-    from typing import cast
-    from redis.asyncio import Redis
     return ConversationMemory(cast(Redis, fake_redis))
 
 

@@ -10,9 +10,9 @@ usados pelos workers Celery, mockando _sync_redis com MagicMock síncrono.
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from typing import Any, cast
 import pytest
 
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (

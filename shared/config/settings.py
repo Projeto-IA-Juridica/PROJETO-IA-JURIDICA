@@ -12,20 +12,6 @@ from shared.config.secrets import load_secrets_to_env
 load_secrets_to_env()
 
 
-# shared/config/settings.py
-# testado
-from typing import Literal
-
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from shared.config.secrets import load_secrets_to_env
-
-# Carrega secrets externos (AWS SM / Vault) antes de ler as variáveis de ambiente.
-# No-op se nenhum backend estiver configurado (desenvolvimento local).
-load_secrets_to_env()
-
-
 class Settings(BaseSettings):
     # Core
     DATABASE_URL: str

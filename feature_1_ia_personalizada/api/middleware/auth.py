@@ -114,6 +114,6 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 status_code=401, content={"detail": "Token JWT inválido"}
             )
 
-        # 4.  Deixa a requisição seguir seu fluxo normal - fica autorizado 
+        # 4.  Deixa a requisição seguir seu fluxo normal - fica autorizado
         response = await call_next(request)
         return response
