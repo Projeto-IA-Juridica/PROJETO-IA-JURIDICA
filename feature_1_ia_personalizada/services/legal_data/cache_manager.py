@@ -155,7 +155,9 @@ def get_andamentos_sync(cnj: str) -> list[dict[str, Any]] | None:
         cached = _sync_redis.get(LegalDataCacheManager._key_andamentos(cnj))
         if cached:
             logger.debug("cache_andamentos_hit_sync", cnj=cnj)
-            data_str = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+            data_str = (
+                cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+            )
             return json.loads(data_str)  # type: ignore[no-any-return]
         logger.debug("cache_andamentos_miss_sync", cnj=cnj)
         return None
@@ -189,7 +191,9 @@ def get_capa_sync(cnj: str) -> dict[str, Any] | None:
         cached = _sync_redis.get(LegalDataCacheManager._key_capa(cnj))
         if cached:
             logger.debug("cache_capa_hit_sync", cnj=cnj)
-            data_str = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+            data_str = (
+                cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+            )
             return json.loads(data_str)  # type: ignore[no-any-return]
         logger.debug("cache_capa_miss_sync", cnj=cnj)
         return None

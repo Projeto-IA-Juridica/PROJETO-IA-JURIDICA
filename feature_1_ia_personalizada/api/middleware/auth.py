@@ -59,7 +59,7 @@ def _checar_basic_auth(request: Request) -> bool:
 
     # secrets.compare_digest evita timing attack
     usuario_ok = secrets.compare_digest(username, DOCS_USERNAME)
-    senha_ok   = secrets.compare_digest(password, DOCS_PASSWORD)
+    senha_ok = secrets.compare_digest(password, DOCS_PASSWORD)
     return usuario_ok and senha_ok
 
 
