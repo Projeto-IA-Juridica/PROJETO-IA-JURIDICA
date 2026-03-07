@@ -38,6 +38,7 @@ INSTANCIA = "instancia-escritorio-abc"
 TELEFONE = "5511988887777"
 TELEFONE_JID = f"{TELEFONE}@s.whatsapp.net"
 GRUPO_JID = "120363000000000001@g.us"
+_WH_HEADERS = {"apikey": "test-evolution-key"}
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +181,7 @@ class TestWebhookFiltros:
     ):
         payload = _payload_texto()
         payload["event"] = "messages.update"
-        response = await async_client.post("/webhook/whatsapp", json=payload)
+        response = await async_client.post("/webhook/whatsapp", json=payload, headers=_WH_HEADERS)
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
         mock_celery.delay.assert_not_called()
@@ -192,6 +193,7 @@ class TestWebhookFiltros:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(from_me=True),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
@@ -204,6 +206,7 @@ class TestWebhookFiltros:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(remote_jid=GRUPO_JID),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
@@ -215,7 +218,7 @@ class TestWebhookFiltros:
     ):
         payload = _payload_texto()
         payload["data"]["message"]["conversation"] = "   "
-        response = await async_client.post("/webhook/whatsapp", json=payload)
+        response = await async_client.post("/webhook/whatsapp", json=payload, headers=_WH_HEADERS)
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
         mock_celery.delay.assert_not_called()
@@ -226,7 +229,7 @@ class TestWebhookFiltros:
     ):
         payload = _payload_texto()
         del payload["instance"]
-        response = await async_client.post("/webhook/whatsapp", json=payload)
+        response = await async_client.post("/webhook/whatsapp", json=payload, headers=_WH_HEADERS)
         assert response.status_code == 200
         assert response.json()["status"] == "error"
         mock_celery.delay.assert_not_called()
@@ -236,7 +239,7 @@ class TestWebhookFiltros:
         response = await async_client.post(
             "/webhook/whatsapp",
             content=b"isso nao e json {{{",
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **_WH_HEADERS},
         )
         assert response.status_code == 400
 
@@ -255,6 +258,7 @@ class TestWebhookLookup:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(instance="instancia-que-nao-existe"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
@@ -268,6 +272,7 @@ class TestWebhookLookup:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(remote_jid="5521900000000@s.whatsapp.net"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
@@ -291,6 +296,7 @@ class TestWebhookHappyPath:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(mensagem="Preciso saber sobre meu processo"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "queued"
@@ -306,6 +312,7 @@ class TestWebhookHappyPath:
         await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(mensagem="Olá"),
+            headers=_WH_HEADERS,
         )
         mock_celery.delay.assert_called_once_with(
             id_escritorio=escritorio_com_instancia.id,
@@ -325,6 +332,7 @@ class TestWebhookHappyPath:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_extended_text(mensagem="Texto com link"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "queued"
@@ -344,6 +352,7 @@ class TestWebhookHappyPath:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_imagem(caption="Foto do contrato"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "queued"
@@ -367,6 +376,7 @@ class TestWebhookHappyPath:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_audio(),
+            headers=_WH_HEADERS,
         )
         data = response.json()
         assert response.status_code == 200
@@ -416,6 +426,7 @@ class TestWebhookMultiTenant:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(instance="instancia-escritorio-b"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         # O telefone do cliente_cadastrado não existe no escritório B
@@ -467,6 +478,7 @@ class TestWebhookMultiTenant:
         response = await async_client.post(
             "/webhook/whatsapp",
             json=_payload_texto(instance="instancia-escritorio-b"),
+            headers=_WH_HEADERS,
         )
         assert response.status_code == 200
         assert response.json()["status"] == "queued"

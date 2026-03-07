@@ -84,11 +84,10 @@ async def list_processos(
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     return ProcessoList(
-        data=processos,
+        items=list(processos),
         page=page,
         per_page=per_page,
         total=total,
-        total_pages=total_pages,
     )
 
 
@@ -184,6 +183,7 @@ async def update_processo(
         setattr(processo, key, value)
 
     await db.flush()
+    await db.refresh(processo)
     return processo
 
 
