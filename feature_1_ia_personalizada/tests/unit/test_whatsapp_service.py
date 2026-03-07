@@ -656,17 +656,43 @@ class TestEnviarPesquisaSatisfacao:
 
 
 # ---------------------------------------------------------------------------
-# Métodos não implementados
+# Mensagens prontas — enviar_notificacao_andamento / enviar_sem_movimentacao
 # ---------------------------------------------------------------------------
 
+from unittest.mock import AsyncMock
 
-class TestMetodosNotImplemented:
-    async def test_enviar_notificacao_andamento_raises(self):
-        svc, _, _ = _service()
-        with pytest.raises(NotImplementedError):
-            await svc.enviar_notificacao_andamento(PROCESSO_ID, "Audiência marcada")
 
-    async def test_enviar_sem_movimentacao_raises(self):
+class TestMensagensProntas:
+    async def test_enviar_notificacao_andamento_processo_nao_encontrado(self):
         svc, _, _ = _service()
-        with pytest.raises(NotImplementedError):
-            await svc.enviar_sem_movimentacao(PROCESSO_ID)
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr(svc, "_obter_contexto_processo", AsyncMock(return_value=None))
+            result = await svc.enviar_notificacao_andamento(PROCESSO_ID, "Audiência marcada")
+        assert result == {"ok": False, "erro": "processo_nao_encontrado"}
+
+    async def test_enviar_notificacao_andamento_envia_mensagem(self):
+        svc, ev, rp = _service(preferencia="livre", mensagens_hoje=0)
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr(
+                svc, "_obter_contexto_processo",
+                AsyncMock(return_value=(ESCRITORIO_ID, CLIENTE_ID)),
+            )
+            result = await svc.enviar_notificacao_andamento(PROCESSO_ID, "Audiência marcada")
+        assert result["ok"] is True
+
+    async def test_enviar_sem_movimentacao_processo_nao_encontrado(self):
+        svc, _, _ = _service()
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr(svc, "_obter_contexto_processo", AsyncMock(return_value=None))
+            result = await svc.enviar_sem_movimentacao(PROCESSO_ID)
+        assert result == {"ok": False, "erro": "processo_nao_encontrado"}
+
+    async def test_enviar_sem_movimentacao_envia_mensagem(self):
+        svc, ev, rp = _service(preferencia="livre", mensagens_hoje=0)
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr(
+                svc, "_obter_contexto_processo",
+                AsyncMock(return_value=(ESCRITORIO_ID, CLIENTE_ID)),
+            )
+            result = await svc.enviar_sem_movimentacao(PROCESSO_ID)
+        assert result["ok"] is True

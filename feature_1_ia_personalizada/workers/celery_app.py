@@ -70,12 +70,12 @@ celery_app.conf.task_default_routing_key = "monitoramento"
 
 #  ROTAS: usar o NOME REAL da task (module.path.function)
 celery_app.conf.task_routes = {
-    # monitor_processos.py
-    "feature_1_ia_personalizada.workers.monitor_processos.monitorar_todos_processos": {
+    # monitor_processos.py — nomes explícitos definidos via name= no decorator
+    "workers.monitorar_processos": {
         "queue": "monitoramento",
         "routing_key": "monitoramento",
     },
-    "feature_1_ia_personalizada.workers.monitor_processos.monitorar_processo_individual": {
+    "workers.monitorar_processo_individual": {
         "queue": "monitoramento",
         "routing_key": "monitoramento",
     },
@@ -120,7 +120,7 @@ celery_app.conf.task_routes = {
 #  BEAT: usar o NOME REAL da task (mesmo padrão)
 celery_app.conf.beat_schedule = {
     "monitorar-processos-a-cada-6-horas": {
-        "task": "feature_1_ia_personalizada.workers.monitor_processos.monitorar_todos_processos",
+        "task": "workers.monitorar_processos",
         "schedule": crontab(minute=0, hour="0,6,12,18"),
     },
     "enviar-sem-movimentacao-semanal-seg-10h": {

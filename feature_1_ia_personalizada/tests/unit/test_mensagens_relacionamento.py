@@ -394,9 +394,6 @@ class TestVerificarClientesSemContato:
     ):
         redis = redis or _mock_redis(lock_ok=lock_ok, existe=existe)
 
-        def _ultima(id_cliente: int):
-            return ultima_interacao_por_id.get(id_cliente)
-
         with (
             patch.object(mr, "cliente_redis", redis),
             patch.object(mr.GoogleSheetsClient, "get_clientes", return_value=clientes),
@@ -404,7 +401,7 @@ class TestVerificarClientesSemContato:
             patch.object(mr.WhatsAppService, "enviar_mensagem"),
             patch.object(mr, "buscar_processo_ativo_do_cliente", return_value=None),
             patch.object(mr, "salvar_interacao"),
-            patch.object(mr, "buscar_data_ultima_interacao", side_effect=_ultima),
+            patch.object(mr, "query_ultima_interacao_batch", return_value=ultima_interacao_por_id),
             patch("time.sleep"),
         ):
             return verificar_clientes_sem_contato.run()

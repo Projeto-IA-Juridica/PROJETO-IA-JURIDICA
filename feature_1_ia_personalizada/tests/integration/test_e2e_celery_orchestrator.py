@@ -6,15 +6,36 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Impede que o módulo tente conectar no banco de dados real em sys imports
+# Impede que o módulo tente conectar no banco de dados real em sys imports.
+# Salva os originais e restaura logo após o import para não poluir os módulos
+# de outros arquivos de teste coletados na mesma sessão pytest.
+_orig_db = sys.modules.get("shared.database")
+_orig_conn = sys.modules.get("shared.database.connection")
+_orig_wq = sys.modules.get("shared.database.worker_queries")
+
 fake_db = MagicMock()
 fake_db.async_session_factory = MagicMock()
-sys.modules["shared.database.connection"] = fake_db
 sys.modules["shared.database"] = fake_db
+sys.modules["shared.database.connection"] = fake_db
+# worker_queries também precisa ser mockado: celery_app importa mensagens_relacionamento
+# ao nível de módulo, que por sua vez importa de shared.database.worker_queries.
+sys.modules["shared.database.worker_queries"] = MagicMock()
 
 from feature_1_ia_personalizada.workers.send_notifications import (
     processar_mensagem_recebida,
 )
+
+# Restaura os módulos reais para que outros test files importem shared.database corretamente
+for _k, _v in [
+    ("shared.database", _orig_db),
+    ("shared.database.connection", _orig_conn),
+    ("shared.database.worker_queries", _orig_wq),
+]:
+    if _v is not None:
+        sys.modules[_k] = _v
+    else:
+        sys.modules.pop(_k, None)
+del _k, _v, _orig_db, _orig_conn, _orig_wq
 
 
 class TestWorkerE2E:

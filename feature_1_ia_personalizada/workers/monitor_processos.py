@@ -184,7 +184,7 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         )
 
         celery_app.send_task(
-            "workers.enviar_notificacao_andamento",
+            "feature_1_ia_personalizada.workers.send_notifications.enviar_notificacao_andamento",
             args=[id_processo, texto_traduzido],
             queue="notificacoes",
         )

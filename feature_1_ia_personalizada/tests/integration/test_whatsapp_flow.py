@@ -21,7 +21,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # o que shadowa o submodulo com o APIRouter no namespace do pacote.
 # `import a.b.c as x` em Python usa attribute traversal (a.b.c), não sys.modules,
 # e portanto retorna o APIRouter. A forma correta de obter o módulo real é via
-# sys.modules — garantido porque routes/__init__.py já o importou durante seu carregamento.
+# sys.modules. Importamos o pacote routes explicitamente para garantir que o módulo
+# webhook_whatsapp já está registrado em sys.modules antes de acessá-lo.
+import feature_1_ia_personalizada.api.routes  # noqa: F401 — garante carregamento do pacote
+
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 

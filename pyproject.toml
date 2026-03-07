@@ -73,7 +73,7 @@ include = ["shared*", "feature_*"]
 asyncio_mode = "auto"
 testpaths = [
     "feature_1_ia_personalizada/tests",
-    "shared",
+    "shared/tests",
 ]
 python_files = "test_*.py"
 python_classes = "Test*"
