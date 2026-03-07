@@ -55,7 +55,8 @@ beat: ## Inicia Celery beat (agendador de tarefas)
 
 flower: ## Inicia Flower (monitoramento Celery) em localhost:5555
 	$(CELERY) -A feature_1_ia_personalizada.workers.celery_app flower \
-		--port=5555
+		--port=5555 \
+		--basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
 
 # ==============================================================================
 # BANCO DE DADOS

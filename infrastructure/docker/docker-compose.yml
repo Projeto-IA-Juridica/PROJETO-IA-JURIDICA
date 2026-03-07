@@ -1,4 +1,4 @@
-version: "3.9"
+
 
 # =============================================================================
 # CONCIERGE JURÍDICO DIGITAL — Docker Compose (Desenvolvimento)
@@ -190,7 +190,6 @@ services:
        celery -A feature_1_ia_personalizada.workers.celery_app beat
        --loglevel=info
        --schedule=/tmp/celerybeat-schedule
-      
 
   # ---------------------------------------------------------------------------
   # FLOWER — Monitoramento Celery (UI em localhost:5555)
@@ -216,15 +215,13 @@ services:
     command: >
       celery -A feature_1_ia_personalizada.workers.celery_app flower
       --port=5555
-      --basic_auth=admin:admin
+      --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
 
   loki:
     image: grafana/loki:2.9.0
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
-
-
 
   promtail:
     image: grafana/promtail:2.9.0

@@ -12,6 +12,20 @@ from shared.config.secrets import load_secrets_to_env
 load_secrets_to_env()
 
 
+# shared/config/settings.py
+# testado
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from shared.config.secrets import load_secrets_to_env
+
+# Carrega secrets externos (AWS SM / Vault) antes de ler as variáveis de ambiente.
+# No-op se nenhum backend estiver configurado (desenvolvimento local).
+load_secrets_to_env()
+
+
 class Settings(BaseSettings):
     # Core
     DATABASE_URL: str
@@ -35,6 +49,10 @@ class Settings(BaseSettings):
     # Docs (/docs, /redoc) — Basic Auth
     DOCS_USERNAME: str = "admin"
     DOCS_PASSWORD: str | None = None  # None em produção = /docs retorna 403
+
+    # Flower (monitoramento Celery) — Basic Auth
+    FLOWER_USER: str = "admin"
+    FLOWER_PASSWORD: str | None = None  # None = sem auth (só dev local)
 
     # Segurança / LGPD
     ENCRYPTION_KEY: str  # Fernet key (base64 urlsafe) — validado abaixo
