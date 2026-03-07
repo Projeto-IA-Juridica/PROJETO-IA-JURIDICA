@@ -10,6 +10,7 @@ Model do Processo Judicial vinculado a um cliente.
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -24,6 +25,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from shared.models.cliente import Cliente
+    from shared.models.escritorio import Escritorio
+    from shared.models.interacao import Interacao
+    from shared.models.usuario import Usuario
 
 
 class Processo(Base, TimestampMixin, TenantMixin):

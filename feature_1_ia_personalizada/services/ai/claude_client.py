@@ -59,7 +59,7 @@ def _calcular_custo(tokens_input: int, tokens_output: int) -> Decimal:
 
 def _backoff(tentativa: int) -> float:
     """Backoff exponencial com jitter — evita thundering herd em múltiplos workers."""
-    return 2**tentativa + random.uniform(0.0, 1.0)
+    return 2**tentativa + random.uniform(0.0, 1.0)  # type: ignore[no-any-return]
 
 
 def _extrair_texto(response: anthropic.types.Message) -> str:
@@ -109,7 +109,7 @@ async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
             logger.warning(
                 "claude_api_error",
                 tentativa=tentativa,
-                status=exc.status_code,
+                status=getattr(exc, "status_code", 500),
                 espera_s=round(espera, 2),
             )
             await asyncio.sleep(espera)
@@ -169,7 +169,7 @@ class ClaudeClient:
                 max_tokens=MAX_TOKENS_RESPOSTA,
                 temperature=TEMPERATURA_CLAUDE,
                 system=system_prompt,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
             )
 
         response = await _com_retry(_chamar)

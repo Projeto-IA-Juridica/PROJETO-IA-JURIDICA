@@ -12,11 +12,16 @@ Roles disponíveis:
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from shared.models.escritorio import Escritorio
+    from shared.models.processo import Processo
 
 
 class Usuario(Base, TimestampMixin, TenantMixin):

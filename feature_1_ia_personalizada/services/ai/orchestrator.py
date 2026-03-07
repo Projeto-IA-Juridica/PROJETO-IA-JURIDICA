@@ -492,7 +492,10 @@ class ConversationOrchestrator:
     def _rota_apos_verificacao(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
-        if state.get("precisa_regenerar") and state.get("tentativas_correcao", 0) < 2:
+        if (
+            state.get("precisa_regenerar")
+            and (state.get("tentativas_correcao") or 0) < 2
+        ):
             return "gerar_resposta"
         return "enviar_resposta"
 
@@ -802,7 +805,7 @@ class ConversationOrchestrator:
                     interacao=stub,
                 )
                 if not resultado_fc["verificado"]:
-                    tentativas = state.get("tentativas_correcao", 0)
+                    tentativas = state.get("tentativas_correcao") or 0
                     if tentativas < 2:
                         precisa_regenerar = True
                         log.warning(
@@ -988,17 +991,17 @@ class ConversationOrchestrator:
 
     async def _fluxo_sequencial(self, state: ConversationState) -> ConversationState:
         """Executa os nós em sequência quando LangGraph não está instalado."""
-        state = dict(state)  # copia mutável
+        state = dict(state)  # type: ignore[assignment]
 
         # Nó 1: classificar
-        state.update(await self._node_classificar_intencao(state))
+        state.update(await self._node_classificar_intencao(state))  # type: ignore[typeddict-item]
         if state.get("erro"):
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
 
         # Nó 2: buscar dados (se intencão exige processo)
         if state["intencao"] in ("status", "duvida_termo", "agendamento", "reclamacao"):
-            state.update(await self._node_buscar_dados(state))
+            state.update(await self._node_buscar_dados(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
                 return state  # type: ignore[return-value]
@@ -1008,27 +1011,27 @@ class ConversationOrchestrator:
                 return state  # type: ignore[return-value]
 
         # Nó 3: gerar resposta
-        state.update(await self._node_gerar_resposta(state))
+        state.update(await self._node_gerar_resposta(state))  # type: ignore[typeddict-item]
         if state.get("erro"):
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
 
         # Nó 4: verificar (com até 1 re-geração)
         for _ in range(2):
-            state.update(await self._node_verificar_resposta(state))
+            state.update(await self._node_verificar_resposta(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
                 return state  # type: ignore[return-value]
             if not state.get("precisa_regenerar"):
                 break
             # Re-gera com contexto de correção
-            state.update(await self._node_gerar_resposta(state))
+            state.update(await self._node_gerar_resposta(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
                 return state  # type: ignore[return-value]
 
         # Nó 5: enviar
-        state.update(await self._node_enviar_resposta(state))
+        state.update(await self._node_enviar_resposta(state))  # type: ignore[typeddict-item]
         if state.get("erro"):
             await self._node_tratar_erro(state)
 
@@ -1183,6 +1186,6 @@ def executar_fluxo_orquestrador(
                 id_escritorio, id_cliente, mensagem, tipo
             )
         finally:
-            await redis_client.aclose()
+            await redis_client.close()
 
     return asyncio.run(_run())

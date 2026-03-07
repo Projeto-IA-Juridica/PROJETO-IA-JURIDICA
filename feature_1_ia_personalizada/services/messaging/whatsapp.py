@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Any, Protocol
 
 import structlog
@@ -360,7 +360,7 @@ class WhatsAppService:
 # Utils internas
 
 
-def _um_dia(agora: datetime):
+def _um_dia(agora: datetime) -> timedelta:
     # sem importar timedelta no topo para manter simples
     from datetime import timedelta
 

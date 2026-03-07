@@ -114,7 +114,7 @@ class GoogleSheetsClient:
         logger.debug(
             "google_sheets_leitura", intervalo=intervalo, linhas=len(resultado)
         )
-        return resultado
+        return resultado  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # Público

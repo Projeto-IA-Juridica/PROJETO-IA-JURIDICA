@@ -37,7 +37,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Estratégia de chave: IP para rotas públicas, User_ID para autenticados
-        identifier = request.client.host
+        identifier = request.client.host if request.client else "unknown"
         if hasattr(request.state, "user_payload"):
             identifier = request.state.user_payload.get("sub", identifier)
 

@@ -15,6 +15,7 @@ Usado para:
 """
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -28,6 +29,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from shared.models.cliente import Cliente
+    from shared.models.escritorio import Escritorio
+    from shared.models.processo import Processo
 
 
 class Interacao(Base, TimestampMixin, TenantMixin):

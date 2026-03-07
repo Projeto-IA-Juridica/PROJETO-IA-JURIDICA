@@ -185,13 +185,17 @@ class TestCapa:
             "assunto": "Execução — débito tributário (Art. 5º, § 3°)",
         }
         await cache.set_capa(CNJ, capa_unicode)
-        assert (await cache.get_capa(CNJ))["assunto"] == capa_unicode["assunto"]
+        capa = await cache.get_capa(CNJ)
+        assert capa is not None
+        assert capa["assunto"] == capa_unicode["assunto"]
 
     async def test_sobrescrever_atualiza_valor(self, cache: LegalDataCacheManager):
         await cache.set_capa(CNJ, CAPA)
         capa_nova = {**CAPA, "classe": "Ação Ordinária"}
         await cache.set_capa(CNJ, capa_nova)
-        assert (await cache.get_capa(CNJ))["classe"] == "Ação Ordinária"
+        capa = await cache.get_capa(CNJ)
+        assert capa is not None
+        assert capa["classe"] == "Ação Ordinária"
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +227,7 @@ class TestAndamentos:
     async def test_ordem_preservada(self, cache: LegalDataCacheManager):
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         resultado = await cache.get_andamentos(CNJ)
+        assert resultado is not None
         assert resultado[0]["data"] == "2024-01-15"
         assert resultado[1]["data"] == "2024-01-20"
 
@@ -252,8 +257,11 @@ class TestChaves:
     ):
         await cache.set_capa(CNJ, {**CAPA, "comarca": "São Paulo"})
         await cache.set_capa(CNJ_2, {**CAPA, "comarca": "Campinas"})
-        assert (await cache.get_capa(CNJ))["comarca"] == "São Paulo"
-        assert (await cache.get_capa(CNJ_2))["comarca"] == "Campinas"
+        capa1 = await cache.get_capa(CNJ)
+        capa2 = await cache.get_capa(CNJ_2)
+        assert capa1 is not None and capa2 is not None
+        assert capa1["comarca"] == "São Paulo"
+        assert capa2["comarca"] == "Campinas"
 
     async def test_cnjs_distintos_nao_se_misturam_andamentos(
         self, cache: LegalDataCacheManager

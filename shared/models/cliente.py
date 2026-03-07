@@ -14,6 +14,7 @@ Pontos de atenção:
 """
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -27,6 +28,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from shared.models.escritorio import Escritorio
+    from shared.models.interacao import Interacao
+    from shared.models.processo import Processo
 
 
 class Cliente(Base, TimestampMixin, TenantMixin):

@@ -274,4 +274,4 @@ def get_logger(nome_modulo: str) -> structlog.stdlib.BoundLogger:
     Campos de contexto injetados automaticamente via bind_contextvars:
         request_id, escritorio_id, cliente_id
     """
-    return structlog.get_logger(nome_modulo)
+    return structlog.get_logger(nome_modulo)  # type: ignore[no-any-return]

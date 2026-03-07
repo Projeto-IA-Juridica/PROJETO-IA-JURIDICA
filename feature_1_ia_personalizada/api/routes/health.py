@@ -56,7 +56,7 @@ async def _check_redis() -> dict[str, Any]:
         return {"status": "error", "detail": str(e)}
     finally:
         if r:
-            await r.aclose()
+            await r.close()
 
 
 async def _check_claude_api() -> dict[str, Any]:
@@ -149,9 +149,11 @@ async def _check_google_sheets() -> dict[str, Any]:
             )
 
             t = time.perf_counter()
+            creds = settings.GOOGLE_CREDENTIALS_PATH or ""
+            sheet_id = settings.GOOGLE_SHEETS_ID or ""
             client = GoogleSheetsClient(
-                credentials_path=settings.GOOGLE_CREDENTIALS_PATH,
-                spreadsheet_id=settings.GOOGLE_SHEETS_ID,
+                credentials_path=creds,
+                spreadsheet_id=sheet_id,
             )
             client._ler_intervalo("Clientes!A1:A1")
             return {

@@ -107,7 +107,7 @@ def _load_aws_secrets(secret_name: str, region: str) -> dict[str, str]:
         )
 
     try:
-        return json.loads(secret_string)
+        return json.loads(secret_string)  # type: ignore[no-any-return]
     except json.JSONDecodeError as exc:
         raise RuntimeError(
             f"Secret '{secret_name}' não é um JSON válido. "
@@ -178,8 +178,8 @@ def _load_vault_secrets(
     # KV v1: {"data": {...}}
     data = body.get("data", {})
     if "data" in data:
-        return data["data"]  # KV v2
-    return data  # KV v1
+        return data["data"]  # type: ignore[no-any-return] # KV v2
+    return data  # type: ignore[no-any-return] # KV v1
 
 
 # ---------------------------------------------------------------------------

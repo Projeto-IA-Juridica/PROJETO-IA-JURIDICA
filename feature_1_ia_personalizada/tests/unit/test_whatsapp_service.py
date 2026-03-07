@@ -211,7 +211,7 @@ def _service(
     rp = repo or _FakeRepositorio(
         preferencia=preferencia, mensagens_enviadas_hoje=mensagens_hoje
     )
-    svc = WhatsAppService(ev, rp, janela)
+    svc = WhatsAppService(ev, rp, janela)  # type: ignore[arg-type]
     return svc, ev, rp
 
 

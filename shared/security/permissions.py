@@ -50,9 +50,10 @@ async def get_current_user(
 
     try:
         payload = validar_token(token)
-        user_id_str: str = payload.get("sub")
-        if user_id_str is None:
+        user_id_str_raw = payload.get("sub")
+        if user_id_str_raw is None:
             raise ValueError("Token não contém ID do usuário")
+        user_id_str: str = str(user_id_str_raw)
         user_id = int(user_id_str)
     except Exception as e:
         raise HTTPException(

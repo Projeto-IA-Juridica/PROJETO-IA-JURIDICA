@@ -80,7 +80,9 @@ async def test_obter_contexto_processo_ids_corretos(service: WhatsAppService):
         "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
         return_value=ctx,
     ):
-        escritorio_id, cliente_id = await service._obter_contexto_processo(10)
+        resultado = await service._obter_contexto_processo(10)
+        assert resultado is not None
+        escritorio_id, cliente_id = resultado
 
     assert escritorio_id == 99
     assert cliente_id == 7

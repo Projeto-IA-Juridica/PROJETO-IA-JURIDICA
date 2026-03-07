@@ -74,7 +74,7 @@ class LegalDataCacheManager:
             cached_data = await self._redis.get(self._key_capa(cnj))
             if cached_data:
                 logger.debug("cache_capa_hit", cnj=cnj)
-                return json.loads(cached_data)
+                return json.loads(cached_data)  # type: ignore[no-any-return]
 
             logger.debug("cache_capa_miss", cnj=cnj)
             return None
@@ -100,7 +100,7 @@ class LegalDataCacheManager:
             cached_data = await self._redis.get(self._key_andamentos(cnj))
             if cached_data:
                 logger.debug("cache_andamentos_hit", cnj=cnj)
-                return json.loads(cached_data)
+                return json.loads(cached_data)  # type: ignore[no-any-return]
 
             logger.debug("cache_andamentos_miss", cnj=cnj)
             return None
@@ -155,7 +155,7 @@ def get_andamentos_sync(cnj: str) -> list[dict[str, Any]] | None:
         cached = _sync_redis.get(LegalDataCacheManager._key_andamentos(cnj))
         if cached:
             logger.debug("cache_andamentos_hit_sync", cnj=cnj)
-            return json.loads(cached)
+            return json.loads(cached)  # type: ignore[no-any-return]
         logger.debug("cache_andamentos_miss_sync", cnj=cnj)
         return None
     except Exception as e:
@@ -188,7 +188,7 @@ def get_capa_sync(cnj: str) -> dict[str, Any] | None:
         cached = _sync_redis.get(LegalDataCacheManager._key_capa(cnj))
         if cached:
             logger.debug("cache_capa_hit_sync", cnj=cnj)
-            return json.loads(cached)
+            return json.loads(cached)  # type: ignore[no-any-return]
         logger.debug("cache_capa_miss_sync", cnj=cnj)
         return None
     except Exception as e:

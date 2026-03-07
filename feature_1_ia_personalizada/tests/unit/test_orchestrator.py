@@ -107,7 +107,7 @@ def _make_session(
             return processos[0] if processos else None
         return None
 
-    session.get = AsyncMock(side_effect=_get)
+    session.get = AsyncMock(side_effect=_get)  # type: ignore[method-assign]
 
     scalars = MagicMock()
     scalars.all.return_value = processos
@@ -115,7 +115,8 @@ def _make_session(
     result.scalars.return_value = scalars
     session.execute = AsyncMock(return_value=result)
     session.add = MagicMock()
-    session.commit = AsyncMock()
+    session.commit = AsyncMock()  # type: ignore[method-assign]
+    session.refresh = AsyncMock()  # type: ignore[method-assign]
     return session
 
 

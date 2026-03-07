@@ -96,7 +96,7 @@ class EvolutionClient:
                 # 2xx ok
                 if 200 <= resp.status_code < 300:
                     if resp.content:
-                        return resp.json()
+                        return resp.json()  # type: ignore[no-any-return]
                     return {}
 
                 # alguns cenários comuns: instância offline / indisponível
@@ -175,7 +175,7 @@ class EvolutionClient:
     def _calcular_backoff(self, tentativa: int) -> float:
         # tentativa=1 => backoff_base*1, tentativa=2 => *2, tentativa=3 => *4
         delay = self._config.backoff_base_seconds * (2 ** (tentativa - 1))
-        return min(delay, self._config.backoff_max_seconds)
+        return float(min(delay, self._config.backoff_max_seconds))  # type: ignore[no-any-return]
 
     # Métodos do enunciado
 

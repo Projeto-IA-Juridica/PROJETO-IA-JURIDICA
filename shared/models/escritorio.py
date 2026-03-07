@@ -7,10 +7,18 @@ Cada escritório é um cliente isolado. Todos os outros models
 referenciam escritorio_id para garantir isolamento multi-tenant.
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from shared.models.cliente import Cliente
+    from shared.models.interacao import Interacao
+    from shared.models.processo import Processo
+    from shared.models.usuario import Usuario
 
 
 class Escritorio(Base, TimestampMixin):

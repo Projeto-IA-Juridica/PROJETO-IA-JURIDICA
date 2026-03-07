@@ -81,13 +81,14 @@ async def list_processos(
     processos = result.scalars().all()
 
     # Cálculo do Links de Paginação (básico)
-    _total_pages = max(1, (total + per_page - 1) // per_page)
+    total_valid = total or 0
+    _total_pages = max(1, (total_valid + per_page - 1) // per_page)
 
     return ProcessoList(
-        items=list(processos),
+        items=list(processos),  # type: ignore[arg-type]
         page=page,
         per_page=per_page,
-        total=total,
+        total=total_valid,
     )
 
 

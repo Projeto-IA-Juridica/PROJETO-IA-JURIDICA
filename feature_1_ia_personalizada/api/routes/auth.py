@@ -75,7 +75,12 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
                 status_code=401, detail="Token fornecido não é um Refresh Token"
             )
 
-        user_id = int(payload.get("sub"))
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            raise HTTPException(
+                status_code=401, detail="Token sem identificação de usuário"
+            )
+        user_id = int(str(user_id_str))
 
         # Precisamos ler o banco de novo para puxar as roles e escritorio_id atualizadas
         usuario = await db.get(Usuario, user_id)

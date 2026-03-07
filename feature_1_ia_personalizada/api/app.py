@@ -183,9 +183,11 @@ if settings.ENVIRONMENT == "development":
         False  # allow_credentials=True é incompatível com allow_origins=["*"]
     )
 else:
-    _cors_origins = [
-        o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",") if o.strip()
-    ]
+    origins = settings.CORS_ALLOWED_ORIGINS
+    if isinstance(origins, list):
+        _cors_origins = [str(o).strip() for o in origins if str(o).strip()]
+    else:
+        _cors_origins = [o.strip() for o in str(origins).split(",") if o.strip()]
     _cors_credentials = True
 
 app.add_middleware(

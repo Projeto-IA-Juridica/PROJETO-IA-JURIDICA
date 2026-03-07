@@ -192,7 +192,7 @@ class DataJudClient:
             total_hits=len(hits),
         )
 
-        return data
+        return data  # type: ignore[no-any-return]
 
     def buscar_novos_andamentos(
         self,

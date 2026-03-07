@@ -105,7 +105,7 @@ async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
 
 def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
     """SELECT processos WHERE monitoramento_ativo = true LIMIT :limite."""
-    return _run(_query_processos_monitorados(limite))
+    return _run(_query_processos_monitorados(limite))  # type: ignore[no-any-return]
 
 
 async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
@@ -125,7 +125,7 @@ async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
 
 def query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     """SELECT processo WHERE id = :id."""
-    return _run(_query_processo_por_id(id_processo))
+    return _run(_query_processo_por_id(id_processo))  # type: ignore[no-any-return]
 
 
 async def _update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None:
@@ -175,7 +175,7 @@ def query_processo_ativo_do_cliente(
     id_cliente: int,
 ) -> dict[str, Any] | None:
     """SELECT processo ativo do cliente (1 resultado)."""
-    return _run(_query_processo_ativo_do_cliente(id_cliente))
+    return _run(_query_processo_ativo_do_cliente(id_cliente))  # type: ignore[no-any-return]
 
 
 async def _insert_interacao(
@@ -258,7 +258,7 @@ def query_ultima_interacao_batch(
     Retorna dict {id_cliente: ultima_interacao}.
     Clientes sem interação não aparecem no resultado (usar .get()).
     """
-    return _run(_query_ultima_interacao_batch(ids_clientes))
+    return _run(_query_ultima_interacao_batch(ids_clientes))  # type: ignore[no-any-return]
 
 
 # ===========================================================================
@@ -299,7 +299,7 @@ def query_processo_e_cliente(
     id_processo: int,
 ) -> tuple[ProcessoWorker, ClienteWorker] | None:
     """SELECT processo + cliente (eager load) WHERE processo.id = :id."""
-    return _run(_query_processo_e_cliente(id_processo))
+    return _run(_query_processo_e_cliente(id_processo))  # type: ignore[no-any-return]
 
 
 async def _query_processos_sem_movimentacao() -> list[ProcessoWorker]:
@@ -343,7 +343,7 @@ def query_processos_sem_movimentacao() -> list[ProcessoWorker]:
     (monitoramento_ativo=true, status='ativo').
     Cada ProcessoWorker traz .cliente preenchido.
     """
-    return _run(_query_processos_sem_movimentacao())
+    return _run(_query_processos_sem_movimentacao())  # type: ignore[no-any-return]
 
 
 async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
@@ -367,7 +367,7 @@ async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
 
 def query_clientes_para_pesquisa() -> list[ClienteWorker]:
     """SELECT clientes ativos com aceite_lgpd=true para pesquisa de satisfação."""
-    return _run(_query_clientes_para_pesquisa())
+    return _run(_query_clientes_para_pesquisa())  # type: ignore[no-any-return]
 
 
 # ===========================================================================

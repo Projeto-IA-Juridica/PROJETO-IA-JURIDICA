@@ -127,4 +127,4 @@ class JusbrasilClient:
             },
         ]
 
-        return extrato_mock
+        return extrato_mock  # type: ignore[return-value]

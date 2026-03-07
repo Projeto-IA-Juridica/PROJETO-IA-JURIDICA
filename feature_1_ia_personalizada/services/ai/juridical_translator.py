@@ -54,7 +54,8 @@ class JuridicalTranslator:
                     }
                 ],
             )
-            traduzido = resposta.content[0].text.strip()
+            bloco = resposta.content[0]
+            traduzido = getattr(bloco, "text", str(bloco)).strip()
             logger.info(
                 "juridical_translator_ok",
                 original_len=len(texto),
