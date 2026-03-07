@@ -12,6 +12,7 @@ Uso:
     python scripts/chat_ao_vivo.py --nome-cliente "Maria"    # nome personalizado
     python scripts/chat_ao_vivo.py --com-processo --nome-cliente "Carlos" --nome-escritorio "Pires Adv."
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -11,7 +11,9 @@ import structlog
 from celery.exceptions import SoftTimeLimitExceeded
 from prometheus_client import Gauge
 
-from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
+from feature_1_ia_personalizada.services.ai.juridical_translator import (
+    JuridicalTranslator,
+)
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     get_andamentos_sync,
     set_andamentos_sync,

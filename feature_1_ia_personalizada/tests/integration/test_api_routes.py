@@ -126,7 +126,9 @@ async def test_get_chat_history_authorized_not_found(
 @pytest.mark.asyncio
 async def test_post_webhook_missing_apikey(async_client: AsyncClient):
     """Testar POST /webhook/whatsapp sem header apikey → 401"""
-    response = await async_client.post("/webhook/whatsapp", json={"event": "status.ignored"})
+    response = await async_client.post(
+        "/webhook/whatsapp", json={"event": "status.ignored"}
+    )
     assert response.status_code == 401
 
 
@@ -148,4 +150,7 @@ async def test_get_metrics(async_client: AsyncClient):
     response = await async_client.get("/metrics")
     assert response.status_code == 200
     assert "text/plain" in response.headers["content-type"]
-    assert "python_gc_objects" in response.text or "process_virtual_memory_bytes" in response.text
+    assert (
+        "python_gc_objects" in response.text
+        or "process_virtual_memory_bytes" in response.text
+    )

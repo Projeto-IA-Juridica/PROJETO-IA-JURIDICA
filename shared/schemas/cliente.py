@@ -43,7 +43,9 @@ class ClienteCreate(BaseModel):
 
     nome: str = Field(min_length=2, max_length=200)
     cpf: str = Field(description="CPF com ou sem formatação (XXX.XXX.XXX-XX)")
-    telefone_whatsapp: str = Field(description="Formato: 5511999999999 (55 + DDD + número)")
+    telefone_whatsapp: str = Field(
+        description="Formato: 5511999999999 (55 + DDD + número)"
+    )
     email: EmailStr | None = None
     data_nascimento: date | None = Field(
         default=None,
@@ -112,7 +114,9 @@ class ClienteUpdate(BaseModel):
             return v
         digits = re.sub(r"[^0-9]", "", v)
         if not validar_telefone_whatsapp(digits):
-            raise ValueError("Telefone WhatsApp inválido — formato esperado: 5511999999999")
+            raise ValueError(
+                "Telefone WhatsApp inválido — formato esperado: 5511999999999"
+            )
         return digits
 
     @field_validator("data_nascimento")

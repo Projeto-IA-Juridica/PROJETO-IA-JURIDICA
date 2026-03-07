@@ -16,7 +16,9 @@ class TestRemoverTagsHtml:
         assert "<b>" not in resultado
 
     def test_remove_multiplas_tags(self):
-        resultado = LegalDataCleaner.remover_tags_html("<p><b>Decisão:</b> Aguarda prazos<br></p>")
+        resultado = LegalDataCleaner.remover_tags_html(
+            "<p><b>Decisão:</b> Aguarda prazos<br></p>"
+        )
         assert "Decisão:" in resultado
         assert "Aguarda prazos" in resultado
         assert "<" not in resultado
@@ -44,7 +46,9 @@ class TestRemoverTagsHtml:
         assert "&nbsp;" not in resultado
 
     def test_tag_com_atributos(self):
-        resultado = LegalDataCleaner.remover_tags_html('<a href="http://example.com">link</a>')
+        resultado = LegalDataCleaner.remover_tags_html(
+            '<a href="http://example.com">link</a>'
+        )
         assert "link" in resultado
         assert "<a" not in resultado
 

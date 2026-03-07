@@ -113,7 +113,9 @@ async def test_refresh_token_invalid_type(
 
 
 @pytest.mark.asyncio
-async def test_get_me_success(async_client: AsyncClient, usuario_factory, escritorio_factory):
+async def test_get_me_success(
+    async_client: AsyncClient, usuario_factory, escritorio_factory
+):
     """Testa acesso à rota protegida /auth/me com token válido."""
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id, nome="João Advogado")

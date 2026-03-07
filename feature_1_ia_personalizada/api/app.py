@@ -36,7 +36,9 @@ def _validar_config_no_startup() -> None:
         erros.append("CELERY_BROKER_URL inválida (esperado 'redis://' ou 'rediss://').")
 
     if not settings.CELERY_RESULT_BACKEND.startswith(("redis://", "rediss://")):
-        erros.append("CELERY_RESULT_BACKEND inválida (esperado 'redis://' ou 'rediss://').")
+        erros.append(
+            "CELERY_RESULT_BACKEND inválida (esperado 'redis://' ou 'rediss://')."
+        )
 
     def _req(cond: bool, msg: str) -> None:
         if not cond:
@@ -56,7 +58,10 @@ def _validar_config_no_startup() -> None:
     )
 
     _req(bool(settings.JWT_SECRET_KEY), "JWT_SECRET_KEY ausente.")
-    _req(len(settings.JWT_SECRET_KEY) >= 32, "JWT_SECRET_KEY muito curta (mínimo 32 caracteres).")
+    _req(
+        len(settings.JWT_SECRET_KEY) >= 32,
+        "JWT_SECRET_KEY muito curta (mínimo 32 caracteres).",
+    )
 
     _req(bool(settings.ENCRYPTION_KEY), "ENCRYPTION_KEY ausente.")
     try:
@@ -110,8 +115,12 @@ if settings.SENTRY_DSN:
         send_default_pii=False,  # LGPD — não enviar dados de usuário
     )
 
-from feature_1_ia_personalizada.api.middleware.auth import JWTAuthMiddleware  # noqa: E402
-from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware  # noqa: E402
+from feature_1_ia_personalizada.api.middleware.auth import (  # noqa: E402
+    JWTAuthMiddleware,
+)
+from feature_1_ia_personalizada.api.middleware.rate_limit import (  # noqa: E402
+    RateLimitMiddleware,
+)
 from feature_1_ia_personalizada.api.middleware.request_logging import (  # noqa: E402
     RequestLoggingMiddleware,
 )
@@ -170,9 +179,13 @@ app = FastAPI(
 # aos domínios declarados em CORS_ALLOWED_ORIGINS (separados por vírgula no .env)
 if settings.ENVIRONMENT == "development":
     _cors_origins = ["*"]
-    _cors_credentials = False  # allow_credentials=True é incompatível com allow_origins=["*"]
+    _cors_credentials = (
+        False  # allow_credentials=True é incompatível com allow_origins=["*"]
+    )
 else:
-    _cors_origins = [o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
+    _cors_origins = [
+        o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",") if o.strip()
+    ]
     _cors_credentials = True
 
 app.add_middleware(
@@ -222,7 +235,9 @@ Instrumentator(
 async def global_exception_handler(request: Request, exc: Exception):
     # Captura explícita necessária: o handler impede que o Sentry capture automaticamente
     sentry_sdk.capture_exception(exc)
-    logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)
+    logger.error(
+        "erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Erro interno do servidor"},

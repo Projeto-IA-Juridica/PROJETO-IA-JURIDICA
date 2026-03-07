@@ -68,7 +68,9 @@ class TestCheckRedis:
         mock_redis.ping = AsyncMock(return_value=True)
         mock_redis.aclose = AsyncMock()
 
-        with patch("feature_1_ia_personalizada.api.routes.health.redis") as mock_redis_module:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.redis"
+        ) as mock_redis_module:
             mock_redis_module.from_url.return_value = mock_redis
             with patch(
                 "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
@@ -83,7 +85,9 @@ class TestCheckRedis:
         mock_redis = AsyncMock()
         mock_redis.aclose = AsyncMock()
 
-        with patch("feature_1_ia_personalizada.api.routes.health.redis") as mock_redis_module:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.redis"
+        ) as mock_redis_module:
             mock_redis_module.from_url.return_value = mock_redis
             with patch(
                 "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
@@ -94,7 +98,9 @@ class TestCheckRedis:
         assert result["status"] == "timeout"
 
     async def test_erro_generico_retorna_error(self):
-        with patch("feature_1_ia_personalizada.api.routes.health.redis") as mock_redis_module:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.redis"
+        ) as mock_redis_module:
             mock_redis_module.from_url.side_effect = Exception("redis unavailable")
             result = await _check_redis()
 
@@ -260,7 +266,10 @@ class TestCheckCeleryWorkers:
             with patch(
                 "feature_1_ia_personalizada.api.routes.health.asyncio.to_thread",
             ) as mock_to_thread:
-                mock_to_thread.return_value = {"status": "ok", "workers": ["celery@worker1"]}
+                mock_to_thread.return_value = {
+                    "status": "ok",
+                    "workers": ["celery@worker1"],
+                }
                 with patch(
                     "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
                     return_value={"status": "ok", "workers": ["celery@worker1"]},
@@ -272,7 +281,10 @@ class TestCheckCeleryWorkers:
     async def test_sem_workers_retorna_degraded(self):
         with patch(
             "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
-            return_value={"status": "degraded", "detail": "Nenhum worker respondeu ao ping"},
+            return_value={
+                "status": "degraded",
+                "detail": "Nenhum worker respondeu ao ping",
+            },
         ):
             result = await _check_celery_workers()
 
@@ -295,7 +307,9 @@ class TestCheckCeleryWorkers:
 
 class TestCheckGoogleSheets:
     async def test_sem_credenciais_retorna_skipped(self):
-        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.settings"
+        ) as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = ""
             mock_settings.GOOGLE_SHEETS_ID = ""
             result = await _check_google_sheets()
@@ -303,7 +317,9 @@ class TestCheckGoogleSheets:
         assert result["status"] == "skipped"
 
     async def test_sem_sheets_id_retorna_skipped(self):
-        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.settings"
+        ) as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = ""
             result = await _check_google_sheets()
@@ -311,7 +327,9 @@ class TestCheckGoogleSheets:
         assert result["status"] == "skipped"
 
     async def test_sucesso_retorna_ok(self):
-        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.settings"
+        ) as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = "sheet-id-123"
 
@@ -324,7 +342,9 @@ class TestCheckGoogleSheets:
         assert result["status"] == "ok"
 
     async def test_timeout_retorna_timeout(self):
-        with patch("feature_1_ia_personalizada.api.routes.health.settings") as mock_settings:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.health.settings"
+        ) as mock_settings:
             mock_settings.GOOGLE_CREDENTIALS_PATH = "/path/creds.json"
             mock_settings.GOOGLE_SHEETS_ID = "sheet-id-123"
 

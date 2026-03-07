@@ -162,7 +162,9 @@ class TestConverterParaIso:
 
 class TestExtrairTextoEData:
     def test_dict_com_texto_e_data_string(self):
-        texto, data = extrair_texto_e_data_do_andamento({"texto": "Despacho", "data": "2024-01-20"})
+        texto, data = extrair_texto_e_data_do_andamento(
+            {"texto": "Despacho", "data": "2024-01-20"}
+        )
         assert texto == "Despacho"
         assert data == "2024-01-20"
 
@@ -256,7 +258,9 @@ class TestProcessarProcessoIndividual:
 
     def test_andamento_sem_data_nao_atualiza_banco(self, fase3):
         andamento_sem_data = {"texto": "Decisão sem data"}
-        with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[andamento_sem_data]):
+        with patch(
+            f"{MODULE}.buscar_andamentos_datajud", return_value=[andamento_sem_data]
+        ):
             processar_processo_individual(PROCESSO)
         fase3["atualizar"].assert_not_called()
 
@@ -294,7 +298,9 @@ class TestMonitorarProcessos:
         assert r["resumo_primeiros_20"] == []
 
     def test_erro_no_banco_retorna_sucesso_false(self):
-        with patch(f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")):
+        with patch(
+            f"{MODULE}.query_processos_monitorados", side_effect=RuntimeError("DB down")
+        ):
             r = monitorar_processos()
         assert r["sucesso"] is False
         assert "DB down" in r["erro"]
@@ -505,4 +511,3 @@ class TestCacheAside:
         # Lista vazia também é cacheada (is not None)
         mock_set.assert_called_once()
         assert r["novos_andamentos"] == 0
-

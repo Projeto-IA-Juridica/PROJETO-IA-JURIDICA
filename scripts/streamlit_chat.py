@@ -9,6 +9,7 @@ Só usa a ANTHROPIC_API_KEY real — tudo mais é simulado em memória.
 Uso:
     streamlit run scripts/streamlit_chat.py
 """
+
 from __future__ import annotations
 
 import asyncio

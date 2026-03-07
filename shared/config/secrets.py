@@ -240,7 +240,9 @@ def load_secrets_to_env() -> None:
         )
 
     else:
-        logger.debug("secrets_manager.desabilitado — usando variaveis de ambiente / .env")
+        logger.debug(
+            "secrets_manager.desabilitado — usando variaveis de ambiente / .env"
+        )
         _LOADED = True
         return
 

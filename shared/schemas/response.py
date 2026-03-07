@@ -50,7 +50,9 @@ class PaginatedResponse[T](BaseModel):
     """
 
     items: list[T]
-    total: int = Field(ge=0, description="Total de registros encontrados (sem paginação)")
+    total: int = Field(
+        ge=0, description="Total de registros encontrados (sem paginação)"
+    )
     page: int = Field(ge=1, description="Página atual (começa em 1)")
     per_page: int = Field(ge=1, le=100, description="Itens por página")
 

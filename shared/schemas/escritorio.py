@@ -69,7 +69,9 @@ class EscritorioCreate(BaseModel):
         if v is None:
             return v
         if not validar_telefone_br(v):
-            raise ValueError("Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)")
+            raise ValueError(
+                "Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)"
+            )
         return v
 
 
@@ -107,7 +109,9 @@ class EscritorioUpdate(BaseModel):
         if v is None:
             return v
         if not validar_telefone_br(v):
-            raise ValueError("Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)")
+            raise ValueError(
+                "Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)"
+            )
         return v
 
     @field_validator("plano")
@@ -117,7 +121,9 @@ class EscritorioUpdate(BaseModel):
             return v
         normalizado = v.lower().strip()  # normaliza para lowercase
         if normalizado not in _PLANOS_VALIDOS:
-            raise ValueError(f"Plano inválido — opções: {', '.join(sorted(_PLANOS_VALIDOS))}")
+            raise ValueError(
+                f"Plano inválido — opções: {', '.join(sorted(_PLANOS_VALIDOS))}"
+            )
         return normalizado
 
 

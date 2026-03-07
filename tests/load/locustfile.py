@@ -361,7 +361,9 @@ class AdvogadoAutenticado(HttpUser):
             "numero_cnj": cnj,
             "cliente_id": random.choice(_CLIENTE_IDS),
             "polo_cliente": random.choice(["ativo", "passivo"]),
-            "tipo_acao": random.choice(["trabalhista", "civel", "criminal", "tributario"]),
+            "tipo_acao": random.choice(
+                ["trabalhista", "civel", "criminal", "tributario"]
+            ),
         }
         with self.client.post(
             "/processos",
@@ -574,7 +576,9 @@ def on_quit(environment, **kwargs):
     total_failures = stats.total.num_failures
     total_requests = stats.total.num_requests
     error_rate = (total_failures / total_requests * 100) if total_requests else 0
-    print(f"  Taxa de erro global: {error_rate:.2f}% ({total_failures}/{total_requests})")
+    print(
+        f"  Taxa de erro global: {error_rate:.2f}% ({total_failures}/{total_requests})"
+    )
     print("=" * 60 + "\n")
 
     # Exit code 1 se algum SLA falhou (útil em CI)

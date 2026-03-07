@@ -258,7 +258,9 @@ class TestRequestLoggingMiddleware:
 
 class TestRateLimitMiddleware:
     async def test_sem_redis_no_estado_passa_direto(self):
-        from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+        from feature_1_ia_personalizada.api.middleware.rate_limit import (
+            RateLimitMiddleware,
+        )
 
         mock_app = MagicMock()
         middleware = RateLimitMiddleware(mock_app)
@@ -278,7 +280,9 @@ class TestRateLimitMiddleware:
         assert response.status_code == 200
 
     async def test_com_redis_abaixo_do_limite_passa(self):
-        from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+        from feature_1_ia_personalizada.api.middleware.rate_limit import (
+            RateLimitMiddleware,
+        )
 
         mock_app = MagicMock()
         middleware = RateLimitMiddleware(mock_app)
@@ -363,7 +367,9 @@ class TestRateLimitMiddleware:
         assert mock_response.headers.get("X-RateLimit-Limit") == str(LIMIT_WEBHOOK)
 
     async def test_redis_error_nao_derruba_api(self):
-        from feature_1_ia_personalizada.api.middleware.rate_limit import RateLimitMiddleware
+        from feature_1_ia_personalizada.api.middleware.rate_limit import (
+            RateLimitMiddleware,
+        )
 
         mock_app = MagicMock()
         middleware = RateLimitMiddleware(mock_app)

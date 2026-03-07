@@ -89,7 +89,9 @@ async def _check_evolution_api() -> dict[str, Any]:
             timeout=_CHECK_TIMEOUT,
             headers={"apikey": settings.EVOLUTION_API_KEY},
         ) as client:
-            resp = await client.get(f"{settings.EVOLUTION_API_URL}/instance/fetchInstances")
+            resp = await client.get(
+                f"{settings.EVOLUTION_API_URL}/instance/fetchInstances"
+            )
         latency_ms = round((time.perf_counter() - t) * 1000, 2)
         if resp.status_code < 500:
             return {
@@ -191,7 +193,9 @@ async def health_ready(db: AsyncSession = Depends(get_db)):
 
     if pg["status"] != "ok" or rd["status"] != "ok":
         health["status"] = "error"
-        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=health)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=health
+        )
 
     return health
 
@@ -250,6 +254,8 @@ async def health_detailed(db: AsyncSession = Depends(get_db)):
     )
 
     if not critical_ok:
-        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=result)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=result
+        )
 
     return result

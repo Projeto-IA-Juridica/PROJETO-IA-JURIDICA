@@ -49,9 +49,7 @@ MENSAGEM_SEM_MOVIMENTACAO = (
     "Isso é comum e não significa necessariamente um problema."
 )
 
-MENSAGEM_PESQUISA_SATISFACAO = (
-    "De 1 a 5, como você avalia nosso atendimento este mês?\nResponda apenas com um número."
-)
+MENSAGEM_PESQUISA_SATISFACAO = "De 1 a 5, como você avalia nosso atendimento este mês?\nResponda apenas com um número."
 
 MENSAGEM_ERRO_PADRAO = (
     "No momento não consegui processar sua mensagem. Nossa equipe será notificada."
@@ -121,7 +119,9 @@ def buscar_clientes_para_pesquisa():
     return query_clientes_para_pesquisa()
 
 
-def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dados: dict):
+def registrar_interacao(
+    id_cliente: int, id_processo: int | None, tipo: str, dados: dict
+):
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -148,7 +148,9 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         espera = segundos_ate_proximo_horario(momento)
         raise self.retry(countdown=espera)
 
-    chave_bloqueio = chave_limite("bloqueio_andamento", id_processo, hash(descricao_andamento))
+    chave_bloqueio = chave_limite(
+        "bloqueio_andamento", id_processo, hash(descricao_andamento)
+    )
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
@@ -157,7 +159,9 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         return {"status": "processo_nao_encontrado", "id_processo": id_processo}
     processo, cliente = resultado
 
-    mensagem = MENSAGEM_NOVO_ANDAMENTO.format(descricao_andamento=descricao_andamento.strip())
+    mensagem = MENSAGEM_NOVO_ANDAMENTO.format(
+        descricao_andamento=descricao_andamento.strip()
+    )
 
     enviar_mensagem_whatsapp(cliente.id, cliente.telefone, mensagem)
 
@@ -192,7 +196,9 @@ def enviar_lote_sem_movimentacao(self):
 
         cliente = processo.cliente
 
-        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO)
+        enviar_mensagem_whatsapp(
+            cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO
+        )
 
         registrar_interacao(
             id_cliente=cliente.id,
@@ -227,7 +233,9 @@ def enviar_pesquisa_satisfacao(self):
         if envio_recente(chave):
             continue
 
-        enviar_mensagem_whatsapp(cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO)
+        enviar_mensagem_whatsapp(
+            cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO
+        )
 
         registrar_interacao(
             id_cliente=cliente.id,

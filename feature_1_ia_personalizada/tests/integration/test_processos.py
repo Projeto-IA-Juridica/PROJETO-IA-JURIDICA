@@ -35,7 +35,9 @@ async def test_list_processos_sem_auth_retorna_401(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_processos_vazio(async_client: AsyncClient, escritorio_factory, usuario_factory):
+async def test_list_processos_vazio(
+    async_client: AsyncClient, escritorio_factory, usuario_factory
+):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
@@ -153,7 +155,12 @@ async def test_get_processo_de_outro_escritorio_retorna_404(
     headers2 = _auth_headers(user_id=user2.id, escritorio_id=esc2.id)
 
     cnj = _make_cnj(10)
-    payload = {"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Teste"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 1,
+        "polo_cliente": "autor",
+        "tipo_acao": "Teste",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         criado = await async_client.post("/processos", headers=headers1, json=payload)
@@ -166,13 +173,20 @@ async def test_get_processo_de_outro_escritorio_retorna_404(
 
 
 @pytest.mark.asyncio
-async def test_update_processo(async_client: AsyncClient, escritorio_factory, usuario_factory):
+async def test_update_processo(
+    async_client: AsyncClient, escritorio_factory, usuario_factory
+):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(4)
-    payload = {"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Cobrança"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 1,
+        "polo_cliente": "autor",
+        "tipo_acao": "Cobrança",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         criado = await async_client.post("/processos", headers=headers, json=payload)
@@ -213,13 +227,20 @@ async def test_delete_processo_soft_delete(
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(5)
-    payload = {"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Teste"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 1,
+        "polo_cliente": "autor",
+        "tipo_acao": "Teste",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         criado = await async_client.post("/processos", headers=headers, json=payload)
         processo_id = criado.json()["id"]
 
-        response = await async_client.delete(f"/processos/{processo_id}", headers=headers)
+        response = await async_client.delete(
+            f"/processos/{processo_id}", headers=headers
+        )
 
     assert response.status_code == 204
 
@@ -247,7 +268,12 @@ async def test_list_processos_com_filtro_status(
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(6)
-    payload = {"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Teste"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 1,
+        "polo_cliente": "autor",
+        "tipo_acao": "Teste",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         await async_client.post("/processos", headers=headers, json=payload)
@@ -267,12 +293,19 @@ async def test_list_processos_com_busca_cnj(
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(7)
-    payload = {"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Teste"}
+    payload = {
+        "numero_cnj": cnj,
+        "cliente_id": 1,
+        "polo_cliente": "autor",
+        "tipo_acao": "Teste",
+    }
 
     with patch("feature_1_ia_personalizada.api.routes.processos.registrar_acesso"):
         await async_client.post("/processos", headers=headers, json=payload)
 
         # busca pelos primeiros 7 dígitos do CNJ
         parcial = cnj[:7]
-        response = await async_client.get(f"/processos?search={parcial}", headers=headers)
+        response = await async_client.get(
+            f"/processos?search={parcial}", headers=headers
+        )
         assert response.status_code == 200

@@ -122,7 +122,9 @@ async def test_health_detailed_externo_degradado_retorna_200(async_client: Async
 
 
 @pytest.mark.asyncio
-async def test_health_detailed_redis_critico_falha_retorna_503(async_client: AsyncClient):
+async def test_health_detailed_redis_critico_falha_retorna_503(
+    async_client: AsyncClient,
+):
     """503 quando Redis falha (serviço crítico)."""
     with (
         patch(

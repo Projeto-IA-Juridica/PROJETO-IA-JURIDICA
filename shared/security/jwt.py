@@ -35,7 +35,9 @@ def criar_token(user_id: int, escritorio_id: int, role: str) -> str:
         "iat": datetime.now(UTC),
     }
 
-    encoded_jwt = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -54,7 +56,9 @@ def criar_refresh_token(user_id: int) -> str:
         "exp": expire,
     }
 
-    encoded_jwt = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
     return encoded_jwt
 
 
@@ -68,7 +72,9 @@ def validar_token(token: str) -> dict[str, Any]:
         Um dict com o payload decodificado.
     """
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
         return payload
     except JWTError as e:
         # Podemos criar custom exceptions depois, mas o ValueError basta no MVP

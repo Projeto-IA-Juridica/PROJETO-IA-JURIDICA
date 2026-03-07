@@ -79,7 +79,9 @@ async def verificar_aceite_lgpd(session: AsyncSession, cliente_id: int) -> bool:
 
     Uso típico: antes de enviar qualquer mensagem proativa ao cliente.
     """
-    resultado = await session.execute(select(Cliente.aceite_lgpd).where(Cliente.id == cliente_id))
+    resultado = await session.execute(
+        select(Cliente.aceite_lgpd).where(Cliente.id == cliente_id)
+    )
     aceite = resultado.scalar_one_or_none()
     return bool(aceite)
 
@@ -123,7 +125,9 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
         "cliente": {
             "id": cliente.id,
             "nome": cliente.nome,
-            "cpf_presente": bool(cliente.cpf),  # CPF é criptografado — indica presença sem expor
+            "cpf_presente": bool(
+                cliente.cpf
+            ),  # CPF é criptografado — indica presença sem expor
             "email": cliente.email,
             "telefone_whatsapp": cliente.telefone_whatsapp,
             "data_nascimento": (
@@ -134,7 +138,9 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
             "cargo": cliente.cargo,
             "aceite_lgpd": cliente.aceite_lgpd,
             "data_aceite_lgpd": (
-                cliente.data_aceite_lgpd.isoformat() if cliente.data_aceite_lgpd else None
+                cliente.data_aceite_lgpd.isoformat()
+                if cliente.data_aceite_lgpd
+                else None
             ),
             "preferencia_horario_notificacao": cliente.preferencia_horario_notificacao,
             "ativo": cliente.ativo,
@@ -234,7 +240,9 @@ async def anonimizar_dados_cliente(
     cliente.ativo = False
 
     # Apaga conteúdo das mensagens nas interações (mantém registros para auditoria)
-    resultado = await session.execute(select(Interacao).where(Interacao.cliente_id == cliente_id))
+    resultado = await session.execute(
+        select(Interacao).where(Interacao.cliente_id == cliente_id)
+    )
     for interacao in resultado.scalars().all():
         interacao.mensagem_cliente = None
         interacao.mensagem_ia = None

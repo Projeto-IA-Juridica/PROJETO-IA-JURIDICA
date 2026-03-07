@@ -107,7 +107,9 @@ class TestTraduzirTermo:
     def test_termo_uppercase_encontrado(self, translator_custom: JuridicalTranslator):
         assert translator_custom.traduzir_termo("SENTENÇA") is not None
 
-    def test_termo_capitalizado_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_capitalizado_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         assert translator_custom.traduzir_termo("Sentença") is not None
 
     def test_termo_sem_acento_encontrado(self, translator_custom: JuridicalTranslator):
@@ -131,7 +133,9 @@ class TestTraduzirTermo:
         t._disponivel = False
         assert t.traduzir_termo("sentença") is None
 
-    def test_retorno_inclui_exemplo_quando_presente(self, translator_custom: JuridicalTranslator):
+    def test_retorno_inclui_exemplo_quando_presente(
+        self, translator_custom: JuridicalTranslator
+    ):
         resultado = translator_custom.traduzir_termo("sentença")
         assert resultado is not None
         assert "Exemplo:" in resultado
@@ -145,7 +149,9 @@ class TestTraduzirTermo:
         assert resultado is not None
         assert "Exemplo:" not in resultado
 
-    def test_termo_com_espacos_extras_nao_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_com_espacos_extras_nao_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         """_normalizar não faz strip: '  sentença  ' não bate com 'sentença'. Documenta o comportamento atual."""
         assert translator_custom.traduzir_termo("  sentença  ") is None
 
@@ -163,7 +169,9 @@ class TestIdentificarTermos:
     def test_texto_vazio_retorna_lista_vazia(self, translator: JuridicalTranslator):
         assert translator.identificar_termos_tecnicos("") == []
 
-    def test_texto_sem_termos_juridicos_retorna_lista_vazia(self, translator: JuridicalTranslator):
+    def test_texto_sem_termos_juridicos_retorna_lista_vazia(
+        self, translator: JuridicalTranslator
+    ):
         assert translator.identificar_termos_tecnicos("Bom dia, como vai você?") == []
 
     def test_termo_composto_prioritario_sobre_subtermo(
@@ -176,7 +184,9 @@ class TestIdentificarTermos:
         assert "agravo de instrumento" in termos
         assert "agravo" not in termos
 
-    def test_dois_termos_distintos_encontrados(self, translator_custom: JuridicalTranslator):
+    def test_dois_termos_distintos_encontrados(
+        self, translator_custom: JuridicalTranslator
+    ):
         termos = translator_custom.identificar_termos_tecnicos(
             "A penhora e a tutela antecipada foram deferidas."
         )
@@ -192,23 +202,35 @@ class TestIdentificarTermos:
         assert "tutela antecipada" in termos
         assert "tutela de urgência" in termos
 
-    def test_retorna_termos_com_acento_original(self, translator_custom: JuridicalTranslator):
+    def test_retorna_termos_com_acento_original(
+        self, translator_custom: JuridicalTranslator
+    ):
         """Deve retornar 'sentença' (com acento), não 'sentenca' (normalizado)."""
-        termos = translator_custom.identificar_termos_tecnicos("O juiz prolatou a sentença.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "O juiz prolatou a sentença."
+        )
         assert "sentença" in termos
 
-    def test_mesmo_termo_nao_aparece_duplicado(self, translator_custom: JuridicalTranslator):
+    def test_mesmo_termo_nao_aparece_duplicado(
+        self, translator_custom: JuridicalTranslator
+    ):
         termos = translator_custom.identificar_termos_tecnicos(
             "A sentença foi proferida. Após a sentença, cabe recurso."
         )
         assert termos.count("sentença") == 1
 
-    def test_termo_uppercase_no_texto_encontrado(self, translator_custom: JuridicalTranslator):
+    def test_termo_uppercase_no_texto_encontrado(
+        self, translator_custom: JuridicalTranslator
+    ):
         """Texto com termos em maiúscula deve ser identificado."""
-        termos = translator_custom.identificar_termos_tecnicos("A PENHORA foi decretada.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "A PENHORA foi decretada."
+        )
         assert "penhora" in termos
 
-    def test_regex_chars_no_texto_nao_causam_crash(self, translator: JuridicalTranslator):
+    def test_regex_chars_no_texto_nao_causam_crash(
+        self, translator: JuridicalTranslator
+    ):
         """Texto com caracteres especiais de regex não deve levantar exceção."""
         texto_perigoso = "O prazo é (.*) dias? [urgente!] {imediato}"
         resultado = translator.identificar_termos_tecnicos(texto_perigoso)
@@ -233,7 +255,9 @@ class TestIdentificarTermos:
         Documenta que _disponivel=False com dicionário populado ainda retorna matches.
         """
         translator_custom._disponivel = False
-        termos = translator_custom.identificar_termos_tecnicos("A penhora foi decretada.")
+        termos = translator_custom.identificar_termos_tecnicos(
+            "A penhora foi decretada."
+        )
         assert "penhora" in termos
 
     def test_termo_parcial_nao_encontrado(self, translator_custom: JuridicalTranslator):

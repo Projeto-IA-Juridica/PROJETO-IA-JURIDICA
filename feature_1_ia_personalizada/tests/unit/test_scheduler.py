@@ -261,7 +261,9 @@ class TestCancelarAgendamento:
         ) as mock_app:
             sched.cancelar_agendamento("task-para-cancelar")
 
-        mock_app.control.revoke.assert_called_once_with("task-para-cancelar", terminate=False)
+        mock_app.control.revoke.assert_called_once_with(
+            "task-para-cancelar", terminate=False
+        )
 
     def test_nao_termina_processo_em_execucao(self):
         sched = _scheduler()

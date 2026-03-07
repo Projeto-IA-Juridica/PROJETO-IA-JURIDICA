@@ -14,6 +14,7 @@ Exemplo de uso:
   python scripts/migration/sync_sheets_to_db.py --escritorio-id 1 --dry-run
   python scripts/migration/sync_sheets_to_db.py --escritorio-id 1
 """
+
 from __future__ import annotations
 
 import argparse

@@ -44,7 +44,9 @@ class ConversationMemory:
         """
         chave = _chave(escritorio_id, cliente_id)
         content_truncado = content[:_MAX_CONTENT_CHARS]
-        payload = json.dumps({"role": role, "content": content_truncado}, ensure_ascii=False)
+        payload = json.dumps(
+            {"role": role, "content": content_truncado}, ensure_ascii=False
+        )
 
         pipe = self._redis.pipeline()
         pipe.rpush(chave, payload)

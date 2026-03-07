@@ -57,7 +57,9 @@ async def test_enviar_texto_payload_correto(client: EvolutionClient):
     resposta_esperada = {"key": "value", "messageId": "abc123"}
     mock_resp = _mock_response(200, resposta_esperada)
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
+    with patch.object(
+        client._client, "request", new_callable=AsyncMock
+    ) as mock_request:
         mock_request.return_value = mock_resp
 
         resultado = await client.enviar_texto(
@@ -88,7 +90,9 @@ async def test_enviar_texto_retorna_dict_vazio_sem_corpo(client: EvolutionClient
     resp.json.return_value = {}
     resp.text = ""
 
-    with patch.object(client._client, "request", new_callable=AsyncMock) as mock_request:
+    with patch.object(
+        client._client, "request", new_callable=AsyncMock
+    ) as mock_request:
         mock_request.return_value = resp
         resultado = await client.enviar_texto("inst", "5511999999999", "teste")
 

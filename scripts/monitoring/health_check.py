@@ -11,6 +11,7 @@ Uso:
   python scripts/monitoring/health_check.py
   python scripts/monitoring/health_check.py --json
 """
+
 from __future__ import annotations
 
 import argparse

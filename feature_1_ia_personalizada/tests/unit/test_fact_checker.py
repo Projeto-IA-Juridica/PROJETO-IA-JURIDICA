@@ -104,7 +104,9 @@ class TestVerificarStatusProcesso:
             }
         )
         interacao = _interacao()
-        resultado = await checker.verificar_status_processo("proc-1", "Nada confere.", interacao)
+        resultado = await checker.verificar_status_processo(
+            "proc-1", "Nada confere.", interacao
+        )
 
         assert resultado["verificado"] is False
         assert len(resultado["correcoes"]) == 3
@@ -113,7 +115,9 @@ class TestVerificarStatusProcesso:
         """Se o banco não tem dados, não há o que verificar — não pode reprovar."""
         checker = _make_checker({})
         interacao = _interacao()
-        resultado = await checker.verificar_status_processo("proc-1", "qualquer coisa", interacao)
+        resultado = await checker.verificar_status_processo(
+            "proc-1", "qualquer coisa", interacao
+        )
 
         assert resultado["verificado"] is True
         assert resultado["correcoes"] == []
@@ -127,7 +131,10 @@ class TestVerificarStatusProcesso:
         assert meta is not None
         assert meta["fact_check_corrigido"] is True
         assert len(meta["auditoria_fact_checker"]) == 1
-        assert meta["auditoria_fact_checker"][0]["evento"] == "fact_checker_status_processo"
+        assert (
+            meta["auditoria_fact_checker"][0]["evento"]
+            == "fact_checker_status_processo"
+        )
 
     async def test_dados_reais_resumo_retornado(self):
         checker = _make_checker(
@@ -138,7 +145,9 @@ class TestVerificarStatusProcesso:
             }
         )
         interacao = _interacao()
-        resultado = await checker.verificar_status_processo("proc-1", "nada aqui", interacao)
+        resultado = await checker.verificar_status_processo(
+            "proc-1", "nada aqui", interacao
+        )
 
         resumo = resultado["dados_reais_resumo"]
         assert resumo["numero_cnj"] == "0001-XX"
@@ -149,7 +158,9 @@ class TestVerificarStatusProcesso:
         """Campo None no banco não gera correção — não há valor para comparar."""
         checker = _make_checker({"numero_cnj": None, "tribunal": None})
         interacao = _interacao()
-        resultado = await checker.verificar_status_processo("proc-1", "sem info", interacao)
+        resultado = await checker.verificar_status_processo(
+            "proc-1", "sem info", interacao
+        )
 
         assert resultado["verificado"] is True
 
@@ -157,7 +168,9 @@ class TestVerificarStatusProcesso:
         """String vazia ou só espaços no banco também não geram correção após strip."""
         checker = _make_checker({"numero_cnj": "", "tribunal": "   "})
         interacao = _interacao()
-        resultado = await checker.verificar_status_processo("proc-1", "sem info", interacao)
+        resultado = await checker.verificar_status_processo(
+            "proc-1", "sem info", interacao
+        )
 
         assert resultado["verificado"] is True
         assert resultado["correcoes"] == []
@@ -285,7 +298,9 @@ class TestFiltrarResposta:
         checker = self._checker()
         interacao = _interacao()
         texto = "Você deve agir. Recomendo que espere. A estratégia é recursar."
-        resultado = checker.filtrar_resposta(texto, interacao, adicionar_disclaimer=False)
+        resultado = checker.filtrar_resposta(
+            texto, interacao, adicionar_disclaimer=False
+        )
 
         assert "Você deve" not in resultado
         assert "Recomendo que" not in resultado
@@ -318,7 +333,9 @@ class TestFiltrarResposta:
 
         assert checker._disclaimer in resultado
         # Disclaimer é o único motivo de alteração — motivo genérico deve estar registrado
-        motivos = interacao.metadata_json["auditoria_fact_checker"][0]["payload"]["motivos"]
+        motivos = interacao.metadata_json["auditoria_fact_checker"][0]["payload"][
+            "motivos"
+        ]
         assert motivos == ["Ajuste de linguagem aplicado."]
 
     def test_disclaimer_sem_padrao_proibido_ainda_loga_auditoria(self):
@@ -334,11 +351,16 @@ class TestFiltrarResposta:
     def test_correcao_loga_metadata_json(self):
         checker = self._checker()
         interacao = _interacao()
-        checker.filtrar_resposta("Você deve agir.", interacao, adicionar_disclaimer=False)
+        checker.filtrar_resposta(
+            "Você deve agir.", interacao, adicionar_disclaimer=False
+        )
 
         meta = interacao.metadata_json
         assert meta["fact_check_corrigido"] is True
-        assert meta["auditoria_fact_checker"][0]["evento"] == "fact_checker_filtrar_resposta"
+        assert (
+            meta["auditoria_fact_checker"][0]["evento"]
+            == "fact_checker_filtrar_resposta"
+        )
 
     def test_log_registra_antes_e_depois(self):
         checker = self._checker()
