@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 60
 
+    # Docs (/docs, /redoc) — Basic Auth
+    DOCS_USERNAME: str = "admin"
+    DOCS_PASSWORD: str | None = None  # None em produção = /docs retorna 403
+
     # Segurança / LGPD
     ENCRYPTION_KEY: str  # Fernet key (base64 urlsafe) — validado abaixo
 
