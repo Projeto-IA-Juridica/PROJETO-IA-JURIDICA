@@ -38,6 +38,7 @@ def get_redis() -> redis.Redis:
     global _cliente_redis
     if _cliente_redis is None:
         _cliente_redis = redis.Redis.from_url(URL_REDIS, decode_responses=True)
+    assert _cliente_redis is not None
     return _cliente_redis
 
 

@@ -267,27 +267,27 @@ class TestEnviarMensagem:
 
 class TestClassificarIntencao:
     async def test_retorna_texto_bruto_do_claude(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(
+        client._client.messages.create = AsyncMock(  # type: ignore[method-assign]
             return_value=_mock_resposta('{"intencao": "status"}')
         )
         resultado = await client.classificar_intencao("system", "qual o status?")
         assert resultado == '{"intencao": "status"}'
 
     async def test_usa_max_tokens_32(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))  # type: ignore[method-assign]
         await client.classificar_intencao("system", "oi")
         kwargs = client._client.messages.create.call_args.kwargs
         assert kwargs["max_tokens"] == 32
 
     async def test_usa_temperature_zero(self, client: ClaudeClient):
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))  # type: ignore[method-assign]
         await client.classificar_intencao("system", "oi")
         kwargs = client._client.messages.create.call_args.kwargs
         assert kwargs["temperature"] == 0.0
 
     async def test_mensagem_como_user_message(self, client: ClaudeClient):
         """A mensagem deve ir como user message, não embutida no system."""
-        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))
+        client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))  # type: ignore[method-assign]
         await client.classificar_intencao("system prompt aqui", "mensagem do cliente")
         kwargs = client._client.messages.create.call_args.kwargs
         assert kwargs["messages"] == [
@@ -296,7 +296,7 @@ class TestClassificarIntencao:
 
     async def test_retry_em_rate_limit_na_classificacao(self, client: ClaudeClient):
         """Classificação é a porta de entrada — deve ter retry."""
-        client._client.messages.create = AsyncMock(
+        client._client.messages.create = AsyncMock(  # type: ignore[method-assign]
             side_effect=[_rate_limit_error(), _mock_resposta('{"intencao": "outro"}')]
         )
         resultado = await client.classificar_intencao("system", "msg")
@@ -305,7 +305,7 @@ class TestClassificarIntencao:
 
     async def test_strip_em_resposta(self, client: ClaudeClient):
         """Resposta com espaços/newlines extras deve ser stripped."""
-        client._client.messages.create = AsyncMock(
+        client._client.messages.create = AsyncMock(  # type: ignore[method-assign]
             return_value=_mock_resposta('  {"intencao": "status"}\n')
         )
         resultado = await client.classificar_intencao("system", "msg")

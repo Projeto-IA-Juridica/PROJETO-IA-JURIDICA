@@ -108,4 +108,4 @@ class ConversationMemory:
     async def tamanho_historico(self, escritorio_id: int, cliente_id: int) -> int:
         """Retorna o número de mensagens no histórico. Útil para debug e testes."""
         chave = _chave(escritorio_id, cliente_id)
-        return await self._redis.llen(chave)
+        return await self._redis.llen(chave)  # type: ignore[misc]
