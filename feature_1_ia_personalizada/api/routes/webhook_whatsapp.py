@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.workers.send_notifications import (
+    enviar_boas_vindas_escritorio,
     processar_mensagem_recebida,
 )
 from shared.config.settings import settings
@@ -57,8 +58,30 @@ async def receive_message(
             status_code=400, detail="Payload inválido ou não é JSON"
         ) from None
 
-    # Apenas processar mensagens novas
     event = body.get("event")
+    instance_name = body.get("instance")
+
+    # ----------------------------------------------------------------
+    # connection.update — WhatsApp conectou → envia boas-vindas em lote
+    # ----------------------------------------------------------------
+    if event == "connection.update":
+        state = body.get("data", {}).get("state", "")
+        if state == "open" and instance_name:
+            stmt_esc = select(Escritorio).where(
+                Escritorio.webhook_whatsapp_instance == instance_name
+            )
+            escritorio = (await db.execute(stmt_esc)).scalars().first()
+            if escritorio:
+                enviar_boas_vindas_escritorio.delay(escritorio.id)
+                logger.info(
+                    "whatsapp_conectado_boas_vindas_agendadas",
+                    instance_name=instance_name,
+                    escritorio_id=escritorio.id,
+                )
+                return {"status": "boas_vindas_agendadas"}
+        return {"status": "ignored", "reason": f"connection.update state={state!r}"}
+
+    # Apenas processar mensagens novas
     if event != "messages.upsert":
         # Retornamos OK para a Evolution não ficar tentando reenviar indefinidamente eventos de status
         return {"status": "ignored", "reason": f"Event '{event}' not processing"}
@@ -121,8 +144,6 @@ async def receive_message(
     if not texto.strip():
         # Ignora mensagens vazias ou de sistema sem texto aparente
         return {"status": "ignored", "reason": "Empty text"}
-
-    instance_name = body.get("instance")
 
     if not instance_name:
         logger.warning("webhook_sem_instancia")

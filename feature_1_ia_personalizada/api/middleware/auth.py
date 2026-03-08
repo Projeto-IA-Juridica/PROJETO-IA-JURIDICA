@@ -16,7 +16,7 @@ from jose import JWTError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from shared.config.settings import settings
-from shared.security.jwt import validar_token
+from shared.security.jwt import token_esta_revogado, validar_token
 
 # Rotas que não exigem token JWT para serem acessadas
 ROTAS_PUBLICAS = [
@@ -26,6 +26,12 @@ ROTAS_PUBLICAS = [
     "/auth/refresh",  # Pra renovar
     "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
     "/metrics",  # Prometheus scraper não usa JWT
+]
+
+# Rotas com match EXATO (não prefixo) — evita vazar proteção de sub-rotas.
+# Ex: /admin/import (HTML) é público, mas /admin/import/clientes (POST) exige JWT.
+ROTAS_PUBLICAS_EXATAS = [
+    "/admin/import",
 ]
 
 
@@ -92,6 +98,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 2. Rotas públicas — passam direto
+        if path in ROTAS_PUBLICAS_EXATAS:
+            return await call_next(request)
+
         if any(path.startswith(rota) for rota in ROTAS_PUBLICAS):
             return await call_next(request)
 
@@ -112,13 +121,20 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
         try:
             payload = validar_token(token)
-            request.state.user_payload = payload
         except ValueError as e:
             return JSONResponse(status_code=401, content={"detail": str(e)})
         except JWTError:
             return JSONResponse(
                 status_code=401, content={"detail": "Token JWT inválido"}
             )
+
+        if token_esta_revogado(token):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Token revogado. Faça login novamente."},
+            )
+
+        request.state.user_payload = payload
 
         # 4.  Deixa a requisição seguir seu fluxo normal - fica autorizado
         response = await call_next(request)

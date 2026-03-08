@@ -4,8 +4,9 @@ Orquestrador da IA — Cérebro do Concierge Jurídico Digital.
 
 Fluxo LangGraph:
   classificar_intencao
-    ├─ (saudacao/outro) ──────────────────────────────► gerar_resposta
-    └─ (status/duvida_termo/agendamento/reclamacao) ──► buscar_dados
+    ├─ (outro) ───────────────────────────────────────► gerar_resposta → mensagem fixa (fora do escopo)
+    ├─ (saudacao) ────────────────────────────────────► gerar_resposta → boas-vindas / recorrente
+    └─ (status/duvida_termo/reclamacao) ─────────────► buscar_dados
                                                               │
                                               ┌───────────────┴───────────────┐
                                               │ (dados ok)                    │ (sem processos)
@@ -124,7 +125,7 @@ class ConversationState(TypedDict):
     mensagem_original: str
     tipo_mensagem: str  # texto | audio_transcrito
     historico: list[dict]
-    intencao: str  # status | duvida_termo | agendamento | saudacao | reclamacao | outro
+    intencao: str  # status | duvida_termo | saudacao | reclamacao | outro
     dados_processo: dict | None
     resposta_ia: str | None
     resposta_verificada: str | None
@@ -151,13 +152,6 @@ _KEYWORDS: list[tuple[str, re.Pattern]] = [
         "duvida_termo",
         re.compile(
             r"\b(significa|quer dizer|o que [eé]|o que significa|defini[çc][aã]o|explica|me explica)\b",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "agendamento",
-        re.compile(
-            r"\b(agendar|marcar|consulta|reuni[aã]o|hor[aá]rio|cancelar agendamento)\b",
             re.IGNORECASE,
         ),
     ),
@@ -470,7 +464,6 @@ class ConversationOrchestrator:
         if state.get("intencao") in (
             "status",
             "duvida_termo",
-            "agendamento",
             "reclamacao",
         ):
             return "buscar_dados"
@@ -518,7 +511,6 @@ class ConversationOrchestrator:
             categorias_validas = {
                 "status",
                 "duvida_termo",
-                "agendamento",
                 "saudacao",
                 "reclamacao",
                 "outro",
@@ -639,13 +631,22 @@ class ConversationOrchestrator:
                         "precisa_regenerar": False,
                     }
 
-            # Sessão única: busca escritório e, se for saudação, cliente também
+            # Mensagem fora do escopo jurídico — resposta fixa, sem chamar Claude
+            if intencao == "outro":
+                log.info("intencao_fora_escopo_recusada")
+                return {
+                    "resposta_ia": (
+                        "Estou aqui para ajudar apenas com dúvidas sobre o seu processo — "
+                        "andamentos e termos jurídicos. 📋\n\n"
+                        "Para outros assuntos, entre em contato diretamente com o escritório."
+                    ),
+                    "precisa_regenerar": False,
+                }
+
+            # Sessão única: busca escritório e cliente (sempre — nome usado em todos os prompts)
             async with self._session_factory() as session:
-                escritorio = await session.get(Escritorio, state["escritorio_id"])
-                cliente = (
-                    await session.get(Cliente, state["cliente_id"])
-                    if intencao == "saudacao"
-                    else None
+                escritorio, cliente = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
                 )
             nome_escritorio = escritorio.nome if escritorio else "Escritório"
             nome_cliente = cliente.nome if cliente else "cliente"
@@ -654,6 +655,7 @@ class ConversationOrchestrator:
             if intencao == "status" and dados:
                 system_prompt = SYSTEM_PROMPT_STATUS_PROCESSO.format(
                     nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
                     numero_cnj=dados.get("numero_cnj", "N/D"),
                     tribunal=dados.get("tribunal", "N/D"),
                     vara=dados.get("vara", "N/D"),
@@ -678,6 +680,7 @@ class ConversationOrchestrator:
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
                     nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
                 )
             elif intencao == "saudacao":
                 cliente_recorrente = len(state.get("historico", [])) > 0
@@ -693,7 +696,8 @@ class ConversationOrchestrator:
                     )
             else:
                 system_prompt = SYSTEM_PROMPT_BASE.format(
-                    nome_escritorio=nome_escritorio
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
                 )
 
             resultado = await self._claude.enviar_mensagem(
@@ -1000,7 +1004,7 @@ class ConversationOrchestrator:
             return state  # type: ignore[return-value]
 
         # Nó 2: buscar dados (se intencão exige processo)
-        if state["intencao"] in ("status", "duvida_termo", "agendamento", "reclamacao"):
+        if state["intencao"] in ("status", "duvida_termo", "reclamacao"):
             state.update(await self._node_buscar_dados(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)

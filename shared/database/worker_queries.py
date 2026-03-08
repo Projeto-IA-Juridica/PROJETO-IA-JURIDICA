@@ -16,6 +16,7 @@ Processos (monitor_processos.py):
     update_ultimo_andamento(id_processo, texto, data_iso)
 
 Relacionamento (mensagens_relacionamento.py):
+    query_clientes_relacionamento()
     query_processo_ativo_do_cliente(id_cliente)
     insert_interacao(id_cliente, id_processo, texto, metadata_json, tipo, direcao)
     query_ultima_interacao_batch(ids_clientes)
@@ -25,6 +26,7 @@ Notificações (send_notifications.py):
     query_processo_e_cliente(id_processo)
     query_processos_sem_movimentacao()
     query_clientes_para_pesquisa()
+    query_clientes_ativos_por_escritorio(escritorio_id)
     update_ultimo_andamento(id_processo, texto, data_iso)
 
 """
@@ -151,6 +153,37 @@ def update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None
 # ===========================================================================
 # RELACIONAMENTO  (mensagens_relacionamento.py)
 # ===========================================================================
+
+
+async def _query_clientes_relacionamento() -> list[dict[str, Any]]:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(ClienteModel).where(ClienteModel.ativo == True)  # noqa: E712
+        )
+        clientes = []
+        for c in result.scalars().all():
+            clientes.append(
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "telefone": c.telefone_whatsapp,
+                    "status": "ativo",
+                    "data_nascimento": str(c.data_nascimento) if c.data_nascimento else None,
+                    "profissao": c.profissao,
+                }
+            )
+        return clientes
+
+
+def query_clientes_relacionamento() -> list[dict[str, Any]]:
+    """
+    SELECT clientes WHERE ativo = true.
+
+    Retorna lista de dicts com: id, nome, telefone, status, data_nascimento
+    (str 'YYYY-MM-DD' ou None), profissao.
+    Compatível com o dataclass Cliente de mensagens_relacionamento.py.
+    """
+    return _run(_query_clientes_relacionamento())  # type: ignore[no-any-return]
 
 
 async def _query_processo_ativo_do_cliente(
@@ -368,6 +401,34 @@ async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
 def query_clientes_para_pesquisa() -> list[ClienteWorker]:
     """SELECT clientes ativos com aceite_lgpd=true para pesquisa de satisfação."""
     return _run(_query_clientes_para_pesquisa())  # type: ignore[no-any-return]
+
+
+async def _query_clientes_ativos_por_escritorio(
+    escritorio_id: int,
+) -> list[ClienteWorker]:
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(ClienteModel).where(
+                ClienteModel.escritorio_id == escritorio_id,
+                ClienteModel.ativo == True,  # noqa: E712
+            )
+        )
+        return [
+            ClienteWorker(
+                id=c.id,
+                nome=c.nome,
+                telefone=c.telefone_whatsapp,
+                escritorio_id=c.escritorio_id,
+            )
+            for c in result.scalars().all()
+        ]
+
+
+def query_clientes_ativos_por_escritorio(
+    escritorio_id: int,
+) -> list[ClienteWorker]:
+    """SELECT clientes ativos de um escritório específico (para boas-vindas em lote)."""
+    return _run(_query_clientes_ativos_por_escritorio(escritorio_id))  # type: ignore[no-any-return]
 
 
 # ===========================================================================

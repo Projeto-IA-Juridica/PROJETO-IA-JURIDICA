@@ -127,6 +127,7 @@ from feature_1_ia_personalizada.api.middleware.request_logging import (  # noqa:
 
 # Importando os roteadores das nossas subpastas
 from feature_1_ia_personalizada.api.routes import (  # noqa: E402
+    admin_import,
     auth,
     chat,
     health,
@@ -216,6 +217,7 @@ app.include_router(auth)
 app.include_router(processos)
 app.include_router(chat)
 app.include_router(webhook_whatsapp)
+app.include_router(admin_import)
 
 # ==========================================
 # INSTRUMENTAÇÃO HTTP (Prometheus)

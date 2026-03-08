@@ -5,6 +5,7 @@ Exporta de forma limpa todos os roteadores para que
 sejam incluídos em `api/app.py`.
 """
 
+from .admin_import import router as admin_import
 from .auth import router as auth
 from .chat import router as chat
 from .health import router as health
@@ -13,6 +14,7 @@ from .processos import router as processos
 from .webhook_whatsapp import router as webhook_whatsapp
 
 __all__ = [
+    "admin_import",
     "auth",
     "health",
     "metrics",

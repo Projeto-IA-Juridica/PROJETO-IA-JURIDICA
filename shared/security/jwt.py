@@ -3,16 +3,62 @@ shared/security/jwt.py
 =======================
 Gerenciamento de tokens JWT usando python-jose.
 
-Fornece funções para criação de Access Tokens, Refresh Tokens
-e validação/decodificação para o sistema de autenticação.
+Fornece funções para criação de Access Tokens, Refresh Tokens,
+validação/decodificação e revogação via blacklist no Redis.
 """
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import redis as redis_sync
 from jose import JWTError, jwt
 
 from shared.config.settings import settings
+
+# Cliente Redis síncrono para operações de blacklist (rota /logout é async,
+# mas a verificação no middleware precisa de acesso rápido).
+_redis_blacklist: redis_sync.Redis | None = None
+
+
+def _get_redis() -> redis_sync.Redis:
+    global _redis_blacklist
+    if _redis_blacklist is None:
+        _redis_blacklist = redis_sync.from_url(
+            settings.REDIS_URL, decode_responses=True, socket_connect_timeout=2
+        )
+    return _redis_blacklist
+
+
+_BLACKLIST_PREFIX = "jwt:blacklist:"
+
+
+def revogar_token(token: str) -> None:
+    """
+    Adiciona o token na blacklist do Redis com TTL igual ao tempo restante
+    de expiração. Após o TTL, o token já teria expirado naturalmente.
+    Falhas silenciosas — log deve ser feito pelo chamador.
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"verify_exp": False},
+        )
+        exp = payload.get("exp")
+        ttl = max(1, int(exp - datetime.now(UTC).timestamp())) if exp else 3600
+        _get_redis().setex(f"{_BLACKLIST_PREFIX}{token}", ttl, "1")
+    except Exception:
+        pass
+
+
+def token_esta_revogado(token: str) -> bool:
+    """Retorna True se o token foi explicitamente revogado (logout)."""
+    try:
+        return bool(_get_redis().exists(f"{_BLACKLIST_PREFIX}{token}"))
+    except Exception:
+        # Redis indisponível: falha aberta (não bloqueia o usuário)
+        return False
 
 
 def criar_token(user_id: int, escritorio_id: int, role: str) -> str:

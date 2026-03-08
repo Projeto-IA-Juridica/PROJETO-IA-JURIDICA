@@ -21,6 +21,7 @@ from shared.database.worker_queries import (
 )
 from shared.database.worker_queries import (
     insert_interacao,
+    query_clientes_relacionamento,
     query_ultima_interacao_batch,
 )
 from shared.database.worker_queries import (
@@ -154,21 +155,6 @@ class GoogleSheetsClient:
         return cls._client
 
     @staticmethod
-    def get_clientes() -> list[Cliente]:
-        raw = GoogleSheetsClient._get().get_clientes()
-        return [
-            Cliente(
-                id=d["id"],
-                nome=d["nome"],
-                telefone=d["telefone"],
-                status=d["status"],
-                data_nascimento=d.get("data_nascimento"),
-                profissao=d.get("profissao"),
-            )
-            for d in raw
-        ]
-
-    @staticmethod
     def get_datas_comemorativas() -> list[dict]:
         return GoogleSheetsClient._get().get_datas_comemorativas()
 
@@ -214,8 +200,19 @@ def salvar_interacao(
 
 @shared_task(bind=True)
 def verificar_aniversarios_diarios(self) -> dict:
-    clientes = GoogleSheetsClient.get_clientes()
-    clientes_ativos = [c for c in clientes if normalizar_texto(c.status) == "ativo"]
+    _raw = query_clientes_relacionamento()
+    clientes = [
+        Cliente(
+            id=d["id"],
+            nome=d["nome"],
+            telefone=d["telefone"],
+            status=d["status"],
+            data_nascimento=d.get("data_nascimento"),
+            profissao=d.get("profissao"),
+        )
+        for d in _raw
+    ]
+    clientes_ativos = clientes  # query já filtra ativo=True
 
     dia, mes = dia_mes_hoje()
 
@@ -307,8 +304,18 @@ def verificar_aniversarios_diarios(self) -> dict:
 
 @shared_task(bind=True)
 def verificar_datas_comemorativas(self) -> dict:
-    clientes = GoogleSheetsClient.get_clientes()
-    clientes_ativos = [c for c in clientes if normalizar_texto(c.status) == "ativo"]
+    _raw = query_clientes_relacionamento()
+    clientes_ativos = [
+        Cliente(
+            id=d["id"],
+            nome=d["nome"],
+            telefone=d["telefone"],
+            status=d["status"],
+            data_nascimento=d.get("data_nascimento"),
+            profissao=d.get("profissao"),
+        )
+        for d in _raw
+    ]  # query já filtra ativo=True
 
     datas = GoogleSheetsClient.get_datas_comemorativas()
     dia, mes = dia_mes_hoje()
@@ -430,8 +437,18 @@ def verificar_datas_comemorativas(self) -> dict:
 
 @shared_task(bind=True)
 def verificar_clientes_sem_contato(self) -> dict:
-    clientes = GoogleSheetsClient.get_clientes()
-    clientes_ativos = [c for c in clientes if normalizar_texto(c.status) == "ativo"]
+    _raw = query_clientes_relacionamento()
+    clientes_ativos = [
+        Cliente(
+            id=d["id"],
+            nome=d["nome"],
+            telefone=d["telefone"],
+            status=d["status"],
+            data_nascimento=d.get("data_nascimento"),
+            profissao=d.get("profissao"),
+        )
+        for d in _raw
+    ]  # query já filtra ativo=True
 
     limite_maximo = 10
     dias_sem_contato = 90

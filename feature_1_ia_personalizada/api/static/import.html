@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concierge Jurídico — Importar Clientes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ===== RESET & TOKENS ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:        #c9a84c;
+      --gold-light:  #e2c97e;
+      --gold-glow:   rgba(201, 168, 76, 0.18);
+      --gold-border: rgba(201, 168, 76, 0.28);
+      --black:       #0b0b0b;
+      --surface:     #141414;
+      --surface-2:   #1c1c1c;
+      --surface-3:   #242424;
+      --text:        #ede8df;
+      --text-muted:  #7a7367;
+      --text-dim:    #b0a99e;
+      --red:         #c0392b;
+      --red-bg:      rgba(192,57,43,.12);
+      --green:       #27ae60;
+      --green-bg:    rgba(39,174,96,.12);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--black);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem 4rem;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201,168,76,.07) 0%, transparent 70%);
+    }
+
+    /* ===== HEADER ===== */
+    .page-header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeDown .6s ease both;
+    }
+    .page-header .emblem {
+      font-size: 2.2rem;
+      margin-bottom: .6rem;
+      filter: drop-shadow(0 0 18px rgba(201,168,76,.5));
+    }
+    .page-header h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--gold-light);
+      letter-spacing: .04em;
+      line-height: 1.2;
+    }
+    .page-header p {
+      font-size: .8rem;
+      color: var(--text-muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-top: .4rem;
+    }
+
+    /* ===== CARD ===== */
+    .card {
+      width: 100%;
+      max-width: 720px;
+      background: var(--surface);
+      border: 1px solid var(--gold-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.03),
+        0 8px 48px rgba(0,0,0,.6),
+        0 0 80px rgba(201,168,76,.05);
+      animation: fadeUp .5s .1s ease both;
+    }
+
+    /* ===== GOLD DIVIDER LINE ===== */
+    .gold-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: .5;
+    }
+
+    /* ===== SECTION ===== */
+    .section {
+      padding: 1.75rem 2rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      transition: background .2s;
+    }
+    .section:last-child { border-bottom: none; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--gold);
+      margin-bottom: 1.2rem;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--gold-border);
+    }
+
+    /* ===== LABEL & INPUT ===== */
+    label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      margin-bottom: .4rem;
+      letter-spacing: .04em;
+    }
+
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: .7rem 1rem;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      font-size: .9rem;
+      color: var(--text);
+      margin-bottom: .9rem;
+      transition: border-color .2s, box-shadow .2s;
+      font-family: 'Inter', sans-serif;
+    }
+    input[type="email"]::placeholder,
+    input[type="password"]::placeholder { color: var(--text-muted); }
+    input[type="email"]:focus,
+    input[type="password"]:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px var(--gold-glow);
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .65rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: .83rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .03em;
+      transition: all .18s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; transform: none !important; }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #b8891f 0%, #c9a84c 50%, #e2c97e 100%);
+      color: #0b0b0b;
+      font-weight: 700;
+      box-shadow: 0 2px 16px rgba(201,168,76,.3);
+    }
+    .btn-gold:not(:disabled):hover {
+      box-shadow: 0 4px 24px rgba(201,168,76,.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-confirm {
+      background: linear-gradient(135deg, #1a6b3a 0%, #27ae60 100%);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 2px 16px rgba(39,174,96,.25);
+    }
+    .btn-confirm:not(:disabled):hover {
+      box-shadow: 0 4px 24px rgba(39,174,96,.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--gold-border);
+      color: var(--gold);
+    }
+    .btn-outline:not(:disabled):hover {
+      background: var(--gold-glow);
+      border-color: var(--gold);
+    }
+
+    /* ===== FILE UPLOAD ZONE ===== */
+    .file-zone {
+      border: 1.5px dashed var(--gold-border);
+      border-radius: 10px;
+      padding: 1.4rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      transition: border-color .2s, background .2s;
+      cursor: pointer;
+      margin-bottom: .9rem;
+    }
+    .file-zone:hover { border-color: var(--gold); background: var(--gold-glow); }
+    .file-zone .zone-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .file-zone .zone-text { flex: 1; }
+    .file-zone .zone-text strong { display: block; font-size: .85rem; color: var(--text); }
+    .file-zone .zone-text span  { font-size: .75rem; color: var(--text-muted); }
+    #file-name {
+      font-size: .78rem;
+      color: var(--gold);
+      font-weight: 500;
+      display: none;
+    }
+    #file-name.visible { display: block; }
+
+    /* ===== HINT ===== */
+    .hint {
+      font-size: .75rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: .6rem;
+    }
+    .hint strong { color: var(--text-dim); }
+
+    /* ===== STATUS BAR ===== */
+    #status-bar {
+      padding: .7rem 1rem;
+      border-radius: 8px;
+      font-size: .82rem;
+      display: none;
+      margin-top: .75rem;
+      font-weight: 500;
+      animation: fadeIn .2s ease;
+    }
+    #status-bar.info {
+      background: rgba(201,168,76,.1);
+      border: 1px solid rgba(201,168,76,.25);
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    #status-bar.info::before { content: '◌'; animation: spin 1s linear infinite; }
+    #status-bar.success {
+      background: var(--green-bg);
+      border: 1px solid rgba(39,174,96,.3);
+      color: #4caf82;
+      display: block;
+    }
+    #status-bar.error {
+      background: var(--red-bg);
+      border: 1px solid rgba(192,57,43,.3);
+      color: #e57373;
+      display: block;
+    }
+
+    /* ===== SUMMARY CARDS ===== */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: .75rem;
+      margin-bottom: 1.2rem;
+    }
+    @media (max-width: 520px) { .summary { grid-template-columns: repeat(2,1fr); } }
+
+    .summary-item {
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 10px;
+      padding: .9rem .75rem;
+      text-align: center;
+      transition: border-color .2s;
+    }
+    .summary-item:hover { border-color: var(--gold-border); }
+    .summary-item .num {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .summary-item .lbl {
+      font-size: .67rem;
+      color: var(--text-muted);
+      margin-top: .3rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* ===== TABLE ===== */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--gold-border) transparent;
+    }
+    .table-wrap::-webkit-scrollbar { width: 5px; height: 5px; }
+    .table-wrap::-webkit-scrollbar-track { background: transparent; }
+    .table-wrap::-webkit-scrollbar-thumb { background: var(--gold-border); border-radius: 4px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    th {
+      background: var(--surface-3);
+      padding: .6rem .85rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: .68rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      border-bottom: 1px solid var(--gold-border);
+      position: sticky;
+      top: 0;
+    }
+    td {
+      padding: .55rem .85rem;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      color: var(--text-dim);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(201,168,76,.04); color: var(--text); }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-block;
+      padding: .2rem .55rem;
+      border-radius: 99px;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
+    .badge-green  { background: rgba(39,174,96,.15);  color: #4caf82; border: 1px solid rgba(39,174,96,.3); }
+    .badge-gold   { background: rgba(201,168,76,.15); color: var(--gold); border: 1px solid var(--gold-border); }
+    .badge-red    { background: rgba(192,57,43,.15);  color: #e57373; border: 1px solid rgba(192,57,43,.3); }
+    .badge-dim    { background: rgba(255,255,255,.05);color: var(--text-muted); border: 1px solid rgba(255,255,255,.08); }
+
+    /* ===== ERRORS ===== */
+    .erros-wrap {
+      background: var(--red-bg);
+      border: 1px solid rgba(192,57,43,.25);
+      border-radius: 10px;
+      padding: .85rem 1rem;
+      margin-top: .9rem;
+      font-size: .78rem;
+      color: #e57373;
+    }
+    .erros-wrap strong { display: block; margin-bottom: .4rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }
+    .erros-wrap ul { padding-left: 1.1rem; }
+    .erros-wrap li { margin-bottom: .3rem; }
+
+    /* ===== AUTH OK ===== */
+    #auth-ok {
+      display: none;
+      align-items: center;
+      gap: .5rem;
+      color: var(--gold);
+      font-size: .85rem;
+      font-weight: 600;
+      padding: .65rem 1rem;
+      background: var(--gold-glow);
+      border: 1px solid var(--gold-border);
+      border-radius: 8px;
+    }
+    #auth-ok .check { font-size: 1.1rem; }
+
+    /* ===== RESULTADO FINAL ===== */
+    .resultado-box {
+      background: var(--green-bg);
+      border: 1px solid rgba(39,174,96,.25);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+    }
+    .resultado-box .titulo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #4caf82;
+      margin-bottom: .6rem;
+    }
+    .resultado-box .badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .5rem; }
+    .resultado-box .datajud-note {
+      font-size: .73rem;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(39,174,96,.15);
+      padding-top: .5rem;
+      margin-top: .5rem;
+    }
+
+    /* ===== WPP GUIDE ===== */
+    #section-wpp { display: none; }
+
+    .wpp-header {
+      display: flex;
+      align-items: center;
+      gap: .85rem;
+      margin-bottom: 1.4rem;
+    }
+    .wpp-header .icon {
+      width: 2.6rem;
+      height: 2.6rem;
+      background: linear-gradient(135deg, #128c7e, #25d366);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      box-shadow: 0 0 16px rgba(37,211,102,.25);
+    }
+    .wpp-header .hd-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .wpp-header .hd-sub { font-size: .75rem; color: var(--text-muted); margin-top: .1rem; }
+
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      gap: .9rem;
+      margin-bottom: 1.1rem;
+      align-items: flex-start;
+      animation: fadeIn .4s ease both;
+    }
+    .steps li:nth-child(1) { animation-delay: .05s; }
+    .steps li:nth-child(2) { animation-delay: .1s;  }
+    .steps li:nth-child(3) { animation-delay: .15s; }
+    .steps li:nth-child(4) { animation-delay: .2s;  }
+    .steps li:nth-child(5) { animation-delay: .25s; }
+    .steps li:nth-child(6) { animation-delay: .3s;  }
+    .steps li::before {
+      content: counter(step);
+      min-width: 1.75rem;
+      height: 1.75rem;
+      background: linear-gradient(135deg, #b8891f, var(--gold));
+      color: #0b0b0b;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .72rem;
+      font-weight: 800;
+      flex-shrink: 0;
+      margin-top: .05rem;
+      box-shadow: 0 0 10px rgba(201,168,76,.3);
+    }
+    .steps li .step-body { flex: 1; }
+    .steps li .step-title {
+      font-weight: 600;
+      font-size: .85rem;
+      color: var(--text);
+      margin-bottom: .25rem;
+    }
+    .steps li .step-desc {
+      font-size: .78rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .steps li .step-desc code {
+      background: var(--surface-3);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 4px;
+      padding: .1rem .4rem;
+      font-family: monospace;
+      font-size: .76rem;
+      color: var(--gold);
+    }
+    .note-pill {
+      display: inline-block;
+      margin-top: .35rem;
+      background: rgba(201,168,76,.1);
+      border: 1px solid var(--gold-border);
+      border-radius: 5px;
+      padding: .2rem .55rem;
+      font-size: .72rem;
+      color: var(--gold-light);
+    }
+
+    .wpp-alert {
+      background: rgba(201,168,76,.07);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      padding: .9rem 1.1rem;
+      font-size: .79rem;
+      color: var(--text-dim);
+      margin-top: 1.1rem;
+      line-height: 1.6;
+    }
+    .wpp-alert strong { color: var(--gold-light); }
+
+    /* ===== FOOTER ===== */
+    .page-footer {
+      margin-top: 2rem;
+      font-size: .7rem;
+      color: var(--text-muted);
+      letter-spacing: .06em;
+      text-align: center;
+      animation: fadeIn 1s .5s ease both;
+    }
+
+    /* ===== SECTION HIDDEN ===== */
+    #section-preview, #section-confirm { display: none; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div class="emblem">⚖️</div>
+    <h1>Concierge Jurídico Digital</h1>
+    <p>Importação de Clientes &amp; Processos</p>
+  </div>
+
+  <div class="card">
+    <div class="gold-line"></div>
+
+    <!-- [1] LOGIN -->
+    <div class="section" id="section-login">
+      <div class="section-title">1 &nbsp; Autenticação</div>
+
+      <div id="auth-ok">
+        <span class="check">✦</span>
+        <span id="auth-ok-email"></span>
+        <span style="margin-left:auto;font-size:.7rem;opacity:.6;">Sessão ativa</span>
+      </div>
+
+      <div id="login-form">
+        <label for="email">E-mail institucional</label>
+        <input type="email" id="email" placeholder="advogado@escritorio.adv.br" autocomplete="email" />
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password" />
+
+        <button class="btn btn-gold" onclick="fazerLogin()">Entrar &nbsp;→</button>
+        <div id="status-bar"></div>
+      </div>
+    </div>
+
+    <!-- [2] SELECIONAR ARQUIVO -->
+    <div class="section" id="section-arquivo">
+      <div class="section-title">2 &nbsp; Selecionar planilha</div>
+
+      <p class="hint" style="margin-bottom:.75rem;">
+        No Google Sheets: <strong>Arquivo → Download → Valores separados por vírgula (.csv)</strong>
+      </p>
+      <p class="hint" style="margin-bottom:1rem;">
+        Colunas <strong>obrigatórias:</strong> nome, telefone &nbsp;·&nbsp;
+        <strong>Opcionais:</strong> cpf, data_nascimento, profissao, empresa, status, numero_processo, polo_cliente
+      </p>
+
+      <div class="file-zone" onclick="document.getElementById('file-input').click()">
+        <div class="zone-icon">📂</div>
+        <div class="zone-text">
+          <strong>Clique para selecionar o arquivo CSV</strong>
+          <span>Máximo 5 MB &nbsp;·&nbsp; somente .csv</span>
+        </div>
+        <input type="file" id="file-input" accept=".csv" style="display:none" onchange="arquivoSelecionado(this)" />
+      </div>
+
+      <div id="file-name"></div>
+
+      <div style="margin-top:1rem;">
+        <button class="btn btn-gold" id="btn-preview" onclick="fazerPreview()" disabled>
+          Pré-visualizar &nbsp;→
+        </button>
+      </div>
+    </div>
+
+    <!-- [3] PREVIEW -->
+    <div class="section" id="section-preview">
+      <div class="section-title">3 &nbsp; Revisão dos dados</div>
+
+      <div class="summary">
+        <div class="summary-item">
+          <div class="num" id="sum-novos" style="color:#4caf82;">0</div>
+          <div class="lbl">Novos</div>
+        </div>
+        <div class="summary-item">
+          <div class="num" id="sum-atualizados" style="color:var(--gold);">0</div>
+          <div class="lbl">Atualizados</div>
+        </div>
+        <div class="summary-item">
+          <div class="num" id="sum-proc-novos" style="color:#9b79e0;">0</div>
+          <div class="lbl">Processos</div>
+        </div>
+        <div class="summary-item">
+          <div class="num" id="sum-erros" style="color:#e57373;">0</div>
+          <div class="lbl">Erros</div>
+        </div>
+      </div>
+
+      <div class="table-wrap" id="preview-table-wrap"></div>
+      <div id="erros-lista"></div>
+    </div>
+
+    <!-- [4] CONFIRMAR -->
+    <div class="section" id="section-confirm">
+      <button class="btn btn-confirm" id="btn-confirm" onclick="confirmarImportacao()">
+        ✓ &nbsp; Confirmar Importação
+      </button>
+      <div id="resultado-final" style="margin-top:1.1rem;"></div>
+    </div>
+
+    <!-- [5] GUIA WHATSAPP -->
+    <div class="section" id="section-wpp">
+      <div class="section-title">5 &nbsp; Conectar ao WhatsApp</div>
+
+      <div class="wpp-header">
+        <div class="icon">💬</div>
+        <div>
+          <div class="hd-title">Próximos passos — Ativar o Agente</div>
+          <div class="hd-sub">Siga o guia para conectar o escritório ao WhatsApp</div>
+        </div>
+      </div>
+
+      <ol class="steps">
+        <li>
+          <div class="step-body">
+            <div class="step-title">Abra o painel da Evolution API</div>
+            <div class="step-desc">
+              Acesse a URL da sua instância no navegador (ex.: <code>http://seu-servidor:8080</code>).
+              Autentique com a <code>EVOLUTION_API_KEY</code> configurada no servidor.
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <div class="step-title">Crie ou selecione a instância do escritório</div>
+            <div class="step-desc">
+              Crie uma instância com o nome exato registrado em <code>webhook_whatsapp_instance</code> no banco.
+              <br><span class="note-pill">⚠️ O nome deve ser idêntico — sem espaços ou variações de capitalização.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <div class="step-title">Escaneie o QR Code com o WhatsApp</div>
+            <div class="step-desc">
+              Clique em <strong>Connect / QR Code</strong> na instância.
+              No celular: <strong>WhatsApp → ⋮ → Dispositivos conectados → Conectar dispositivo</strong>.
+              <br><span class="note-pill">✅ Status "open" confirma a conexão.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <div class="step-title">Configure o Webhook</div>
+            <div class="step-desc">
+              Em <strong>Webhook</strong> da instância:<br>
+              <code>URL</code> → <code>https://seu-dominio.com/webhook/whatsapp</code><br>
+              <code>Eventos</code> → marque <strong>MESSAGES_UPSERT</strong> e <strong>CONNECTION_UPDATE</strong><br>
+              <code>Header</code> → <code>apikey: SUA_EVOLUTION_API_KEY</code>
+              <br><span class="note-pill">🔗 A URL precisa ser acessível publicamente.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <div class="step-title">Aguarde as mensagens de boas-vindas</div>
+            <div class="step-desc">
+              Ao conectar, o sistema envia automaticamente uma mensagem de boas-vindas para todos os clientes importados.
+              <br><span class="note-pill">✅ Cada cliente recebe apenas uma vez — reconexões não reenviam.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <div class="step-title">Verifique os logs</div>
+            <div class="step-desc">
+              Se o agente não responder, consulte os logs da aplicação.
+              Procure por <code>webhook_mensagem_enfileirada</code> e <code>boas_vindas_escritorio_concluido</code>.
+            </div>
+          </div>
+        </li>
+      </ol>
+
+      <div class="wpp-alert">
+        <strong>Boas-vindas automáticas:</strong> ao conectar (status "open"), o agente envia automaticamente
+        uma apresentação para <strong>todos os clientes importados</strong>. Após isso, responde qualquer
+        mensagem relacionada ao processo do cliente. ⚖️
+      </div>
+    </div>
+
+    <div class="gold-line"></div>
+  </div>
+
+  <div class="page-footer">CONCIERGE JURÍDICO &nbsp;·&nbsp; SISTEMA RESTRITO AO USO INTERNO</div>
+
+<script>
+  let _token = null;
+  let _arquivo = null;
+
+  /* ========= HELPERS ========= */
+  function setStatus(msg, tipo = 'info') {
+    const el = document.getElementById('status-bar');
+    el.className = tipo;
+    el.textContent = msg;
+  }
+
+  function clearStatus() {
+    const el = document.getElementById('status-bar');
+    el.className = '';
+    el.style.display = 'none';
+  }
+
+  function mostrarSecao(id) {
+    const el = document.getElementById(id);
+    el.style.display = 'block';
+    el.style.animation = 'fadeIn .35s ease both';
+  }
+
+  /* ========= LOGIN ========= */
+  async function fazerLogin() {
+    const email = document.getElementById('email').value.trim();
+    const senha = document.getElementById('senha').value;
+    if (!email || !senha) { setStatus('Preencha e-mail e senha.', 'error'); return; }
+
+    setStatus('Autenticando...', 'info');
+    try {
+      const resp = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { setStatus(data.detail || 'Credenciais inválidas.', 'error'); return; }
+
+      _token = data.access_token;
+      document.getElementById('login-form').style.display = 'none';
+      const okDiv = document.getElementById('auth-ok');
+      okDiv.style.display = 'flex';
+      document.getElementById('auth-ok-email').textContent = email;
+      clearStatus();
+    } catch (e) {
+      setStatus('Erro de conexão com o servidor.', 'error');
+    }
+  }
+
+  /* ========= ARQUIVO ========= */
+  function arquivoSelecionado(input) {
+    _arquivo = input.files[0] || null;
+    const nameEl = document.getElementById('file-name');
+    if (_arquivo) {
+      nameEl.textContent = '✦ ' + _arquivo.name;
+      nameEl.classList.add('visible');
+    } else {
+      nameEl.classList.remove('visible');
+    }
+    document.getElementById('btn-preview').disabled = !_arquivo || !_token;
+    document.getElementById('section-preview').style.display = 'none';
+    document.getElementById('section-confirm').style.display = 'none';
+  }
+
+  /* ========= PRÉ-VISUALIZAR ========= */
+  async function fazerPreview() {
+    if (!_token) { setStatus('Faça login primeiro.', 'error'); return; }
+    if (!_arquivo) { setStatus('Selecione um arquivo CSV.', 'error'); return; }
+
+    setStatus('Lendo e validando CSV...', 'info');
+    document.getElementById('btn-preview').disabled = true;
+
+    const form = new FormData();
+    form.append('file', _arquivo);
+
+    try {
+      const resp = await fetch('/admin/import/clientes?preview=true', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + _token },
+        body: form,
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setStatus(data.detail || 'Erro ao processar o CSV.', 'error');
+        document.getElementById('btn-preview').disabled = false;
+        return;
+      }
+
+      clearStatus();
+      renderPreview(data);
+    } catch (e) {
+      setStatus('Erro de conexão com o servidor.', 'error');
+      document.getElementById('btn-preview').disabled = false;
+    }
+  }
+
+  function renderPreview(data) {
+    document.getElementById('sum-novos').textContent       = data.importados        ?? 0;
+    document.getElementById('sum-atualizados').textContent = data.atualizados       ?? 0;
+    document.getElementById('sum-proc-novos').textContent  = data.processos_novos   ?? 0;
+    document.getElementById('sum-erros').textContent       = (data.erros || []).length;
+
+    const wrap = document.getElementById('preview-table-wrap');
+    if ((data.preview || []).length === 0) {
+      wrap.innerHTML = '<p style="padding:1rem;color:var(--text-muted);font-size:.82rem;">Nenhum cliente válido encontrado no arquivo.</p>';
+    } else {
+      let html = '<table><thead><tr><th>#</th><th>Nome</th><th>Telefone</th><th>CPF</th><th>Profissão</th><th>Nº Processo (CNJ)</th><th>Status</th></tr></thead><tbody>';
+      data.preview.forEach((c, i) => {
+        const statusBadge = c.status === 'ativo'
+          ? '<span class="badge badge-green">ativo</span>'
+          : '<span class="badge badge-dim">inativo</span>';
+        const procBadge = c.numero_processo && c.numero_processo !== '(não informado)'
+          ? `<span class="badge badge-gold">${esc(c.numero_processo)}</span>`
+          : '<span style="color:var(--text-muted);font-size:.7rem;">—</span>';
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td>${esc(c.nome)}</td>
+          <td>${esc(c.telefone)}</td>
+          <td>${esc(c.cpf || '—')}</td>
+          <td>${esc(c.profissao || '—')}</td>
+          <td>${procBadge}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+    }
+
+    const errosDiv = document.getElementById('erros-lista');
+    if ((data.erros || []).length > 0) {
+      let eHtml = '<div class="erros-wrap"><strong>Linhas com problema</strong><ul>';
+      data.erros.forEach(e => {
+        eHtml += `<li>Linha ${e.linha}: ${esc(e.motivo)}</li>`;
+      });
+      eHtml += '</ul></div>';
+      errosDiv.innerHTML = eHtml;
+    } else {
+      errosDiv.innerHTML = '';
+    }
+
+    mostrarSecao('section-preview');
+
+    if ((data.importados + data.atualizados) > 0) {
+      mostrarSecao('section-confirm');
+      document.getElementById('resultado-final').innerHTML = '';
+      document.getElementById('btn-confirm').disabled = false;
+    } else {
+      document.getElementById('section-confirm').style.display = 'none';
+    }
+  }
+
+  /* ========= CONFIRMAR ========= */
+  async function confirmarImportacao() {
+    if (!_token || !_arquivo) return;
+
+    document.getElementById('btn-confirm').disabled = true;
+    setStatus('Importando clientes para o banco de dados...', 'info');
+
+    const form = new FormData();
+    form.append('file', _arquivo);
+
+    try {
+      const resp = await fetch('/admin/import/clientes?preview=false', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + _token },
+        body: form,
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setStatus(data.detail || 'Erro ao importar.', 'error');
+        document.getElementById('btn-confirm').disabled = false;
+        return;
+      }
+
+      clearStatus();
+
+      const datajudNote = (data.processos_novos ?? 0) > 0
+        ? '<div class="datajud-note">⚙️ Os processos serão enriquecidos automaticamente pelo DataJud na próxima execução do worker.</div>'
+        : '';
+
+      document.getElementById('resultado-final').innerHTML = `
+        <div class="resultado-box">
+          <div class="titulo">Importação concluída com sucesso</div>
+          <div class="badges">
+            <span class="badge badge-green">${data.importados} cliente(s) novo(s)</span>
+            <span class="badge badge-gold">${data.atualizados} atualizado(s)</span>
+            <span class="badge" style="background:rgba(155,121,224,.15);color:#9b79e0;border:1px solid rgba(155,121,224,.3);">${data.processos_novos ?? 0} processo(s) novo(s)</span>
+            <span class="badge badge-dim">${data.processos_atualizados ?? 0} processo(s) vinculado(s)</span>
+            ${data.erros?.length ? `<span class="badge badge-red">${data.erros.length} erro(s)</span>` : ''}
+          </div>
+          ${datajudNote}
+        </div>`;
+
+      document.getElementById('file-input').value = '';
+      _arquivo = null;
+      document.getElementById('file-name').textContent = '';
+      document.getElementById('file-name').classList.remove('visible');
+      document.getElementById('btn-preview').disabled = true;
+
+      mostrarSecao('section-wpp');
+      setTimeout(() => {
+        document.getElementById('section-wpp').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 200);
+    } catch (e) {
+      setStatus('Erro de conexão com o servidor.', 'error');
+      document.getElementById('btn-confirm').disabled = false;
+    }
+  }
+
+  function esc(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('senha').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fazerLogin();
+  });
+</script>
+</body>
+</html>

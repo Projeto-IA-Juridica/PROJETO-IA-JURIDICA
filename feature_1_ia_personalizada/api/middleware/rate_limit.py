@@ -21,6 +21,7 @@ redis_client = None
 LIMIT_WEBHOOK = 100
 LIMIT_API_GERAL = 60
 LIMIT_CHAT = 30
+LIMIT_LOGIN = 5  # anti-brute-force
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -48,10 +49,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         limit = LIMIT_API_GERAL
         prefix = "rate_limit:api:"
 
-        if path.startswith("/webhook/whatsapp"):
+        if path == "/auth/login":
+            # Proteção anti-brute-force: sempre usa IP, nunca user_id
+            identifier = request.client.host if request.client else "unknown"
+            limit = LIMIT_LOGIN
+            prefix = "rate_limit:login:"
+        elif path.startswith("/webhook/whatsapp"):
             limit = LIMIT_WEBHOOK
             prefix = "rate_limit:webhook:"
-            # Para webhook, garantimos que travemos por IP ou Instance Name
         elif path.startswith("/chat"):
             limit = LIMIT_CHAT
             prefix = "rate_limit:chat:"

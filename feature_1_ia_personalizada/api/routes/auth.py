@@ -9,7 +9,7 @@ from shared.database.session import get_db
 from shared.models.usuario import Usuario
 from shared.schemas.usuario import TokenResponse, UsuarioLogin, UsuarioResponse
 from shared.security.encryption import verificar_senha
-from shared.security.jwt import criar_refresh_token, criar_token, validar_token
+from shared.security.jwt import criar_refresh_token, criar_token, revogar_token, validar_token
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -104,6 +104,19 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
 
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e)) from e
+
+
+@router.post("/logout", status_code=204)
+async def logout(request: Request):
+    """
+    Invalida o Access Token atual adicionando-o à blacklist do Redis.
+    O cliente deve descartar o token e o refresh token após o logout.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        revogar_token(token)
+    return None
 
 
 @router.get("/me", response_model=UsuarioResponse)

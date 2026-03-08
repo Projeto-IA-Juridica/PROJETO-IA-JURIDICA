@@ -12,6 +12,7 @@ from feature_1_ia_personalizada.workers.celery_app import DLQTask
 from shared.database.worker_queries import (
     enviar_mensagem_whatsapp,
     insert_interacao,
+    query_clientes_ativos_por_escritorio,
     query_clientes_para_pesquisa,
     query_processo_e_cliente,
     query_processos_sem_movimentacao,
@@ -65,6 +66,14 @@ MENSAGEM_PESQUISA_SATISFACAO = "De 1 a 5, como você avalia nosso atendimento es
 
 MENSAGEM_ERRO_PADRAO = (
     "No momento não consegui processar sua mensagem. Nossa equipe será notificada."
+)
+
+MENSAGEM_BOAS_VINDAS = (
+    "Olá, {nome}! 👋 Seja bem-vindo(a).\n\n"
+    "Sou a assistente jurídica digital do escritório e estou aqui para facilitar\n"
+    "o acompanhamento do seu processo e esclarecer dúvidas rápidas.\n\n"
+    "⚠️ _As informações enviadas por aqui não substituem a orientação jurídica formal do seu advogado._\n\n"
+    "Quando precisar, é só me chamar! ⚖️"
 )
 
 
@@ -129,6 +138,10 @@ def buscar_processos_sem_movimentacao():
 
 def buscar_clientes_para_pesquisa():
     return query_clientes_para_pesquisa()
+
+
+def buscar_clientes_ativos_por_escritorio(escritorio_id: int):
+    return query_clientes_ativos_por_escritorio(escritorio_id)
 
 
 def registrar_interacao(
@@ -305,3 +318,58 @@ def processar_mensagem_recebida(
         )
 
         raise
+
+
+@shared_task(bind=True)
+def enviar_boas_vindas_escritorio(self, escritorio_id: int):
+    """
+    Disparada quando o WhatsApp do escritório conecta (evento connection.update/open).
+
+    Envia mensagem de boas-vindas para todos os clientes ativos do escritório.
+    Usa Redis para garantir que cada cliente receba no máximo 1 mensagem
+    (TTL de 90 dias — evita re-envio se o advogado reconectar o WhatsApp).
+    """
+    TTL_BOAS_VINDAS = 90 * 24 * 60 * 60  # 90 dias
+
+    clientes = buscar_clientes_ativos_por_escritorio(escritorio_id)
+    enviados = 0
+    ignorados = 0
+
+    for cliente in clientes:
+        chave = chave_limite("boas_vindas", escritorio_id, cliente.id)
+
+        if envio_recente(chave):
+            ignorados += 1
+            continue
+
+        primeiro_nome = cliente.nome.split()[0] if cliente.nome else "cliente"
+        texto = MENSAGEM_BOAS_VINDAS.format(nome=primeiro_nome)
+
+        try:
+            enviar_mensagem_whatsapp(cliente.id, cliente.telefone, texto)
+        except Exception as exc:
+            logger.warning(
+                "boas_vindas_falhou",
+                escritorio_id=escritorio_id,
+                cliente_id=cliente.id,
+                erro=str(exc),
+            )
+            continue
+
+        registrar_interacao(
+            id_cliente=cliente.id,
+            id_processo=None,
+            tipo="boas_vindas",
+            dados={"escritorio_id": escritorio_id},
+        )
+
+        registrar_envio_com_validade(chave, TTL_BOAS_VINDAS)
+        enviados += 1
+
+    logger.info(
+        "boas_vindas_escritorio_concluido",
+        escritorio_id=escritorio_id,
+        enviados=enviados,
+        ignorados=ignorados,
+    )
+    return {"enviados": enviados, "ignorados": ignorados}
