@@ -69,6 +69,12 @@ htmlcov/
 # SEGURANÇA E AMBIENTE
 # ==========================
 # CRÍTICO: Nunca commitar chaves de API ou segredos
+.env
+.env.*
+!.env.example
+credenciais.json
+google-credentials.json
+service-account*.json
 *.pem
 *.key
 *.crt
