@@ -20,12 +20,12 @@ from shared.security.jwt import validar_token
 
 # Rotas que não exigem token JWT para serem acessadas
 ROTAS_PUBLICAS = [
-    "/health",            # O health check básico é open
-    "/health/ready",      # O detailed também, para pods k8s conseguirem ler
-    "/auth/login",        # Obviamente, pra gerar o token
-    "/auth/refresh",      # Pra renovar
+    "/health",  # O health check básico é open
+    "/health/ready",  # O detailed também, para pods k8s conseguirem ler
+    "/auth/login",  # Obviamente, pra gerar o token
+    "/auth/refresh",  # Pra renovar
     "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
-    "/metrics",           # Prometheus scraper não usa JWT
+    "/metrics",  # Prometheus scraper não usa JWT
 ]
 
 
@@ -101,7 +101,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={
-                    "detail": "Token JWT ausente ou mal formatado. Use 'Authorization: Bearer <token>'"
+                    "detail": (
+                        "Token JWT ausente ou mal formatado."
+                        " Use 'Authorization: Bearer <token>'"
+                    )
                 },
             )
 
