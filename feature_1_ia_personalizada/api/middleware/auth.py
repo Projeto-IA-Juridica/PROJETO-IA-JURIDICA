@@ -82,7 +82,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             if not _checar_basic_auth(request):
                 return JSONResponse(
                     status_code=401,
-                    content={"detail": "Autenticação necessária para acessar a documentação."},
+                    content={
+                        "detail": "Autenticação necessária para acessar a documentação."
+                    },
                     headers={"WWW-Authenticate": "Basic"},
                 )
 
