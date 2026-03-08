@@ -48,7 +48,7 @@ try:
     from langgraph.graph import END, StateGraph
 
     _LANGGRAPH_OK = True
-except ImportError:
+except Exception:  # ImportError ou TypeError (pydantic v1 + Python 3.12)
     _LANGGRAPH_OK = False
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
