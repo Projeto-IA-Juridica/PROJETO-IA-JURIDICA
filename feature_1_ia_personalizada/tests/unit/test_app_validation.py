@@ -123,7 +123,14 @@ class TestJWTAuthMiddleware:
 
     async def test_rota_publica_docs_bypassa_auth(self):
         middleware = self._criar_middleware()
-        response, called = await self._dispatch(middleware, "/docs")
+        with (
+            patch("feature_1_ia_personalizada.api.middleware.auth.DOCS_PASSWORD", None),
+            patch(
+                "feature_1_ia_personalizada.api.middleware.auth.settings"
+            ) as mock_settings,
+        ):
+            mock_settings.ENVIRONMENT = "development"
+            response, called = await self._dispatch(middleware, "/docs")
         assert called
 
     async def test_rota_publica_auth_login_bypassa_auth(self):
