@@ -223,6 +223,8 @@ def verificar_aniversarios_diarios(self) -> dict:
 
     aniversariantes: list[Cliente] = []
     for cliente in clientes_ativos:
+        if cliente.status != "ativo":
+            continue
         if not cliente.data_nascimento:
             continue
         try:
@@ -336,10 +338,11 @@ def verificar_datas_comemorativas(self) -> dict:
             clientes_filtrados = [
                 c
                 for c in clientes_ativos
-                if normalizar_texto(c.profissao or "") == profissao_alvo
+                if c.status == "ativo"
+                and normalizar_texto(c.profissao or "") == profissao_alvo
             ]
         else:
-            clientes_filtrados = clientes_ativos
+            clientes_filtrados = [c for c in clientes_ativos if c.status == "ativo"]
 
         for lote in dividir_em_lotes(clientes_filtrados, TAMANHO_LOTE):
             for cliente in lote:
@@ -445,6 +448,8 @@ def verificar_clientes_sem_contato(self) -> dict:
     datas_ultima = query_ultima_interacao_batch(ids_ativos)
 
     for cliente in clientes_ativos:
+        if cliente.status != "ativo":
+            continue
         ultima = datas_ultima.get(cliente.id)
         if ultima is None or (agora - ultima) > timedelta(days=dias_sem_contato):
             candidatos.append(cliente)
