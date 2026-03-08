@@ -103,13 +103,13 @@ async def importar_clientes(
             db=db,
             preview=preview,
         )
-    except UnicodeDecodeError:
+    except UnicodeDecodeError as exc:
         raise HTTPException(
             status_code=400,
             detail=(
                 "Erro de encoding no arquivo. Salve o CSV com encoding UTF-8: "
                 "no Google Sheets, o download já vem em UTF-8 por padrão."
             ),
-        )
+        ) from exc
 
     return resultado
