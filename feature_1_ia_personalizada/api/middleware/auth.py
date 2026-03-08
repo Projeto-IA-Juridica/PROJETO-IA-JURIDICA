@@ -47,6 +47,7 @@ def _checar_basic_auth(request: Request) -> bool:
         return True
 
     import base64
+
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Basic "):
         return False
