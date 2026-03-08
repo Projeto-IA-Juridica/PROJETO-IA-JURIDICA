@@ -153,11 +153,10 @@ class TestTagsXML:
 
 
 class TestClassificador:
-    def test_todas_seis_categorias_presentes(self):
+    def test_todas_cinco_categorias_presentes(self):
         for categoria in [
             "status",
             "duvida_termo",
-            "agendamento",
             "saudacao",
             "reclamacao",
             "outro",

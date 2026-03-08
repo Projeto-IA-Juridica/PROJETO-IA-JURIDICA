@@ -264,8 +264,8 @@ class TestClassificarPorKeywords:
     def test_duvida_termo(self):
         assert _classificar_por_keywords("o que significa agravo?") == "duvida_termo"
 
-    def test_agendamento(self):
-        assert _classificar_por_keywords("quero agendar uma consulta") == "agendamento"
+    def test_agendamento_retorna_outro(self):
+        assert _classificar_por_keywords("quero agendar uma consulta") == "outro"
 
     def test_saudacao(self):
         assert _classificar_por_keywords("olá, bom dia!") == "saudacao"
@@ -291,11 +291,11 @@ class TestNodeClassificarIntencao:
     async def test_sucesso_retorna_intencao_do_claude(self):
         claude = _mock_claude()
         claude.classificar_intencao = AsyncMock(
-            return_value='{"intencao": "agendamento"}'
+            return_value='{"intencao": "reclamacao"}'
         )
         orq = _make_orchestrator(claude=claude)
         result = await orq._node_classificar_intencao(_base_state())
-        assert result["intencao"] == "agendamento"
+        assert result["intencao"] == "reclamacao"
 
     async def test_json_invalido_usa_keywords_como_fallback(self):
         claude = _mock_claude()
@@ -326,7 +326,6 @@ class TestNodeClassificarIntencao:
         for intencao in (
             "status",
             "duvida_termo",
-            "agendamento",
             "saudacao",
             "reclamacao",
             "outro",
@@ -568,8 +567,8 @@ class TestNodeGerarResposta:
         prompt = claude.enviar_mensagem.call_args.kwargs["system_prompt"]
         assert "Pedro Alves" in prompt
 
-    async def test_saudacao_nao_busca_cliente_para_outras_intencoes(self):
-        """Para 'status', session.get(Cliente) não deve ser chamado."""
+    async def test_status_busca_escritorio_e_cliente(self):
+        """Para 'status', session.get deve ser chamado para Escritorio e Cliente."""
         from shared.models.cliente import Cliente as ClienteModel
         from shared.models.escritorio import Escritorio as EscritorioModel
 
@@ -588,12 +587,10 @@ class TestNodeGerarResposta:
         await orq._node_gerar_resposta(
             _base_state(intencao="status", dados_processo=dados)
         )
-        # Compara a classe real (não o nome como string) — imune a refactoring de kwargs
+        # Ambos são buscados para montar o prompt (nome_escritorio + nome_cliente)
         classes_consultadas = {c.args[0] for c in session.get.call_args_list if c.args}
-        assert ClienteModel not in classes_consultadas
-        assert (
-            EscritorioModel in classes_consultadas
-        )  # sanity: Escritorio foi consultado
+        assert EscritorioModel in classes_consultadas
+        assert ClienteModel in classes_consultadas
 
     async def test_tokens_acumulados_corretamente(self):
         claude = _mock_claude()
@@ -1029,12 +1026,12 @@ class TestRotas:
             == "buscar_dados"
         )
 
-    def test_classificacao_agendamento_vai_para_buscar_dados(self):
+    def test_classificacao_outro_vai_para_gerar_resposta(self):
         assert (
             self._orq()._rota_apos_classificacao(
-                _base_state(intencao="agendamento", erro=None)
+                _base_state(intencao="outro", erro=None)
             )
-            == "buscar_dados"
+            == "gerar_resposta"
         )
 
     def test_classificacao_reclamacao_vai_para_buscar_dados(self):
@@ -1049,14 +1046,6 @@ class TestRotas:
         assert (
             self._orq()._rota_apos_classificacao(
                 _base_state(intencao="saudacao", erro=None)
-            )
-            == "gerar_resposta"
-        )
-
-    def test_classificacao_outro_vai_para_gerar_resposta(self):
-        assert (
-            self._orq()._rota_apos_classificacao(
-                _base_state(intencao="outro", erro=None)
             )
             == "gerar_resposta"
         )
@@ -1382,7 +1371,7 @@ class TestFluxoSequencial:
     async def test_fluxo_com_fallback_claude_nao_seta_erro(self):
         """RuntimeError no Claude ativa fallback — o fluxo termina normalmente."""
         claude = _mock_claude()
-        claude.classificar_intencao = AsyncMock(return_value='{"intencao": "outro"}')
+        claude.classificar_intencao = AsyncMock(return_value='{"intencao": "saudacao"}')
         claude.enviar_mensagem = AsyncMock(side_effect=RuntimeError("Claude down"))
 
         with patch(
