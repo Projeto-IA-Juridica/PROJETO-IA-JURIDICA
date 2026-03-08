@@ -9,7 +9,12 @@ from shared.database.session import get_db
 from shared.models.usuario import Usuario
 from shared.schemas.usuario import TokenResponse, UsuarioLogin, UsuarioResponse
 from shared.security.encryption import verificar_senha
-from shared.security.jwt import criar_refresh_token, criar_token, revogar_token, validar_token
+from shared.security.jwt import (
+    criar_refresh_token,
+    criar_token,
+    revogar_token,
+    validar_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 

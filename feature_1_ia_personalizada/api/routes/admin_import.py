@@ -31,7 +31,9 @@ async def pagina_importacao():
     """Serve o mini-frontend de importação (HTML puro, sem autenticação)."""
     html_path = _STATIC_DIR / "import.html"
     if not html_path.exists():
-        raise HTTPException(status_code=404, detail="Página de importação não encontrada.")
+        raise HTTPException(
+            status_code=404, detail="Página de importação não encontrada."
+        )
     return FileResponse(html_path, media_type="text/html")
 
 
@@ -85,7 +87,7 @@ async def importar_clientes(
         raise HTTPException(
             status_code=400,
             detail="O arquivo deve ter extensão .csv. Exporte a planilha pelo menu: "
-                   "Arquivo → Download → Valores separados por vírgula (.csv).",
+            "Arquivo → Download → Valores separados por vírgula (.csv).",
         )
 
     conteudo = await file.read()

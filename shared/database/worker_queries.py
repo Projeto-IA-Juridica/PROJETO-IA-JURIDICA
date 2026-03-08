@@ -168,7 +168,9 @@ async def _query_clientes_relacionamento() -> list[dict[str, Any]]:
                     "nome": c.nome,
                     "telefone": c.telefone_whatsapp,
                     "status": "ativo",
-                    "data_nascimento": str(c.data_nascimento) if c.data_nascimento else None,
+                    "data_nascimento": (
+                        str(c.data_nascimento) if c.data_nascimento else None
+                    ),
                     "profissao": c.profissao,
                 }
             )

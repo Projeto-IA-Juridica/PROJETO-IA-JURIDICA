@@ -104,10 +104,14 @@ async def processar_csv(
 
     if reader.fieldnames is None:
         return {
-            "importados": 0, "atualizados": 0,
-            "processos_novos": 0, "processos_atualizados": 0,
+            "importados": 0,
+            "atualizados": 0,
+            "processos_novos": 0,
+            "processos_atualizados": 0,
             "ignorados": 0,
-            "erros": [{"linha": 0, "dados": "", "motivo": "CSV vazio ou sem cabeçalho"}],
+            "erros": [
+                {"linha": 0, "dados": "", "motivo": "CSV vazio ou sem cabeçalho"}
+            ],
             "preview": [],
         }
 
@@ -116,11 +120,18 @@ async def processar_csv(
     faltando = [c for c in ("nome", "telefone") if c not in campos]
     if faltando:
         return {
-            "importados": 0, "atualizados": 0,
-            "processos_novos": 0, "processos_atualizados": 0,
+            "importados": 0,
+            "atualizados": 0,
+            "processos_novos": 0,
+            "processos_atualizados": 0,
             "ignorados": 0,
-            "erros": [{"linha": 1, "dados": str(campos),
-                       "motivo": f"Colunas obrigatórias ausentes: {faltando}"}],
+            "erros": [
+                {
+                    "linha": 1,
+                    "dados": str(campos),
+                    "motivo": f"Colunas obrigatórias ausentes: {faltando}",
+                }
+            ],
             "preview": [],
         }
 
@@ -133,9 +144,7 @@ async def processar_csv(
 
     for i, row in enumerate(reader, start=2):
         row_norm: dict[str, str] = {
-            k.strip().lower(): (v or "").strip()
-            for k, v in row.items()
-            if k
+            k.strip().lower(): (v or "").strip() for k, v in row.items() if k
         }
 
         nome = row_norm.get("nome", "")
@@ -146,24 +155,32 @@ async def processar_csv(
             continue
 
         if not telefone_raw:
-            erros.append({"linha": i, "dados": str(row_norm), "motivo": "Telefone ausente"})
+            erros.append(
+                {"linha": i, "dados": str(row_norm), "motivo": "Telefone ausente"}
+            )
             continue
 
         telefone = _normalizar_telefone(telefone_raw)
         if not _validar_telefone(telefone):
-            erros.append({
-                "linha": i, "dados": str(row_norm),
-                "motivo": f"Telefone inválido: '{telefone_raw}' (normalizado: '{telefone}')",
-            })
+            erros.append(
+                {
+                    "linha": i,
+                    "dados": str(row_norm),
+                    "motivo": f"Telefone inválido: '{telefone_raw}' (normalizado: '{telefone}')",
+                }
+            )
             continue
 
         # CPF — opcional no CSV, obrigatório no banco (not null → placeholder)
         cpf_raw = row_norm.get("cpf", "")
         if cpf_raw and not _validar_cpf_formato(cpf_raw):
-            erros.append({
-                "linha": i, "dados": str(row_norm),
-                "motivo": f"CPF inválido: '{cpf_raw}'",
-            })
+            erros.append(
+                {
+                    "linha": i,
+                    "dados": str(row_norm),
+                    "motivo": f"CPF inválido: '{cpf_raw}'",
+                }
+            )
             continue
 
         cpf_para_salvar = cpf_raw if cpf_raw else f"sem_cpf_{telefone}"
@@ -180,13 +197,16 @@ async def processar_csv(
         if numero_processo_raw:
             numero_cnj = _normalizar_cnj(numero_processo_raw)
             if numero_cnj is None:
-                erros.append({
-                    "linha": i, "dados": str(row_norm),
-                    "motivo": (
-                        f"Número de processo inválido: '{numero_processo_raw}'. "
-                        "Use o formato CNJ: 0000001-23.2024.8.26.0100"
-                    ),
-                })
+                erros.append(
+                    {
+                        "linha": i,
+                        "dados": str(row_norm),
+                        "motivo": (
+                            f"Número de processo inválido: '{numero_processo_raw}'. "
+                            "Use o formato CNJ: 0000001-23.2024.8.26.0100"
+                        ),
+                    }
+                )
                 continue
 
         # Polo do cliente no processo (autor/reu/terceiro)
