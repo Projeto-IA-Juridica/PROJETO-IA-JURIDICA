@@ -81,15 +81,33 @@ _CNJ_RAW = re.compile(r"^\d{20}$")
 # ---------------------------------------------------------------------------
 
 _TJ_INDICES: dict[str, str] = {
-    "01": "api_publica_tjac", "02": "api_publica_tjal", "03": "api_publica_tjap",
-    "04": "api_publica_tjam", "05": "api_publica_tjba", "06": "api_publica_tjce",
-    "07": "api_publica_tjdf", "08": "api_publica_tjes", "09": "api_publica_tjgo",
-    "10": "api_publica_tjma", "11": "api_publica_tjmt", "12": "api_publica_tjms",
-    "13": "api_publica_tjmg", "14": "api_publica_tjpa", "15": "api_publica_tjpb",
-    "16": "api_publica_tjpr", "17": "api_publica_tjpe", "18": "api_publica_tjpi",
-    "19": "api_publica_tjrj", "20": "api_publica_tjrn", "21": "api_publica_tjrs",
-    "22": "api_publica_tjro", "23": "api_publica_tjrr", "24": "api_publica_tjsc",
-    "25": "api_publica_tjse", "26": "api_publica_tjsp", "27": "api_publica_tjto",
+    "01": "api_publica_tjac",
+    "02": "api_publica_tjal",
+    "03": "api_publica_tjap",
+    "04": "api_publica_tjam",
+    "05": "api_publica_tjba",
+    "06": "api_publica_tjce",
+    "07": "api_publica_tjdf",
+    "08": "api_publica_tjes",
+    "09": "api_publica_tjgo",
+    "10": "api_publica_tjma",
+    "11": "api_publica_tjmt",
+    "12": "api_publica_tjms",
+    "13": "api_publica_tjmg",
+    "14": "api_publica_tjpa",
+    "15": "api_publica_tjpb",
+    "16": "api_publica_tjpr",
+    "17": "api_publica_tjpe",
+    "18": "api_publica_tjpi",
+    "19": "api_publica_tjrj",
+    "20": "api_publica_tjrn",
+    "21": "api_publica_tjrs",
+    "22": "api_publica_tjro",
+    "23": "api_publica_tjrr",
+    "24": "api_publica_tjsc",
+    "25": "api_publica_tjse",
+    "26": "api_publica_tjsp",
+    "27": "api_publica_tjto",
 }
 _DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br"
 
@@ -154,9 +172,7 @@ def parsear_csv(conteudo: bytes) -> tuple[list[dict], list[dict]]:
 
         telefone = _normalizar_telefone(telefone_raw)
         if not (telefone.isdigit() and 12 <= len(telefone) <= 13):
-            erros.append(
-                {"linha": i, "motivo": f"Telefone inválido: {telefone_raw!r}"}
-            )
+            erros.append({"linha": i, "motivo": f"Telefone inválido: {telefone_raw!r}"})
             continue
 
         numero_processo_raw = row_norm.get("numero_processo", "").strip()
@@ -335,7 +351,9 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
             obj.ultimo_andamento = ultimo.get("nome", "sem movimentação recente")
             data_str = (ultimo.get("dataHora") or "")[:10]
             try:
-                obj.data_ultimo_andamento = date.fromisoformat(data_str) if data_str else None
+                obj.data_ultimo_andamento = (
+                    date.fromisoformat(data_str) if data_str else None
+                )
             except ValueError:
                 obj.data_ultimo_andamento = None
         else:
@@ -390,7 +408,9 @@ def _fake_evolution() -> MagicMock:
     return client
 
 
-def _make_session_factory(escritorio_nome: str, cliente: dict, dados_datajud: dict | None):
+def _make_session_factory(
+    escritorio_nome: str, cliente: dict, dados_datajud: dict | None
+):
     """
     Cria uma session_factory mockada que retorna entidades populadas com
     dados reais do CSV e do DataJud, no mesmo contrato esperado pelo orchestrator.
@@ -640,7 +660,7 @@ st.divider()
 
 tabs = st.tabs([c["nome"] for c in clientes])
 
-for tab, cliente in zip(tabs, clientes):
+for tab, cliente in zip(tabs, clientes, strict=False):
     with tab:
         cid = cliente["id"]
 
@@ -702,9 +722,7 @@ for tab, cliente in zip(tabs, clientes):
                 )
                 classe = dados_dj.get("classe", {})
                 nome_classe = (
-                    classe.get("nome", "—")
-                    if isinstance(classe, dict)
-                    else str(classe)
+                    classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
                 )
                 assuntos = dados_dj.get("assuntos", [])
                 assunto_str = (
@@ -717,9 +735,7 @@ for tab, cliente in zip(tabs, clientes):
                 movimentos = dados_dj.get("movimentos", [])
                 ultimo_mov = movimentos[0] if movimentos else {}
                 nome_mov = (
-                    ultimo_mov.get("nome", "—")
-                    if isinstance(ultimo_mov, dict)
-                    else "—"
+                    ultimo_mov.get("nome", "—") if isinstance(ultimo_mov, dict) else "—"
                 )
                 data_mov = (
                     (ultimo_mov.get("dataHora") or "")[:10]
@@ -739,7 +755,9 @@ for tab, cliente in zip(tabs, clientes):
                     ("Data Andamento", data_mov),
                 ]
                 st.markdown(_tabela_md(linhas_proc))
-                st.success("Dados reais do DataJud injetados no orchestrator", icon="✅")
+                st.success(
+                    "Dados reais do DataJud injetados no orchestrator", icon="✅"
+                )
 
                 if len(movimentos) > 1:
                     with st.expander("Ver andamentos anteriores"):
@@ -787,7 +805,7 @@ for tab, cliente in zip(tabs, clientes):
                     boas_vindas = resultado_bv["resposta"]
                     intencao_bv = resultado_bv.get("intencao", "saudacao")
                     fallback_bv = resultado_bv.get("usando_fallback", False)
-                except Exception as exc:
+                except Exception:
                     boas_vindas = (
                         f"Olá, {cliente['nome'].split()[0]}! "
                         f"Bem-vindo(a) ao {escritorio_nome}."
