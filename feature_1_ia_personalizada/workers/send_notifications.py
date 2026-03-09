@@ -22,6 +22,7 @@ from shared.database.worker_queries import (
     insert_interacao,
     query_clientes_ativos_por_escritorio,
     query_clientes_para_pesquisa,
+    query_processo_e_cliente,
     query_processos_sem_movimentacao,
 )
 
@@ -139,6 +140,10 @@ def envio_recente(chave: str) -> bool:
 
 def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
     return bool(get_redis().set(chave, "1", nx=True, ex=tempo_segundos))
+
+
+def buscar_processo_e_cliente(id_processo: int):
+    return query_processo_e_cliente(id_processo)
 
 
 def buscar_processos_sem_movimentacao():
