@@ -179,8 +179,10 @@ class FactChecker:
 
         # Se houve mudança e você quer, adiciona disclaimer
         if adicionar_disclaimer:
-            # só adiciona se ainda não estiver presente
-            if self._disclaimer not in ajustada:
+            # Verifica por trecho-chave (case-insensitive) para não duplicar
+            # caso o Claude escreva com capitalização ligeiramente diferente
+            _chave = "orientação informativa com base nos dados disponíveis"
+            if _chave not in ajustada.lower():
                 ajustada = ajustada.rstrip() + "\n\n" + self._disclaimer
 
         houve_correcao = ajustada != original
