@@ -10,7 +10,10 @@ import structlog
 from celery import shared_task
 
 from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
-from feature_1_ia_personalizada.services.messaging.whatsapp import SQLWhatsAppRepository, WhatsAppService
+from feature_1_ia_personalizada.services.messaging.whatsapp import (
+    SQLWhatsAppRepository,
+    WhatsAppService,
+)
 from feature_1_ia_personalizada.workers.celery_app import DLQTask
 from shared.config.settings import settings
 from shared.database.worker_queries import (
@@ -187,7 +190,7 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         resp = await service.enviar_notificacao_andamento(id_processo, descricao_andamento)
         await service.evolution_client.close()
         return resp
-        
+
     resultado_envio = asyncio.run(_enviar())
 
     return {"status": "processado", "resultado": resultado_envio}
@@ -245,7 +248,7 @@ def enviar_pesquisa_satisfacao(self):
             if envio_recente(chave):
                 continue
 
-            # Assuming cliente record has escritorio_id 
+            # Assuming cliente record has escritorio_id
             await service.enviar_pesquisa_satisfacao(cliente.escritorio_id, cliente.id)
             registrar_envio_com_validade(chave, TEMPO_32_DIAS)
             count += 1
@@ -340,7 +343,7 @@ def enviar_boas_vindas_escritorio(self, escritorio_id: int):
         return c_enviados, c_ignorados
 
     enviados, ignorados = asyncio.run(_enviar_lote())
-    
+
     logger.info(
         "boas_vindas_escritorio_finalizadas",
         escritorio_id=escritorio_id,
