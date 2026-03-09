@@ -9,7 +9,9 @@ import redis
 import structlog
 from celery import shared_task
 
-from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
+from feature_1_ia_personalizada.services.messaging.evolution_client import (
+    EvolutionClient,
+)
 from feature_1_ia_personalizada.services.messaging.whatsapp import (
     SQLWhatsAppRepository,
     WhatsAppService,
@@ -84,10 +86,12 @@ MENSAGEM_BOAS_VINDAS = (
 
 # FUNÇÕES AUXILIARES
 
+
 def _get_whatsapp_service() -> WhatsAppService:
     client = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
     repo = SQLWhatsAppRepository()
     return WhatsAppService(evolution_client=client, repositorio=repo)
+
 
 def agora_local() -> datetime:
     fuso = timezone(timedelta(hours=FUSO_HORARIO_PADRAO))
@@ -187,7 +191,9 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
     service = _get_whatsapp_service()
 
     async def _enviar():
-        resp = await service.enviar_notificacao_andamento(id_processo, descricao_andamento)
+        resp = await service.enviar_notificacao_andamento(
+            id_processo, descricao_andamento
+        )
         await service.evolution_client.close()
         return resp
 

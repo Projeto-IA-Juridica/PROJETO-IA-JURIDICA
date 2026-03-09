@@ -376,11 +376,15 @@ class SQLWhatsAppRepository:
     async def obter_instancia_por_escritorio(self, escritorio_id: int) -> str:
         async with async_session_factory() as session:
             result = await session.execute(
-                select(Escritorio.webhook_whatsapp_instance).where(Escritorio.id == escritorio_id)
+                select(Escritorio.webhook_whatsapp_instance).where(
+                    Escritorio.id == escritorio_id
+                )
             )
             val = result.scalar_one_or_none()
         if not val:
-            raise ValueError(f"Escritório {escritorio_id} não possui instância do WhatsApp configurada.")
+            raise ValueError(
+                f"Escritório {escritorio_id} não possui instância do WhatsApp configurada."
+            )
         return val
 
     async def obter_numero_cliente(self, cliente_id: int) -> str:
@@ -396,7 +400,9 @@ class SQLWhatsAppRepository:
     async def obter_preferencia_horario_notificacao(self, cliente_id: int) -> str:
         async with async_session_factory() as session:
             result = await session.execute(
-                select(Cliente.preferencia_horario_notificacao).where(Cliente.id == cliente_id)
+                select(Cliente.preferencia_horario_notificacao).where(
+                    Cliente.id == cliente_id
+                )
             )
             val = result.scalar_one_or_none()
         return val or "comercial"
@@ -408,7 +414,7 @@ class SQLWhatsAppRepository:
                 select(func.count(Interacao.id)).where(
                     Interacao.cliente_id == cliente_id,
                     Interacao.direcao == "saida",
-                    func.date(Interacao.created_at) == hj
+                    func.date(Interacao.created_at) == hj,
                 )
             )
             qtd = result.scalar()
@@ -435,7 +441,7 @@ class SQLWhatsAppRepository:
                 tipo="whatsapp_texto",  # Simplificado para padrão de saída
                 direcao="saida",
                 mensagem_ia=texto,
-                metadata_json=metadata
+                metadata_json=metadata,
             )
             session.add(interacao)
             await session.commit()
@@ -454,5 +460,5 @@ class SQLWhatsAppRepository:
             "agendamento_ainda_nao_suportado",
             cliente_id=cliente_id,
             enviar_em=enviar_em.isoformat(),
-            motivo=motivo
+            motivo=motivo,
         )
