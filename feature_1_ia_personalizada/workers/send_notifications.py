@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
@@ -8,13 +9,14 @@ import redis
 import structlog
 from celery import shared_task
 
+from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
+from feature_1_ia_personalizada.services.messaging.whatsapp import SQLWhatsAppRepository, WhatsAppService
 from feature_1_ia_personalizada.workers.celery_app import DLQTask
+from shared.config.settings import settings
 from shared.database.worker_queries import (
-    enviar_mensagem_whatsapp,
     insert_interacao,
     query_clientes_ativos_por_escritorio,
     query_clientes_para_pesquisa,
-    query_processo_e_cliente,
     query_processos_sem_movimentacao,
 )
 
@@ -79,6 +81,10 @@ MENSAGEM_BOAS_VINDAS = (
 
 # FUNÇÕES AUXILIARES
 
+def _get_whatsapp_service() -> WhatsAppService:
+    client = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
+    repo = SQLWhatsAppRepository()
+    return WhatsAppService(evolution_client=client, repositorio=repo)
 
 def agora_local() -> datetime:
     fuso = timezone(timedelta(hours=FUSO_HORARIO_PADRAO))
@@ -128,10 +134,6 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
     return bool(get_redis().set(chave, "1", nx=True, ex=tempo_segundos))
 
 
-def buscar_processo_e_cliente(id_processo: int):
-    return query_processo_e_cliente(id_processo)
-
-
 def buscar_processos_sem_movimentacao():
     return query_processos_sem_movimentacao()
 
@@ -179,25 +181,16 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
-    resultado = buscar_processo_e_cliente(id_processo)
-    if resultado is None:
-        return {"status": "processo_nao_encontrado", "id_processo": id_processo}
-    processo, cliente = resultado
+    service = _get_whatsapp_service()
 
-    mensagem = MENSAGEM_NOVO_ANDAMENTO.format(
-        descricao_andamento=descricao_andamento.strip()
-    )
+    async def _enviar():
+        resp = await service.enviar_notificacao_andamento(id_processo, descricao_andamento)
+        await service.evolution_client.close()
+        return resp
+        
+    resultado_envio = asyncio.run(_enviar())
 
-    enviar_mensagem_whatsapp(cliente.id, cliente.telefone, mensagem)
-
-    registrar_interacao(
-        id_cliente=cliente.id,
-        id_processo=processo.id,
-        tipo="novo_andamento",
-        dados={"descricao": descricao_andamento},
-    )
-
-    return {"status": "enviado"}
+    return {"status": "processado", "resultado": resultado_envio}
 
 
 @shared_task(bind=True)
@@ -210,31 +203,23 @@ def enviar_lote_sem_movimentacao(self):
         raise self.retry(countdown=espera)
 
     processos = buscar_processos_sem_movimentacao()
+    service = _get_whatsapp_service()
 
-    enviados = 0
+    async def _enviar_lote() -> int:
+        count = 0
+        for processo in processos:
+            chave = chave_limite("limite_sem_movimentacao", processo.id)
 
-    for processo in processos:
-        chave = chave_limite("limite_sem_movimentacao", processo.id)
+            if envio_recente(chave):
+                continue
 
-        if envio_recente(chave):
-            continue
+            await service.enviar_sem_movimentacao(processo.id)
+            registrar_envio_com_validade(chave, TEMPO_30_DIAS)
+            count += 1
+        await service.evolution_client.close()
+        return count
 
-        cliente = processo.cliente
-
-        enviar_mensagem_whatsapp(
-            cliente.id, cliente.telefone, MENSAGEM_SEM_MOVIMENTACAO
-        )
-
-        registrar_interacao(
-            id_cliente=cliente.id,
-            id_processo=processo.id,
-            tipo="sem_movimentacao",
-            dados={},
-        )
-
-        registrar_envio_com_validade(chave, TEMPO_30_DIAS)
-        enviados += 1
-
+    enviados = asyncio.run(_enviar_lote())
     return {"enviados": enviados}
 
 
@@ -250,28 +235,24 @@ def enviar_pesquisa_satisfacao(self):
     clientes = buscar_clientes_para_pesquisa()
 
     mes_referencia = momento.strftime("%Y-%m")
-    enviados = 0
+    service = _get_whatsapp_service()
 
-    for cliente in clientes:
-        chave = chave_limite("limite_pesquisa", cliente.id, mes_referencia)
+    async def _enviar_lote() -> int:
+        count = 0
+        for cliente in clientes:
+            chave = chave_limite("limite_pesquisa", cliente.id, mes_referencia)
 
-        if envio_recente(chave):
-            continue
+            if envio_recente(chave):
+                continue
 
-        enviar_mensagem_whatsapp(
-            cliente.id, cliente.telefone, MENSAGEM_PESQUISA_SATISFACAO
-        )
+            # Assuming cliente record has escritorio_id 
+            await service.enviar_pesquisa_satisfacao(cliente.escritorio_id, cliente.id)
+            registrar_envio_com_validade(chave, TEMPO_32_DIAS)
+            count += 1
+        await service.evolution_client.close()
+        return count
 
-        registrar_interacao(
-            id_cliente=cliente.id,
-            id_processo=None,
-            tipo="pesquisa_satisfacao",
-            dados={"mes": mes_referencia},
-        )
-
-        registrar_envio_com_validade(chave, TEMPO_32_DIAS)
-        enviados += 1
-
+    enviados = asyncio.run(_enviar_lote())
     return {"enviados": enviados}
 
 
@@ -332,44 +313,39 @@ def enviar_boas_vindas_escritorio(self, escritorio_id: int):
     TTL_BOAS_VINDAS = 90 * 24 * 60 * 60  # 90 dias
 
     clientes = buscar_clientes_ativos_por_escritorio(escritorio_id)
-    enviados = 0
-    ignorados = 0
+    service = _get_whatsapp_service()
 
-    for cliente in clientes:
-        chave = chave_limite("boas_vindas", escritorio_id, cliente.id)
+    async def _enviar_lote() -> tuple[int, int]:
+        c_enviados: int = 0
+        c_ignorados: int = 0
+        for cliente in clientes:
+            chave = chave_limite("boas_vindas", escritorio_id, cliente.id)
 
-        if envio_recente(chave):
-            ignorados += 1
-            continue
+            if envio_recente(chave):
+                c_ignorados += 1
+                continue
 
-        primeiro_nome = cliente.nome.split()[0] if cliente.nome else "cliente"
-        texto = MENSAGEM_BOAS_VINDAS.format(nome=primeiro_nome)
+            try:
+                await service.enviar_boas_vindas(escritorio_id, cliente.id)
+                registrar_envio_com_validade(chave, TTL_BOAS_VINDAS)
+                c_enviados += 1
+            except Exception as exc:
+                logger.error(
+                    "erro_boas_vindas_individual",
+                    escritorio_id=escritorio_id,
+                    cliente_id=cliente.id,
+                    erro=str(exc),
+                )
+        await service.evolution_client.close()
+        return c_enviados, c_ignorados
 
-        try:
-            enviar_mensagem_whatsapp(cliente.id, cliente.telefone, texto)
-        except Exception as exc:
-            logger.warning(
-                "boas_vindas_falhou",
-                escritorio_id=escritorio_id,
-                cliente_id=cliente.id,
-                erro=str(exc),
-            )
-            continue
-
-        registrar_interacao(
-            id_cliente=cliente.id,
-            id_processo=None,
-            tipo="boas_vindas",
-            dados={"escritorio_id": escritorio_id},
-        )
-
-        registrar_envio_com_validade(chave, TTL_BOAS_VINDAS)
-        enviados += 1
-
+    enviados, ignorados = asyncio.run(_enviar_lote())
+    
     logger.info(
-        "boas_vindas_escritorio_concluido",
+        "boas_vindas_escritorio_finalizadas",
         escritorio_id=escritorio_id,
-        enviados=enviados,
+        sucesso=enviados,
         ignorados=ignorados,
     )
+
     return {"enviados": enviados, "ignorados": ignorados}

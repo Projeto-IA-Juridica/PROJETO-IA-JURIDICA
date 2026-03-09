@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/home/bruno/Área de trabalho/ia-juridica/PROJETO-IA-JURIDICA/.venv/bin/mypy", line 8, in <module>
+    sys.exit(console_entry())
+             ^^^^^^^^^^^^^^^
+  File "/home/bruno/Área de trabalho/ia-juridica/PROJETO-IA-JURIDICA/.venv/lib/python3.12/site-packages/mypy/__main__.py", line 15, in console_entry
+    main()
+  File "mypy/main.py", line 135, in main
+  File "mypy/main.py", line 219, in run_build
+  File "mypy/build.py", line 222, in build
+  File "mypy/build.py", line 301, in _build
+  File "mypy/build.py", line 2952, in dispatch
+  File "mypy/build.py", line 3347, in process_graph
+  File "mypy/build.py", line 925, in wait_for_done
+  File "mypy/build.py", line 3455, in process_stale_scc
+  File "mypy/build.py", line 3415, in process_fresh_modules
+  File "mypy/build.py", line 2135, in fix_cross_refs
+  File "mypy/fixup.py", line 53, in fixup_module
+  File "mypy/fixup.py", line 131, in visit_symbol_table
+  File "mypy/lookup.py", line 33, in lookup_fully_qualified
+AssertionError: Cannot find module for google

@@ -6,9 +6,12 @@ from typing import Any, Protocol
 
 import structlog
 from prometheus_client import Counter
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from shared.database.connection import async_session_factory
+from shared.models.cliente import Cliente
+from shared.models.escritorio import Escritorio
+from shared.models.interacao import Interacao
 from shared.models.processo import Processo as ProcessoModel
 
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
@@ -365,3 +368,91 @@ def _um_dia(agora: datetime) -> timedelta:
     from datetime import timedelta
 
     return timedelta(days=1)
+
+
+class SQLWhatsAppRepository:
+    """Implementa as rotinas de banco de dados para os envios de mensagens."""
+
+    async def obter_instancia_por_escritorio(self, escritorio_id: int) -> str:
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(Escritorio.webhook_whatsapp_instance).where(Escritorio.id == escritorio_id)
+            )
+            val = result.scalar_one_or_none()
+        if not val:
+            raise ValueError(f"Escritório {escritorio_id} não possui instância do WhatsApp configurada.")
+        return val
+
+    async def obter_numero_cliente(self, cliente_id: int) -> str:
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(Cliente.telefone_whatsapp).where(Cliente.id == cliente_id)
+            )
+            val = result.scalar_one_or_none()
+        if not val:
+            raise ValueError(f"Cliente {cliente_id} não encontrado ou sem telefone.")
+        return val
+
+    async def obter_preferencia_horario_notificacao(self, cliente_id: int) -> str:
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(Cliente.preferencia_horario_notificacao).where(Cliente.id == cliente_id)
+            )
+            val = result.scalar_one_or_none()
+        return val or "comercial"
+
+    async def contar_mensagens_enviadas_hoje(self, cliente_id: int) -> int:
+        hj = datetime.now().date()
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(func.count(Interacao.id)).where(
+                    Interacao.cliente_id == cliente_id,
+                    Interacao.direcao == "saida",
+                    func.date(Interacao.created_at) == hj
+                )
+            )
+            qtd = result.scalar()
+        return int(qtd) if qtd else 0
+
+    async def salvar_interacao(
+        self,
+        escritorio_id: int,
+        cliente_id: int,
+        texto: str,
+        processo_id: int | None,
+        status: str,
+        payload_resposta: dict[str, Any] | None = None,
+    ) -> None:
+        metadata: dict[str, Any] = {"status": status}
+        if payload_resposta:
+            metadata["payload_resposta"] = payload_resposta
+
+        async with async_session_factory() as session:
+            interacao = Interacao(
+                escritorio_id=escritorio_id,
+                cliente_id=cliente_id,
+                processo_id=processo_id,
+                tipo="whatsapp_texto",  # Simplificado para padrão de saída
+                direcao="saida",
+                mensagem_ia=texto,
+                metadata_json=metadata
+            )
+            session.add(interacao)
+            await session.commit()
+
+    async def agendar_envio_mensagem(
+        self,
+        escritorio_id: int,
+        cliente_id: int,
+        texto: str,
+        processo_id: int | None,
+        enviar_em: datetime,
+        motivo: str,
+    ) -> None:
+        # TODO: Implementar agendamento real usando algo como celery beat ou tabela de agendamentos
+        logger.warning(
+            "agendamento_ainda_nao_suportado",
+            cliente_id=cliente_id,
+            enviar_em=enviar_em.isoformat(),
+            motivo=motivo
+        )

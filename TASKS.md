@@ -1450,4 +1450,3 @@ Antes de iniciar, corrigir no doc do projeto (`PROJETO-IA-JURIDICA`):
 | 9.4 | 🟡 Alta    | Alertas e Sentry — sem isso falhas passam despercebidas |
 | 9.5 | 🟡 Alta    | Infra de prod — TLS, backups, resource limits |
 | 9.6 | 🟢 Média   | Resiliência — DLQ, circuit breaker, load testing |
-
