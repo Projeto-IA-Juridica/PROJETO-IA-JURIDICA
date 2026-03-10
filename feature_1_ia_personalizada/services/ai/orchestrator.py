@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from dataclasses import asdict
 from decimal import Decimal
 from typing import Any
 
@@ -59,9 +60,11 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_BASE,
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
+    SYSTEM_PROMPT_DESABAFO,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
+    TEMPLATE_CONTEXTO_CASOS_SIMILARES,
 )
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
@@ -69,6 +72,9 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 )
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
+)
+from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+    VitoriaPreditor,
 )
 from feature_1_ia_personalizada.services.messaging.evolution_client import (
     EvolutionClient,
@@ -169,6 +175,24 @@ _KEYWORDS: list[tuple[str, re.Pattern]] = [
             re.IGNORECASE,
         ),
     ),
+    (
+        "duvida_geral",
+        re.compile(
+            r"\b(como funciona|quanto tempo|o que acontece|o que [eé] uma|o que [eé] um|"
+            r"quando [eé]|posso|preciso|tenho direito|qual [eé] o prazo|fases do processo|"
+            r"etapas|procedimento|como [eé] feito|pode acontecer|o que muda)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "desabafo",
+        re.compile(
+            r"\b(ansioso|ansiosa|preocupado|preocupada|medo|angustia|angustiado|sofrendo|"
+            r"cansado|cansada|desesperado|desesperada|n[aã]o aguento|n[aã]o consigo|"
+            r"estou mal|t[aã]o dif[ií]cil|muito dif[ií]cil|desabafo|chorar|chorando)\b",
+            re.IGNORECASE,
+        ),
+    ),
 ]
 
 
@@ -201,6 +225,7 @@ class ConversationOrchestrator:
         cache_manager: LegalDataCacheManager,
         evolution_client: EvolutionClient,
         session_factory: async_sessionmaker[AsyncSession],
+        vitoria_preditor: VitoriaPreditor | None = None,
     ) -> None:
         self._claude = claude_client
         self._memory = memory
@@ -209,6 +234,8 @@ class ConversationOrchestrator:
         self._cache = cache_manager
         self._evolution = evolution_client
         self._session_factory = session_factory
+        # None = feature desabilitada (ex: sem chave DataJud no ambiente)
+        self._vitoria_preditor = vitoria_preditor
 
         # FactChecker usa DB via adapter
         self._fact_checker = FactChecker(
@@ -511,8 +538,10 @@ class ConversationOrchestrator:
             categorias_validas = {
                 "status",
                 "duvida_termo",
+                "duvida_geral",
                 "saudacao",
                 "reclamacao",
+                "desabafo",
                 "outro",
             }
             if intencao not in categorias_validas:
@@ -583,6 +612,13 @@ class ConversationOrchestrator:
                     # Usa só a definição (antes do "\n\nExemplo:") para manter o prompt conciso
                     glossario_andamento[termo] = trad.split("\n\n")[0]
 
+            # Histórico dos últimos 5 andamentos (para dar contexto de evolução ao Claude)
+            andamentos_recentes = [
+                {"descricao": a.get("descricao", ""), "data": a.get("data", "")}
+                for a in andamentos[:5]
+                if a.get("descricao")
+            ]
+
             dados_processo = {
                 "processo_id": processo.id,
                 "numero_cnj": numero_cnj,
@@ -591,10 +627,36 @@ class ConversationOrchestrator:
                 "polo_cliente": processo.polo_cliente or "autor",
                 "ultimo_andamento": ultimo_andamento,
                 "data_ultimo_andamento": data_ultimo,
+                "andamentos_recentes": andamentos_recentes,
                 "glossario_andamento": glossario_andamento,
             }
 
             log.info("dados_processo_obtidos", cnj=numero_cnj)
+
+            # Enriquece com contexto de casos similares (apenas status + preditor ativo)
+            if (
+                state.get("intencao") == "status"
+                and self._vitoria_preditor is not None
+                and processo.tipo_acao
+            ):
+                try:
+                    estatistica = await self._vitoria_preditor.buscar_estatistica(
+                        numero_cnj=numero_cnj,
+                        tipo_acao=processo.tipo_acao,
+                        polo_cliente=processo.polo_cliente or "autor",
+                    )
+                    if estatistica:
+                        dados_processo["estatistica_processual"] = asdict(estatistica)
+                        log.info(
+                            "estatistica_processual_obtida",
+                            cnj=numero_cnj,
+                            pct_favoravel=estatistica.pct_favoravel,
+                            confianca=estatistica.confianca,
+                        )
+                except Exception as exc_stat:
+                    # Não bloqueia o fluxo principal — contexto é melhoramento opcional
+                    log.warning("estatistica_processual_erro", erro=str(exc_stat))
+
             return {
                 "processo_id": processo.id,
                 "dados_processo": dados_processo,
@@ -631,18 +693,6 @@ class ConversationOrchestrator:
                         "precisa_regenerar": False,
                     }
 
-            # Mensagem fora do escopo jurídico — resposta fixa, sem chamar Claude
-            if intencao == "outro":
-                log.info("intencao_fora_escopo_recusada")
-                return {
-                    "resposta_ia": (
-                        "Estou aqui para ajudar apenas com dúvidas sobre o seu processo — "
-                        "andamentos e termos jurídicos. 📋\n\n"
-                        "Para outros assuntos, entre em contato diretamente com o escritório."
-                    ),
-                    "precisa_regenerar": False,
-                }
-
             # Sessão única: busca escritório e cliente (sempre — nome usado em todos os prompts)
             async with self._session_factory() as session:
                 escritorio, cliente = await self._obter_escritorio_cliente(
@@ -653,6 +703,15 @@ class ConversationOrchestrator:
 
             # Monta system_prompt baseado na intenção
             if intencao == "status" and dados:
+                andamentos_lista = dados.get("andamentos_recentes") or []
+                andamentos_str = (
+                    "\n".join(
+                        f"- {a['data']}: {a['descricao']}" if a.get("data")
+                        else f"- {a['descricao']}"
+                        for a in andamentos_lista
+                    )
+                    or "Histórico não disponível"
+                )
                 system_prompt = SYSTEM_PROMPT_STATUS_PROCESSO.format(
                     nome_escritorio=nome_escritorio,
                     nome_cliente=nome_cliente,
@@ -664,6 +723,7 @@ class ConversationOrchestrator:
                     ),
                     data_ultimo_andamento=dados.get("data_ultimo_andamento", "N/D"),
                     polo_cliente=dados.get("polo_cliente", "N/D"),
+                    andamentos_recentes=andamentos_str,
                 )
                 # Injeta glossário de termos técnicos detectados no andamento.
                 # Claude usa esses significados para explicar a movimentação em linguagem simples,
@@ -676,6 +736,17 @@ class ConversationOrchestrator:
                     )
                     system_prompt += (
                         f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
+                    )
+
+                # Injeta contexto de casos similares quando disponível
+                estatistica_dict = dados.get("estatistica_processual")
+                if estatistica_dict:
+                    fatores_str = "\n".join(
+                        f"- {f}" for f in estatistica_dict.get("fatores", [])
+                    )
+                    system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
+                        fatores=fatores_str,
+                        disclaimer=estatistica_dict.get("disclaimer", ""),
                     )
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
@@ -694,6 +765,11 @@ class ConversationOrchestrator:
                         nome_escritorio=nome_escritorio,
                         nome_cliente=nome_cliente,
                     )
+            elif intencao == "desabafo":
+                system_prompt = SYSTEM_PROMPT_DESABAFO.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                )
             else:
                 system_prompt = SYSTEM_PROMPT_BASE.format(
                     nome_escritorio=nome_escritorio,
@@ -739,7 +815,7 @@ class ConversationOrchestrator:
                     "No momento estou com dificuldades técnicas, "
                     "mas o escritório retornará em breve."
                 )
-            elif intencao == "duvida_termo":
+            elif intencao in ("duvida_termo", "duvida_geral"):
                 fallback_msg = (
                     "Obrigado pela pergunta! Estou com uma dificuldade técnica temporária. "
                     "Encaminhei sua dúvida ao escritório."
@@ -748,6 +824,12 @@ class ConversationOrchestrator:
                 fallback_msg = (
                     "Olá! No momento estou passando por uma manutenção rápida. "
                     "O escritório entrará em contato em breve."
+                )
+            elif intencao == "desabafo":
+                fallback_msg = (
+                    "Entendo que esse momento pode ser muito difícil. "
+                    "Estou com uma instabilidade técnica agora, mas o escritório "
+                    "está ciente e entrará em contato com você em breve. 🤝"
                 )
             else:
                 fallback_msg = MENSAGENS_FALLBACK.get(
@@ -794,10 +876,12 @@ class ConversationOrchestrator:
             stub = _InteracaoStub()
 
             # 1. Filtrar linguagem proibida (pareceres, promessas de resultado)
+            # Disclaimer habilitado apenas para mensagens sobre o processo (status)
+            eh_sobre_processo = state.get("intencao") == "status"
             resposta_filtrada = self._fact_checker.filtrar_resposta(
                 resposta_ia=resposta,
                 interacao=stub,
-                adicionar_disclaimer=True,
+                adicionar_disclaimer=eh_sobre_processo,
             )
 
             # 2. Verificar factualidade quando há dados de processo
@@ -1054,6 +1138,7 @@ def criar_orchestrador(
     api_key_jusbrasil: str | None = None,
     api_key_evolution: str | None = None,
     evolution_base_url: str = "http://localhost:8080",
+    api_key_datajud: str | None = None,
 ) -> ConversationOrchestrator:
     """
     Instancia e configura o ConversationOrchestrator com todas as dependências.
@@ -1085,6 +1170,7 @@ def criar_orchestrador(
             api_key=api_key_evolution or "",
         ),
         session_factory=session_factory,
+        vitoria_preditor=VitoriaPreditor(api_key=api_key_datajud),
     )
 
 

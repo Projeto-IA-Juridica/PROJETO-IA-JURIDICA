@@ -40,12 +40,18 @@ class FactChecker:
             re.compile(r"\brecomendo que\b", re.IGNORECASE),
             re.compile(r"\ba estratégia é\b", re.IGNORECASE),
             re.compile(r"\bvocê vai ganhar\b", re.IGNORECASE),
+            # Guards específicos para EstatisticaProcessual:
+            # Impedem que Claude converta dados históricos em predição individual.
+            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),           # "você tem 72%..."
+            re.compile(r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE),   # "seu processo tem 80%..."
+            re.compile(r"\bsua probabilidade\b", re.IGNORECASE),           # "sua probabilidade é de..."
+            re.compile(r"\b\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b", re.IGNORECASE),  # "80% de chance de ganhar"
+            re.compile(r"\bchance de (ganhar|vencer|procedência)\b", re.IGNORECASE),  # "chance de ganhar"
         ]
 
-        # Disclaimer neutro (pode ajustar depois)
+        # Disclaimer — aparece apenas quando um padrão proibido é corrigido
         self._disclaimer = (
-            "Observação: esta é uma orientação informativa com base nos dados disponíveis. "
-            "Para estratégia jurídica e conclusões definitivas, consulte seu advogado(a)."
+            "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a). 😊"
         )
 
     # 1) Status do processo
@@ -177,13 +183,11 @@ class FactChecker:
                 motivos.append(f"Padrão proibido detectado: '{padrao.pattern}'")
                 ajustada = padrao.sub("é recomendado considerar", ajustada)
 
-        # Se houve mudança e você quer, adiciona disclaimer
-        if adicionar_disclaimer:
-            # Verifica por trecho-chave (case-insensitive) para não duplicar
-            # caso o Claude escreva com capitalização ligeiramente diferente
-            _chave = "orientação informativa com base nos dados disponíveis"
-            if _chave not in ajustada.lower():
-                ajustada = ajustada.rstrip() + "\n\n" + self._disclaimer
+        # Adiciona disclaimer SOMENTE se um padrão proibido foi corrigido
+        # e o chamador pediu (adicionar_disclaimer=True).
+        # Não aparece em toda mensagem — apenas quando a IA usou linguagem inadequada.
+        if adicionar_disclaimer and motivos:
+            ajustada = ajustada.rstrip() + "\n\n" + self._disclaimer
 
         houve_correcao = ajustada != original
 

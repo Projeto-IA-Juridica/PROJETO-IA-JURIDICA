@@ -68,6 +68,9 @@ from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslato
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
 )
+from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+    VitoriaPreditor,
+)
 
 # ---------------------------------------------------------------------------
 # Padrões CNJ
@@ -345,6 +348,12 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
         grau = dados_datajud.get("grau", "")
         obj.vara = grau if grau else "N/D"
 
+        # Tipo de ação (classe processual) — alimenta o VitoriaPreditor
+        classe = dados_datajud.get("classe", {})
+        obj.tipo_acao = (
+            classe.get("nome") if isinstance(classe, dict) else str(classe)
+        ) or None
+
         movimentos = dados_datajud.get("movimentos", [])
         if movimentos and isinstance(movimentos[0], dict):
             ultimo = movimentos[0]
@@ -363,6 +372,7 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
         # Sem dados do DataJud — preenche com placeholders
         obj.tribunal = "N/D"
         obj.vara = "N/D"
+        obj.tipo_acao = None
         obj.ultimo_andamento = "aguardando consulta ao tribunal"
         obj.data_ultimo_andamento = None
 
@@ -474,6 +484,7 @@ def criar_orchestrator(
         cache_manager=_fake_cache(),
         evolution_client=_fake_evolution(),
         session_factory=_make_session_factory(escritorio_nome, cliente, dados_datajud),
+        vitoria_preditor=VitoriaPreditor(api_key=DATAJUD_API_KEY or None),
     )
 
     # No demo, desabilita a verificação factual por string exata do FactChecker.
@@ -625,9 +636,10 @@ if not clientes:
 
         ### Exemplos de perguntas para testar
 
-        - *"Qual é o status do meu processo?"* → intent: status, usa dados DataJud
+        - *"Qual é o status do meu processo?"* → intent: status, usa dados DataJud + VitoriaPreditor
         - *"O que significa concluso para sentença?"* → intent: duvida_termo
-        - *"Estou preocupado com o andamento"* → intent: reclamacao
+        - *"Como funciona uma audiência de instrução?"* → intent: duvida_geral
+        - *"Estou muito ansioso com esse processo..."* → intent: desabafo
         - *"Oi, tudo bem?"* → intent: saudacao
         """
     )
