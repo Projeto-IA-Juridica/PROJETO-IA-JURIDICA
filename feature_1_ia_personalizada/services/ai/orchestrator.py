@@ -706,8 +706,11 @@ class ConversationOrchestrator:
                 andamentos_lista = dados.get("andamentos_recentes") or []
                 andamentos_str = (
                     "\n".join(
-                        f"- {a['data']}: {a['descricao']}" if a.get("data")
-                        else f"- {a['descricao']}"
+                        (
+                            f"- {a['data']}: {a['descricao']}"
+                            if a.get("data")
+                            else f"- {a['descricao']}"
+                        )
                         for a in andamentos_lista
                     )
                     or "Histórico não disponível"

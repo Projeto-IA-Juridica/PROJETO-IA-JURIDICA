@@ -323,30 +323,26 @@ class TestFiltrarResposta:
 
         assert resultado.count(checker._disclaimer) == 1
 
-    def test_disclaimer_adicionado_mesmo_sem_padroes_proibidos(self):
-        """adicionar_disclaimer=True sempre inclui o disclaimer se ainda não estiver."""
+    def test_disclaimer_nao_adicionado_sem_padroes_proibidos(self):
+        """adicionar_disclaimer=True só inclui o disclaimer quando há padrão proibido.
+        Texto neutro não deve ser alterado mesmo com adicionar_disclaimer=True."""
         checker = self._checker()
         interacao = _interacao()
         resultado = checker.filtrar_resposta(
             "Texto informativo neutro.", interacao, adicionar_disclaimer=True
         )
 
-        assert checker._disclaimer in resultado
-        # Disclaimer é o único motivo de alteração — motivo genérico deve estar registrado
-        motivos = interacao.metadata_json["auditoria_fact_checker"][0]["payload"][
-            "motivos"
-        ]
-        assert motivos == ["Ajuste de linguagem aplicado."]
+        assert checker._disclaimer not in resultado
+        assert resultado == "Texto informativo neutro."
 
-    def test_disclaimer_sem_padrao_proibido_ainda_loga_auditoria(self):
-        """Texto limpo com adicionar_disclaimer=True ainda gera log de auditoria
-        porque ajustada != original após acrescentar o disclaimer."""
+    def test_sem_padrao_proibido_nao_loga_auditoria(self):
+        """Texto limpo com adicionar_disclaimer=True NÃO gera log de auditoria
+        pois nenhuma alteração é feita (texto neutro = sem padrão proibido)."""
         checker = self._checker()
         interacao = _interacao()
         checker.filtrar_resposta("Texto neutro.", interacao, adicionar_disclaimer=True)
 
-        assert interacao.metadata_json is not None
-        assert interacao.metadata_json["fact_check_corrigido"] is True
+        assert interacao.metadata_json is None
 
     def test_correcao_loga_metadata_json(self):
         checker = self._checker()

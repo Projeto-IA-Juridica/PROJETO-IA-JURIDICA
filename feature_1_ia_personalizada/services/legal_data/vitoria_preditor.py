@@ -342,7 +342,9 @@ class VitoriaPreditor:
                 )
                 return []
             except httpx.RequestError as exc:
-                logger.warning("vitoria_preditor_rede_erro", indice=indice, erro=str(exc))
+                logger.warning(
+                    "vitoria_preditor_rede_erro", indice=indice, erro=str(exc)
+                )
                 return []
 
         hits = resp.json().get("hits", {}).get("hits", [])

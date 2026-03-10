@@ -42,7 +42,7 @@ class TestSeguranca:
     def test_base_contem_regras_oab(self):
         """Regras OAB são a proteção mais crítica do sistema."""
         assert "NUNCA" in SYSTEM_PROMPT_BASE
-        assert "parecer" in SYSTEM_PROMPT_BASE.lower()
+        assert "advogado" in SYSTEM_PROMPT_BASE.lower()
         assert "estratégi" in SYSTEM_PROMPT_BASE.lower()
 
     def test_disclaimer_oab_embutido_em_base(self):
@@ -170,7 +170,7 @@ class TestClassificador:
 
     def test_exemplo_formato_correto(self):
         """O prompt deve mostrar o exemplo exato esperado."""
-        assert '{"intencao": "status"}' in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
+        assert '{"intencao": "duvida_geral"}' in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
 
 
 class TestConteudoMinimo:

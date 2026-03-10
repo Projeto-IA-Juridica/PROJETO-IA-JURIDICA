@@ -42,11 +42,20 @@ class FactChecker:
             re.compile(r"\bvocê vai ganhar\b", re.IGNORECASE),
             # Guards específicos para EstatisticaProcessual:
             # Impedem que Claude converta dados históricos em predição individual.
-            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),           # "você tem 72%..."
-            re.compile(r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE),   # "seu processo tem 80%..."
-            re.compile(r"\bsua probabilidade\b", re.IGNORECASE),           # "sua probabilidade é de..."
-            re.compile(r"\b\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b", re.IGNORECASE),  # "80% de chance de ganhar"
-            re.compile(r"\bchance de (ganhar|vencer|procedência)\b", re.IGNORECASE),  # "chance de ganhar"
+            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),  # "você tem 72%..."
+            re.compile(
+                r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE
+            ),  # "seu processo tem 80%..."
+            re.compile(
+                r"\bsua probabilidade\b", re.IGNORECASE
+            ),  # "sua probabilidade é de..."
+            re.compile(
+                r"\b\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b",
+                re.IGNORECASE,
+            ),  # "80% de chance de ganhar"
+            re.compile(
+                r"\bchance de (ganhar|vencer|procedência)\b", re.IGNORECASE
+            ),  # "chance de ganhar"
         ]
 
         # Disclaimer — aparece apenas quando um padrão proibido é corrigido
@@ -183,10 +192,10 @@ class FactChecker:
                 motivos.append(f"Padrão proibido detectado: '{padrao.pattern}'")
                 ajustada = padrao.sub("é recomendado considerar", ajustada)
 
-        # Adiciona disclaimer SOMENTE se um padrão proibido foi corrigido
-        # e o chamador pediu (adicionar_disclaimer=True).
+        # Adiciona disclaimer SOMENTE se um padrão proibido foi corrigido,
+        # o chamador pediu (adicionar_disclaimer=True) e ainda não está presente.
         # Não aparece em toda mensagem — apenas quando a IA usou linguagem inadequada.
-        if adicionar_disclaimer and motivos:
+        if adicionar_disclaimer and motivos and self._disclaimer not in ajustada:
             ajustada = ajustada.rstrip() + "\n\n" + self._disclaimer
 
         houve_correcao = ajustada != original

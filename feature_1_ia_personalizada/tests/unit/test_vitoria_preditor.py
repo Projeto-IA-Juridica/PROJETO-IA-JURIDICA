@@ -96,7 +96,9 @@ def _preditor() -> VitoriaPreditor:
 # ---------------------------------------------------------------------------
 
 _CASO_PROCEDENTE = {
-    "movimentos": [{"nome": "Julgamento procedente", "dataHora": "2024-06-01T10:00:00Z"}]
+    "movimentos": [
+        {"nome": "Julgamento procedente", "dataHora": "2024-06-01T10:00:00Z"}
+    ]
 }
 _CASO_IMPROCEDENTE = {
     "movimentos": [
@@ -104,7 +106,9 @@ _CASO_IMPROCEDENTE = {
     ]
 }
 _CASO_ACORDO = {
-    "movimentos": [{"nome": "Homologação de acordo", "dataHora": "2024-04-01T10:00:00Z"}]
+    "movimentos": [
+        {"nome": "Homologação de acordo", "dataHora": "2024-04-01T10:00:00Z"}
+    ]
 }
 _CASO_SEM_DESFECHO = {
     "movimentos": [{"nome": "Juntada de petição", "dataHora": "2024-03-01T10:00:00Z"}]
@@ -211,14 +215,18 @@ class TestContarDesfechosAutor:
 
     def test_multiplos_casos_mixtos(self):
         casos = _gerar_casos(procedentes=6, improcedentes=3, neutros=1)
-        fav, desfav, neutros = self.preditor._contar_desfechos(casos, polo_cliente="autor")
+        fav, desfav, neutros = self.preditor._contar_desfechos(
+            casos, polo_cliente="autor"
+        )
         assert fav == 6
         assert desfav == 3
         assert neutros == 1
 
     def test_apenas_movimentos_sem_nome_ignorados(self):
         caso = {"movimentos": [{"dataHora": "2024-01-01T00:00:00Z"}]}  # sem 'nome'
-        fav, desfav, neutros = self.preditor._contar_desfechos([caso], polo_cliente="autor")
+        fav, desfav, neutros = self.preditor._contar_desfechos(
+            [caso], polo_cliente="autor"
+        )
         assert fav == desfav == neutros == 0
 
 
@@ -410,7 +418,9 @@ class TestBuscarEstatisticaHappyPath:
             )
 
         assert resultado is not None
-        total = resultado.pct_favoravel + resultado.pct_desfavoravel + resultado.pct_neutro
+        total = (
+            resultado.pct_favoravel + resultado.pct_desfavoravel + resultado.pct_neutro
+        )
         assert abs(total - 100.0) < 0.2  # tolerância para arredondamento
 
     async def test_confianca_alta_com_50_desfechos(self):
@@ -473,7 +483,7 @@ class TestBuscarEstatisticaHappyPath:
             )
 
         assert resultado is not None
-        assert resultado.pct_favoravel == 30.0   # improcedentes → favorável ao réu
+        assert resultado.pct_favoravel == 30.0  # improcedentes → favorável ao réu
         assert resultado.pct_desfavoravel == 70.0  # procedentes → desfavorável ao réu
 
 
