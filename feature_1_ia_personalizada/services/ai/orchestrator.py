@@ -6,7 +6,7 @@ Fluxo LangGraph:
   classificar_intencao
     ├─ (outro) ───────────────────────────────────────► gerar_resposta → mensagem fixa (fora do escopo)
     ├─ (saudacao) ────────────────────────────────────► gerar_resposta → boas-vindas / recorrente
-    └─ (status/duvida_termo/reclamacao) ─────────────► buscar_dados
+    └─ (status/duvida_termo/reclamacao/perspectivas) ─► buscar_dados
                                                               │
                                               ┌───────────────┴───────────────┐
                                               │ (dados ok)                    │ (sem processos)
@@ -61,6 +61,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
     SYSTEM_PROMPT_DESABAFO,
+    SYSTEM_PROMPT_PERSPECTIVAS,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
@@ -131,7 +132,7 @@ class ConversationState(TypedDict):
     mensagem_original: str
     tipo_mensagem: str  # texto | audio_transcrito
     historico: list[dict]
-    intencao: str  # status | duvida_termo | saudacao | reclamacao | outro
+    intencao: str  # status | duvida_termo | saudacao | reclamacao | perspectivas | outro
     dados_processo: dict | None
     resposta_ia: str | None
     resposta_verificada: str | None
@@ -151,6 +152,14 @@ _KEYWORDS: list[tuple[str, re.Pattern]] = [
         "status",
         re.compile(
             r"\b(status|andamento|situa[çc][aã]o|processo|como est[aá]|o que aconteceu|movimenta[çc][aã]o)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "perspectivas",
+        re.compile(
+            r"\b(chance|chances|probabilidade|vencer|ganhar|perder|procedente|improcedente|"
+            r"vai dar certo|vale a pena|perspectiva|expectativa|resultado|prognóstico)\b",
             re.IGNORECASE,
         ),
     ),
@@ -492,6 +501,7 @@ class ConversationOrchestrator:
             "status",
             "duvida_termo",
             "reclamacao",
+            "perspectivas",  # ← nova categoria: busca dados + vitoria_preditor
         ):
             return "buscar_dados"
         return "gerar_resposta"
@@ -537,6 +547,7 @@ class ConversationOrchestrator:
             intencao = parsed.get("intencao", "outro")
             categorias_validas = {
                 "status",
+                "perspectivas",  # ← nova categoria
                 "duvida_termo",
                 "duvida_geral",
                 "saudacao",
@@ -601,7 +612,6 @@ class ConversationOrchestrator:
             )
 
             # Detecta termos jurídicos no andamento e monta glossário contextual
-            # para enriquecer o prompt de status sem custo extra de API
             termos_detectados = self._translator.identificar_termos_tecnicos(
                 ultimo_andamento
             )
@@ -609,10 +619,9 @@ class ConversationOrchestrator:
             for termo in termos_detectados:
                 trad = self._translator.traduzir_termo(termo)
                 if trad:
-                    # Usa só a definição (antes do "\n\nExemplo:") para manter o prompt conciso
                     glossario_andamento[termo] = trad.split("\n\n")[0]
 
-            # Histórico dos últimos 5 andamentos (para dar contexto de evolução ao Claude)
+            # Histórico dos últimos 5 andamentos
             andamentos_recentes = [
                 {"descricao": a.get("descricao", ""), "data": a.get("data", "")}
                 for a in andamentos[:5]
@@ -633,9 +642,9 @@ class ConversationOrchestrator:
 
             log.info("dados_processo_obtidos", cnj=numero_cnj)
 
-            # Enriquece com contexto de casos similares (apenas status + preditor ativo)
+            # Enriquece com estatística de casos similares para status E perspectivas
             if (
-                state.get("intencao") == "status"
+                state.get("intencao") in ("status", "perspectivas")
                 and self._vitoria_preditor is not None
                 and processo.tipo_acao
             ):
@@ -654,7 +663,6 @@ class ConversationOrchestrator:
                             confianca=estatistica.confianca,
                         )
                 except Exception as exc_stat:
-                    # Não bloqueia o fluxo principal — contexto é melhoramento opcional
                     log.warning("estatistica_processual_erro", erro=str(exc_stat))
 
             return {
@@ -693,7 +701,7 @@ class ConversationOrchestrator:
                         "precisa_regenerar": False,
                     }
 
-            # Sessão única: busca escritório e cliente (sempre — nome usado em todos os prompts)
+            # Sessão única: busca escritório e cliente
             async with self._session_factory() as session:
                 escritorio, cliente = await self._obter_escritorio_cliente(
                     session, state["escritorio_id"], state["cliente_id"]
@@ -728,9 +736,7 @@ class ConversationOrchestrator:
                     polo_cliente=dados.get("polo_cliente", "N/D"),
                     andamentos_recentes=andamentos_str,
                 )
-                # Injeta glossário de termos técnicos detectados no andamento.
-                # Claude usa esses significados para explicar a movimentação em linguagem simples,
-                # sem precisar inferir — tradução local (O(1)), zero tokens extras de inferência.
+                # Injeta glossário de termos técnicos
                 glossario = dados.get("glossario_andamento") or {}
                 if glossario:
                     linhas = "\n".join(
@@ -751,6 +757,30 @@ class ConversationOrchestrator:
                         fatores=fatores_str,
                         disclaimer=estatistica_dict.get("disclaimer", ""),
                     )
+
+            elif intencao == "perspectivas" and dados:
+                # Prompt dedicado para perguntas sobre chances/perspectivas
+                system_prompt = SYSTEM_PROMPT_PERSPECTIVAS.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                    numero_cnj=dados.get("numero_cnj", "N/D"),
+                    tribunal=dados.get("tribunal", "N/D"),
+                    polo_cliente=dados.get("polo_cliente", "N/D"),
+                    ultimo_andamento=dados.get(
+                        "ultimo_andamento", "sem movimentação recente"
+                    ),
+                )
+                # Injeta estatística de casos similares (razão de ser desta intenção)
+                estatistica_dict = dados.get("estatistica_processual")
+                if estatistica_dict:
+                    fatores_str = "\n".join(
+                        f"- {f}" for f in estatistica_dict.get("fatores", [])
+                    )
+                    system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
+                        fatores=fatores_str,
+                        disclaimer=estatistica_dict.get("disclaimer", ""),
+                    )
+
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
                     nome_escritorio=nome_escritorio,
@@ -792,7 +822,6 @@ class ConversationOrchestrator:
                 "input": tokens_anteriores.get("input", 0) + resultado["tokens_input"],
                 "output": tokens_anteriores.get("output", 0)
                 + resultado["tokens_output"],
-                # custo_str preserva o Decimal calculado pelo ClaudeClient (sem aritmética float)
                 "custo_str": str(custo_anterior + resultado["custo"]),
             }
 
@@ -817,6 +846,12 @@ class ConversationOrchestrator:
                     f"Recebemos sua mensagem sobre o processo {numero}. "
                     "No momento estou com dificuldades técnicas, "
                     "mas o escritório retornará em breve."
+                )
+            elif intencao == "perspectivas":
+                fallback_msg = (
+                    "Entendo sua dúvida sobre as perspectivas do processo. "
+                    "Estou com uma instabilidade técnica agora — "
+                    "o escritório entrará em contato em breve para esclarecer. ⚖️"
                 )
             elif intencao in ("duvida_termo", "duvida_geral"):
                 fallback_msg = (
@@ -878,16 +913,15 @@ class ConversationOrchestrator:
 
             stub = _InteracaoStub()
 
-            # 1. Filtrar linguagem proibida (pareceres, promessas de resultado)
-            # Disclaimer habilitado apenas para mensagens sobre o processo (status)
-            eh_sobre_processo = state.get("intencao") == "status"
+            # Disclaimer habilitado para status e perspectivas
+            eh_sobre_processo = state.get("intencao") in ("status", "perspectivas")
             resposta_filtrada = self._fact_checker.filtrar_resposta(
                 resposta_ia=resposta,
                 interacao=stub,
                 adicionar_disclaimer=eh_sobre_processo,
             )
 
-            # 2. Verificar factualidade quando há dados de processo
+            # Verificar factualidade quando há dados de processo
             precisa_regenerar = False
             if state.get("dados_processo") and state.get("processo_id"):
                 resultado_fc = await self._fact_checker.verificar_status_processo(
@@ -905,7 +939,6 @@ class ConversationOrchestrator:
                             tentativa=tentativas,
                         )
                     else:
-                        # Esgotou as tentativas → usa fallback genérico
                         log.error("fact_check_max_tentativas_atingidas")
                         resposta_filtrada = MENSAGENS_FALLBACK.get(
                             "indisponivel", TEMPLATE_ERRO_GENERICO
@@ -923,7 +956,6 @@ class ConversationOrchestrator:
         except Exception as exc:
             _erros_total.labels(no="verificar_resposta").inc()
             log.error("verificar_resposta_erro", erro=str(exc))
-            # Não bloqueia o fluxo — passa a resposta sem verificação
             return {
                 "resposta_verificada": resposta,
                 "precisa_regenerar": False,
@@ -957,7 +989,6 @@ class ConversationOrchestrator:
                     log.error("escritorio_ou_cliente_nao_encontrado")
                     return {"erro": "enviar_resposta:entidade_nao_encontrada"}
 
-                # Envia via Evolution API (WhatsApp)
                 instance = escritorio.webhook_whatsapp_instance
                 numero = cliente.telefone_whatsapp
 
@@ -971,7 +1002,6 @@ class ConversationOrchestrator:
                             numero_parcial=numero[:4] + "***",
                         )
                     except Exception as exc_wa:
-                        # Falha no envio WhatsApp não interrompe o fluxo — só loga
                         log.warning("falha_envio_whatsapp", erro=str(exc_wa))
                 else:
                     log.warning(
@@ -980,7 +1010,6 @@ class ConversationOrchestrator:
                         numero=bool(numero),
                     )
 
-                # Atualiza memória de conversa no Redis
                 await self._memory.salvar_mensagem(
                     state["escritorio_id"],
                     state["cliente_id"],
@@ -994,7 +1023,6 @@ class ConversationOrchestrator:
                     resposta_final,
                 )
 
-                # Persiste Interação no banco (custo vem do ClaudeClient, sem recálculo)
                 await self._salvar_interacao(
                     session, state, resposta_final, tokens, custo
                 )
@@ -1032,7 +1060,6 @@ class ConversationOrchestrator:
                     session, state["escritorio_id"], state["cliente_id"]
                 )
 
-                # Tenta enviar mensagem de erro ao cliente
                 if (
                     escritorio
                     and cliente
@@ -1048,9 +1075,6 @@ class ConversationOrchestrator:
                     except Exception as exc_wa:
                         log.warning("falha_envio_mensagem_erro", erro=str(exc_wa))
 
-                # Persiste interação com metadata de erro para auditoria.
-                # Nota: traceback.format_exc() só é confiável dentro de um bloco except ativo.
-                # O erro de origem já está capturado em state["erro"] — suficiente para auditoria.
                 metadata = {
                     "erro": True,
                     "tipo_erro": erro,
@@ -1090,13 +1114,12 @@ class ConversationOrchestrator:
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
 
-        # Nó 2: buscar dados (se intencão exige processo)
-        if state["intencao"] in ("status", "duvida_termo", "reclamacao"):
+        # Nó 2: buscar dados (se intenção exige processo)
+        if state["intencao"] in ("status", "duvida_termo", "reclamacao", "perspectivas"):
             state.update(await self._node_buscar_dados(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
                 return state  # type: ignore[return-value]
-            # Sem processos → resposta já definida em resposta_verificada
             if state.get("resposta_verificada"):
                 await self._node_enviar_resposta(state)
                 return state  # type: ignore[return-value]
@@ -1115,7 +1138,6 @@ class ConversationOrchestrator:
                 return state  # type: ignore[return-value]
             if not state.get("precisa_regenerar"):
                 break
-            # Re-gera com contexto de correção
             state.update(await self._node_gerar_resposta(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
@@ -1143,25 +1165,6 @@ def criar_orchestrador(
     evolution_base_url: str = "http://localhost:8080",
     api_key_datajud: str | None = None,
 ) -> ConversationOrchestrator:
-    """
-    Instancia e configura o ConversationOrchestrator com todas as dependências.
-
-    Exemplo (Celery worker ou FastAPI lifespan):
-
-        from shared.config.settings import settings
-        from shared.database.connection import async_session_factory
-        import redis.asyncio as aioredis
-
-        redis_client = aioredis.from_url(settings.REDIS_URL)
-        orchestrador = criar_orchestrador(
-            api_key_anthropic=settings.ANTHROPIC_API_KEY,
-            redis_client=redis_client,
-            session_factory=async_session_factory,
-            api_key_jusbrasil=settings.JUSBRASIL_API_KEY,
-            api_key_evolution=settings.EVOLUTION_API_KEY,
-            evolution_base_url=settings.EVOLUTION_API_URL,
-        )
-    """
     return ConversationOrchestrator(
         claude_client=ClaudeClient(api_key=api_key_anthropic),
         memory=ConversationMemory(redis=redis_client),
@@ -1180,26 +1183,11 @@ def criar_orchestrador(
 # ---------------------------------------------------------------------------
 # Singleton por processo — apenas componentes 100% síncronos
 # ---------------------------------------------------------------------------
-#
-# ⚠️  Por que NÃO singletonizar clientes assíncronos (Redis, Claude, Evolution)?
-#
-#   asyncio.run() cria um novo event loop a cada chamada e o destrói ao final.
-#   Clientes assíncronos (redis.asyncio, httpx, aiohttp) atrelam seus pools de
-#   conexão ao loop em que foram criados/usados pela primeira vez.
-#   Na segunda task do Celery o asyncio.run() cria um novo loop, mas o singleton
-#   tenta operar conexões do loop anterior (já destruído):
-#       RuntimeError: Event loop is closed
-#
-#   Solução: singletonizar apenas o JuridicalTranslator (puro dict em memória,
-#   zero I/O assíncrono). Todos os clientes assíncronos são instanciados dentro
-#   do asyncio.run() de cada task — o custo é irrelevante (apenas atribuição de
-#   strings/referências, sem conexões de rede no __init__).
 
 _translator_singleton: JuridicalTranslator | None = None
 
 
 def _criar_translator() -> JuridicalTranslator:
-    """Retorna o singleton se disponível, cria novo caso contrário (testes/scripts)."""
     return (
         _translator_singleton
         if _translator_singleton is not None
@@ -1208,23 +1196,6 @@ def _criar_translator() -> JuridicalTranslator:
 
 
 def inicializar_orchestrador_worker() -> None:
-    """
-    Inicializa o JuridicalTranslator uma única vez por processo worker Celery.
-
-    O tradutor carrega o JSON de termos jurídicos em memória (operação de disco,
-    ~ms) — é o único componente cujo custo de inicialização justifica singletonizar.
-
-    Deve ser chamado no sinal `worker_process_init` do Celery:
-
-        from celery.signals import worker_process_init
-
-        @worker_process_init.connect
-        def init_worker(**kwargs):
-            from feature_1_ia_personalizada.services.ai.orchestrator import (
-                inicializar_orchestrador_worker,
-            )
-            inicializar_orchestrador_worker()
-    """
     global _translator_singleton
     _translator_singleton = JuridicalTranslator()
     logger.info(
@@ -1244,17 +1215,6 @@ def executar_fluxo_orquestrador(
     mensagem: str,
     tipo: str = "texto",
 ) -> dict[str, Any]:
-    """
-    Entry point síncrono chamado pelos workers Celery.
-
-    Todos os clientes assíncronos (Redis, Claude, Evolution) são criados dentro do
-    asyncio.run() e destruídos ao final — garantindo que vivam no mesmo event loop.
-    Apenas o JuridicalTranslator (puro dict em memória) é reaproveitado via singleton
-    quando `inicializar_orchestrador_worker()` foi chamado no worker_process_init.
-
-    Returns:
-        {"resposta": str, "intencao": str, "usando_fallback": bool, ...}
-    """
     import redis.asyncio as aioredis
 
     from shared.config.settings import settings
