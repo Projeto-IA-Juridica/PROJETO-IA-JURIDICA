@@ -41,21 +41,16 @@ class FactChecker:
             re.compile(r"\ba estratégia é\b", re.IGNORECASE),
             re.compile(r"\bvocê vai ganhar\b", re.IGNORECASE),
             # Guards específicos para EstatisticaProcessual:
-            # Impedem que Claude converta dados históricos em predição individual.
-            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),  # "você tem 72%..."
-            re.compile(
-                r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE
-            ),  # "seu processo tem 80%..."
-            re.compile(
-                r"\bsua probabilidade\b", re.IGNORECASE
-            ),  # "sua probabilidade é de..."
-            re.compile(
-                r"\b\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b",
+            # Impedem que Claude converta dados históricos em predição INDIVIDUAL.
+            # Bloqueiam apenas frases que personalizam a estatística para o cliente,
+            # não frases históricas genéricas ("em casos similares, X% foram favoráveis").
+            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),        # "você tem 72%..."
+            re.compile(r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE), # "seu processo tem 80%..."
+            re.compile(r"\bsua probabilidade\b", re.IGNORECASE),         # "sua probabilidade é de..."
+            re.compile(                                                   # "você tem 80% de chance de ganhar"
+                r"\bvocê tem\s+\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b",
                 re.IGNORECASE,
-            ),  # "80% de chance de ganhar"
-            re.compile(
-                r"\bchance de (ganhar|vencer|procedência)\b", re.IGNORECASE
-            ),  # "chance de ganhar"
+            ),
         ]
 
         # Disclaimer — aparece apenas quando um padrão proibido é corrigido

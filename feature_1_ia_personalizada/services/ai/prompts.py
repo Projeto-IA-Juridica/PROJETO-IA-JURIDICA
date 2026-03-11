@@ -37,7 +37,9 @@ SYSTEM_PROMPT_BASE = (
     "</tom_e_estilo>\n\n"
     f"{_FORMATO_WHATSAPP}\n\n"
     "<regras_oab>\n"
-    "NUNCA prometa resultados ou dê probabilidades de ganhar/perder.\n"
+    "NUNCA prometa resultados individuais nem afirme que o cliente vai ganhar ou perder.\n"
+    "Você PODE apresentar estatísticas históricas de casos similares quando os dados forem fornecidos, "
+    "sempre como contexto público de casos passados, nunca como previsão deste caso específico.\n"
     "NUNCA sugira estratégias processuais ou opine sobre o mérito da causa.\n"
     "NUNCA se apresente ou aja como advogado(a).\n"
     "Apenas para dúvidas que exijam análise jurídica personalizada: encaminhe ao advogado responsável.\n"
@@ -53,6 +55,7 @@ SYSTEM_PROMPT_BASE = (
     "Confirmar datas e prazos já registrados pelo escritório.\n"
     "Responder dúvidas gerais sobre como funciona o processo judicial, sem opinar sobre este caso específico.\n"
     "Tranquilizar o cliente sobre silêncios ou demoras processuais comuns.\n"
+    "Apresentar estatísticas históricas de casos similares como contexto informativo, com disclaimer obrigatório.\n"
     "Encaminhar ao advogado apenas dúvidas que exijam análise jurídica personalizada deste caso.\n"
     "</acoes_permitidas>"
 )
@@ -82,7 +85,9 @@ SYSTEM_PROMPT_STATUS_PROCESSO = (
     "3. Traduza o último andamento para linguagem simples e explique o que significa para o cliente.\n"
     "4. Use o histórico recente para dar contexto da evolução do processo, se relevante.\n"
     "5. Mencione os próximos passos de forma geral, sem prometer prazos específicos.\n"
-    "6. Máximo 4 parágrafos curtos.\n"
+    "6. Se houver dados de casos similares no contexto, apresente-os como informação histórica "
+    "seguindo rigorosamente as regras do bloco <contexto_casos_similares>.\n"
+    "7. Máximo 4 parágrafos curtos.\n"
     "</instrucoes>\n\n"
     f"{_FORMATO_WHATSAPP}"
 )
@@ -188,19 +193,6 @@ SYSTEM_PROMPT_PESQUISA_SATISFACAO = (
 )
 
 # ---------------------------------------------------------------------------
-# SYSTEM PROMPT — classificação de intenção
-#
-# A mensagem do cliente é passada como user message separada — não aqui.
-# Isso evita prompt injection via conteúdo da mensagem.
-#
-# Uso:
-#   messages=[{"role": "user", "content": mensagem_do_cliente}]
-#
-# Saída esperada (JSON para parsing robusto no LangGraph):
-#   {"intencao": "status"}
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # TEMPLATE — contexto de casos similares (EstatisticaProcessual)
 #
 # Injetado no SYSTEM_PROMPT_STATUS_PROCESSO quando VitoriaPreditor retorna dados.
@@ -219,27 +211,15 @@ TEMPLATE_CONTEXTO_CASOS_SIMILARES = (
     "1. Apresente como contexto histórico, NUNCA como previsão do resultado deste caso.\n"
     "2. Use frases como 'em casos similares registrados publicamente...' "
     "ou 'historicamente, processos desse tipo no mesmo tribunal...'.\n"
-    "3. NUNCA escreva 'você tem X% de chance', 'seu processo tem X% de probabilidade' "
-    "ou qualquer variante que personalize a estatística como predição individual.\n"
+    "3. Use frases como 'em casos similares registrados, X% tiveram desfecho favorável ao autor' — "
+    "NUNCA escreva 'você tem X% de chance de ganhar' ou qualquer frase que personalize "
+    "a estatística como predição individual para este caso.\n"
     "4. Apresente os três percentuais (favorável, desfavorável, neutro) — "
     "não omita o desfavorável para não criar viés de seleção.\n"
     "5. Finalize a seção com o seguinte disclaimer, literalmente:\n"
     "{disclaimer}\n"
     "</contexto_casos_similares>"
 )
-
-# ---------------------------------------------------------------------------
-# SYSTEM PROMPT — classificação de intenção
-#
-# A mensagem do cliente é passada como user message separada — não aqui.
-# Isso evita prompt injection via conteúdo da mensagem.
-#
-# Uso:
-#   messages=[{"role": "user", "content": mensagem_do_cliente}]
-#
-# Saída esperada (JSON para parsing robusto no LangGraph):
-#   {"intencao": "status"}
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # PROMPT — desabafo / apoio emocional
