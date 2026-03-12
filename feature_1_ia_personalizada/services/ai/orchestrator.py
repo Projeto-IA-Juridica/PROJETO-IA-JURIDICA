@@ -62,6 +62,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
     SYSTEM_PROMPT_DESABAFO,
     SYSTEM_PROMPT_PERSPECTIVAS,
+    SYSTEM_PROMPT_PERSPECTIVAS_DESFAVORAVEL,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
@@ -655,13 +656,23 @@ class ConversationOrchestrator:
                         polo_cliente=processo.polo_cliente or "autor",
                     )
                     if estatistica:
-                        dados_processo["estatistica_processual"] = asdict(estatistica)
-                        log.info(
-                            "estatistica_processual_obtida",
-                            cnj=numero_cnj,
-                            pct_favoravel=estatistica.pct_favoravel,
-                            confianca=estatistica.confianca,
-                        )
+                        # Só expõe estatística se pct_favoravel > 50%.
+                        # Abaixo disso, omite os dados e redireciona ao advogado.
+                        if estatistica.pct_favoravel > 50:
+                            dados_processo["estatistica_processual"] = asdict(estatistica)
+                            log.info(
+                                "estatistica_processual_obtida",
+                                cnj=numero_cnj,
+                                pct_favoravel=estatistica.pct_favoravel,
+                                confianca=estatistica.confianca,
+                            )
+                        else:
+                            dados_processo["estatistica_desfavoravel"] = True
+                            log.info(
+                                "estatistica_processual_omitida_pct_baixo",
+                                cnj=numero_cnj,
+                                pct_favoravel=estatistica.pct_favoravel,
+                            )
                 except Exception as exc_stat:
                     log.warning("estatistica_processual_erro", erro=str(exc_stat))
 
@@ -747,9 +758,9 @@ class ConversationOrchestrator:
                         f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
                     )
 
-                # Injeta contexto de casos similares quando disponível
+                # Injeta contexto de casos similares quando disponível e favorável
                 estatistica_dict = dados.get("estatistica_processual")
-                if estatistica_dict:
+                if estatistica_dict and not dados.get("estatistica_desfavoravel"):
                     fatores_str = "\n".join(
                         f"- {f}" for f in estatistica_dict.get("fatores", [])
                     )
@@ -759,27 +770,34 @@ class ConversationOrchestrator:
                     )
 
             elif intencao == "perspectivas" and dados:
-                # Prompt dedicado para perguntas sobre chances/perspectivas
-                system_prompt = SYSTEM_PROMPT_PERSPECTIVAS.format(
-                    nome_escritorio=nome_escritorio,
-                    nome_cliente=nome_cliente,
-                    numero_cnj=dados.get("numero_cnj", "N/D"),
-                    tribunal=dados.get("tribunal", "N/D"),
-                    polo_cliente=dados.get("polo_cliente", "N/D"),
-                    ultimo_andamento=dados.get(
-                        "ultimo_andamento", "sem movimentação recente"
-                    ),
-                )
-                # Injeta estatística de casos similares (razão de ser desta intenção)
-                estatistica_dict = dados.get("estatistica_processual")
-                if estatistica_dict:
-                    fatores_str = "\n".join(
-                        f"- {f}" for f in estatistica_dict.get("fatores", [])
+                # Se pct_favoravel <= 50%, redireciona ao advogado sem expor dados
+                if dados.get("estatistica_desfavoravel"):
+                    system_prompt = SYSTEM_PROMPT_PERSPECTIVAS_DESFAVORAVEL.format(
+                        nome_escritorio=nome_escritorio,
+                        nome_cliente=nome_cliente,
                     )
-                    system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
-                        fatores=fatores_str,
-                        disclaimer=estatistica_dict.get("disclaimer", ""),
+                else:
+                    # Prompt dedicado para perguntas sobre chances/perspectivas
+                    system_prompt = SYSTEM_PROMPT_PERSPECTIVAS.format(
+                        nome_escritorio=nome_escritorio,
+                        nome_cliente=nome_cliente,
+                        numero_cnj=dados.get("numero_cnj", "N/D"),
+                        tribunal=dados.get("tribunal", "N/D"),
+                        polo_cliente=dados.get("polo_cliente", "N/D"),
+                        ultimo_andamento=dados.get(
+                            "ultimo_andamento", "sem movimentação recente"
+                        ),
                     )
+                    # Injeta estatística de casos similares (razão de ser desta intenção)
+                    estatistica_dict = dados.get("estatistica_processual")
+                    if estatistica_dict:
+                        fatores_str = "\n".join(
+                            f"- {f}" for f in estatistica_dict.get("fatores", [])
+                        )
+                        system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
+                            fatores=fatores_str,
+                            disclaimer=estatistica_dict.get("disclaimer", ""),
+                        )
 
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
