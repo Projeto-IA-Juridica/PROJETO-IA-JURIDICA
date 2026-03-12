@@ -58,7 +58,7 @@ def _make_httpx_mock(
     response_mock.status_code = status_code
     response_mock.json.return_value = payload or {"hits": {"hits": []}}
 
-    if isinstance(raise_exc, (httpx.TimeoutException, httpx.RequestError)):
+    if isinstance(raise_exc, httpx.TimeoutException | httpx.RequestError):
         # Exceção lançada pelo próprio client.post() (antes de raise_for_status)
         client_mock = AsyncMock()
         client_mock.post = AsyncMock(side_effect=raise_exc)
