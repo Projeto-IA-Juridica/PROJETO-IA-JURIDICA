@@ -594,7 +594,8 @@ clientes: list[dict] = st.session_state.get("clientes_hub", [])
 
 if not clientes:
     st.title("⚖️ Hub do Advogado — Demonstração Completa")
-    st.markdown("""
+    st.markdown(
+        """
         ### O que este teste demonstra
 
         O fluxo completo da plataforma, usando o **orchestrator real do projeto** (LangGraph):
@@ -628,7 +629,8 @@ if not clientes:
         - *"Como funciona uma audiência de instrução?"* → intent: duvida_geral
         - *"Estou muito ansioso com esse processo..."* → intent: desabafo
         - *"Oi, tudo bem?"* → intent: saudacao
-        """)
+        """
+    )
 
     if st.session_state.get("erros_hub"):
         with st.expander("Ver erros do CSV"):
