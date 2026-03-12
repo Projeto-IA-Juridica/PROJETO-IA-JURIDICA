@@ -1,6 +1,7 @@
 import asyncio
 import time
-from typing import Any, Awaitable, cast
+from collections.abc import Awaitable
+from typing import Any, cast
 
 import httpx
 import redis.asyncio as redis
