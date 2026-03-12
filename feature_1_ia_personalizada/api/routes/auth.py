@@ -76,23 +76,17 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
 
         # O refresh token viaja leve, verificamos explicitamente a flag:
         if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=401, detail="Token fornecido não é um Refresh Token"
-            )
+            raise HTTPException(status_code=401, detail="Token fornecido não é um Refresh Token")
 
         user_id_str = payload.get("sub")
         if not user_id_str:
-            raise HTTPException(
-                status_code=401, detail="Token sem identificação de usuário"
-            )
+            raise HTTPException(status_code=401, detail="Token sem identificação de usuário")
         user_id = int(str(user_id_str))
 
         # Precisamos ler o banco de novo para puxar as roles e escritorio_id atualizadas
         usuario = await db.get(Usuario, user_id)
         if not usuario:
-            raise HTTPException(
-                status_code=401, detail="Usuário do token não existe mais"
-            )
+            raise HTTPException(status_code=401, detail="Usuário do token não existe mais")
 
         # Gera novo par (isso invalida a ideia de que o refresh vive pra sempre, entregamos um novo access)
         access_token = criar_token(
@@ -138,8 +132,6 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db)):
 
     usuario = await db.get(Usuario, user_id)
     if not usuario:
-        raise HTTPException(
-            status_code=404, detail="Usuário não encontrado no banco de dados"
-        )
+        raise HTTPException(status_code=404, detail="Usuário não encontrado no banco de dados")
 
     return usuario

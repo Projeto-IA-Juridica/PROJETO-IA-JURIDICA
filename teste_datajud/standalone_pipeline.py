@@ -99,9 +99,7 @@ class DatajudTesterPipeline:
             if historico_limpo:
                 ultimo_andamento = historico_limpo[0].get("descricao", "")
 
-            termos_detectados = self.translator.identificar_termos_tecnicos(
-                ultimo_andamento
-            )
+            termos_detectados = self.translator.identificar_termos_tecnicos(ultimo_andamento)
             glossario_andamento = {}
             for termo in termos_detectados:
                 trad = self.translator.traduzir_termo(termo)
@@ -151,9 +149,7 @@ class DatajudTesterPipeline:
         )
 
         if glossario:
-            linhas = "\n".join(
-                f"- {termo}: {definicao}" for termo, definicao in glossario.items()
-            )
+            linhas = "\n".join(f"- {termo}: {definicao}" for termo, definicao in glossario.items())
             system_prompt += f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
 
         return system_prompt

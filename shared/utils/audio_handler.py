@@ -180,7 +180,7 @@ async def transcrever_audio(audio_bytes: bytes) -> str:
             )
 
         duracao_ms = int((time.monotonic() - inicio) * 1000)
-        texto = resposta.text.strip()
+        texto = str(resposta.text).strip()
 
         if not texto:
             raise ValueError("Whisper retornou transcrição vazia")

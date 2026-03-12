@@ -16,7 +16,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 
 from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
     DISCLAIMER_ESTATISTICA,
@@ -96,19 +95,13 @@ def _preditor() -> VitoriaPreditor:
 # ---------------------------------------------------------------------------
 
 _CASO_PROCEDENTE = {
-    "movimentos": [
-        {"nome": "Julgamento procedente", "dataHora": "2024-06-01T10:00:00Z"}
-    ]
+    "movimentos": [{"nome": "Julgamento procedente", "dataHora": "2024-06-01T10:00:00Z"}]
 }
 _CASO_IMPROCEDENTE = {
-    "movimentos": [
-        {"nome": "Julgamento improcedente", "dataHora": "2024-05-01T10:00:00Z"}
-    ]
+    "movimentos": [{"nome": "Julgamento improcedente", "dataHora": "2024-05-01T10:00:00Z"}]
 }
 _CASO_ACORDO = {
-    "movimentos": [
-        {"nome": "Homologação de acordo", "dataHora": "2024-04-01T10:00:00Z"}
-    ]
+    "movimentos": [{"nome": "Homologação de acordo", "dataHora": "2024-04-01T10:00:00Z"}]
 }
 _CASO_SEM_DESFECHO = {
     "movimentos": [{"nome": "Juntada de petição", "dataHora": "2024-03-01T10:00:00Z"}]
@@ -200,9 +193,7 @@ class TestContarDesfechosAutor:
         assert neutros == 0
 
     def test_acordo_e_neutro(self):
-        fav, desfav, neutros = self.preditor._contar_desfechos(
-            [_CASO_ACORDO], polo_cliente="autor"
-        )
+        fav, desfav, neutros = self.preditor._contar_desfechos([_CASO_ACORDO], polo_cliente="autor")
         assert neutros == 1
 
     def test_caso_sem_desfecho_nao_conta(self):
@@ -215,18 +206,14 @@ class TestContarDesfechosAutor:
 
     def test_multiplos_casos_mixtos(self):
         casos = _gerar_casos(procedentes=6, improcedentes=3, neutros=1)
-        fav, desfav, neutros = self.preditor._contar_desfechos(
-            casos, polo_cliente="autor"
-        )
+        fav, desfav, neutros = self.preditor._contar_desfechos(casos, polo_cliente="autor")
         assert fav == 6
         assert desfav == 3
         assert neutros == 1
 
     def test_apenas_movimentos_sem_nome_ignorados(self):
         caso = {"movimentos": [{"dataHora": "2024-01-01T00:00:00Z"}]}  # sem 'nome'
-        fav, desfav, neutros = self.preditor._contar_desfechos(
-            [caso], polo_cliente="autor"
-        )
+        fav, desfav, neutros = self.preditor._contar_desfechos([caso], polo_cliente="autor")
         assert fav == desfav == neutros == 0
 
 
@@ -254,9 +241,7 @@ class TestContarDesfechosReu:
         assert desfav == 0
 
     def test_neutro_igual_para_reu(self):
-        _, _, neutros = self.preditor._contar_desfechos(
-            [_CASO_ACORDO], polo_cliente="reu"
-        )
+        _, _, neutros = self.preditor._contar_desfechos([_CASO_ACORDO], polo_cliente="reu")
         assert neutros == 1
 
 
@@ -285,9 +270,7 @@ class TestOrdenacaoCronologica:
                 {"nome": "Julgamento improcedente", "dataHora": "2023-11-15T10:00:00Z"},
             ]
         }
-        fav, desfav, _ = self.preditor._contar_desfechos(
-            [caso_com_recurso], polo_cliente="autor"
-        )
+        fav, desfav, _ = self.preditor._contar_desfechos([caso_com_recurso], polo_cliente="autor")
         # Deve registrar improcedente (resultado do acórdão mais recente)
         assert desfav == 1
         assert fav == 0
@@ -418,9 +401,7 @@ class TestBuscarEstatisticaHappyPath:
             )
 
         assert resultado is not None
-        total = (
-            resultado.pct_favoravel + resultado.pct_desfavoravel + resultado.pct_neutro
-        )
+        total = resultado.pct_favoravel + resultado.pct_desfavoravel + resultado.pct_neutro
         assert abs(total - 100.0) < 0.2  # tolerância para arredondamento
 
     async def test_confianca_alta_com_50_desfechos(self):
@@ -496,18 +477,14 @@ class TestBuscarEstatisticaRetornaNone:
     async def test_tipo_acao_vazio_retorna_none(self):
         mock = _make_httpx_mock()
         with _patch_http(mock):
-            resultado = await _preditor().buscar_estatistica(
-                numero_cnj=_CNJ_TJSP, tipo_acao=""
-            )
+            resultado = await _preditor().buscar_estatistica(numero_cnj=_CNJ_TJSP, tipo_acao="")
         assert resultado is None
         mock.post.assert_not_called()  # não fez chamada HTTP
 
     async def test_tipo_acao_none_retorna_none(self):
         mock = _make_httpx_mock()
         with _patch_http(mock):
-            resultado = await _preditor().buscar_estatistica(
-                numero_cnj=_CNJ_TJSP, tipo_acao=None
-            )
+            resultado = await _preditor().buscar_estatistica(numero_cnj=_CNJ_TJSP, tipo_acao=None)
         assert resultado is None
 
     async def test_cnj_invalido_retorna_none(self):
@@ -578,9 +555,7 @@ class TestBuscarCasosSimilaresErros:
         exc = httpx.TimeoutException("timeout")
         mock = _make_httpx_mock(raise_exc=exc)
         with _patch_http(mock):
-            resultado = await _preditor()._buscar_casos_similares(
-                "api_publica_tjsp", _TIPO_ACAO
-            )
+            resultado = await _preditor()._buscar_casos_similares("api_publica_tjsp", _TIPO_ACAO)
         assert resultado == []
 
     async def test_http_status_error_retorna_lista_vazia(self):
@@ -590,26 +565,20 @@ class TestBuscarCasosSimilaresErros:
         exc = httpx.HTTPStatusError("503", request=request_mock, response=response_mock)
         mock = _make_httpx_mock(raise_exc=exc)
         with _patch_http(mock):
-            resultado = await _preditor()._buscar_casos_similares(
-                "api_publica_tjsp", _TIPO_ACAO
-            )
+            resultado = await _preditor()._buscar_casos_similares("api_publica_tjsp", _TIPO_ACAO)
         assert resultado == []
 
     async def test_request_error_rede_retorna_lista_vazia(self):
         exc = httpx.ConnectError("connection refused")
         mock = _make_httpx_mock(raise_exc=exc)
         with _patch_http(mock):
-            resultado = await _preditor()._buscar_casos_similares(
-                "api_publica_tjsp", _TIPO_ACAO
-            )
+            resultado = await _preditor()._buscar_casos_similares("api_publica_tjsp", _TIPO_ACAO)
         assert resultado == []
 
     async def test_resposta_sem_hits_key_retorna_lista_vazia(self):
         mock = _make_httpx_mock(payload={"total": 0})  # sem chave "hits"
         with _patch_http(mock):
-            resultado = await _preditor()._buscar_casos_similares(
-                "api_publica_tjsp", _TIPO_ACAO
-            )
+            resultado = await _preditor()._buscar_casos_similares("api_publica_tjsp", _TIPO_ACAO)
         assert resultado == []
 
     async def test_chama_url_correta_com_indice(self):
@@ -633,9 +602,7 @@ class TestBuscarCasosSimilaresErros:
         preditor_sem_key = VitoriaPreditor(api_key=None)
         mock = _make_httpx_mock()
         with _patch_http(mock):
-            await preditor_sem_key._buscar_casos_similares(
-                "api_publica_tjsp", _TIPO_ACAO
-            )
+            await preditor_sem_key._buscar_casos_similares("api_publica_tjsp", _TIPO_ACAO)
 
         headers = mock.post.call_args[1]["headers"]
         assert "Authorization" not in headers

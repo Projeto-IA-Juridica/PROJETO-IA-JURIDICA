@@ -45,8 +45,7 @@ def get_database_url() -> str:
     url = os.getenv("DATABASE_URL")
     if not url:
         raise RuntimeError(
-            "DATABASE_URL não definida. "
-            "Verifique seu arquivo .env ou variáveis de ambiente."
+            "DATABASE_URL não definida. " "Verifique seu arquivo .env ou variáveis de ambiente."
         )
     if not url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)

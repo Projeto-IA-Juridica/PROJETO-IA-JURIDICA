@@ -120,9 +120,7 @@ class TestRetryHttp:
         erro = HttpError(resp=resp_mock, content=b"error")
         fn = MagicMock(side_effect=[erro, "ok"])
 
-        with patch(
-            "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-        ):
+        with patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"):
             resultado = _retry_http(fn, max_tentativas=3)
 
         assert resultado == "ok"
@@ -135,9 +133,7 @@ class TestRetryHttp:
         fn = MagicMock(side_effect=erro)
 
         with (
-            patch(
-                "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-            ),
+            patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"),
             pytest.raises(HttpError),
         ):
             _retry_http(fn, max_tentativas=3)
@@ -174,9 +170,7 @@ class TestRetryHttp:
 class TestLerIntervalo:
     def _mock_execute(self, cliente, payload: dict):
         """Configura self._sheet para retornar payload no execute()."""
-        cliente._sheet.values.return_value.get.return_value.execute.return_value = (
-            payload
-        )
+        cliente._sheet.values.return_value.get.return_value.execute.return_value = payload
 
     def test_retorna_linhas_da_api(self, cliente):
         self._mock_execute(cliente, {"values": [["a", "b"], ["c", "d"]]})
@@ -316,9 +310,7 @@ class TestGetClientes:
     def test_get_clientes_propaga_excecao_da_api(self, cliente):
         """Erro na API deve ser propagado (não silenciado)."""
         with (
-            patch.object(
-                cliente, "_ler_intervalo", side_effect=RuntimeError("API down")
-            ),
+            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
             pytest.raises(RuntimeError),
         ):
             cliente.get_clientes()
@@ -381,9 +373,7 @@ class TestGetDatasComemorativas:
 
     def test_get_datas_propaga_excecao_da_api(self, cliente):
         with (
-            patch.object(
-                cliente, "_ler_intervalo", side_effect=RuntimeError("API down")
-            ),
+            patch.object(cliente, "_ler_intervalo", side_effect=RuntimeError("API down")),
             pytest.raises(RuntimeError),
         ):
             cliente.get_datas_comemorativas()
@@ -407,9 +397,7 @@ class TestRegistrarLogEnvio:
     def test_chama_append_com_5_colunas(self, cliente):
         mock_values = self._mock_sheet(cliente)
 
-        with patch(
-            "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-        ):
+        with patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"):
             cliente.registrar_log_envio(
                 tipo="aniversario",
                 cliente_id=42,
@@ -428,9 +416,7 @@ class TestRegistrarLogEnvio:
     def test_sucesso_false_registra_nao(self, cliente):
         mock_values = self._mock_sheet(cliente)
 
-        with patch(
-            "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-        ):
+        with patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"):
             cliente.registrar_log_envio(
                 tipo="check_in",
                 cliente_id=10,
@@ -457,9 +443,7 @@ class TestRegistrarLogEnvio:
         cliente._sheet = MagicMock()
         cliente._sheet.values.return_value = mock_values
 
-        with patch(
-            "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-        ):
+        with patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"):
             cliente.registrar_log_envio(
                 tipo="data_comemorativa",
                 cliente_id=1,
@@ -494,9 +478,7 @@ class TestRegistrarLogEnvio:
         cliente._sheet.values.return_value = mock_values
 
         with (
-            patch(
-                "feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"
-            ),
+            patch("feature_1_ia_personalizada.services.integrations.google_sheets.time.sleep"),
             pytest.raises(HttpError),
         ):
             cliente.registrar_log_envio(tipo="test", cliente_id=1, detalhe="test")

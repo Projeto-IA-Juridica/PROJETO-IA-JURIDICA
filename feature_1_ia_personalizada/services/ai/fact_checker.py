@@ -44,19 +44,17 @@ class FactChecker:
             # Impedem que Claude converta dados históricos em predição INDIVIDUAL.
             # Bloqueiam apenas frases que personalizam a estatística para o cliente,
             # não frases históricas genéricas ("em casos similares, X% foram favoráveis").
-            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),        # "você tem 72%..."
-            re.compile(r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE), # "seu processo tem 80%..."
-            re.compile(r"\bsua probabilidade\b", re.IGNORECASE),         # "sua probabilidade é de..."
-            re.compile(                                                   # "você tem 80% de chance de ganhar"
+            re.compile(r"\bvocê tem\s+\d+\s*%", re.IGNORECASE),  # "você tem 72%..."
+            re.compile(r"\bseu processo tem\s+\d+\s*%", re.IGNORECASE),  # "seu processo tem 80%..."
+            re.compile(r"\bsua probabilidade\b", re.IGNORECASE),  # "sua probabilidade é de..."
+            re.compile(  # "você tem 80% de chance de ganhar"
                 r"\bvocê tem\s+\d+\s*%\s*de\s*chance\s*de\s*(ganhar|vencer|procedência)\b",
                 re.IGNORECASE,
             ),
         ]
 
         # Disclaimer — aparece apenas quando um padrão proibido é corrigido
-        self._disclaimer = (
-            "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a). 😊"
-        )
+        self._disclaimer = "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a). 😊"
 
     # 1) Status do processo
 
@@ -90,13 +88,9 @@ class FactChecker:
         if numero_cnj and numero_cnj not in afirmacao_ia:
             correcoes.append("Número CNJ não confere com o cadastro do processo.")
         if tribunal and tribunal not in afirmacao_ia:
-            correcoes.append(
-                "Tribunal mencionado não confere com o cadastro do processo."
-            )
+            correcoes.append("Tribunal mencionado não confere com o cadastro do processo.")
         if ultimo_andamento and ultimo_andamento not in afirmacao_ia:
-            correcoes.append(
-                "Último andamento mencionado não confere com o cadastro do processo."
-            )
+            correcoes.append("Último andamento mencionado não confere com o cadastro do processo.")
 
         resultado = {
             "verificado": len(correcoes) == 0,
@@ -141,9 +135,7 @@ class FactChecker:
         if prazo_real:
             # Checagem simples: string igual (você pode evoluir para datas/regex)
             if prazo_mencionado.strip() != prazo_real:
-                correcoes.append(
-                    "Prazo mencionado não corresponde ao prazo real cadastrado."
-                )
+                correcoes.append("Prazo mencionado não corresponde ao prazo real cadastrado.")
         # Se não há prazo real, não reprova (apenas não verifica)
         resultado = {
             "verificado": len(correcoes) == 0,
@@ -211,9 +203,7 @@ class FactChecker:
 
     # 4) Logger em metadata_json
 
-    def _logar_metadata_json(
-        self, interacao: Any, evento: str, payload: dict[str, Any]
-    ) -> None:
+    def _logar_metadata_json(self, interacao: Any, evento: str, payload: dict[str, Any]) -> None:
         """
         Registra dados em interacao.metadata_json.
 

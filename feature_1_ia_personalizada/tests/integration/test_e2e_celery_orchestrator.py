@@ -45,9 +45,7 @@ class TestWorkerE2E:
     consegue instanciar as dependências e percorrer o fluxo.
     """
 
-    @patch(
-        "feature_1_ia_personalizada.services.ai.orchestrator.executar_fluxo_orquestrador"
-    )
+    @patch("feature_1_ia_personalizada.services.ai.orchestrator.executar_fluxo_orquestrador")
     @patch("feature_1_ia_personalizada.workers.send_notifications.registrar_interacao")
     def test_worker_sucesso_invoca_orquestrador_e_salva_historico(
         self, mock_registrar, mock_orquestrador
@@ -81,13 +79,9 @@ class TestWorkerE2E:
         assert args_registro["tipo"] == "mensagem_processada"
         assert args_registro["dados"] == resultado_simulado
 
-    @patch(
-        "feature_1_ia_personalizada.services.ai.orchestrator.executar_fluxo_orquestrador"
-    )
+    @patch("feature_1_ia_personalizada.services.ai.orchestrator.executar_fluxo_orquestrador")
     @patch("feature_1_ia_personalizada.workers.send_notifications.registrar_interacao")
-    def test_worker_falha_propaga_erro_e_registra_falha(
-        self, mock_registrar, mock_orquestrador
-    ):
+    def test_worker_falha_propaga_erro_e_registra_falha(self, mock_registrar, mock_orquestrador):
         """
         Garante que, se o orquestrador falhar catastroficamente (raise Exception),
         o worker registra o erro e repassa a exceção (para o Celery dar retry).
@@ -108,9 +102,7 @@ class TestWorkerE2E:
 
     @patch("feature_1_ia_personalizada.services.ai.orchestrator.asyncio.run")
     @patch("feature_1_ia_personalizada.workers.send_notifications.registrar_interacao")
-    def test_fluxo_completo_orquestrador_mockando_aio_run(
-        self, mock_registrar, mock_run
-    ):
+    def test_fluxo_completo_orquestrador_mockando_aio_run(self, mock_registrar, mock_run):
         """
         Testa a cadeia processar_mensagem_recebida -> executar_fluxo_orquestrador
         sem invocar de fato as classes do LangGraph (pois o event loop não roda).

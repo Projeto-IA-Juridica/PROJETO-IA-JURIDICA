@@ -131,9 +131,7 @@ class Processo(Base, TimestampMixin, TenantMixin):
     escritorio: Mapped["Escritorio"] = relationship(  # noqa: F821
         "Escritorio", back_populates="processos"
     )
-    cliente: Mapped["Cliente"] = relationship(  # noqa: F821
-        "Cliente", back_populates="processos"
-    )
+    cliente: Mapped["Cliente"] = relationship("Cliente", back_populates="processos")  # noqa: F821
     advogado_responsavel: Mapped["Usuario | None"] = relationship(  # noqa: F821
         "Usuario",
         foreign_keys=[advogado_responsavel_id],
@@ -145,9 +143,7 @@ class Processo(Base, TimestampMixin, TenantMixin):
 
     # --- Constraints e Índices ---
     __table_args__ = (
-        UniqueConstraint(
-            "escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"
-        ),
+        UniqueConstraint("escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"),
     )
 
     def __repr__(self) -> str:

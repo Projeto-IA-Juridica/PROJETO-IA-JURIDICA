@@ -15,9 +15,7 @@ from shared.models.interacao import Interacao
 from teste_datajud.standalone_pipeline import DatajudTesterPipeline
 
 # Configuração da Página
-st.set_page_config(
-    page_title="Datajud API Tester Sandbox", page_icon="⚖️", layout="wide"
-)
+st.set_page_config(page_title="Datajud API Tester Sandbox", page_icon="⚖️", layout="wide")
 
 # Estilização
 st.markdown(
@@ -69,9 +67,7 @@ with st.sidebar:
         "Número do Processo (CNJ) ou CPF/CNPJ",
         placeholder="Ex: 0000000-00.0000.0.00.0000 ou 111.222.333-44",
     )
-    btn_buscar = st.button(
-        "Executar Busca 🚀", use_container_width=True, type="primary"
-    )
+    btn_buscar = st.button("Executar Busca 🚀", use_container_width=True, type="primary")
 
     if btn_buscar:
         st.session_state.mensagens = []  # Limpa o chat ao buscar novo processo
@@ -100,9 +96,7 @@ with st.sidebar:
                 st.info(
                     "🔎 Identificado formato CPF/CNPJ. Buscando lista de processos para o documento..."
                 )
-                resultado = asyncio.run(
-                    tester.datajud_client.consultar_cpf_cnpj(termo_limpo)
-                )
+                resultado = asyncio.run(tester.datajud_client.consultar_cpf_cnpj(termo_limpo))
 
                 if resultado.get("erro"):
                     st.error(f"❌ Erro na busca por documento: {resultado.get('erro')}")
@@ -188,9 +182,7 @@ else:
 
                 # Resgata o prompt base
                 ultimo_andamento = ""
-                limpo = st.session_state.contexto_processo.get("limpo", {}).get(
-                    "historico", []
-                )
+                limpo = st.session_state.contexto_processo.get("limpo", {}).get("historico", [])
                 if limpo:
                     ultimo_andamento = limpo[0].get("descricao", "")
 
@@ -211,9 +203,7 @@ else:
                     )
                     r_texto = resposta["resposta"]
                     st.markdown(r_texto)
-                    st.session_state.mensagens.append(
-                        {"role": "assistant", "content": r_texto}
-                    )
+                    st.session_state.mensagens.append({"role": "assistant", "content": r_texto})
 
                     # Salva a interação no Supabase (Postgres)
                     async def salvar_no_banco():

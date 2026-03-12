@@ -223,9 +223,7 @@ async def seed_escritorio(session) -> Escritorio:
 async def seed_usuarios(session, escritorio: Escritorio) -> list[Usuario]:
     usuarios = []
     for dados in USUARIOS_SEED:
-        result = await session.execute(
-            select(Usuario).where(Usuario.email == dados["email"])
-        )
+        result = await session.execute(select(Usuario).where(Usuario.email == dados["email"]))
         existente = result.scalar_one_or_none()
         if existente:
             print(f"  [SKIP] Usuário já existe: {existente.email}")

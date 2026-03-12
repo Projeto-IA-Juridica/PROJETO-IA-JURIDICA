@@ -23,9 +23,7 @@ import os
 import sys
 
 # Garante que o root do projeto esteja no path, independente de onde o script é chamado
-_PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -46,9 +44,7 @@ logger = structlog.get_logger(__name__)
 
 async def run(escritorio_id: int, dry_run: bool) -> None:
     """Executa a sincronização."""
-    logger.info(
-        "iniciando_sincronizacao_sheets", escritorio_id=escritorio_id, dry_run=dry_run
-    )
+    logger.info("iniciando_sincronizacao_sheets", escritorio_id=escritorio_id, dry_run=dry_run)
 
     if not settings.GOOGLE_CREDENTIALS_PATH or not settings.GOOGLE_SHEETS_ID:
         logger.error(
@@ -99,17 +95,13 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
                     continue
 
                 if not raw_telefone.strip():
-                    logger.debug(
-                        "linha_ignorada_sem_telefone", linha=idx, nome=nome, cpf=raw_cpf
-                    )
+                    logger.debug("linha_ignorada_sem_telefone", linha=idx, nome=nome, cpf=raw_cpf)
                     estatisticas["ignorados_sem_telefone"] += 1
                     continue
 
                 cpf_limpo = normalizar_cpf(raw_cpf)
                 if not cpf_limpo or len(cpf_limpo) != 11:
-                    logger.debug(
-                        "linha_ignorada_cpf_invalido", linha=idx, nome=nome, cpf=raw_cpf
-                    )
+                    logger.debug("linha_ignorada_cpf_invalido", linha=idx, nome=nome, cpf=raw_cpf)
                     estatisticas["ignorados_cpf_invalido"] += 1
                     continue
 
@@ -132,9 +124,7 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
                 data_nascimento = None
                 if data_nasc_str:
                     try:
-                        data_nascimento = datetime.strptime(
-                            data_nasc_str, "%Y-%m-%d"
-                        ).date()
+                        data_nascimento = datetime.strptime(data_nasc_str, "%Y-%m-%d").date()
                     except ValueError:
                         pass
 
@@ -203,9 +193,7 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
                     try:
                         from datetime import datetime
 
-                        data_nascimento = datetime.strptime(
-                            data_nasc_str, "%Y-%m-%d"
-                        ).date()
+                        data_nascimento = datetime.strptime(data_nasc_str, "%Y-%m-%d").date()
                     except ValueError:
                         pass
 
@@ -263,9 +251,7 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
                 estatisticas["erros"] += 1
 
         if dry_run:
-            logger.info(
-                "dry_run_ativo", detail="Não iremos commitar ao banco de dados."
-            )
+            logger.info("dry_run_ativo", detail="Não iremos commitar ao banco de dados.")
             await session.rollback()
         else:
             if estatisticas["inseridos"] > 0 or estatisticas["atualizados"] > 0:
@@ -273,9 +259,7 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
                 logger.info("transacao_commitada")
             else:
                 await session.rollback()
-                logger.info(
-                    "nenhum_dado_alterado", detail="Rollback invocado por otimização."
-                )
+                logger.info("nenhum_dado_alterado", detail="Rollback invocado por otimização.")
 
     # 3. Sumarização Final
     print("\n" + "=" * 50)
@@ -289,9 +273,7 @@ async def run(escritorio_id: int, dry_run: bool) -> None:
     print(f" Ignorados (Sem CPF):          {estatisticas['ignorados_sem_cpf']}")
     print(f" Ignorados (CPF Inválido):     {estatisticas['ignorados_cpf_invalido']}")
     print(f" Ignorados (Sem Telefone):     {estatisticas['ignorados_sem_telefone']}")
-    print(
-        f" Ignorados (Tel. Inválido):    {estatisticas['ignorados_telefone_invalido']}"
-    )
+    print(f" Ignorados (Tel. Inválido):    {estatisticas['ignorados_telefone_invalido']}")
     print(f" Erros de Processamento:       {estatisticas['erros']}")
     print("=" * 50 + "\n")
 

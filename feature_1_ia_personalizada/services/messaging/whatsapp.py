@@ -124,15 +124,9 @@ class WhatsAppService:
             second=0,
             microsecond=0,
         )
-        return (
-            proximo_dia.replace(day=agora.day)
-            if False
-            else (proximo_dia + _um_dia(agora))
-        )
+        return proximo_dia.replace(day=agora.day) if False else (proximo_dia + _um_dia(agora))
 
-    async def _pode_enviar_agora(
-        self, cliente_id: int, agora: datetime
-    ) -> tuple[bool, str | None]:
+    async def _pode_enviar_agora(self, cliente_id: int, agora: datetime) -> tuple[bool, str | None]:
         preferencia = await self.repo.obter_preferencia_horario_notificacao(cliente_id)
         if preferencia == "comercial" and not self._esta_na_janela_comercial(agora):
             return False, "fora_horario_comercial"
@@ -205,9 +199,7 @@ class WhatsAppService:
         numero = await self.repo.obter_numero_cliente(cliente_id)
 
         try:
-            resposta = await self.evolution_client.enviar_texto(
-                instancia, numero, texto
-            )
+            resposta = await self.evolution_client.enviar_texto(instancia, numero, texto)
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -216,9 +208,7 @@ class WhatsAppService:
                 status="enviado",
                 payload_resposta=resposta,
             )
-            _mensagens_enviadas.labels(
-                escritorio_id=str(escritorio_id), tipo="texto"
-            ).inc()
+            _mensagens_enviadas.labels(escritorio_id=str(escritorio_id), tipo="texto").inc()
             return {"ok": True, "agendado": False, "resposta": resposta}
 
         except EvolutionOfflineError as e:
@@ -258,9 +248,7 @@ class WhatsAppService:
 
     # Mensagens “prontas”
 
-    async def _obter_contexto_processo(
-        self, processo_id: int
-    ) -> tuple[int, int] | None:
+    async def _obter_contexto_processo(self, processo_id: int) -> tuple[int, int] | None:
         """Retorna (escritorio_id, cliente_id) do processo, ou None se não encontrado."""
         async with async_session_factory() as session:
             result = await session.execute(
@@ -286,22 +274,16 @@ class WhatsAppService:
             f"{andamento}\n\n"
             "Se desejar, posso explicar em linguagem mais simples."
         )
-        return await self.enviar_mensagem(
-            escritorio_id, cliente_id, texto, processo_id=processo_id
-        )
+        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
-    async def enviar_boas_vindas(
-        self, escritorio_id: int, cliente_id: int
-    ) -> dict[str, Any]:
+    async def enviar_boas_vindas(self, escritorio_id: int, cliente_id: int) -> dict[str, Any]:
         texto = (
             "Olá! 👋 Seja bem-vindo(a).\n"
             "Este canal é para atualizações e dúvidas rápidas do seu atendimento.\n"
             "⚠️ Aviso: informações enviadas aqui não substituem orientação jurídica formal.\n"
             "Se precisar de algo, é só responder esta mensagem."
         )
-        return await self.enviar_mensagem(
-            escritorio_id, cliente_id, texto, processo_id=None
-        )
+        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=None)
 
     async def enviar_pesquisa_satisfacao(
         self, escritorio_id: int, cliente_id: int
@@ -323,9 +305,7 @@ class WhatsAppService:
         ]
 
         try:
-            resposta = await self.evolution_client.enviar_botoes(
-                instancia, numero, texto, botoes
-            )
+            resposta = await self.evolution_client.enviar_botoes(instancia, numero, texto, botoes)
             await self.repo.salvar_interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -355,9 +335,7 @@ class WhatsAppService:
             "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
             "Isso é comum e não significa necessariamente um problema."
         )
-        return await self.enviar_mensagem(
-            escritorio_id, cliente_id, texto, processo_id=processo_id
-        )
+        return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
 
 # Utils internas
@@ -376,16 +354,14 @@ class SQLWhatsAppRepository:
     async def obter_instancia_por_escritorio(self, escritorio_id: int) -> str:
         async with async_session_factory() as session:
             result = await session.execute(
-                select(Escritorio.webhook_whatsapp_instance).where(
-                    Escritorio.id == escritorio_id
-                )
+                select(Escritorio.webhook_whatsapp_instance).where(Escritorio.id == escritorio_id)
             )
             val = result.scalar_one_or_none()
         if not val:
             raise ValueError(
                 f"Escritório {escritorio_id} não possui instância do WhatsApp configurada."
             )
-        return val
+        return str(val)
 
     async def obter_numero_cliente(self, cliente_id: int) -> str:
         async with async_session_factory() as session:
@@ -395,14 +371,12 @@ class SQLWhatsAppRepository:
             val = result.scalar_one_or_none()
         if not val:
             raise ValueError(f"Cliente {cliente_id} não encontrado ou sem telefone.")
-        return val
+        return str(val)
 
     async def obter_preferencia_horario_notificacao(self, cliente_id: int) -> str:
         async with async_session_factory() as session:
             result = await session.execute(
-                select(Cliente.preferencia_horario_notificacao).where(
-                    Cliente.id == cliente_id
-                )
+                select(Cliente.preferencia_horario_notificacao).where(Cliente.id == cliente_id)
             )
             val = result.scalar_one_or_none()
         return val or "comercial"

@@ -76,7 +76,9 @@ def _normalizar_cnj(numero: str) -> str | None:
     # Tenta normalizar a partir de raw ou com pontuação diferente
     digits = re.sub(r"[.\-/]", "", numero)
     if _CNJ_RAW.match(digits):
-        return f"{digits[:7]}-{digits[7:9]}.{digits[9:13]}.{digits[13]}.{digits[14:16]}.{digits[16:]}"
+        return (
+            f"{digits[:7]}-{digits[7:9]}.{digits[9:13]}.{digits[13]}.{digits[14:16]}.{digits[16:]}"
+        )
 
     return None  # formato inválido
 
@@ -109,9 +111,7 @@ async def processar_csv(
             "processos_novos": 0,
             "processos_atualizados": 0,
             "ignorados": 0,
-            "erros": [
-                {"linha": 0, "dados": "", "motivo": "CSV vazio ou sem cabeçalho"}
-            ],
+            "erros": [{"linha": 0, "dados": "", "motivo": "CSV vazio ou sem cabeçalho"}],
             "preview": [],
         }
 
@@ -155,9 +155,7 @@ async def processar_csv(
             continue
 
         if not telefone_raw:
-            erros.append(
-                {"linha": i, "dados": str(row_norm), "motivo": "Telefone ausente"}
-            )
+            erros.append({"linha": i, "dados": str(row_norm), "motivo": "Telefone ausente"})
             continue
 
         telefone = _normalizar_telefone(telefone_raw)

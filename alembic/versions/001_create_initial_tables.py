@@ -105,9 +105,7 @@ def upgrade() -> None:
         sa.Column("profissao", sa.String(100), nullable=True),
         sa.Column("empresa_atual", sa.String(200), nullable=True),
         sa.Column("cargo", sa.String(100), nullable=True),
-        sa.Column(
-            "aceite_lgpd", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("aceite_lgpd", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("data_aceite_lgpd", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "preferencia_horario_notificacao",
@@ -153,9 +151,7 @@ def upgrade() -> None:
         sa.Column("vara", sa.String(200), nullable=True),
         sa.Column("comarca", sa.String(200), nullable=True),
         sa.Column("tipo_acao", sa.String(200), nullable=True),
-        sa.Column(
-            "polo_cliente", sa.String(20), nullable=False, server_default="autor"
-        ),
+        sa.Column("polo_cliente", sa.String(20), nullable=False, server_default="autor"),
         sa.Column("status", sa.String(50), nullable=False, server_default="ativo"),
         sa.Column("ultimo_andamento", sa.Text(), nullable=True),
         sa.Column("data_ultimo_andamento", sa.DateTime(timezone=True), nullable=True),
@@ -202,9 +198,7 @@ def upgrade() -> None:
             ondelete="SET NULL",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"
-        ),
+        sa.UniqueConstraint("escritorio_id", "numero_cnj", name="uq_processos_escritorio_cnj"),
     )
     op.create_index("ix_processos_escritorio_id", "processos", ["escritorio_id"])
     op.create_index("ix_processos_cliente_id", "processos", ["cliente_id"])
@@ -284,8 +278,7 @@ def upgrade() -> None:
     # O ORM já cuida disso via onupdate=func.now(), mas garantir no banco
     # protege contra updates diretos via SQL (migrations, seeds, scripts).
     # =========================================================================
-    op.execute(
-        """
+    op.execute("""
         CREATE OR REPLACE FUNCTION update_updated_at()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -293,17 +286,14 @@ def upgrade() -> None:
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
-    """
-    )
+    """)
 
     for tabela in ["escritorios", "usuarios", "clientes", "processos", "interacoes"]:
-        op.execute(
-            f"""
+        op.execute(f"""
             CREATE TRIGGER trg_{tabela}_updated_at
             BEFORE UPDATE ON {tabela}
             FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-        """
-        )
+        """)
 
 
 def downgrade() -> None:

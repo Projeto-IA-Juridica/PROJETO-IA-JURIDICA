@@ -144,7 +144,6 @@ SYSTEM_PROMPT_PERSPECTIVAS_DESFAVORAVEL = (
 )
 
 
-
 SYSTEM_PROMPT_TRADUZIR_TERMO = (
     "Você é a assistente jurídica digital do escritório {nome_escritorio}.\n\n"
     "{nome_cliente} perguntou o significado de um termo jurídico.\n\n"

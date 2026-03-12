@@ -32,9 +32,7 @@ def memory(fake_redis: FakeRedis) -> ConversationMemory:
 # ---------------------------------------------------------------------------
 
 
-async def _salvar_n(
-    memory: ConversationMemory, n: int, escritorio=1, cliente=1
-) -> None:
+async def _salvar_n(memory: ConversationMemory, n: int, escritorio=1, cliente=1) -> None:
     for i in range(n):
         await memory.salvar_mensagem(escritorio, cliente, "user", f"mensagem {i}")
 
@@ -65,9 +63,7 @@ class TestHappyPath:
         historico = await memory.buscar_historico(1, 1)
         assert historico[0]["content"] == texto
 
-    async def test_historico_vazio_retorna_lista_vazia(
-        self, memory: ConversationMemory
-    ):
+    async def test_historico_vazio_retorna_lista_vazia(self, memory: ConversationMemory):
         historico = await memory.buscar_historico(99, 99)
         assert historico == []
 
@@ -81,9 +77,7 @@ class TestHappyPath:
         assert await memory.tamanho_historico(1, 1) == 0
         assert await memory.buscar_historico(1, 1) == []
 
-    async def test_buscar_limite_maior_que_historico_retorna_tudo(
-        self, memory: ConversationMemory
-    ):
+    async def test_buscar_limite_maior_que_historico_retorna_tudo(self, memory: ConversationMemory):
         await _salvar_n(memory, 5)
         historico = await memory.buscar_historico(1, 1, limite=100)
         assert len(historico) == 5
@@ -137,16 +131,12 @@ class TestFIFO:
 
 
 class TestTTL:
-    async def test_salvar_define_ttl(
-        self, memory: ConversationMemory, fake_redis: FakeRedis
-    ):
+    async def test_salvar_define_ttl(self, memory: ConversationMemory, fake_redis: FakeRedis):
         await memory.salvar_mensagem(1, 1, "user", "msg")
         chave = _chave(1, 1)
         assert fake_redis._ttl(chave) == _TTL_SEGUNDOS
 
-    async def test_buscar_renova_ttl(
-        self, memory: ConversationMemory, fake_redis: FakeRedis
-    ):
+    async def test_buscar_renova_ttl(self, memory: ConversationMemory, fake_redis: FakeRedis):
         """buscar_historico deve renovar o TTL mesmo que salvar já tenha feito isso."""
         await memory.salvar_mensagem(1, 1, "user", "msg")
         chave = _chave(1, 1)
@@ -203,9 +193,7 @@ class TestTruncamento:
 
 
 class TestIsolamento:
-    async def test_escritorios_diferentes_nao_se_misturam(
-        self, memory: ConversationMemory
-    ):
+    async def test_escritorios_diferentes_nao_se_misturam(self, memory: ConversationMemory):
         await memory.salvar_mensagem(1, 1, "user", "escritorio 1")
         await memory.salvar_mensagem(2, 1, "user", "escritorio 2")
 
@@ -217,9 +205,7 @@ class TestIsolamento:
         assert len(hist_1) == 1
         assert len(hist_2) == 1
 
-    async def test_clientes_diferentes_nao_se_misturam(
-        self, memory: ConversationMemory
-    ):
+    async def test_clientes_diferentes_nao_se_misturam(self, memory: ConversationMemory):
         await memory.salvar_mensagem(1, 10, "user", "cliente 10")
         await memory.salvar_mensagem(1, 20, "user", "cliente 20")
 
@@ -229,9 +215,7 @@ class TestIsolamento:
         assert hist_10[0]["content"] == "cliente 10"
         assert hist_20[0]["content"] == "cliente 20"
 
-    async def test_limpar_historico_nao_afeta_outro_cliente(
-        self, memory: ConversationMemory
-    ):
+    async def test_limpar_historico_nao_afeta_outro_cliente(self, memory: ConversationMemory):
         await memory.salvar_mensagem(1, 1, "user", "cliente 1")
         await memory.salvar_mensagem(1, 2, "user", "cliente 2")
 

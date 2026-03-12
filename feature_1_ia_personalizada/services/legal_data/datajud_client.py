@@ -118,9 +118,7 @@ def _indice_para_cnj(numero_cnj: str) -> str:
         indice = None
 
     if not indice:
-        raise DataJudClientError(
-            f"Tribunal não mapeado para CNJ {numero_cnj!r} (J={j}, TT={tt})"
-        )
+        raise DataJudClientError(f"Tribunal não mapeado para CNJ {numero_cnj!r} (J={j}, TT={tt})")
     return indice
 
 
@@ -162,13 +160,9 @@ class DataJudClient:
             try:
                 response = await client.post(url, json=query, headers=self._headers())
             except httpx.TimeoutException as exc:
-                raise DataJudClientError(
-                    f"Timeout ao consultar DataJud para {numero_cnj}"
-                ) from exc
+                raise DataJudClientError(f"Timeout ao consultar DataJud para {numero_cnj}") from exc
             except httpx.RequestError as exc:
-                raise DataJudClientError(
-                    f"Erro de rede ao consultar DataJud: {exc}"
-                ) from exc
+                raise DataJudClientError(f"Erro de rede ao consultar DataJud: {exc}") from exc
 
         if response.status_code == 401:
             raise DataJudClientError(
@@ -222,9 +216,7 @@ class DataJudClient:
             complementos = m.get("complementosTabelados", [])
             if complementos:
                 valores = "; ".join(
-                    str(c.get("valor", ""))
-                    for c in complementos
-                    if c.get("valor") is not None
+                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
                 )
                 if valores:
                     nome = f"{nome}: {valores}"

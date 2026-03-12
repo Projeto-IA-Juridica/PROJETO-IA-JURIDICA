@@ -40,9 +40,7 @@ FUSO_HORARIO_PADRAO = int(os.getenv("FUSO_HORARIO_PADRAO", "-3"))
 cliente_redis = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 TAMANHO_LOTE = 10
-TEMPO_ALERTA_POR_CLIENTE = (
-    15  # limiar de observabilidade; não interrompe o processamento
-)
+TEMPO_ALERTA_POR_CLIENTE = 15  # limiar de observabilidade; não interrompe o processamento
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
 
@@ -62,7 +60,9 @@ TEMPLATE_DIA_BANCARIO = (
     "Se precisar de ajuda com documentos, prazos ou dúvidas do processo, me chama por aqui."
 )
 
-TEMPLATE_DATA_COMEMORATIVA_GENERICA = "📅 Hoje é {nome_data}.\n\nSe precisar de qualquer apoio com seu processo, estou à disposição."
+TEMPLATE_DATA_COMEMORATIVA_GENERICA = (
+    "📅 Hoje é {nome_data}.\n\nSe precisar de qualquer apoio com seu processo, estou à disposição."
+)
 
 
 @dataclass
@@ -93,9 +93,7 @@ def normalizar_texto(texto: str) -> str:
         return ""
     texto = texto.strip().lower()
     return "".join(
-        c
-        for c in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(c) != "Mn"
+        c for c in unicodedata.normalize("NFD", texto) if unicodedata.category(c) != "Mn"
     )
 
 
@@ -200,9 +198,7 @@ def buscar_processo_ativo_do_cliente(id_cliente: int) -> Processo | None:
     )
 
 
-def salvar_interacao(
-    *, id_cliente: int, id_processo: int | None, texto: str, metadata_json: dict
-):
+def salvar_interacao(*, id_cliente: int, id_processo: int | None, texto: str, metadata_json: dict):
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -241,9 +237,7 @@ def verificar_aniversarios_diarios(self) -> dict:
         for cliente in lote:
             inicio = time.time()
 
-            chave_envio = chave(
-                "relacionamento:aniversario", cliente.id, f"{dia:02d}-{mes:02d}"
-            )
+            chave_envio = chave("relacionamento:aniversario", cliente.id, f"{dia:02d}-{mes:02d}")
             if ja_enviado_recentemente(chave_envio):
                 ignorados += 1
                 continue
@@ -295,9 +289,7 @@ def verificar_aniversarios_diarios(self) -> dict:
                 )
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
-                logger.warning(
-                    "timeout_por_cliente", tipo="aniversario", cliente_id=cliente.id
-                )
+                logger.warning("timeout_por_cliente", tipo="aniversario", cliente_id=cliente.id)
 
         time.sleep(1)
 
@@ -316,11 +308,7 @@ def verificar_datas_comemorativas(self) -> dict:
     datas = GoogleSheetsClient.get_datas_comemorativas()
     dia, mes = dia_mes_hoje()
 
-    datas_hoje = [
-        d
-        for d in datas
-        if int(d.get("dia", -1)) == dia and int(d.get("mes", -1)) == mes
-    ]
+    datas_hoje = [d for d in datas if int(d.get("dia", -1)) == dia and int(d.get("mes", -1)) == mes]
     if not datas_hoje:
         return {"status": "ok", "enviados": 0, "ignorados": 0, "datas": 0}
 
@@ -329,17 +317,14 @@ def verificar_datas_comemorativas(self) -> dict:
 
     for data_info in datas_hoje:
         nome_data = str(data_info.get("nome", "Data comemorativa")).strip()
-        profissao_alvo = normalizar_texto(
-            str(data_info.get("profissao_alvo", "")).strip()
-        )
+        profissao_alvo = normalizar_texto(str(data_info.get("profissao_alvo", "")).strip())
         template = str(data_info.get("template", "")).strip()
 
         if profissao_alvo:
             clientes_filtrados = [
                 c
                 for c in clientes_ativos
-                if c.status == "ativo"
-                and normalizar_texto(c.profissao or "") == profissao_alvo
+                if c.status == "ativo" and normalizar_texto(c.profissao or "") == profissao_alvo
             ]
         else:
             clientes_filtrados = [c for c in clientes_ativos if c.status == "ativo"]
@@ -358,9 +343,7 @@ def verificar_datas_comemorativas(self) -> dict:
                     ignorados += 1
                     continue
 
-                chave_bloqueio = chave(
-                    "lock:data", cliente.id, normalizar_texto(nome_data)
-                )
+                chave_bloqueio = chave("lock:data", cliente.id, normalizar_texto(nome_data))
                 if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
                     ignorados += 1
                     continue
@@ -370,17 +353,13 @@ def verificar_datas_comemorativas(self) -> dict:
                 if template == "TEMPLATE_DIA_BANCARIO":
                     texto = TEMPLATE_DIA_BANCARIO.format(nome_data=nome_data)
                 else:
-                    texto = TEMPLATE_DATA_COMEMORATIVA_GENERICA.format(
-                        nome_data=nome_data
-                    )
+                    texto = TEMPLATE_DATA_COMEMORATIVA_GENERICA.format(nome_data=nome_data)
 
                 WhatsAppService.enviar_mensagem(
                     id_cliente=cliente.id, telefone=cliente.telefone, texto=texto
                 )
                 marcar_enviado(chave_envio, TEMPO_30_DIAS)
-                _mensagens_relacionamento_enviadas_total.labels(
-                    tipo="data_comemorativa"
-                ).inc()
+                _mensagens_relacionamento_enviadas_total.labels(tipo="data_comemorativa").inc()
                 enviados += 1
 
                 try:
@@ -511,9 +490,7 @@ def verificar_clientes_sem_contato(self) -> dict:
                 )
 
             if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
-                logger.warning(
-                    "timeout_por_cliente", tipo="check_in", cliente_id=cliente.id
-                )
+                logger.warning("timeout_por_cliente", tipo="check_in", cliente_id=cliente.id)
 
         time.sleep(1)
 

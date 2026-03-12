@@ -31,9 +31,7 @@ async def pagina_importacao():
     """Serve o mini-frontend de importação (HTML puro, sem autenticação)."""
     html_path = _STATIC_DIR / "import.html"
     if not html_path.exists():
-        raise HTTPException(
-            status_code=404, detail="Página de importação não encontrada."
-        )
+        raise HTTPException(status_code=404, detail="Página de importação não encontrada.")
     return FileResponse(html_path, media_type="text/html")
 
 
@@ -78,9 +76,7 @@ async def importar_clientes(
 
     escritorio_id: int | None = request.state.user_payload.get("escritorio_id")
     if not escritorio_id:
-        raise HTTPException(
-            status_code=403, detail="Escritório não identificado no token JWT."
-        )
+        raise HTTPException(status_code=403, detail="Escritório não identificado no token JWT.")
 
     filename = file.filename or ""
     if not filename.lower().endswith(".csv"):

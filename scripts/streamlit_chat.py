@@ -109,9 +109,7 @@ def _fake_processo() -> MagicMock:
     return obj
 
 
-def _make_session_factory(
-    *, com_processo: bool, nome_cliente: str, nome_escritorio: str
-):
+def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escritorio: str):
     escritorio = _fake_escritorio(nome_escritorio)
     cliente = _fake_cliente(nome_cliente)
     processo = _fake_processo()
@@ -211,9 +209,7 @@ def _init_state(com_processo: bool, nome_cliente: str, nome_escritorio: str) -> 
     }
 
 
-def _config_changed(
-    com_processo: bool, nome_cliente: str, nome_escritorio: str
-) -> bool:
+def _config_changed(com_processo: bool, nome_cliente: str, nome_escritorio: str) -> bool:
     cfg = st.session_state.get("config", {})
     return (
         cfg.get("com_processo") != com_processo
@@ -292,9 +288,7 @@ for msg in st.session_state.messages:
             if meta.get("intencao"):
                 partes.append(f"intenção: `{meta['intencao']}`")
             if meta.get("tokens_in") or meta.get("tokens_out"):
-                partes.append(
-                    f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`"
-                )
+                partes.append(f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`")
             if meta.get("fallback"):
                 partes.append("⚠️ fallback ativo")
             if partes:

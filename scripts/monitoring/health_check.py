@@ -23,9 +23,7 @@ import time
 from typing import Any
 
 # Garante que o root do projeto esteja no path, independente de onde o script é chamado
-_PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
@@ -44,14 +42,10 @@ async def _check_postgresql(database_url: str) -> dict[str, Any]:
         from sqlalchemy import text
         from sqlalchemy.ext.asyncio import create_async_engine
 
-        engine = create_async_engine(
-            database_url, pool_size=1, max_overflow=0, pool_pre_ping=True
-        )
+        engine = create_async_engine(database_url, pool_size=1, max_overflow=0, pool_pre_ping=True)
         t = time.perf_counter()
         async with engine.connect() as conn:
-            await asyncio.wait_for(
-                conn.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT
-            )
+            await asyncio.wait_for(conn.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT)
         await engine.dispose()
         return {
             "status": "ok",
@@ -214,9 +208,7 @@ async def run(output_json: bool) -> int:
         _check_claude_api(settings.ANTHROPIC_API_KEY),
         _check_evolution_api(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY),
         _check_celery_workers(settings.CELERY_BROKER_URL),
-        _check_google_sheets(
-            settings.GOOGLE_CREDENTIALS_PATH, settings.GOOGLE_SHEETS_ID
-        ),
+        _check_google_sheets(settings.GOOGLE_CREDENTIALS_PATH, settings.GOOGLE_SHEETS_ID),
     )
 
     checks: dict[str, dict[str, Any]] = {
@@ -263,9 +255,7 @@ async def run(output_json: bool) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Health check standalone dos serviços")
-    parser.add_argument(
-        "--json", action="store_true", help="Saída em JSON (para integração CI/CD)"
-    )
+    parser.add_argument("--json", action="store_true", help="Saída em JSON (para integração CI/CD)")
     args = parser.parse_args()
 
     sys.exit(asyncio.run(run(output_json=args.json)))

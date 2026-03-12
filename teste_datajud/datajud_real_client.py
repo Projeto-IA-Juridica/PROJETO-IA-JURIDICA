@@ -75,9 +75,7 @@ class DataJudRealClient:
                 # Se encontrou hits
                 hits = data.get("hits", {}).get("hits", [])
                 if not hits:
-                    logger.warning(
-                        f"CNJ {numero_cnj} encontrou 0 resultados no Datajud."
-                    )
+                    logger.warning(f"CNJ {numero_cnj} encontrou 0 resultados no Datajud.")
                     return {
                         "erro": "Processo não encontrado nos repositórios do CNJ indexados.",
                         "raw": data,
@@ -92,9 +90,7 @@ class DataJudRealClient:
                 logger.error(f"Erro inesperado no DataJud: {e}")
                 return {"erro": str(e)}
 
-    async def consultar_cpf_cnpj(
-        self, documento: str, tribunal: str = "tjsp"
-    ) -> dict[str, Any]:
+    async def consultar_cpf_cnpj(self, documento: str, tribunal: str = "tjsp") -> dict[str, Any]:
         """
         Busca processos associados a um CPF ou CNPJ específico usando query_string no Elasticsearch.
         Retorna uma lista dos processos encontrados.
@@ -105,9 +101,7 @@ class DataJudRealClient:
         url = f"{self.base_url}{tribunal}/_search"
 
         payload = {
-            "query": {
-                "query_string": {"query": f'"{documento_limpo}" OR "{documento}"'}
-            },
+            "query": {"query_string": {"query": f'"{documento_limpo}" OR "{documento}"'}},
             "size": 10,
         }
 
@@ -121,9 +115,7 @@ class DataJudRealClient:
 
                 hits = data.get("hits", {}).get("hits", [])
                 if not hits:
-                    logger.warning(
-                        f"Documento {documento} encontrou 0 resultados no Datajud."
-                    )
+                    logger.warning(f"Documento {documento} encontrou 0 resultados no Datajud.")
                     return {
                         "erro": "Nenhum processo encontrado para este documento.",
                         "processos": [],

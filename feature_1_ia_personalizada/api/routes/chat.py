@@ -25,7 +25,7 @@ def _get_user_id(request: Request) -> int:
 def _get_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return str(forwarded).split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -71,9 +71,7 @@ async def get_history(
     # 1. Checa se o cliente pertence ao escritório
     cliente = await db.get(Cliente, cliente_id)
     if not cliente or cliente.escritorio_id != escritorio_id:
-        raise HTTPException(
-            status_code=404, detail="Cliente não encontrado ou acesso restrito."
-        )
+        raise HTTPException(status_code=404, detail="Cliente não encontrado ou acesso restrito.")
 
     registrar_acesso(
         _get_user_id(request),
@@ -149,14 +147,12 @@ async def get_chat_stats(request: Request, db: AsyncSession = Depends(get_db)):
     """Retorna estatísticas gerais de uso da I.A. pelo escritório (tokens e grana gasta)."""
     escritorio_id = _get_escritorio_id(request)
 
-    stmt_count = select(func.count(Interacao.id)).where(
-        Interacao.escritorio_id == escritorio_id
-    )
+    stmt_count = select(func.count(Interacao.id)).where(Interacao.escritorio_id == escritorio_id)
     total_interacoes = await db.scalar(stmt_count) or 0
 
-    stmt_tokens = select(
-        func.sum(Interacao.tokens_input + Interacao.tokens_output)
-    ).where(Interacao.escritorio_id == escritorio_id)
+    stmt_tokens = select(func.sum(Interacao.tokens_input + Interacao.tokens_output)).where(
+        Interacao.escritorio_id == escritorio_id
+    )
     total_tokens = await db.scalar(stmt_tokens) or 0
 
     stmt_custos = select(func.sum(Interacao.custo_estimado)).where(

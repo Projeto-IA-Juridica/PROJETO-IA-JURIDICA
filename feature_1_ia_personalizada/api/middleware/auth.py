@@ -89,9 +89,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             if not _checar_basic_auth(request):
                 return JSONResponse(
                     status_code=401,
-                    content={
-                        "detail": "Autenticação necessária para acessar a documentação."
-                    },
+                    content={"detail": "Autenticação necessária para acessar a documentação."},
                     headers={"WWW-Authenticate": "Basic"},
                 )
 
@@ -111,8 +109,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content={
                     "detail": (
-                        "Token JWT ausente ou mal formatado."
-                        " Use 'Authorization: Bearer <token>'"
+                        "Token JWT ausente ou mal formatado." " Use 'Authorization: Bearer <token>'"
                     )
                 },
             )
@@ -124,9 +121,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         except ValueError as e:
             return JSONResponse(status_code=401, content={"detail": str(e)})
         except JWTError:
-            return JSONResponse(
-                status_code=401, content={"detail": "Token JWT inválido"}
-            )
+            return JSONResponse(status_code=401, content={"detail": "Token JWT inválido"})
 
         if token_esta_revogado(token):
             return JSONResponse(

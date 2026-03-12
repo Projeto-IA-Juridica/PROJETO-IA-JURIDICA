@@ -70,7 +70,7 @@ def _extrair_texto(response: anthropic.types.Message) -> str:
             f"Claude não retornou bloco de texto. Blocos recebidos: "
             f"{[b.type for b in response.content]}"
         )
-    return text_blocks[0].text
+    return str(text_blocks[0].text)
 
 
 async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
@@ -90,17 +90,13 @@ async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
             _erros.labels(tipo_erro="rate_limit").inc()
             ultimo_erro = exc
             espera = _backoff(tentativa)
-            logger.warning(
-                "claude_rate_limit", tentativa=tentativa, espera_s=round(espera, 2)
-            )
+            logger.warning("claude_rate_limit", tentativa=tentativa, espera_s=round(espera, 2))
             await asyncio.sleep(espera)
         except anthropic.APITimeoutError as exc:
             _erros.labels(tipo_erro="timeout").inc()
             ultimo_erro = exc
             espera = _backoff(tentativa)
-            logger.warning(
-                "claude_timeout", tentativa=tentativa, espera_s=round(espera, 2)
-            )
+            logger.warning("claude_timeout", tentativa=tentativa, espera_s=round(espera, 2))
             await asyncio.sleep(espera)
         except anthropic.APIError as exc:
             _erros.labels(tipo_erro="api_error").inc()

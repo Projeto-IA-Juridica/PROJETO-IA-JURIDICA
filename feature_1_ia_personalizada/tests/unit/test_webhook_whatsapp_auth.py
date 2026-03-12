@@ -53,9 +53,7 @@ async def test_webhook_auth_valid_apikey():
     db = AsyncMock()
 
     try:
-        resultado = await receive_message(
-            request=request, apikey=settings.EVOLUTION_API_KEY, db=db
-        )
+        resultado = await receive_message(request=request, apikey=settings.EVOLUTION_API_KEY, db=db)
         assert resultado["status"] == "ignored"
     except HTTPException as e:
         pytest.fail(f"Não deveria levantar HTTPException para apikey válida: {e}")

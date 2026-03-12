@@ -35,9 +35,7 @@ async def test_list_processos_sem_auth_retorna_401(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_processos_vazio(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
-):
+async def test_list_processos_vazio(async_client: AsyncClient, escritorio_factory, usuario_factory):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
@@ -173,9 +171,7 @@ async def test_get_processo_de_outro_escritorio_retorna_404(
 
 
 @pytest.mark.asyncio
-async def test_update_processo(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
-):
+async def test_update_processo(async_client: AsyncClient, escritorio_factory, usuario_factory):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
@@ -238,9 +234,7 @@ async def test_delete_processo_soft_delete(
         criado = await async_client.post("/processos", headers=headers, json=payload)
         processo_id = criado.json()["id"]
 
-        response = await async_client.delete(
-            f"/processos/{processo_id}", headers=headers
-        )
+        response = await async_client.delete(f"/processos/{processo_id}", headers=headers)
 
     assert response.status_code == 204
 
@@ -305,7 +299,5 @@ async def test_list_processos_com_busca_cnj(
 
         # busca pelos primeiros 7 dígitos do CNJ
         parcial = cnj[:7]
-        response = await async_client.get(
-            f"/processos?search={parcial}", headers=headers
-        )
+        response = await async_client.get(f"/processos?search={parcial}", headers=headers)
         assert response.status_code == 200

@@ -112,9 +112,7 @@ def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
 
 async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(ProcessoModel).where(ProcessoModel.id == id_processo)
-        )
+        result = await session.execute(select(ProcessoModel).where(ProcessoModel.id == id_processo))
         p = result.scalar_one_or_none()
         if p is None:
             return None
@@ -168,9 +166,7 @@ async def _query_clientes_relacionamento() -> list[dict[str, Any]]:
                     "nome": c.nome,
                     "telefone": c.telefone_whatsapp,
                     "status": "ativo",
-                    "data_nascimento": (
-                        str(c.data_nascimento) if c.data_nascimento else None
-                    ),
+                    "data_nascimento": (str(c.data_nascimento) if c.data_nascimento else None),
                     "profissao": c.profissao,
                 }
             )
@@ -229,9 +225,7 @@ async def _insert_interacao(
         )
         escritorio_id = result.scalar_one_or_none()
         if escritorio_id is None:
-            logger.warning(
-                "insert_interacao_cliente_nao_encontrado", id_cliente=id_cliente
-            )
+            logger.warning("insert_interacao_cliente_nao_encontrado", id_cliente=id_cliente)
             return
 
         interacao = Interacao(

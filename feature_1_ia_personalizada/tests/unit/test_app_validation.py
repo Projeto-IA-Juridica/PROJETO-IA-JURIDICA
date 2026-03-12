@@ -125,9 +125,7 @@ class TestJWTAuthMiddleware:
         middleware = self._criar_middleware()
         with (
             patch("feature_1_ia_personalizada.api.middleware.auth.DOCS_PASSWORD", None),
-            patch(
-                "feature_1_ia_personalizada.api.middleware.auth.settings"
-            ) as mock_settings,
+            patch("feature_1_ia_personalizada.api.middleware.auth.settings") as mock_settings,
         ):
             mock_settings.ENVIRONMENT = "development"
             response, called = await self._dispatch(middleware, "/docs")

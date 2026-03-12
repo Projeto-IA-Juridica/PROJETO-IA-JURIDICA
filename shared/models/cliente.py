@@ -113,13 +113,10 @@ class Cliente(Base, TimestampMixin, TenantMixin):
         if not self.data_nascimento:
             return None
         hoje = date.today()
-        return (
+        return int(
             hoje.year
             - self.data_nascimento.year
-            - (
-                (hoje.month, hoje.day)
-                < (self.data_nascimento.month, self.data_nascimento.day)
-            )
+            - ((hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day))
         )
 
     @property

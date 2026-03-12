@@ -25,7 +25,7 @@ def criptografar(texto: str) -> str:
     """
     if not texto:
         return texto
-    return _fernet.encrypt(texto.encode("utf-8")).decode("utf-8")
+    return str(_fernet.encrypt(texto.encode("utf-8")).decode("utf-8"))
 
 
 def descriptografar(texto_cifrado: str) -> str:
@@ -34,7 +34,7 @@ def descriptografar(texto_cifrado: str) -> str:
     """
     if not texto_cifrado:
         return texto_cifrado
-    return _fernet.decrypt(texto_cifrado.encode("utf-8")).decode("utf-8")
+    return str(_fernet.decrypt(texto_cifrado.encode("utf-8")).decode("utf-8"))
 
 
 def hash_senha(senha_plana: str) -> str:
@@ -44,14 +44,14 @@ def hash_senha(senha_plana: str) -> str:
     """
     salt = bcrypt.gensalt()
     # Em bcrypt, retornamos a string decodificada (que inclui o salt)
-    return bcrypt.hashpw(senha_plana.encode("utf-8"), salt).decode("utf-8")
+    return str(bcrypt.hashpw(senha_plana.encode("utf-8"), salt).decode("utf-8"))
 
 
 def verificar_senha(senha_plana: str, senha_hash: str) -> bool:
     """
     Verifica se uma senha plana corresponde ao hash armazenado no banco.
     """
-    return bcrypt.checkpw(senha_plana.encode("utf-8"), senha_hash.encode("utf-8"))
+    return bool(bcrypt.checkpw(senha_plana.encode("utf-8"), senha_hash.encode("utf-8")))
 
 
 def mascarar_cpf(cpf: str) -> str:

@@ -122,9 +122,7 @@ def _fake_processo() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-def _make_session_factory(
-    *, com_processo: bool, nome_cliente: str, nome_escritorio: str
-):
+def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escritorio: str):
     escritorio = _fake_escritorio(nome_escritorio)
     cliente = _fake_cliente(nome_cliente)
     processo = _fake_processo()
@@ -264,9 +262,7 @@ async def chat(
         f"  Processo   : {'✅ ativo (TJSP 0001234-56.2023.8.26.0001)' if com_processo else '❌ sem processo cadastrado'}"
     )
     print(f"{_BOLD}{'─' * 58}{_R}")
-    print(
-        f"{_CINZA}  Comandos: 'sair' para encerrar | 'limpar' para resetar histórico{_R}"
-    )
+    print(f"{_CINZA}  Comandos: 'sair' para encerrar | 'limpar' para resetar histórico{_R}")
     print()
 
     while True:
@@ -312,9 +308,7 @@ async def chat(
         # linha de metadados
         partes = [f"intenção: {intencao}"]
         if tokens.get("input") or tokens.get("output"):
-            partes.append(
-                f"tokens: {tokens.get('input', 0)}↑ {tokens.get('output', 0)}↓"
-            )
+            partes.append(f"tokens: {tokens.get('input', 0)}↑ {tokens.get('output', 0)}↓")
         if fallback:
             partes.append(f"{_AMARELO}⚠ fallback ativo{_CINZA}")
         print(f"{_CINZA}  [{' | '.join(partes)}]{_R}")

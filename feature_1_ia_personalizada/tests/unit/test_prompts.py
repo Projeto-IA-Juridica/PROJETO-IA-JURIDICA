@@ -99,9 +99,7 @@ class TestPlaceholders:
         é resolvido em runtime pelo orchestrator.
         """
         for prompt in _PROMPTS_GERACAO:
-            assert (
-                "{nome_escritorio}" in prompt
-            ), f"{prompt[:60]}... não tem {{nome_escritorio}}"
+            assert "{nome_escritorio}" in prompt, f"{prompt[:60]}... não tem {{nome_escritorio}}"
 
 
 class TestFormatoWhatsApp:
@@ -133,9 +131,7 @@ class TestTagsXML:
             "acoes_permitidas",
         ]:
             assert f"<{tag}>" in SYSTEM_PROMPT_BASE, f"Tag <{tag}> ausente no BASE"
-            assert (
-                f"</{tag}>" in SYSTEM_PROMPT_BASE
-            ), f"Tag </{tag}> não fechada no BASE"
+            assert f"</{tag}>" in SYSTEM_PROMPT_BASE, f"Tag </{tag}> não fechada no BASE"
 
     def test_tags_xml_no_status(self):
         assert "<dados_processo>" in SYSTEM_PROMPT_STATUS_PROCESSO
@@ -170,7 +166,7 @@ class TestClassificador:
 
     def test_exemplo_formato_correto(self):
         """O prompt deve mostrar o exemplo exato esperado."""
-        assert '{"intencao": "duvida_geral"}' in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
+        assert '{"intencao": "perspectivas"}' in SYSTEM_PROMPT_CLASSIFICAR_INTENCAO
 
 
 class TestConteudoMinimo:

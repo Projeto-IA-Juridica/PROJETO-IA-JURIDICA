@@ -36,9 +36,7 @@ def _validar_config_no_startup() -> None:
         erros.append("CELERY_BROKER_URL inválida (esperado 'redis://' ou 'rediss://').")
 
     if not settings.CELERY_RESULT_BACKEND.startswith(("redis://", "rediss://")):
-        erros.append(
-            "CELERY_RESULT_BACKEND inválida (esperado 'redis://' ou 'rediss://')."
-        )
+        erros.append("CELERY_RESULT_BACKEND inválida (esperado 'redis://' ou 'rediss://').")
 
     def _req(cond: bool, msg: str) -> None:
         if not cond:
@@ -180,9 +178,7 @@ app = FastAPI(
 # aos domínios declarados em CORS_ALLOWED_ORIGINS (separados por vírgula no .env)
 if settings.ENVIRONMENT == "development":
     _cors_origins = ["*"]
-    _cors_credentials = (
-        False  # allow_credentials=True é incompatível com allow_origins=["*"]
-    )
+    _cors_credentials = False  # allow_credentials=True é incompatível com allow_origins=["*"]
 else:
     origins = settings.CORS_ALLOWED_ORIGINS
     if isinstance(origins, list):
@@ -239,9 +235,7 @@ Instrumentator(
 async def global_exception_handler(request: Request, exc: Exception):
     # Captura explícita necessária: o handler impede que o Sentry capture automaticamente
     sentry_sdk.capture_exception(exc)
-    logger.error(
-        "erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True
-    )
+    logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Erro interno do servidor"},

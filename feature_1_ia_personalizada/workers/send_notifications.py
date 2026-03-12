@@ -70,7 +70,9 @@ MENSAGEM_SEM_MOVIMENTACAO = (
     "Isso é comum e não significa necessariamente um problema."
 )
 
-MENSAGEM_PESQUISA_SATISFACAO = "De 1 a 5, como você avalia nosso atendimento este mês?\nResponda apenas com um número."
+MENSAGEM_PESQUISA_SATISFACAO = (
+    "De 1 a 5, como você avalia nosso atendimento este mês?\nResponda apenas com um número."
+)
 
 MENSAGEM_ERRO_PADRAO = (
     "No momento não consegui processar sua mensagem. Nossa equipe será notificada."
@@ -158,9 +160,7 @@ def buscar_clientes_ativos_por_escritorio(escritorio_id: int):
     return query_clientes_ativos_por_escritorio(escritorio_id)
 
 
-def registrar_interacao(
-    id_cliente: int, id_processo: int | None, tipo: str, dados: dict
-):
+def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dados: dict):
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -187,18 +187,14 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         espera = segundos_ate_proximo_horario(momento)
         raise self.retry(countdown=espera)
 
-    chave_bloqueio = chave_limite(
-        "bloqueio_andamento", id_processo, hash(descricao_andamento)
-    )
+    chave_bloqueio = chave_limite("bloqueio_andamento", id_processo, hash(descricao_andamento))
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
     service = _get_whatsapp_service()
 
     async def _enviar():
-        resp = await service.enviar_notificacao_andamento(
-            id_processo, descricao_andamento
-        )
+        resp = await service.enviar_notificacao_andamento(id_processo, descricao_andamento)
         await service.evolution_client.close()
         return resp
 

@@ -137,7 +137,5 @@ def formatar_numero_processo(numero: str) -> str:
     """
     limpo = re.sub(r"[^0-9]", "", numero)
     if len(limpo) != 20:
-        raise ValueError(
-            f"Número de processo deve ter 20 dígitos, recebeu {len(limpo)}"
-        )
+        raise ValueError(f"Número de processo deve ter 20 dígitos, recebeu {len(limpo)}")
     return f"{limpo[:7]}-{limpo[7:9]}.{limpo[9:13]}.{limpo[13]}.{limpo[14:16]}.{limpo[16:20]}"

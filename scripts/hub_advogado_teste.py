@@ -151,9 +151,7 @@ def parsear_csv(conteudo: bytes) -> tuple[list[dict], list[dict]]:
     campos = [f.strip().lower() for f in reader.fieldnames if f]
     faltando = [c for c in ("nome", "telefone") if c not in campos]
     if faltando:
-        return [], [
-            {"linha": 1, "motivo": f"Colunas obrigatórias ausentes: {faltando}"}
-        ]
+        return [], [{"linha": 1, "motivo": f"Colunas obrigatórias ausentes: {faltando}"}]
 
     clientes: list[dict] = []
     erros: list[dict] = []
@@ -341,18 +339,14 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
     if dados_datajud:
         # Dados reais do DataJud
         tribunal = dados_datajud.get("tribunal", {})
-        obj.tribunal = (
-            tribunal.get("nome", "N/D") if isinstance(tribunal, dict) else str(tribunal)
-        )
+        obj.tribunal = tribunal.get("nome", "N/D") if isinstance(tribunal, dict) else str(tribunal)
         # DataJud não expõe vara diretamente; usa grau quando disponível
         grau = dados_datajud.get("grau", "")
         obj.vara = grau if grau else "N/D"
 
         # Tipo de ação (classe processual) — alimenta o VitoriaPreditor
         classe = dados_datajud.get("classe", {})
-        obj.tipo_acao = (
-            classe.get("nome") if isinstance(classe, dict) else str(classe)
-        ) or None
+        obj.tipo_acao = (classe.get("nome") if isinstance(classe, dict) else str(classe)) or None
 
         movimentos = dados_datajud.get("movimentos", [])
         if movimentos and isinstance(movimentos[0], dict):
@@ -360,9 +354,7 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
             obj.ultimo_andamento = ultimo.get("nome", "sem movimentação recente")
             data_str = (ultimo.get("dataHora") or "")[:10]
             try:
-                obj.data_ultimo_andamento = (
-                    date.fromisoformat(data_str) if data_str else None
-                )
+                obj.data_ultimo_andamento = date.fromisoformat(data_str) if data_str else None
             except ValueError:
                 obj.data_ultimo_andamento = None
         else:
@@ -418,9 +410,7 @@ def _fake_evolution() -> MagicMock:
     return client
 
 
-def _make_session_factory(
-    escritorio_nome: str, cliente: dict, dados_datajud: dict | None
-):
+def _make_session_factory(escritorio_nome: str, cliente: dict, dados_datajud: dict | None):
     """
     Cria uma session_factory mockada que retorna entidades populadas com
     dados reais do CSV e do DataJud, no mesmo contrato esperado pelo orchestrator.
@@ -526,9 +516,7 @@ with st.sidebar:
     st.caption("Demonstração Completa — Orchestrator LangGraph")
     st.divider()
 
-    escritorio_nome = st.text_input(
-        "Nome do Escritório", value="Silva & Associados Advogados"
-    )
+    escritorio_nome = st.text_input("Nome do Escritório", value="Silva & Associados Advogados")
 
     st.divider()
     st.subheader("Importar Clientes")
@@ -606,8 +594,7 @@ clientes: list[dict] = st.session_state.get("clientes_hub", [])
 
 if not clientes:
     st.title("⚖️ Hub do Advogado — Demonstração Completa")
-    st.markdown(
-        """
+    st.markdown("""
         ### O que este teste demonstra
 
         O fluxo completo da plataforma, usando o **orchestrator real do projeto** (LangGraph):
@@ -641,8 +628,7 @@ if not clientes:
         - *"Como funciona uma audiência de instrução?"* → intent: duvida_geral
         - *"Estou muito ansioso com esse processo..."* → intent: desabafo
         - *"Oi, tudo bem?"* → intent: saudacao
-        """
-    )
+        """)
 
     if st.session_state.get("erros_hub"):
         with st.expander("Ver erros do CSV"):
@@ -690,9 +676,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
 
         orch_key = f"orch_{cid}"
         if orch_key not in st.session_state:
-            orchestrator, memoria = criar_orchestrator(
-                escritorio_nome, cliente, dados_dj
-            )
+            orchestrator, memoria = criar_orchestrator(escritorio_nome, cliente, dados_dj)
             st.session_state[orch_key] = orchestrator
             st.session_state[f"mem_{cid}"] = memoria
             st.session_state[f"chat_{cid}"] = []
@@ -728,31 +712,22 @@ for tab, cliente in zip(tabs, clientes, strict=False):
             elif dados_dj:
                 tribunal = dados_dj.get("tribunal", {})
                 nome_trib = (
-                    tribunal.get("nome", "—")
-                    if isinstance(tribunal, dict)
-                    else str(tribunal)
+                    tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
                 )
                 classe = dados_dj.get("classe", {})
-                nome_classe = (
-                    classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
-                )
+                nome_classe = classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
                 assuntos = dados_dj.get("assuntos", [])
                 assunto_str = (
                     ", ".join(
-                        a.get("nome", "") if isinstance(a, dict) else str(a)
-                        for a in assuntos[:2]
+                        a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]
                     )
                     or "—"
                 )
                 movimentos = dados_dj.get("movimentos", [])
                 ultimo_mov = movimentos[0] if movimentos else {}
-                nome_mov = (
-                    ultimo_mov.get("nome", "—") if isinstance(ultimo_mov, dict) else "—"
-                )
+                nome_mov = ultimo_mov.get("nome", "—") if isinstance(ultimo_mov, dict) else "—"
                 data_mov = (
-                    (ultimo_mov.get("dataHora") or "")[:10]
-                    if isinstance(ultimo_mov, dict)
-                    else "—"
+                    (ultimo_mov.get("dataHora") or "")[:10] if isinstance(ultimo_mov, dict) else "—"
                 )
                 data_ajuiz = (dados_dj.get("dataAjuizamento") or "")[:10] or "—"
 
@@ -767,9 +742,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     ("Data Andamento", data_mov),
                 ]
                 st.markdown(_tabela_md(linhas_proc))
-                st.success(
-                    "Dados reais do DataJud injetados no orchestrator", icon="✅"
-                )
+                st.success("Dados reais do DataJud injetados no orchestrator", icon="✅")
 
                 if len(movimentos) > 1:
                     with st.expander("Ver andamentos anteriores"):
@@ -819,8 +792,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     fallback_bv = resultado_bv.get("usando_fallback", False)
                 except Exception:
                     boas_vindas = (
-                        f"Olá, {cliente['nome'].split()[0]}! "
-                        f"Bem-vindo(a) ao {escritorio_nome}."
+                        f"Olá, {cliente['nome'].split()[0]}! " f"Bem-vindo(a) ao {escritorio_nome}."
                     )
                     intencao_bv = "erro"
                     fallback_bv = True

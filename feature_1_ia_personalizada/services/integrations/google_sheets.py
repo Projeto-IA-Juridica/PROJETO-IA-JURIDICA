@@ -111,9 +111,7 @@ class GoogleSheetsClient:
             return resposta.get("values", [])
 
         resultado = _retry_http(_fetch)
-        logger.debug(
-            "google_sheets_leitura", intervalo=intervalo, linhas=len(resultado)
-        )
+        logger.debug("google_sheets_leitura", intervalo=intervalo, linhas=len(resultado))
         return resultado  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
@@ -131,9 +129,7 @@ class GoogleSheetsClient:
             linhas = self._ler_intervalo("Clientes!A2:I")
         except Exception as exc:
             _google_sheets_requests_total.labels(operacao="get", sucesso="false").inc()
-            logger.error(
-                "google_sheets_get_clientes_falhou", erro=str(exc), exc_info=True
-            )
+            logger.error("google_sheets_get_clientes_falhou", erro=str(exc), exc_info=True)
             raise
         clientes: list[dict] = []
 
@@ -247,9 +243,7 @@ class GoogleSheetsClient:
         try:
             _retry_http(_append)
         except Exception as exc:
-            _google_sheets_requests_total.labels(
-                operacao="append", sucesso="false"
-            ).inc()
+            _google_sheets_requests_total.labels(operacao="append", sucesso="false").inc()
             logger.error(
                 "google_sheets_append_falhou",
                 tipo=tipo,

@@ -63,9 +63,7 @@ class Usuario(Base, TimestampMixin, TenantMixin):
 
     # --- Status ---
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    ultimo_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    ultimo_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # --- Relacionamentos ---
     escritorio: Mapped["Escritorio"] = relationship(  # noqa: F821

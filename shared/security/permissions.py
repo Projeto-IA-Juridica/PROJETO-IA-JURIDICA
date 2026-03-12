@@ -65,7 +65,7 @@ async def get_current_user(
     # Buscando o usuário no DB para revalidação de status
     stmt = select(Usuario).where(Usuario.id == user_id)
     result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    user: Usuario | None = result.scalar_one_or_none()
 
     if user is None:
         raise HTTPException(

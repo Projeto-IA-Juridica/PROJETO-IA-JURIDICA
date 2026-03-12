@@ -162,9 +162,7 @@ async def main() -> None:
             dados = coletar_dados_admin()
 
             # Verifica e-mail único
-            result = await session.execute(
-                select(Usuario).where(Usuario.email == dados["email"])
-            )
+            result = await session.execute(select(Usuario).where(Usuario.email == dados["email"]))
             if result.scalar_one_or_none():
                 print(f"\nErro: e-mail '{dados['email']}' já cadastrado.")
                 sys.exit(1)

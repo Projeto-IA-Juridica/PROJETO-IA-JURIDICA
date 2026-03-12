@@ -23,6 +23,7 @@ Fluxo:
   4. Ajusta perspectiva para polo do cliente (autor ou réu)
   5. Retorna EstatisticaProcessual (com todos os percentuais) ou None
 """
+
 from __future__ import annotations
 
 import re
@@ -342,9 +343,7 @@ class VitoriaPreditor:
                 )
                 return []
             except httpx.RequestError as exc:
-                logger.warning(
-                    "vitoria_preditor_rede_erro", indice=indice, erro=str(exc)
-                )
+                logger.warning("vitoria_preditor_rede_erro", indice=indice, erro=str(exc))
                 return []
 
         hits = resp.json().get("hits", {}).get("hits", [])
@@ -438,8 +437,7 @@ class VitoriaPreditor:
 
         if polo_cliente.lower() == "reu":
             fatores.append(
-                "Perspectiva ajustada para polo réu "
-                "(cliente está sendo processado nesta ação)"
+                "Perspectiva ajustada para polo réu " "(cliente está sendo processado nesta ação)"
             )
 
         return fatores

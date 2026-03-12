@@ -130,9 +130,7 @@ class Interacao(Base, TimestampMixin, TenantMixin):
     escritorio: Mapped["Escritorio"] = relationship(  # noqa: F821
         "Escritorio", back_populates="interacoes"
     )
-    cliente: Mapped["Cliente"] = relationship(  # noqa: F821
-        "Cliente", back_populates="interacoes"
-    )
+    cliente: Mapped["Cliente"] = relationship("Cliente", back_populates="interacoes")  # noqa: F821
     processo: Mapped["Processo | None"] = relationship(  # noqa: F821
         "Processo", back_populates="interacoes"
     )
