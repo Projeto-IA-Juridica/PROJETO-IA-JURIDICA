@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Any
+from typing import Any, Awaitable, cast
 
 import httpx
 import redis.asyncio as redis
@@ -45,7 +45,7 @@ async def _check_redis() -> dict[str, Any]:
     try:
         r = redis.from_url(settings.REDIS_URL, decode_responses=True)
         t = time.perf_counter()
-        await asyncio.wait_for(r.ping(), timeout=_CHECK_TIMEOUT)
+        await asyncio.wait_for(cast(Awaitable[bool], r.ping()), timeout=_CHECK_TIMEOUT)
         return {
             "status": "ok",
             "latency_ms": round((time.perf_counter() - t) * 1000, 2),

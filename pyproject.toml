@@ -113,6 +113,10 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["shared", "feature_1_ia_personalizada"]
 
+[tool.black]
+target-version = ["py312"]
+line-length = 100
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
