@@ -485,13 +485,13 @@ concierge-juridico/
 
 ## FUNCIONALIDADES ADICIONAIS 
 
-- IA personalizada ( pesquisa de satisfação, responde duvidas, notifica os clientes sobre os processos , da boas-vindas para novos clientes)
-- Controladoria - IA avisa sobre os deveres e funções do dia: Projuris
-- Realizar conexões entre  funcionários de empresas e escritórios 
-- Estimativa de prazo : depende da participação do autor/ réu e da quantidade de problemas.
+- IA personalizada ( pesquisa de satisfação, responde duvidas, notifica os clientes sobre os processos , da boas-vindas para novos clientes) FEITO
+- Controladoria - IA avisa sobre os deveres e funções do dia: Projuris - FALTA INTEGRAÇÃO COM O PROJURIS 
+- Realizar conexões entre  funcionários de empresas e escritórios - LINKEDIN
+- Estimativa de prazo : depende da participação do autor/ réu e da quantidade de problemas. FEITO
 - Concorrente JusBrasil - oferecer ao advogado um aplicativo para vender acesso sobre os processos para o cliente: 
-  - Ao realizar o pagamento, o cliente terá acesso completo ao documento sobre o processo e a um IA que tira todas as dúvidas sobre o processo.
-  - Plano IA cliente VS Plano IA empresa
+- Ao realizar o pagamento, o cliente terá acesso completo ao documento sobre o processo e a um IA que tira todas as dúvidas sobre o processo.
+- Plano IA cliente VS Plano IA empresa
 - Ecossistema de dados fechados: ProJuris
 
 ## FERRAMENTAS NECESSARIAS - Stack Tecnológica e APIs
