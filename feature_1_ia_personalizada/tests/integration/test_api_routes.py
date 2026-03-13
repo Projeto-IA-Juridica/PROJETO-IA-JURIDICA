@@ -149,3 +149,98 @@ async def test_get_metrics(async_client: AsyncClient):
     assert response.status_code == 200
     assert "text/plain" in response.headers["content-type"]
     assert "python_gc_objects" in response.text or "process_virtual_memory_bytes" in response.text
+
+
+@pytest.mark.asyncio
+async def test_get_admin_import_page(async_client: AsyncClient):
+    """Testar GET /admin/import → 200 (servimento de HTML estático)"""
+    # Nota: Assumindo que o arquivo static/import.html existe (foi visto no routes/admin_import.py)
+    response = await async_client.get("/admin/import")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
+@pytest.mark.asyncio
+async def test_post_import_clientes_unauthorized(async_client: AsyncClient):
+    """Testar POST /admin/import/clientes sem token → 401"""
+    response = await async_client.post("/admin/import/clientes")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_post_import_clientes_success_preview(
+    async_client: AsyncClient, usuario_factory, escritorio_factory
+):
+    """Testar POST /admin/import/clientes com token válido (modo preview) → 200"""
+    escritorio = await escritorio_factory()
+    usuario = await usuario_factory(escritorio_id=escritorio.id)
+
+    login = await async_client.post(
+        "/auth/login", json={"email": usuario.email, "senha": "Senha123!"}
+    )
+    token = login.json()["access_token"]
+
+    csv_content = b"nome,telefone\nJoao,5511999999999\n"
+    files = {"file": ("clientes.csv", csv_content, "text/csv")}
+
+    with patch(
+        "feature_1_ia_personalizada.api.routes.admin_import.processar_csv",
+        return_value={"importados": 1, "preview": [{"nome": "Joao"}]},
+    ):
+        response = await async_client.post(
+            "/admin/import/clientes?preview=true",
+            headers={"Authorization": f"Bearer {token}"},
+            files=files,
+        )
+
+    assert response.status_code == 200
+    assert response.json()["importados"] == 1
+
+
+@pytest.mark.asyncio
+async def test_post_chat_send_proactive_success(
+    async_client: AsyncClient, usuario_factory, escritorio_factory, cliente_factory
+):
+    """Testar POST /chat/send/{id} → 202 status enfileirado"""
+    escritorio = await escritorio_factory()
+    usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
+
+    login = await async_client.post(
+        "/auth/login", json={"email": usuario.email, "senha": "Senha123!"}
+    )
+    token = login.json()["access_token"]
+
+    with patch(
+        "feature_1_ia_personalizada.api.routes.chat.processar_mensagem_recebida"
+    ) as mock_celery:
+        response = await async_client.post(
+            f"/chat/send/{cliente.id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"mensagem": "Olá, tudo bem?"},
+        )
+        assert response.status_code == 202
+        assert response.json()["status"] == "enfileirado"
+        mock_celery.delay.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_chat_stats_dashboard(
+    async_client: AsyncClient, usuario_factory, escritorio_factory
+):
+    """Testar GET /chat/stats/dashboard → 200"""
+    escritorio = await escritorio_factory()
+    usuario = await usuario_factory(escritorio_id=escritorio.id)
+
+    login = await async_client.post(
+        "/auth/login", json={"email": usuario.email, "senha": "Senha123!"}
+    )
+    token = login.json()["access_token"]
+
+    response = await async_client.get(
+        "/chat/stats/dashboard", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_interacoes" in data
+    assert "custo_total_usd" in data

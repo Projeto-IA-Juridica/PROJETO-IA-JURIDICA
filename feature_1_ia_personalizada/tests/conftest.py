@@ -158,6 +158,7 @@ from shared.database.session import get_db
 from shared.models.base import Base
 from shared.models.escritorio import Escritorio
 from shared.models.usuario import Usuario
+from shared.models.cliente import Cliente
 from shared.security.encryption import hash_senha
 from shared.security.jwt import criar_token
 
@@ -239,6 +240,25 @@ async def usuario_factory(db_session):
         return usuario
 
     return _criar_usuario
+
+
+# Factory para Cliente
+@pytest.fixture
+async def cliente_factory(db_session):
+    async def _criar_cliente(escritorio_id: int, **kwargs):
+        cliente = Cliente(
+            escritorio_id=escritorio_id,
+            nome=kwargs.get("nome", fake.name()),
+            telefone_whatsapp=kwargs.get("telefone_whatsapp", "55119" + fake.msisdn()[5:]),
+            cpf=kwargs.get("cpf", fake.cpf()),
+            email=kwargs.get("email", fake.email()),
+        )
+        db_session.add(cliente)
+        await db_session.commit()
+        await db_session.refresh(cliente)
+        return cliente
+
+    return _criar_cliente
 
 
 # Token de autenticação válido
