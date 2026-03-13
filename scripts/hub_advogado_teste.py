@@ -68,10 +68,6 @@ from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslato
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
 )
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
-    VitoriaPreditor,
-)
-
 # ---------------------------------------------------------------------------
 # Padrões CNJ
 # ---------------------------------------------------------------------------
@@ -474,7 +470,6 @@ def criar_orchestrator(
         cache_manager=_fake_cache(),
         evolution_client=_fake_evolution(),
         session_factory=_make_session_factory(escritorio_nome, cliente, dados_datajud),
-        vitoria_preditor=VitoriaPreditor(api_key=DATAJUD_API_KEY or None),
     )
 
     # No demo, desabilita a verificação factual por string exata do FactChecker.
@@ -573,10 +568,13 @@ with st.sidebar:
 
     st.divider()
     st.caption("📄 CSV de exemplo:")
+    st.caption(
+        "💡 Preencha `numero_processo` com um CNJ real do cliente "
+        "(ex: `1234567-89.2022.8.26.0100`) para ativar a análise de casos similares."
+    )
     csv_exemplo = (
         "nome,telefone,cpf,data_nascimento,profissao,empresa,numero_processo,polo_cliente\n"
-        "João Silva,11999990001,123.456.789-00,15/03/1980,Engenheiro,Tech Corp,"
-        "0000001-68.2019.8.26.0053,autor\n"
+        "João Silva,11999990001,123.456.789-00,15/03/1980,Engenheiro,Tech Corp,,autor\n"
         "Maria Santos,21988880002,987.654.321-00,22/07/1975,Médica,Hospital ABC,,\n"
         "Carlos Oliveira,31977770003,456.789.012-00,08/11/1990,Empresário,,,\n"
     )
