@@ -7,21 +7,13 @@ ATENÇÃO — Compliance OAB:
   Ele coleta e apresenta estatísticas de desfecho de CASOS PÚBLICOS SIMILARES
   para fornecer contexto informativo ao cliente, sem constituir opinião jurídica.
 
-  A IA nunca deve converter esses dados em promessa de resultado.
-  O FactChecker possui padrões específicos para bloquear esse tipo de framing.
-
-Regra de exibição:
-  Retorna EstatisticaProcessual apenas quando há dados suficientes
-  (>= MIN_CASOS_COM_DESFECHO). O critério é QUALIDADE DA AMOSTRA, não o resultado.
-  Nenhum gate por percentual é aplicado — exibir 40% é tão válido quanto 80%.
-  A decisão de interpretar os dados é do cliente com seu advogado(a).
-
 Fluxo:
   1. Deriva o índice ElasticSearch a partir do número CNJ
-  2. Busca casos com mesma classe/tipo de ação no mesmo tribunal (DataJud)
-  3. Classifica movimentos em: favorável_autor | desfavorável_autor | neutro
-  4. Ajusta perspectiva para polo do cliente (autor ou réu)
-  5. Retorna EstatisticaProcessual (com todos os percentuais) ou None
+  2. Se tipo_acao não disponível localmente, busca do próprio processo no DataJud
+  3. Busca casos com mesma classe/tipo de ação no mesmo tribunal (DataJud)
+  4. Classifica movimentos em: favorável_autor | desfavorável_autor | neutro
+  5. Ajusta perspectiva para polo do cliente (autor ou réu)
+  6. Retorna EstatisticaProcessual (com todos os percentuais) ou None
 """
 
 from __future__ import annotations
@@ -37,7 +29,7 @@ from prometheus_client import Counter, Histogram
 
 from feature_1_ia_personalizada.services.legal_data.datajud_client import (
     DataJudClientError,
-    _indice_para_cnj,  # função interna reutilizada — mesma lógica CNJ
+    _indice_para_cnj,
 )
 
 logger = structlog.get_logger(__name__)
@@ -48,14 +40,9 @@ _BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 # Configuração
 # ---------------------------------------------------------------------------
 
-# Mínimo de casos com desfecho claro para exibir (gate de qualidade da amostra)
-# Abaixo disso, retorna None — dados insuficientes para ser informativo
 MIN_CASOS_COM_DESFECHO: int = 10
-
-# Máximo de casos similares buscados por consulta
 MAX_CASOS_BUSCA: int = 100
 
-# Disclaimer obrigatório — sempre incluído na resposta ao cliente
 DISCLAIMER_ESTATISTICA = (
     "Estes são dados históricos de processos públicos similares, "
     "obtidos do DataJud (CNJ). Não representam previsão de resultado "
@@ -70,7 +57,7 @@ DISCLAIMER_ESTATISTICA = (
 _estatistica_total = Counter(
     "vitoria_estatistica_total",
     "Total de consultas de estatísticas processuais",
-    labelnames=["resultado"],  # "exibida" | "sem_dados"
+    labelnames=["resultado"],
 )
 _estatistica_duration = Histogram(
     "vitoria_estatistica_duration_seconds",
@@ -84,25 +71,6 @@ _estatistica_duration = Histogram(
 
 @dataclass
 class EstatisticaProcessual:
-    """
-    Contexto histórico de casos similares públicos.
-
-    NÃO é uma predição de resultado. É um recorte estatístico de
-    desfechos registrados no DataJud para casos com perfil similar.
-
-    Atributos:
-        casos_analisados:   Total de casos encontrados no DataJud
-        casos_com_desfecho: Casos com movimentação de desfecho claro
-        pct_favoravel:      % com desfecho favorável ao polo do cliente (0–100)
-        pct_desfavoravel:   % com desfecho desfavorável ao polo do cliente (0–100)
-        pct_neutro:         % com desfecho neutro (acordo, extinção sem mérito etc.)
-        confianca:          "alta" (≥50) | "media" (≥20) | "baixa" (≥10)
-        tipo_acao:          Tipo de ação usado na busca
-        polo_cliente:       Polo do cliente (autor | reu | terceiro)
-        disclaimer:         Texto de aviso obrigatório (compliance OAB)
-        fatores:            Frases explicativas para incluir na mensagem
-    """
-
     casos_analisados: int
     casos_com_desfecho: int
     pct_favoravel: float
@@ -121,21 +89,7 @@ class EstatisticaProcessual:
 
 
 class VitoriaPreditor:
-    """
-    Consulta DataJud para coletar contexto histórico de casos similares.
 
-    Uso:
-        preditor = VitoriaPreditor(api_key=settings.DATAJUD_API_KEY)
-        resultado = await preditor.buscar_estatistica(
-            numero_cnj="0000001-23.2021.8.26.0001",
-            tipo_acao="Ação de Indenização por Dano Moral",
-            polo_cliente="autor",
-        )
-        if resultado:
-            # Amostra suficiente — seguro apresentar como contexto ao cliente
-    """
-
-    # Desfecho FAVORÁVEL ao autor (procedência / concessão)
     _FAVORAVEL_AUTOR = re.compile(
         r"\b("
         r"procedente"
@@ -152,7 +106,6 @@ class VitoriaPreditor:
         re.IGNORECASE,
     )
 
-    # Desfecho DESFAVORÁVEL ao autor (improcedência / indeferimento)
     _DESFAVORAVEL_AUTOR = re.compile(
         r"\b("
         r"improcedente"
@@ -167,7 +120,6 @@ class VitoriaPreditor:
         re.IGNORECASE,
     )
 
-    # Desfecho NEUTRO (acordo, extinção sem mérito, arquivamento)
     _NEUTRO = re.compile(
         r"\b("
         r"acordo"
@@ -193,29 +145,7 @@ class VitoriaPreditor:
         tipo_acao: str | None,
         polo_cliente: str = "autor",
     ) -> EstatisticaProcessual | None:
-        """
-        Busca contexto histórico de casos similares no DataJud.
-
-        Retorna EstatisticaProcessual quando a amostra é suficiente
-        (>= MIN_CASOS_COM_DESFECHO), ou None quando:
-          - tipo_acao não disponível
-          - CNJ inválido ou tribunal não mapeado
-          - Amostra insuficiente de casos com desfecho claro
-
-        Nenhum gate por percentual é aplicado — resultado é exibido
-        independente do valor calculado.
-
-        Args:
-            numero_cnj:   Número CNJ formatado (ex: 0000001-23.2021.8.26.0001)
-            tipo_acao:    Tipo/classe da ação (ex: "Ação de Indenização por Dano Moral")
-            polo_cliente: "autor" | "reu" | "terceiro"
-        """
         log = logger.bind(cnj=numero_cnj, polo=polo_cliente)
-
-        if not tipo_acao or not tipo_acao.strip():
-            log.info("vitoria_preditor_sem_tipo_acao")
-            _estatistica_total.labels(resultado="sem_dados").inc()
-            return None
 
         try:
             indice = _indice_para_cnj(numero_cnj)
@@ -224,8 +154,15 @@ class VitoriaPreditor:
             _estatistica_total.labels(resultado="sem_dados").inc()
             return None
 
-        # perf_counter manual: prometheus_client.Histogram.time() é síncrono e infla
-        # a métrica com latência ociosa do event loop em carga alta.
+        # Se tipo_acao não cadastrado localmente, busca do DataJud pelo CNJ
+        if not tipo_acao or not tipo_acao.strip():
+            log.info("vitoria_preditor_buscando_tipo_acao_no_datajud")
+            tipo_acao = await self._buscar_tipo_acao_do_cnj(indice, numero_cnj)
+            if not tipo_acao:
+                log.info("vitoria_preditor_sem_tipo_acao")
+                _estatistica_total.labels(resultado="sem_dados").inc()
+                return None
+
         _t0 = time.perf_counter()
         casos = await self._buscar_casos_similares(indice, tipo_acao)
         _estatistica_duration.observe(time.perf_counter() - _t0)
@@ -281,6 +218,69 @@ class VitoriaPreditor:
         )
 
     # -----------------------------------------------------------------------
+    # Busca tipo_acao diretamente do processo no DataJud
+    # -----------------------------------------------------------------------
+
+    async def _buscar_tipo_acao_do_cnj(
+        self,
+        indice: str,
+        numero_cnj: str,
+    ) -> str | None:
+        """
+        Busca o tipo/classe da ação diretamente do processo no DataJud pelo número CNJ.
+        Usado como fallback quando tipo_acao não está cadastrado localmente.
+        """
+        # Remove formatação do CNJ para busca
+        numero_limpo = re.sub(r"[.\-]", "", numero_cnj).strip()
+        numero_formatado = numero_cnj.strip()
+
+        url = f"{_BASE_URL}/{indice}/_search"
+        query: dict[str, Any] = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"match": {"numeroProcesso": numero_formatado}},
+                        {"match": {"numeroProcesso": numero_limpo}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+            "size": 1,
+            "_source": ["classe", "assuntos"],
+        }
+
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"ApiKey {self._api_key}"
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                resp = await client.post(url, json=query, headers=headers)
+                resp.raise_for_status()
+            except (httpx.TimeoutException, httpx.HTTPStatusError, httpx.RequestError) as exc:
+                logger.warning("vitoria_preditor_busca_tipo_acao_erro", erro=str(exc))
+                return None
+
+        hits = resp.json().get("hits", {}).get("hits", [])
+        if not hits:
+            return None
+
+        source = hits[0].get("_source", {})
+
+        # Tenta pegar da classe primeiro, depois assuntos
+        classe = source.get("classe", {})
+        if isinstance(classe, dict) and classe.get("nome"):
+            return classe["nome"]
+
+        assuntos = source.get("assuntos", [])
+        if assuntos and isinstance(assuntos, list):
+            primeiro = assuntos[0]
+            if isinstance(primeiro, dict) and primeiro.get("nome"):
+                return primeiro["nome"]
+
+        return None
+
+    # -----------------------------------------------------------------------
     # Métodos internos
     # -----------------------------------------------------------------------
 
@@ -289,12 +289,6 @@ class VitoriaPreditor:
         indice: str,
         tipo_acao: str,
     ) -> list[dict[str, Any]]:
-        """
-        Consulta DataJud por casos com mesma classe ou assunto no mesmo tribunal.
-
-        Usa fuzzy matching para tolerar variações de escrita
-        (ex: "Dano Moral" vs "Indenização por Dano Moral").
-        """
         url = f"{_BASE_URL}/{indice}/_search"
         query: dict[str, Any] = {
             "query": {
@@ -354,18 +348,6 @@ class VitoriaPreditor:
         casos: list[dict[str, Any]],
         polo_cliente: str,
     ) -> tuple[int, int, int]:
-        """
-        Percorre movimentos de cada caso classificando desfechos.
-
-        Retorna: (favoraveis, desfavoraveis, neutros) do ponto de vista do cliente.
-
-        Regra de polo:
-          - "autor" → procedência = favorável, improcedência = desfavorável
-          - "reu"   → improcedência = favorável, procedência = desfavorável
-          - outros  → tratados como autor
-
-        Considera apenas o primeiro movimento com desfecho claro por caso.
-        """
         favoraveis = 0
         desfavoraveis = 0
         neutros = 0
@@ -373,9 +355,6 @@ class VitoriaPreditor:
 
         for caso in casos:
             movimentos = caso.get("movimentos") or []
-            # DataJud não garante ordem cronológica — ordenamos decrescente por dataHora
-            # para que o break capture o desfecho mais recente (após eventuais recursos),
-            # não a sentença original de 1ª instância.
             movimentos = sorted(
                 movimentos,
                 key=lambda m: m.get("dataHora") or "",
@@ -408,7 +387,6 @@ class VitoriaPreditor:
 
     @staticmethod
     def _calcular_confianca(total_desfechos: int) -> str:
-        """Alta: ≥50 casos | Media: ≥20 | Baixa: ≥10."""
         if total_desfechos >= 50:
             return "alta"
         if total_desfechos >= 20:
@@ -424,7 +402,6 @@ class VitoriaPreditor:
         polo_cliente: str,
         tipo_acao: str,
     ) -> list[str]:
-        """Gera frases humanizadas para compor a mensagem ao cliente."""
         fatores: list[str] = []
 
         tipo_curto = tipo_acao[:70] if len(tipo_acao) > 70 else tipo_acao
@@ -437,7 +414,8 @@ class VitoriaPreditor:
 
         if polo_cliente.lower() == "reu":
             fatores.append(
-                "Perspectiva ajustada para polo réu " "(cliente está sendo processado nesta ação)"
+                "Perspectiva ajustada para polo réu "
+                "(cliente está sendo processado nesta ação)"
             )
 
         return fatores
