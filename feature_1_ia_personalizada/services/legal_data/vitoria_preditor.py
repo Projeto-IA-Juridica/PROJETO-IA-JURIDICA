@@ -18,6 +18,7 @@ Fluxo:
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from dataclasses import dataclass, field
@@ -43,11 +44,49 @@ _BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 MIN_CASOS_COM_DESFECHO: int = 10
 MAX_CASOS_BUSCA: int = 100
 
+# Listas de índices para fallback nacional (sem wildcard — API pública não suporta)
+_INDICES_TJ_NACIONAIS = [
+    "api_publica_tjsp",
+    "api_publica_tjmg",
+    "api_publica_tjrj",
+    "api_publica_tjrs",
+    "api_publica_tjpr",
+    "api_publica_tjba",
+    "api_publica_tjsc",
+    "api_publica_tjgo",
+    "api_publica_tjce",
+    "api_publica_tjpe",
+]
+_INDICES_TRF_NACIONAIS = [
+    "api_publica_trf1",
+    "api_publica_trf2",
+    "api_publica_trf3",
+    "api_publica_trf4",
+    "api_publica_trf5",
+    "api_publica_trf6",
+]
+_INDICES_TRT_NACIONAIS = [
+    "api_publica_trt1",
+    "api_publica_trt2",
+    "api_publica_trt3",
+    "api_publica_trt4",
+    "api_publica_trt5",
+    "api_publica_trt15",
+]
+
 DISCLAIMER_ESTATISTICA = (
     "Estes são dados históricos de processos públicos similares, "
     "obtidos do DataJud (CNJ). Não representam previsão de resultado "
     "para o seu caso. Cada processo é único. Converse com seu advogado(a) "
     "para uma análise personalizada."
+)
+
+DISCLAIMER_ESTATISTICA_NACIONAL = (
+    "Estes são dados históricos de processos similares em tribunais brasileiros, "
+    "obtidos do DataJud (CNJ). Por não haver amostra suficiente no mesmo tribunal, "
+    "utilizamos referências nacionais como contexto informativo. "
+    "Não representam previsão de resultado para o seu caso. "
+    "Cada processo é único. Converse com seu advogado(a) para uma análise personalizada."
 )
 
 # ---------------------------------------------------------------------------
@@ -79,6 +118,7 @@ class EstatisticaProcessual:
     confianca: str
     tipo_acao: str
     polo_cliente: str
+    escopo: str = "tribunal"  # "tribunal" | "nacional"
     disclaimer: str = field(default=DISCLAIMER_ESTATISTICA)
     fatores: list[str] = field(default_factory=list)
 
@@ -167,19 +207,54 @@ class VitoriaPreditor:
         casos = await self._buscar_casos_similares(indice, tipo_acao)
         _estatistica_duration.observe(time.perf_counter() - _t0)
 
-        if not casos:
-            log.info("vitoria_preditor_sem_casos", tipo_acao=tipo_acao)
-            _estatistica_total.labels(resultado="sem_dados").inc()
-            return None
-
-        favoraveis, desfavoraveis, neutros = self._contar_desfechos(casos, polo_cliente)
+        favoraveis, desfavoraveis, neutros = self._contar_desfechos(casos, polo_cliente) if casos else (0, 0, 0)
         total_desfechos = favoraveis + desfavoraveis + neutros
+        escopo = "tribunal"
+
+        # Fallback: se amostra local insuficiente, consulta top tribunais do mesmo tipo em paralelo
+        if total_desfechos < MIN_CASOS_COM_DESFECHO:
+            indices_nacionais = self._indices_nacionais(indice)
+            if indices_nacionais:
+                log.info(
+                    "vitoria_preditor_tentando_escopo_nacional",
+                    indice_local=indice,
+                    qtd_indices=len(indices_nacionais),
+                    total_local=total_desfechos,
+                )
+                _t1 = time.perf_counter()
+                # Consulta todos os índices em paralelo
+                resultados_paralelos = await asyncio.gather(
+                    *[self._buscar_casos_similares(idx, tipo_acao) for idx in indices_nacionais],
+                    return_exceptions=True,
+                )
+                _estatistica_duration.observe(time.perf_counter() - _t1)
+
+                # Agrega todos os casos válidos (exclui erros e o índice local já consultado)
+                casos_nacionais: list[dict[str, Any]] = []
+                for resultado in resultados_paralelos:
+                    if isinstance(resultado, list):
+                        casos_nacionais.extend(resultado)
+
+                if casos_nacionais:
+                    fav_n, desf_n, neut_n = self._contar_desfechos(casos_nacionais, polo_cliente)
+                    total_n = fav_n + desf_n + neut_n
+                    if total_n >= MIN_CASOS_COM_DESFECHO:
+                        casos = casos_nacionais
+                        favoraveis, desfavoraveis, neutros = fav_n, desf_n, neut_n
+                        total_desfechos = total_n
+                        escopo = "nacional"
+                        log.info(
+                            "vitoria_preditor_usando_escopo_nacional",
+                            total_nacional=total_n,
+                            indices_consultados=len(indices_nacionais),
+                        )
 
         if total_desfechos < MIN_CASOS_COM_DESFECHO:
             log.info(
                 "vitoria_preditor_amostra_insuficiente",
                 total_desfechos=total_desfechos,
                 minimo_exigido=MIN_CASOS_COM_DESFECHO,
+                escopo_tentado=escopo,
             )
             _estatistica_total.labels(resultado="sem_dados").inc()
             return None
@@ -195,7 +270,10 @@ class VitoriaPreditor:
             pct_neutro=pct_neutro,
             total_desfechos=total_desfechos,
             casos_analisados=len(casos),
+            escopo=escopo,
         )
+
+        disclaimer = DISCLAIMER_ESTATISTICA if escopo == "tribunal" else DISCLAIMER_ESTATISTICA_NACIONAL
 
         _estatistica_total.labels(resultado="exibida").inc()
         return EstatisticaProcessual(
@@ -204,9 +282,11 @@ class VitoriaPreditor:
             pct_favoravel=pct_favoravel,
             pct_desfavoravel=pct_desfavoravel,
             pct_neutro=pct_neutro,
-            confianca=self._calcular_confianca(total_desfechos),
+            confianca=self._calcular_confianca(total_desfechos, escopo),
             tipo_acao=tipo_acao,
             polo_cliente=polo_cliente,
+            escopo=escopo,
+            disclaimer=disclaimer,
             fatores=self._montar_fatores(
                 pct_favoravel,
                 pct_desfavoravel,
@@ -214,6 +294,7 @@ class VitoriaPreditor:
                 total_desfechos,
                 polo_cliente,
                 tipo_acao,
+                escopo,
             ),
         )
 
@@ -386,7 +467,33 @@ class VitoriaPreditor:
         return favoraveis, desfavoraveis, neutros
 
     @staticmethod
-    def _calcular_confianca(total_desfechos: int) -> str:
+    def _indices_nacionais(indice: str) -> list[str]:
+        """
+        Retorna lista de índices do mesmo tipo de justiça para fallback nacional.
+        Exclui o índice local (já foi consultado). Não usa wildcards (a API pública
+        retorna 401 para padrões como api_publica_tj*).
+
+        Exemplos:
+          api_publica_tjsp → top 10 TJs estaduais (exceto tjsp)
+          api_publica_trf3 → todos os TRFs (exceto trf3)
+          api_publica_trt15 → top TRTs (exceto trt15)
+          api_publica_stj  → [] (já é único, sem fallback possível)
+        """
+        if re.match(r"api_publica_tj[a-z]{2}$", indice):
+            return [idx for idx in _INDICES_TJ_NACIONAIS if idx != indice]
+        if re.match(r"api_publica_trf\d+$", indice):
+            return [idx for idx in _INDICES_TRF_NACIONAIS if idx != indice]
+        if re.match(r"api_publica_trt\d+$", indice):
+            return [idx for idx in _INDICES_TRT_NACIONAIS if idx != indice]
+        return []  # STJ, STF, TST — únicos, sem fallback útil
+
+    @staticmethod
+    def _calcular_confianca(total_desfechos: int, escopo: str = "tribunal") -> str:
+        if escopo == "nacional":
+            # Dados nacionais são informativos mas menos representativos do tribunal local
+            if total_desfechos >= 50:
+                return "media"
+            return "baixa"
         if total_desfechos >= 50:
             return "alta"
         if total_desfechos >= 20:
@@ -401,16 +508,28 @@ class VitoriaPreditor:
         total_desfechos: int,
         polo_cliente: str,
         tipo_acao: str,
+        escopo: str = "tribunal",
     ) -> list[str]:
         fatores: list[str] = []
 
         tipo_curto = tipo_acao[:70] if len(tipo_acao) > 70 else tipo_acao
-        fatores.append(
-            f"Em {total_desfechos} casos públicos de '{tipo_curto}' com desfecho registrado: "
-            f"{pct_favoravel}% favoráveis, "
-            f"{pct_desfavoravel}% desfavoráveis, "
-            f"{pct_neutro}% acordos ou extinções"
-        )
+
+        if escopo == "nacional":
+            fatores.append(
+                f"Em {total_desfechos} casos públicos de '{tipo_curto}' com desfecho "
+                f"registrado em tribunais brasileiros (escopo nacional — amostra local insuficiente): "
+                f"{pct_favoravel}% favoráveis, "
+                f"{pct_desfavoravel}% desfavoráveis, "
+                f"{pct_neutro}% acordos ou extinções"
+            )
+        else:
+            fatores.append(
+                f"Em {total_desfechos} casos públicos de '{tipo_curto}' com desfecho "
+                f"registrado no mesmo tribunal: "
+                f"{pct_favoravel}% favoráveis, "
+                f"{pct_desfavoravel}% desfavoráveis, "
+                f"{pct_neutro}% acordos ou extinções"
+            )
 
         if polo_cliente.lower() == "reu":
             fatores.append(

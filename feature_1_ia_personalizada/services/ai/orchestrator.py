@@ -35,7 +35,6 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from dataclasses import asdict
 from decimal import Decimal
 from typing import Any
 
@@ -61,11 +60,11 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
     SYSTEM_PROMPT_DESABAFO,
+    SYSTEM_PROMPT_DUVIDA_GERAL,
     SYSTEM_PROMPT_PERSPECTIVAS,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
-    TEMPLATE_CONTEXTO_CASOS_SIMILARES,
 )
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
@@ -73,9 +72,6 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 )
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
-)
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
-    VitoriaPreditor,
 )
 from feature_1_ia_personalizada.services.messaging.evolution_client import (
     EvolutionClient,
@@ -234,7 +230,6 @@ class ConversationOrchestrator:
         cache_manager: LegalDataCacheManager,
         evolution_client: EvolutionClient,
         session_factory: async_sessionmaker[AsyncSession],
-        vitoria_preditor: VitoriaPreditor | None = None,
     ) -> None:
         self._claude = claude_client
         self._memory = memory
@@ -243,8 +238,6 @@ class ConversationOrchestrator:
         self._cache = cache_manager
         self._evolution = evolution_client
         self._session_factory = session_factory
-        # None = feature desabilitada (ex: sem chave DataJud no ambiente)
-        self._vitoria_preditor = vitoria_preditor
 
         # FactChecker usa DB via adapter
         self._fact_checker = FactChecker(
@@ -500,8 +493,10 @@ class ConversationOrchestrator:
         if state.get("intencao") in (
             "status",
             "duvida_termo",
+            "duvida_geral",
             "reclamacao",
-            "perspectivas",  # ← nova categoria: busca dados + vitoria_preditor
+            "perspectivas",
+            "saudacao",
         ):
             return "buscar_dados"
         return "gerar_resposta"
@@ -642,28 +637,6 @@ class ConversationOrchestrator:
 
             log.info("dados_processo_obtidos", cnj=numero_cnj)
 
-            # Enriquece com estatística de casos similares para status E perspectivas
-            if (
-                state.get("intencao") in ("status", "perspectivas")
-                and self._vitoria_preditor is not None
-            ):
-                try:
-                    estatistica = await self._vitoria_preditor.buscar_estatistica(
-                        numero_cnj=numero_cnj,
-                        tipo_acao=processo.tipo_acao,
-                        polo_cliente=processo.polo_cliente or "autor",
-                    )
-                    if estatistica:
-                        dados_processo["estatistica_processual"] = asdict(estatistica)
-                        log.info(
-                            "estatistica_processual_obtida",
-                            cnj=numero_cnj,
-                            pct_favoravel=estatistica.pct_favoravel,
-                            confianca=estatistica.confianca,
-                        )
-                except Exception as exc_stat:
-                    log.warning("estatistica_processual_erro", erro=str(exc_stat))
-
             return {
                 "processo_id": processo.id,
                 "dados_processo": dados_processo,
@@ -746,19 +719,8 @@ class ConversationOrchestrator:
                         f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
                     )
 
-                # Injeta contexto de casos similares quando disponível
-                estatistica_dict = dados.get("estatistica_processual")
-                if estatistica_dict:
-                    fatores_str = "\n".join(
-                        f"- {f}" for f in estatistica_dict.get("fatores", [])
-                    )
-                    system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
-                        fatores=fatores_str,
-                        disclaimer=estatistica_dict.get("disclaimer", ""),
-                    )
-
             elif intencao == "perspectivas" and dados:
-                # Prompt dedicado para perguntas sobre chances/perspectivas
+                # Explica por que não é possível fornecer previsões (compliance OAB)
                 system_prompt = SYSTEM_PROMPT_PERSPECTIVAS.format(
                     nome_escritorio=nome_escritorio,
                     nome_cliente=nome_cliente,
@@ -769,33 +731,45 @@ class ConversationOrchestrator:
                         "ultimo_andamento", "sem movimentação recente"
                     ),
                 )
-                # Injeta estatística de casos similares (razão de ser desta intenção)
-                estatistica_dict = dados.get("estatistica_processual")
-                if estatistica_dict:
-                    fatores_str = "\n".join(
-                        f"- {f}" for f in estatistica_dict.get("fatores", [])
-                    )
-                    system_prompt += "\n\n" + TEMPLATE_CONTEXTO_CASOS_SIMILARES.format(
-                        fatores=fatores_str,
-                        disclaimer=estatistica_dict.get("disclaimer", ""),
-                    )
+
+            elif intencao == "duvida_geral" and dados:
+                system_prompt = SYSTEM_PROMPT_DUVIDA_GERAL.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                    numero_cnj=dados.get("numero_cnj", "N/D"),
+                    tribunal=dados.get("tribunal", "N/D"),
+                    polo_cliente=dados.get("polo_cliente", "N/D"),
+                    ultimo_andamento=dados.get("ultimo_andamento", "sem movimentação recente"),
+                    data_ultimo_andamento=dados.get("data_ultimo_andamento", "N/D"),
+                )
 
             elif intencao == "duvida_termo":
                 system_prompt = SYSTEM_PROMPT_TRADUZIR_TERMO.format(
                     nome_escritorio=nome_escritorio,
                     nome_cliente=nome_cliente,
+                    numero_cnj=dados.get("numero_cnj", "N/D"),
+                    ultimo_andamento=dados.get("ultimo_andamento", "N/D"),
                 )
             elif intencao == "saudacao":
+                _numero_cnj = dados.get("numero_cnj", "N/D")
+                _ultimo_andamento = dados.get("ultimo_andamento", "N/D")
+                _data_ultimo = dados.get("data_ultimo_andamento", "N/D")
                 cliente_recorrente = len(state.get("historico", [])) > 0
                 if cliente_recorrente:
                     system_prompt = SYSTEM_PROMPT_SAUDACAO_RECORRENTE.format(
                         nome_escritorio=nome_escritorio,
                         nome_cliente=nome_cliente,
+                        numero_cnj=_numero_cnj,
+                        ultimo_andamento=_ultimo_andamento,
+                        data_ultimo_andamento=_data_ultimo,
                     )
                 else:
                     system_prompt = SYSTEM_PROMPT_BOAS_VINDAS.format(
                         nome_escritorio=nome_escritorio,
                         nome_cliente=nome_cliente,
+                        numero_cnj=_numero_cnj,
+                        ultimo_andamento=_ultimo_andamento,
+                        data_ultimo_andamento=_data_ultimo,
                     )
             elif intencao == "desabafo":
                 system_prompt = SYSTEM_PROMPT_DESABAFO.format(
@@ -1114,7 +1088,7 @@ class ConversationOrchestrator:
             return state  # type: ignore[return-value]
 
         # Nó 2: buscar dados (se intenção exige processo)
-        if state["intencao"] in ("status", "duvida_termo", "reclamacao", "perspectivas"):
+        if state["intencao"] in ("status", "duvida_termo", "duvida_geral", "reclamacao", "perspectivas", "saudacao"):
             state.update(await self._node_buscar_dados(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
@@ -1162,7 +1136,6 @@ def criar_orchestrador(
     api_key_jusbrasil: str | None = None,
     api_key_evolution: str | None = None,
     evolution_base_url: str = "http://localhost:8080",
-    api_key_datajud: str | None = None,
 ) -> ConversationOrchestrator:
     return ConversationOrchestrator(
         claude_client=ClaudeClient(api_key=api_key_anthropic),
@@ -1175,7 +1148,6 @@ def criar_orchestrador(
             api_key=api_key_evolution or "",
         ),
         session_factory=session_factory,
-        vitoria_preditor=VitoriaPreditor(api_key=api_key_datajud),
     )
 
 
