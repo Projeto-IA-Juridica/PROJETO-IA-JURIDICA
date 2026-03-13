@@ -27,7 +27,7 @@ Fluxo LangGraph:
   tratar_erro ◄─── qualquer nó com exceção não recuperável
        │
        ▼
-      END
+      END 
 """
 
 from __future__ import annotations
