@@ -646,7 +646,6 @@ class ConversationOrchestrator:
             if (
                 state.get("intencao") in ("status", "perspectivas")
                 and self._vitoria_preditor is not None
-                and processo.tipo_acao
             ):
                 try:
                     estatistica = await self._vitoria_preditor.buscar_estatistica(
