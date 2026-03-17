@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from feature_1_ia_personalizada.workers.send_notifications import (
     enviar_boas_vindas_escritorio,
     processar_mensagem_recebida,
+    processar_resposta_advogado,
 )
 from shared.config.settings import settings
 from shared.database.session import get_db
@@ -157,12 +158,32 @@ async def receive_message(
     cliente = (await db.execute(stmt_cli)).scalars().first()
 
     if not cliente:
+        # Tentar verificar se é um ADVOGADO respondendo a uma escalação
+        from shared.models.usuario import Usuario
+
+        stmt_adv = select(Usuario).where(
+            Usuario.whatsapp_numero == telefone_digitos,
+            Usuario.escritorio_id == escritorio.id,
+            Usuario.ativo == True,
+            Usuario.escalacao_ativa == True,
+        )
+        advogado = (await db.execute(stmt_adv)).scalars().first()
+
+        if advogado:
+            processar_resposta_advogado.delay(
+                id_escritorio=escritorio.id,
+                id_advogado=advogado.id,
+                texto_resposta=texto,
+                msg_context=msg_content if isinstance(msg_content, dict) else {},
+            )
+            return {"status": "queued_escalation_reply"}
+
         logger.info(
             "webhook_numero_desconhecido",
             telefone=telefone_digitos,
             instance_name=instance_name,
         )
-        return {"status": "ignored", "reason": "Client not registered"}
+        return {"status": "ignored", "reason": "Client or Lawyer not registered"}
 
     # 3. Disparar o Worker (Processamento via Celery assíncrono)
     # A IA fará todo o trabalho pesado longe da Main Thread do FastAPI

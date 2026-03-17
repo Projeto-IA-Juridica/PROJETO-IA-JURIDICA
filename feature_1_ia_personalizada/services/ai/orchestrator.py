@@ -67,6 +67,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_TRADUZIR_TERMO,
 )
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
+from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManager
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     LegalDataCacheManager,
 )
@@ -241,6 +242,11 @@ class ConversationOrchestrator:
         self._cache = cache_manager
         self._evolution = evolution_client
         self._session_factory = session_factory
+        self._escalacao_manager = EscalacaoManager(
+            claude_client=claude_client,
+            evolution_client=evolution_client,
+            session_factory=session_factory,
+        )
         self._rag = rag_retriever  # None = RAG desativado (graceful degradation)
 
         # FactChecker usa DB via adapter
@@ -624,7 +630,34 @@ class ConversationOrchestrator:
             intencao=state.get("intencao"),
         )
         try:
-            # Em vez de deferir, injetamos a resposta dizendo que a pergunta foi encaminhada -> a lógica de mandar pro WhatsApp vem melhor isolada na manager que posso chamar asincronamente
+            # Buscar informações necessárias (como instancia do whatsapp)
+            instancia_whatsapp = ""
+            async with self._session_factory() as session:
+                escritorio, _ = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
+                )
+                if escritorio:
+                    instancia_whatsapp = escritorio.webhook_whatsapp_instance or ""
+
+            # Invocar o EscalacaoManager
+            historico = state.get("historico", [])
+            motivo = state.get("motivo_escalacao") or "indefinido"
+            mensagem_cliente = state["mensagem_original"]
+            
+            # Aqui podemos despachar a task em background nativamente usando asyncio_create_task 
+            # ou rodar inline. Para não atrasar a resposta ao cliente, vamos despachar background.
+            import asyncio
+            asyncio.create_task(
+                self._escalacao_manager.avaliar_e_notificar_advogados(
+                    escritorio_id=state["escritorio_id"],
+                    cliente_id=state["cliente_id"],
+                    mensagem_cliente=mensagem_cliente,
+                    motivo=motivo,
+                    historico_recente=historico,
+                    instancia_whatsapp=instancia_whatsapp,
+                )
+            )
+
             fallback_msg = (
                 "Sua pergunta é muito importante e específica para o andamento do seu caso particular. "
                 "Para garantir a melhor orientação jurídica, encaminhei sua mensagem imediatamente "

@@ -359,3 +359,96 @@ def enviar_boas_vindas_escritorio(self, escritorio_id: int):
     )
 
     return {"enviados": enviados, "ignorados": ignorados}
+
+
+@shared_task(
+    bind=True,
+    base=DLQTask,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    max_retries=3,
+)
+def processar_resposta_advogado(
+    self, id_escritorio: int, id_advogado: int, texto_resposta: str, msg_context: dict
+):
+    """
+    Processa a resposta de um advogado a uma escalação e envia ao cliente final.
+    """
+    from shared.database.connection import async_session_factory
+    from sqlalchemy import select
+    from shared.models.interacao import Interacao
+
+    async def _processar():
+        async with async_session_factory() as session:
+            interacao_id = None
+            import re
+            
+            # Buscar no quoted message
+            texto_citado = ""
+            if "extendedTextMessage" in msg_context:
+                ctx_info = msg_context.get("extendedTextMessage", {}).get("contextInfo", {})
+                quoted = ctx_info.get("quotedMessage", {})
+                if "conversation" in quoted:
+                    texto_citado = quoted["conversation"]
+                elif "extendedTextMessage" in quoted:
+                    texto_citado = quoted.get("extendedTextMessage", {}).get("text", "")
+
+            if texto_citado:
+                match = re.search(r"ID:\s*#(\d+)", texto_citado)
+                if match:
+                    interacao_id = int(match.group(1))
+
+            stmt = select(Interacao).where(
+                Interacao.escritorio_id == id_escritorio,
+                Interacao.tipo == "escalacao",
+            ).order_by(Interacao.id.desc()).limit(20)
+            
+            result = await session.execute(stmt)
+            interacoes_recentes = result.scalars().all()
+            
+            interacao_alvo = None
+            if interacao_id:
+                for i in interacoes_recentes:
+                    if i.id == interacao_id and i.metadata_json.get("escalacao", {}).get("status") == "pendente":
+                        interacao_alvo = i
+                        break
+            
+            if not interacao_alvo:
+                # Fallback: pegar pendente mais recente
+                for i in interacoes_recentes:
+                    meta_esc = i.metadata_json.get("escalacao", {})
+                    if meta_esc.get("status") == "pendente" and id_advogado in meta_esc.get("advogados_notificados", []):
+                        interacao_alvo = i
+                        break
+            
+            if not interacao_alvo:
+                logger.warning("nenhuma_escalacao_pendente_encontrada", advogado_id=id_advogado)
+                return
+
+            # Atualizar o status da escalação
+            meta = dict(interacao_alvo.metadata_json)
+            esc_meta = dict(meta.get("escalacao", {}))
+            esc_meta["status"] = "respondido"
+            esc_meta["advogado_responsavel_id"] = id_advogado
+            esc_meta["resposta_advogado"] = texto_resposta
+            meta["escalacao"] = esc_meta
+            
+            interacao_alvo.metadata_json = meta
+            
+            # Analisar a resposta do advogado
+            texto_limpo = texto_resposta.strip().lower()
+            if texto_limpo in ["ok", "aprovado", "aprovar", "sim", "pode enviar"]:
+                resposta_final = esc_meta.get("sugestao_resposta", "")
+            else:
+                resposta_final = texto_resposta
+                
+            service = _get_whatsapp_service()
+            await service.enviar_mensagem(id_escritorio, interacao_alvo.cliente_id, resposta_final)
+            
+            await session.commit()
+            logger.info("escalacao_resolvida", interacao_id=interacao_alvo.id, advogado_id=id_advogado)
+            await service.evolution_client.close()
+
+    asyncio.run(_processar())
+    return {"status": "processado"}
+

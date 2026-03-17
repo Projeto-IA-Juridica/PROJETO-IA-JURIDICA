@@ -110,6 +110,10 @@ celery_app.conf.task_routes = {
         "queue": "relacionamento",
         "routing_key": "relacionamento",
     },
+    "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_escalacoes_pendentes": {
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
+    },
     # ingest_documentos.py
     "feature_1_ia_personalizada.workers.ingest_documentos.ingest_documento": {
         "queue": "ia",
@@ -151,6 +155,10 @@ celery_app.conf.beat_schedule = {
     "relacionamento-sem-contato-seg-10h": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_clientes_sem_contato",
         "schedule": crontab(day_of_week=1, hour=10, minute=0),
+    },
+    "monitorar-escalacoes-pendentes": {
+        "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_escalacoes_pendentes",
+        "schedule": crontab(minute="*/30"),
     },
 }
 
