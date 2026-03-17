@@ -131,6 +131,7 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     health,
     metrics,
     processos,
+    rag,
     webhook_whatsapp,
 )
 
@@ -212,6 +213,7 @@ app.include_router(metrics)
 app.include_router(auth)
 app.include_router(processos)
 app.include_router(chat)
+app.include_router(rag)
 app.include_router(webhook_whatsapp)
 app.include_router(admin_import)
 

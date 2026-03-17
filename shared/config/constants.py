@@ -54,7 +54,19 @@ RETENCAO_LOGS_MESES: Final[int] = 6
 FORMATO_NUMERO_PROCESSO: Final[str] = r"\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}"
 REGEX_NUMERO_PROCESSO: Final[re.Pattern[str]] = re.compile(FORMATO_NUMERO_PROCESSO)
 
-# 6) Mensagens de fallback (quando o provedor estiver indisponível)
+# 6) RAG — parâmetros de busca vetorial
+
+RAG_MAX_FILE_SIZE_MB: Final[int] = 50                             # limite de upload
+RAG_ALLOWED_EXTENSIONS: Final[frozenset[str]] = frozenset({"pdf", "docx", "txt"})
+
+RAG_MIN_SIMILARITY: Final[float] = 0.75   # threshold mínimo de similaridade coseno (0-1)
+# Distância coseno equivalente: 1 - RAG_MIN_SIMILARITY = 0.25
+# Chunks com distância > 0.25 são descartados como irrelevantes.
+
+RAG_TOP_K_CANDIDATOS: Final[int] = 10     # candidatos buscados antes do re-ranking
+RAG_TOP_K_FINAL: Final[int] = 3           # chunks selecionados após re-ranking MMR
+
+# 7) Mensagens de fallback (quando o provedor estiver indisponível)
 
 MENSAGENS_FALLBACK: Final[dict[str, str]] = {
     "indisponivel": (

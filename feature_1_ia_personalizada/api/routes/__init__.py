@@ -11,6 +11,7 @@ from .chat import router as chat
 from .health import router as health
 from .metrics import router as metrics
 from .processos import router as processos
+from .rag import router as rag
 from .webhook_whatsapp import router as webhook_whatsapp
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "metrics",
     "processos",
     "chat",
+    "rag",
     "webhook_whatsapp",
 ]

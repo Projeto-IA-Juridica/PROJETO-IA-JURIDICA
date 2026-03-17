@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     JUSBRASIL_API_KEY: str
     DATAJUD_API_KEY: str | None = None
 
+    # RAG — Voyage AI (opcional; se ausente usa OpenAI text-embedding-3-small)
+    VOYAGE_API_KEY: str | None = None
+
     # Auth
     JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: str = "HS256"

@@ -8,7 +8,18 @@ from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
 from shared.database.connection import async_session_factory
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """
+    Retorna a fábrica de sessões assíncronas compartilhada.
+    Usada por serviços que não passam pela injeção de dependência do FastAPI
+    (ex: workers Celery, serviços RAG instanciados manualmente).
+    """
+    return async_session_factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

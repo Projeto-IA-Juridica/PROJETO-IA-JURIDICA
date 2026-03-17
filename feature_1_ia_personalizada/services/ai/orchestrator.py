@@ -53,6 +53,7 @@ except Exception:  # ImportError ou TypeError (pydantic v1 + Python 3.12)
     _LANGGRAPH_OK = False
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
+from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.prompts import (
@@ -130,6 +131,7 @@ class ConversationState(TypedDict):
     historico: list[dict]
     intencao: str  # status | duvida_termo | saudacao | reclamacao | perspectivas | outro
     dados_processo: dict | None
+    contexto_rag: str | None  # bloco XML injetado no prompt; None = RAG sem resultado
     resposta_ia: str | None
     resposta_verificada: str | None
     tokens_usados: dict
@@ -230,6 +232,7 @@ class ConversationOrchestrator:
         cache_manager: LegalDataCacheManager,
         evolution_client: EvolutionClient,
         session_factory: async_sessionmaker[AsyncSession],
+        rag_retriever: RAGRetriever | None = None,
     ) -> None:
         self._claude = claude_client
         self._memory = memory
@@ -238,6 +241,7 @@ class ConversationOrchestrator:
         self._cache = cache_manager
         self._evolution = evolution_client
         self._session_factory = session_factory
+        self._rag = rag_retriever  # None = RAG desativado (graceful degradation)
 
         # FactChecker usa DB via adapter
         self._fact_checker = FactChecker(
@@ -287,6 +291,7 @@ class ConversationOrchestrator:
             "historico": historico,
             "intencao": "outro",
             "dados_processo": None,
+            "contexto_rag": None,
             "resposta_ia": None,
             "resposta_verificada": None,
             "tokens_usados": {"input": 0, "output": 0},
@@ -346,6 +351,27 @@ class ConversationOrchestrator:
     # -----------------------------------------------------------------------
     # DB / adapters
     # -----------------------------------------------------------------------
+
+    async def _buscar_rag(
+        self,
+        state: ConversationState,
+        contexto_processo: dict | None = None,
+    ) -> str:
+        """
+        Chama o RAGRetriever de forma segura.
+        Retorna string vazia se RAG não configurado ou em caso de erro.
+        """
+        if not self._rag:
+            return ""
+        try:
+            return await self._rag.buscar(
+                query=state["mensagem_original"],
+                escritorio_id=state["escritorio_id"],
+                contexto_processo=contexto_processo,
+            )
+        except Exception as exc:
+            logger.warning("rag_busca_falhou_graceful", erro=str(exc))
+            return ""
 
     async def _buscar_resumo_processo_para_fact_checker(
         self, processo_id: str
@@ -582,12 +608,22 @@ class ConversationOrchestrator:
             processo = processos[0]
             numero_cnj = processo.numero_cnj
 
-            # Tenta cache de andamentos → Jusbrasil como fallback
+            # Tenta cache de andamentos → Jusbrasil como fallback.
+            # RAG é executado em paralelo com Jusbrasil quando há cache miss,
+            # eliminando latência adicional no caminho crítico.
             andamentos = await self._cache.get_andamentos(numero_cnj)
             if andamentos:
                 log.debug("andamentos_do_cache", cnj=numero_cnj)
+                contexto_rag = await self._buscar_rag(state)
             else:
-                andamentos = await self._jusbrasil.sincronizar_andamentos(numero_cnj)
+                contexto_processo_para_rag = {
+                    "tipo_acao": getattr(processo, "tipo_acao", None),
+                    "tribunal": processo.tribunal,
+                }
+                andamentos, contexto_rag = await asyncio.gather(
+                    self._jusbrasil.sincronizar_andamentos(numero_cnj),
+                    self._buscar_rag(state, contexto_processo_para_rag),
+                )
                 await self._cache.set_andamentos(numero_cnj, andamentos)
                 log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
 
@@ -635,11 +671,12 @@ class ConversationOrchestrator:
                 "glossario_andamento": glossario_andamento,
             }
 
-            log.info("dados_processo_obtidos", cnj=numero_cnj)
+            log.info("dados_processo_obtidos", cnj=numero_cnj, rag_ativo=bool(contexto_rag))
 
             return {
                 "processo_id": processo.id,
                 "dados_processo": dados_processo,
+                "contexto_rag": contexto_rag or None,
             }
 
         except Exception as exc:
@@ -781,6 +818,12 @@ class ConversationOrchestrator:
                     nome_escritorio=nome_escritorio,
                     nome_cliente=nome_cliente,
                 )
+
+            # Injeta contexto RAG no prompt quando disponível
+            # (só presente para intenções que passam por buscar_dados)
+            contexto_rag = state.get("contexto_rag") or ""
+            if contexto_rag:
+                system_prompt += f"\n\n{contexto_rag}"
 
             resultado = await self._claude.enviar_mensagem(
                 system_prompt=system_prompt,

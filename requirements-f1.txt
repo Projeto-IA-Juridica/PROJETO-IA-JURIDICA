@@ -34,3 +34,10 @@ pydub==0.25.1             # Conversão ogg→mp3 (requer ffmpeg instalado no SO)
 # Google Sheets
 google-api-python-client==2.116.0
 google-auth==2.27.0
+
+# RAG Jurisprudencial (Feature 1)
+pgvector==0.3.2           # Tipo Vector para SQLAlchemy + operadores coseno no pgvector
+PyMuPDF==1.24.0           # Extração de texto de PDFs (fitz)
+langchain-text-splitters==0.2.4  # RecursiveCharacterTextSplitter (chunking com tiktoken)
+# Voyage AI: sem SDK — chamado via httpx (já incluso pelo openai SDK)
+# OpenAI embeddings: já coberto por openai==1.50.2 acima
