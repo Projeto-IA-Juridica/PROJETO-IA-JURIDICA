@@ -15,7 +15,7 @@
 
 **Objetivo:** transformar andamentos técnicos em mensagens que o cliente entende de verdade, com contexto histórico do processo.
 
-**Status: 83% concluída — falta apenas 3.6 (testes)**
+**Status: 100% concluída ✅**
 
 #### 3.1 — Migração SQL: estado do processo ✅
 
@@ -62,11 +62,11 @@
 - [x] Envia resumo contextualizado via Celery (mesmo canal, fila `notificacoes`)
 - **Arquivos:** `monitor_processos.py`, `shared/database/worker_queries.py`
 
-#### 3.6 — Testes ⏳ (pendente)
+#### 3.6 — Testes ✅
 
-- [ ] `feature_1_ia_personalizada/tests/unit/test_processo_state.py` — classifica fases corretamente, persiste estado, gera contexto histórico
-- [ ] `feature_1_ia_personalizada/tests/unit/test_juridical_translator_contexto.py` — mock Claude; verifica que prompt montado contém todos os campos
-- [ ] `feature_1_ia_personalizada/tests/integration/test_resumo_andamento.py` — fluxo completo: andamento detectado → resumo → WhatsApp (mock Evolution)
+- [x] `feature_1_ia_personalizada/tests/unit/test_processo_state.py` — classifica fases corretamente, persiste estado, gera contexto histórico
+- [x] `feature_1_ia_personalizada/tests/unit/test_juridical_translator_contexto.py` — mock Claude; verifica que prompt montado contém todos os campos
+- [x] `feature_1_ia_personalizada/tests/integration/test_resumo_andamento.py` — fluxo completo: andamento detectado → resumo → WhatsApp (mock Evolution)
 
 ---
 
