@@ -403,9 +403,9 @@
 
 #### 1.1 — Ativar extensão pgvector no PostgreSQL
 
-- [ ] Criar `alembic/versions/007_add_pgvector.py`
-- [ ] `CREATE EXTENSION IF NOT EXISTS vector`
-- [ ] Criar tabela `documentos_rag`:
+- [x] Criar `alembic/versions/007_add_pgvector.py`
+- [x] `CREATE EXTENSION IF NOT EXISTS vector`
+- [x] Criar tabela `documentos_rag`:
   ```sql
   CREATE TABLE documentos_rag (
       id            SERIAL PRIMARY KEY,
@@ -422,7 +422,7 @@
       updated_at    TIMESTAMPTZ DEFAULT NOW()
   );
   ```
-- [ ] Índices:
+- [x] Índices:
   ```sql
   CREATE INDEX ON documentos_rag USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
   CREATE INDEX ON documentos_rag (escritorio_id, tipo, ativo);
@@ -433,21 +433,21 @@
 
 #### 1.2 — Serviço `EmbeddingGenerator`
 
-- [ ] Criar `feature_1_ia_personalizada/services/rag/embeddings.py`
-- [ ] Classe `EmbeddingGenerator`:
+- [x] Criar `feature_1_ia_personalizada/services/rag/embeddings.py`
+- [x] Classe `EmbeddingGenerator`:
   - Usa **`claude-3-5-haiku`** para embeddings via API Anthropic (mais barato; dimensão 1536)
   - Fallback: Voyage AI (`voyage-law-2` — especializado em textos jurídicos; ativar com env var `VOYAGE_API_KEY`)
   - Método `gerar(texto: str) -> list[float]`: retorna vetor 1536D
   - Método `gerar_batch(textos: list[str]) -> list[list[float]]`: paraleliza com `asyncio.gather` (máx 10 concurrent)
-- [ ] **Eficiência:** batch de embeddings reduz latência total; usar semáforo para limitar concorrência e não estourar rate limit
-- [ ] **Cache:** hash do texto como chave no Redis (TTL 7 dias) — mesmo chunk do mesmo texto não gera embedding novamente
+- [x] **Eficiência:** batch de embeddings reduz latência total; usar semáforo para limitar concorrência e não estourar rate limit
+- [x] **Cache:** hash do texto como chave no Redis (TTL 7 dias) — mesmo chunk do mesmo texto não gera embedding novamente
 - **Arquivo:** `feature_1_ia_personalizada/services/rag/embeddings.py`
 - **Critério:** batch de 20 chunks < 5s; embedding cacheado reutilizado corretamente; fallback para Voyage funciona
 
 #### 1.3 — Pipeline de Ingestão `DocumentoIngester`
 
-- [ ] Criar `feature_1_ia_personalizada/services/rag/ingestion.py`
-- [ ] Classe `DocumentoIngester`:
+- [x] Criar `feature_1_ia_personalizada/services/rag/ingestion.py`
+- [x] Classe `DocumentoIngester`:
   - `ingerir_pdf(arquivo_bytes, escritorio_id, metadata) -> IngestaoResultado`:
     1. Extrai texto com `PyMuPDF` (fitz)
     2. Limpa texto: remove cabeçalhos de rodapé, numeração de página, artefatos de scan
@@ -456,15 +456,15 @@
     5. Gera embeddings em batch via `EmbeddingGenerator`
     6. Salva todos os chunks em `documentos_rag` em transação única
   - `ingerir_texto(texto, escritorio_id, titulo, tipo, metadata)`: mesmo fluxo sem etapa 1
-- [ ] **Inteligência:** extrair metadados automaticamente do PDF (tribunal, número CNJ, data, tipo de ação) via regex + Claude (somente para campos não encontrados por regex)
-- [ ] **Performance:** ingestão de PDF 10 páginas < 15s (processamento + embeddings)
+- [x] **Inteligência:** extrair metadados automaticamente do PDF (tribunal, número CNJ, data, tipo de ação) via regex + Claude (somente para campos não encontrados por regex)
+- [x] **Performance:** ingestão de PDF 10 páginas < 15s (processamento + embeddings)
 - **Arquivo:** `feature_1_ia_personalizada/services/rag/ingestion.py`
 - **Critério:** deduplicação por hash funciona; chunks com overlap correto; metadados extraídos automaticamente
 
 #### 1.4 — Serviço `VectorStore`
 
-- [ ] Criar `feature_1_ia_personalizada/services/rag/vector_store.py`
-- [ ] Classe `VectorStore`:
+- [x] Criar `feature_1_ia_personalizada/services/rag/vector_store.py`
+- [x] Classe `VectorStore`:
   - `buscar(query_embedding, escritorio_id, top_k=5, filtros=None) -> list[DocumentoRAG]`:
     - Query pgvector: `ORDER BY embedding <=> $1 LIMIT $2`
     - Filtros opcionais: `tipo`, `tribunal`, `tipo_acao` (via `metadata_json @> '...'`)
@@ -478,8 +478,8 @@
 
 #### 1.5 — Interface `RAGRetriever`
 
-- [ ] Criar `feature_1_ia_personalizada/services/rag/retriever.py`
-- [ ] Classe `RAGRetriever` — interface de alto nível para o orquestrador:
+- [x] Criar `feature_1_ia_personalizada/services/rag/retriever.py`
+- [x] Classe `RAGRetriever` — interface de alto nível para o orquestrador:
   - `buscar(query, escritorio_id, contexto_processo=None) -> str`:
     - Chama `VectorStore.buscar_por_texto()`
     - Formata os chunks encontrados em texto estruturado para injeção no prompt
@@ -492,39 +492,39 @@
 
 #### 1.6 — Novo nó RAG no Orquestrador
 
-- [ ] Em `feature_1_ia_personalizada/services/ai/orchestrator.py`, adicionar nó `buscar_contexto_rag`:
+- [x] Em `feature_1_ia_personalizada/services/ai/orchestrator.py`, adicionar nó `buscar_contexto_rag`:
   - Posição: entre `buscar_dados` e `gerar_resposta`
   - Chama `RAGRetriever.buscar(mensagem, escritorio_id, processo)`
   - Salva em `state["contexto_rag"]`
   - **Performance:** executado em paralelo com `buscar_dados` via `asyncio.gather` — não adiciona latência ao caminho crítico
-- [ ] Em `gerar_resposta`, injetar `{contexto_escritorio}` nos prompts onde aplicável (status, perspectivas, dúvida geral)
-- [ ] Se `contexto_rag` vazio: gera resposta normalmente sem menção ao RAG
+- [x] Em `gerar_resposta`, injetar `{contexto_escritorio}` nos prompts onde aplicável (status, perspectivas, dúvida geral)
+- [x] Se `contexto_rag` vazio: gera resposta normalmente sem menção ao RAG
 - **Arquivo:** `feature_1_ia_personalizada/services/ai/orchestrator.py`
 - **Critério:** RAG não adiciona latência perceptível (paralelo); prompt só recebe contexto quando relevante
 
 #### 1.7 — Rota de gerenciamento RAG
 
-- [ ] Criar `feature_1_ia_personalizada/api/routes/rag.py`
-- [ ] Endpoints:
+- [x] Criar `feature_1_ia_personalizada/api/routes/rag.py`
+- [x] Endpoints:
   - `POST /rag/upload` — Upload de PDF/DOCX/TXT; dispara task Celery de ingestão; retorna `job_id`
   - `GET /rag/status/{job_id}` — Status da ingestão (pendente/processando/concluído/erro)
   - `GET /rag/documentos` — Lista documentos do escritório (paginado, filtros por tipo)
   - `DELETE /rag/documentos/{doc_hash}` — Remove documento (soft delete)
   - `POST /rag/buscar` — Testa busca semântica (uso interno/debug)
-- [ ] Validação: só aceita arquivos < 50MB; tipos permitidos em `constants.py`
-- [ ] **Segurança:** todos os endpoints protegidos por JWT + `escritorio_id` do token
+- [x] Validação: só aceita arquivos < 50MB; tipos permitidos em `constants.py`
+- [x] **Segurança:** todos os endpoints protegidos por JWT + `escritorio_id` do token
 - **Arquivo:** `feature_1_ia_personalizada/api/routes/rag.py`
 - **Critério:** upload funciona; task Celery disparada; status rastreável
 
 #### 1.8 — Worker Celery de ingestão
 
-- [ ] Criar `feature_1_ia_personalizada/workers/ingest_documentos.py`
-- [ ] Task `ingest_documento(arquivo_path, escritorio_id, metadata, job_id)`:
+- [x] Criar `feature_1_ia_personalizada/workers/ingest_documentos.py`
+- [x] Task `ingest_documento(arquivo_path, escritorio_id, metadata, job_id)`:
   - Fila: `ia` (já existente)
   - Chama `DocumentoIngester.ingerir_pdf()`
   - Atualiza status do job no Redis: `job:{job_id}` → `{status, chunks, erro}`
   - Em caso de erro: envia para `dead_letter` queue (padrão existente)
-- [ ] Task `ingest_jurisprudencia_publica(tipo_acao, tribunal, escritorio_id)`:
+- [x] Task `ingest_jurisprudencia_publica(tipo_acao, tribunal, escritorio_id)`:
   - Busca jurisprudência no DataJud e JusBrasil para o tipo/tribunal
   - Ingere automaticamente como contexto base para escritórios novos
   - **Inteligência:** executado no onboarding (Feature 4) para pré-popular a base
@@ -533,20 +533,20 @@
 
 #### 1.9 — Adicionar dependências
 
-- [ ] Em `requirements-f1.txt`:
+- [x] Em `requirements-f1.txt`:
   ```
   pgvector==0.3.2
   PyMuPDF==1.24.0
   ```
-- [ ] Verificar `langchain-text-splitters` já incluso via `langchain==0.2.16`
+- [x] Verificar `langchain-text-splitters` já incluso via `langchain==0.2.16`
 - **Arquivo:** `requirements-f1.txt`
 
 #### 1.10 — Testes
 
-- [ ] `feature_1_ia_personalizada/tests/unit/test_embeddings.py` — geração, cache, batch, fallback Voyage
-- [ ] `feature_1_ia_personalizada/tests/unit/test_ingestion.py` — chunking correto; deduplicação por hash; extração de metadados
-- [ ] `feature_1_ia_personalizada/tests/unit/test_retriever.py` — re-ranking; threshold de relevância; contexto vazio quando sem match
-- [ ] `feature_1_ia_personalizada/tests/integration/test_rag_pipeline.py` — upload → ingestão → busca → resposta com contexto RAG
+- [x] `feature_1_ia_personalizada/tests/unit/test_embeddings.py` — geração, cache, batch, fallback Voyage
+- [x] `feature_1_ia_personalizada/tests/unit/test_ingestion.py` — chunking correto; deduplicação por hash; extração de metadados
+- [x] `feature_1_ia_personalizada/tests/unit/test_retriever.py` — re-ranking; threshold de relevância; contexto vazio quando sem match
+- [x] `feature_1_ia_personalizada/tests/integration/test_rag_pipeline.py` — upload → ingestão → busca → resposta com contexto RAG
 
 ---
 
