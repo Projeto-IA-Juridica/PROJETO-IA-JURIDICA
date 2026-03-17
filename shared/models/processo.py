@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
@@ -105,6 +106,24 @@ class Processo(Base, TimestampMixin, TenantMixin):
         DateTime(timezone=True), nullable=True
     )
     valor_causa: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+
+    # --- Estado Processual (Feature 3) ---
+    estado_atual: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment=(
+            "Snapshot do estado: fase, ultimos_andamentos (últimos 5), "
+            "proximo_passo_esperado. Atualizado a cada novo andamento."
+        ),
+    )
+    fase_processual: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment=(
+            "Fase atual: conhecimento | instrucao | saneamento | "
+            "julgamento | recurso | execucao | encerrado"
+        ),
+    )
 
     # --- Integração Jusbrasil ---
     jusbrasil_id: Mapped[str | None] = mapped_column(

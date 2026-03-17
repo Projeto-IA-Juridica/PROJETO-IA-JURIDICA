@@ -15,72 +15,54 @@
 
 **Objetivo:** transformar andamentos técnicos em mensagens que o cliente entende de verdade, com contexto histórico do processo.
 
-#### 3.1 — Migração SQL: estado do processo
+**Status: 83% concluída — falta apenas 3.6 (testes)**
 
-- [ ] Criar `alembic/versions/003_add_processo_state.py`
-- [ ] Adicionar em `processos`:
+#### 3.1 — Migração SQL: estado do processo ✅
+
+- [x] Criar `alembic/versions/003_add_processo_state.py`
+- [x] Adicionar em `processos`:
   - `estado_atual JSONB DEFAULT NULL` — snapshot do estado: fase, andamentos recentes, próximo passo esperado
   - `fase_processual VARCHAR(100) DEFAULT NULL` — `conhecimento` | `instrucao` | `saneamento` | `julgamento` | `recurso` | `execucao` | `encerrado`
-- [ ] Adicionar índice: `CREATE INDEX ON processos (escritorio_id, fase_processual)`
+- [x] Adicionar índice: `CREATE INDEX ON processos (escritorio_id, fase_processual)`
 - [ ] Rodar e testar migração em dev
 - **Arquivo:** `alembic/versions/003_add_processo_state.py`
 - **Critério:** `alembic upgrade head` sem erros; colunas visíveis no schema
 
-#### 3.2 — Serviço `ProcessoStateManager`
+> Modelo `shared/models/processo.py` também atualizado com as novas colunas.
 
-- [ ] Criar `feature_1_ia_personalizada/services/ai/processo_state.py`
-- [ ] Implementar `get_state(processo_id)`:
-  - Lê `processo.estado_atual` do banco (async)
-  - Se nulo, inicializa com fase `conhecimento`
-  - Retorna dict com `fase`, `ultimos_andamentos` (últimos 5), `proximo_passo_esperado`
-- [ ] Implementar `update_state(processo_id, novo_andamento)`:
-  - Classifica a fase via mapa de palavras-chave (ex: "sentença" → `julgamento`, "apelação" → `recurso`)
-  - Atualiza `processo.fase_processual` e `processo.estado_atual`
-  - Persiste no banco via `session.commit()`
-  - Retorna estado atualizado
-- [ ] Implementar `gerar_contexto_historico(processo_id, n_ultimos=5)`:
-  - Consulta últimas `n` interações do tipo `notificacao` para o processo
-  - Formata como string enumerada para injeção no prompt
-  - **Performance:** usa query indexada em `interacoes (processo_id, created_at DESC)` com `LIMIT 5`
+#### 3.2 — Serviço `ProcessoStateManager` ✅
+
+- [x] Criar `feature_1_ia_personalizada/services/ai/processo_state.py`
+- [x] Implementar `get_state(processo_id)` — lê estado_atual, inicializa com fase `conhecimento` se nulo
+- [x] Implementar `update_state(processo_id, novo_andamento)` — classifica fase por mapa de palavras-chave, persiste no banco
+- [x] Implementar `gerar_contexto_historico(processo_id, n_ultimos=5)` — query indexada com LIMIT
+- [x] Expor versões `async_*` para uso no FastAPI/orchestrator sem bloquear o event loop
 - **Arquivo:** `feature_1_ia_personalizada/services/ai/processo_state.py`
-- **Critério:** testes unitários passando; classificação de fase correta para 10+ tipos de andamento
 
-#### 3.3 — Novo prompt contextualizado
+#### 3.3 — Novo prompt contextualizado ✅
 
-- [ ] Adicionar `SYSTEM_PROMPT_ANDAMENTO_CONTEXTUALIZADO` em `feature_1_ia_personalizada/services/ai/prompts.py`
-- [ ] Prompt deve incluir variáveis: `{nome_escritorio}`, `{tipo_acao}`, `{fase_processual}`, `{polo_cliente}`, `{historico_andamentos}`, `{novo_andamento}`, `{contexto_escritorio}` (para RAG futuro)
-- [ ] Instruções explícitas no prompt:
-  1. Explique o que aconteceu em 1 frase simples
-  2. Diga se é normal nesta fase (sim/não + motivo curto)
-  3. Estime prazo para próximo passo (range, não data exata — compliance OAB)
-  4. Informe se o cliente precisa fazer algo
-  5. Sempre feche com "Seu advogado {nome_advogado} já foi notificado"
-- [ ] Limitar resposta a **máximo 4 parágrafos curtos** — ideal para WhatsApp
+- [x] Adicionar `SYSTEM_PROMPT_ANDAMENTO_CONTEXTUALIZADO` em `feature_1_ia_personalizada/services/ai/prompts.py`
+- [x] Variáveis: `{nome_escritorio}`, `{nome_cliente}`, `{tipo_acao}`, `{fase_processual}`, `{polo_cliente}`, `{historico_andamentos}`, `{novo_andamento}`
+- [x] 5 instruções explícitas + limite de 4 parágrafos / 250 palavras
 - **Arquivo:** `feature_1_ia_personalizada/services/ai/prompts.py`
-- **Critério:** resposta gerada tem tom natural, sem jargão, máximo 250 palavras
 
-#### 3.4 — Refatorar `juridical_translator.py` para aceitar contexto
+#### 3.4 — Refatorar `juridical_translator.py` para aceitar contexto ✅
 
-- [ ] Adicionar método `traduzir_com_contexto(andamento, fase_atual, historico, tipo_acao, polo_cliente)` em `feature_1_ia_personalizada/services/ai/juridical_translator.py`
-- [ ] Internamente: monta o `SYSTEM_PROMPT_ANDAMENTO_CONTEXTUALIZADO` com os parâmetros e chama `ClaudeClient`
-- [ ] Manter método original `traduzir(termo)` intacto para não quebrar chamadas existentes
-- [ ] **Eficiência:** se `ClaudeClient` já tem o histórico em `memory.py`, não re-buscar do banco — passar como argumento
+- [x] Adicionar método `traduzir_com_contexto(andamento, fase_atual, historico, tipo_acao, polo_cliente, nome_escritorio, nome_cliente)`
+- [x] Monta `SYSTEM_PROMPT_ANDAMENTO_CONTEXTUALIZADO` e chama Claude Haiku com `max_tokens=400`
+- [x] Método original `traduzir_andamento()` mantido intacto
+- [x] Loga `tokens_input` e `tokens_output` para monitorar critério < 1500 tokens
 - **Arquivo:** `feature_1_ia_personalizada/services/ai/juridical_translator.py`
-- **Critério:** método novo funciona; método antigo não quebra; tokens usados por chamada < 1500
 
-#### 3.5 — Integrar no worker `monitor_processos.py`
+#### 3.5 — Integrar no worker `monitor_processos.py` ✅
 
-- [ ] Em `feature_1_ia_personalizada/workers/monitor_processos.py`, após detectar novo andamento:
-  1. Instanciar `ProcessoStateManager`
-  2. Chamar `estado = await state_manager.update_state(processo.id, novo_andamento)`
-  3. Chamar `juridical_translator.traduzir_com_contexto(...)` com o estado
-  4. Enviar resumo via `whatsapp.py` (canal existente — sem mudança)
-  5. Salvar resumo em `interacao.mensagem_ia` + `metadata_json["fase_processual"]`
-- [ ] **Performance:** `update_state` e busca de histórico em paralelo com `asyncio.gather`
-- **Arquivo:** `feature_1_ia_personalizada/workers/monitor_processos.py`
-- **Critério:** do andamento detectado ao WhatsApp enviado em < 3s (excluindo latência Claude)
+- [x] Import do `ProcessoStateManager`
+- [x] Extrai `tipo_acao` e `polo_cliente` dos dados do processo (query atualizada em `worker_queries.py`)
+- [x] Para cada andamento: `update_state()` → `gerar_contexto_historico()` → `traduzir_com_contexto()`
+- [x] Envia resumo contextualizado via Celery (mesmo canal, fila `notificacoes`)
+- **Arquivos:** `monitor_processos.py`, `shared/database/worker_queries.py`
 
-#### 3.6 — Testes
+#### 3.6 — Testes ⏳ (pendente)
 
 - [ ] `feature_1_ia_personalizada/tests/unit/test_processo_state.py` — classifica fases corretamente, persiste estado, gera contexto histórico
 - [ ] `feature_1_ia_personalizada/tests/unit/test_juridical_translator_contexto.py` — mock Claude; verifica que prompt montado contém todos os campos

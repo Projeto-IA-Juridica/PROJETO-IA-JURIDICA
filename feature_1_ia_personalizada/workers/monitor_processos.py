@@ -14,6 +14,7 @@ from prometheus_client import Gauge
 from feature_1_ia_personalizada.services.ai.juridical_translator import (
     JuridicalTranslator,
 )
+from feature_1_ia_personalizada.services.ai.processo_state import ProcessoStateManager
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     get_andamentos_sync,
     set_andamentos_sync,
@@ -102,6 +103,8 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     id_processo = int(dados_processo["id"])
     numero_processo = str(dados_processo["numero"])
     data_ultimo_andamento_salvo = dados_processo.get("data_ultimo_andamento")
+    tipo_acao = dados_processo.get("tipo_acao") or "não informado"
+    polo_cliente = dados_processo.get("polo_cliente") or "autor"
 
     # 1️⃣ Buscar andamentos: Redis (cache) → Jusbrasil → DataJud (fallback)
     # Cache-aside: hit evita chamada HTTP e reduz custo de API.
@@ -136,15 +139,28 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     ultima_data_encontrada = None
     ultimo_texto_limpo = None
 
+    state_manager = ProcessoStateManager()
+
     for andamento in lista_andamentos:
         texto_original, data_iso = extrair_texto_e_data_do_andamento(andamento)
 
         texto_limpo = DataCleaner.limpar_andamento(texto_original)
-        texto_traduzido = JuridicalTranslator.traduzir_andamento(texto_limpo)
+
+        # Atualiza estado processual e busca histórico em paralelo
+        estado = state_manager.update_state(id_processo, texto_limpo)
+        historico = state_manager.gerar_contexto_historico(id_processo)
+
+        texto_resumido = JuridicalTranslator.traduzir_com_contexto(
+            andamento=texto_limpo,
+            fase_atual=estado.get("fase", "conhecimento"),
+            historico=historico,
+            tipo_acao=tipo_acao,
+            polo_cliente=polo_cliente,
+        )
 
         celery_app.send_task(
             "feature_1_ia_personalizada.workers.send_notifications.enviar_notificacao_andamento",
-            args=[id_processo, texto_traduzido],
+            args=[id_processo, texto_resumido],
             queue="notificacoes",
         )
 

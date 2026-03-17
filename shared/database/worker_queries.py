@@ -100,6 +100,8 @@ async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
                 "id": p.id,
                 "numero": p.numero_cnj,
                 "data_ultimo_andamento": p.data_ultimo_andamento,
+                "tipo_acao": p.tipo_acao,
+                "polo_cliente": p.polo_cliente,
             }
             for p in result.scalars().all()
         ]
