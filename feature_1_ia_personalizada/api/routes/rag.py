@@ -28,7 +28,15 @@ import uuid
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile  # Request usado nas funções de dependência
+from fastapi import (  # Request usado nas funções de dependência
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from pydantic import BaseModel
 from redis.asyncio import Redis
 from sqlalchemy import func, select
@@ -311,9 +319,7 @@ async def deletar_documento(
     ).scalar()
 
     if not existe:
-        raise HTTPException(
-            status_code=404, detail="Documento não encontrado ou já removido."
-        )
+        raise HTTPException(status_code=404, detail="Documento não encontrado ou já removido.")
 
     n = await store.deletar_documento(doc_hash=doc_hash, escritorio_id=escritorio_id)
     return {"doc_hash": doc_hash, "chunks_removidos": n}

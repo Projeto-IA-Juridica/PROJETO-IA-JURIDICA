@@ -53,7 +53,6 @@ except Exception:  # ImportError ou TypeError (pydantic v1 + Python 3.12)
     _LANGGRAPH_OK = False
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
-from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.prompts import (
@@ -81,6 +80,7 @@ from feature_1_ia_personalizada.services.messaging.templates import (
     TEMPLATE_CLIENTE_SEM_PROCESSO,
     TEMPLATE_ERRO_GENERICO,
 )
+from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 from shared.config.constants import MENSAGENS_FALLBACK
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
@@ -89,9 +89,7 @@ from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
 
-_TIMEOUT_FLUXO_SEGUNDOS = (
-    60.0  # guarda-chuva contra nós travados (Jusbrasil, Evolution, Claude)
-)
+_TIMEOUT_FLUXO_SEGUNDOS = 60.0  # guarda-chuva contra nós travados (Jusbrasil, Evolution, Claude)
 
 # ---------------------------------------------------------------------------
 # Métricas Prometheus
@@ -139,6 +137,8 @@ class ConversationState(TypedDict):
     tentativas_correcao: int
     usando_fallback: bool
     precisa_regenerar: bool  # sinal interno: verificar_resposta → gerar_resposta
+    requer_escalacao: bool
+    motivo_escalacao: str | None
 
 
 # ---------------------------------------------------------------------------
@@ -253,9 +253,7 @@ class ConversationOrchestrator:
             logger.info("orchestrator_iniciado", modo="langgraph")
         else:
             self._graph = None
-            logger.warning(
-                "orchestrator_iniciado", modo="fallback_simples_sem_langgraph"
-            )
+            logger.warning("orchestrator_iniciado", modo="fallback_simples_sem_langgraph")
 
     # -----------------------------------------------------------------------
     # API pública
@@ -299,6 +297,8 @@ class ConversationOrchestrator:
             "tentativas_correcao": 0,
             "usando_fallback": False,
             "precisa_regenerar": False,
+            "requer_escalacao": False,
+            "motivo_escalacao": None,
         }
 
         try:
@@ -373,9 +373,7 @@ class ConversationOrchestrator:
             logger.warning("rag_busca_falhou_graceful", erro=str(exc))
             return ""
 
-    async def _buscar_resumo_processo_para_fact_checker(
-        self, processo_id: str
-    ) -> dict[str, Any]:
+    async def _buscar_resumo_processo_para_fact_checker(self, processo_id: str) -> dict[str, Any]:
         """Adapter para FactChecker — lê dados reais do processo no banco."""
         try:
             async with self._session_factory() as session:
@@ -457,6 +455,8 @@ class ConversationOrchestrator:
         graph = StateGraph(ConversationState)
 
         graph.add_node("classificar_intencao", self._node_classificar_intencao)
+        graph.add_node("avaliar_escalacao", self._node_avaliar_escalacao)
+        graph.add_node("preparar_escalacao", self._node_preparar_escalacao)
         graph.add_node("buscar_dados", self._node_buscar_dados)
         graph.add_node("gerar_resposta", self._node_gerar_resposta)
         graph.add_node("verificar_resposta", self._node_verificar_resposta)
@@ -465,15 +465,20 @@ class ConversationOrchestrator:
 
         graph.set_entry_point("classificar_intencao")
 
+        graph.add_edge("classificar_intencao", "avaliar_escalacao")
+
         graph.add_conditional_edges(
-            "classificar_intencao",
-            self._rota_apos_classificacao,
+            "avaliar_escalacao",
+            self._rota_apos_avaliar_escalacao,
             {
+                "preparar_escalacao": "preparar_escalacao",
                 "buscar_dados": "buscar_dados",
                 "gerar_resposta": "gerar_resposta",
                 "tratar_erro": "tratar_erro",
             },
         )
+
+        graph.add_edge("preparar_escalacao", "enviar_resposta")
 
         graph.add_conditional_edges(
             "buscar_dados",
@@ -513,9 +518,11 @@ class ConversationOrchestrator:
     # Routing functions (recebem state, retornam chave do próximo nó)
     # -----------------------------------------------------------------------
 
-    def _rota_apos_classificacao(self, state: ConversationState) -> str:
+    def _rota_apos_avaliar_escalacao(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
+        if state.get("requer_escalacao"):
+            return "preparar_escalacao"
         if state.get("intencao") in (
             "status",
             "duvida_termo",
@@ -543,10 +550,7 @@ class ConversationOrchestrator:
     def _rota_apos_verificacao(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
-        if (
-            state.get("precisa_regenerar")
-            and (state.get("tentativas_correcao") or 0) < 2
-        ):
+        if state.get("precisa_regenerar") and (state.get("tentativas_correcao") or 0) < 2:
             return "gerar_resposta"
         return "enviar_resposta"
 
@@ -568,12 +572,16 @@ class ConversationOrchestrator:
             intencao = parsed.get("intencao", "outro")
             categorias_validas = {
                 "status",
-                "perspectivas",  # ← nova categoria
+                "perspectivas",
                 "duvida_termo",
                 "duvida_geral",
                 "saudacao",
                 "reclamacao",
                 "desabafo",
+                "parecer_juridico",
+                "estrategia_processual",
+                "negociacao",
+                "decisao_judicial_impacto_alto",
                 "outro",
             }
             if intencao not in categorias_validas:
@@ -584,6 +592,53 @@ class ConversationOrchestrator:
             log.warning("intencao_fallback_keywords", intencao=intencao, erro=str(exc))
 
         return {"intencao": intencao}
+
+    # -----------------------------------------------------------------------
+    # Nó Avaliar Escalação
+    # -----------------------------------------------------------------------
+    async def _node_avaliar_escalacao(self, state: ConversationState) -> dict:
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+        ESCALACAO_OBRIGATORIA = {
+            "parecer_juridico",
+            "estrategia_processual",
+            "negociacao",
+            "decisao_judicial_impacto_alto",
+        }
+        intencao = state.get("intencao", "outro")
+        if intencao in ESCALACAO_OBRIGATORIA:
+            log.info("escalacao_detectada", motivo=intencao)
+            return {"requer_escalacao": True, "motivo_escalacao": intencao}
+        return {"requer_escalacao": False, "motivo_escalacao": None}
+
+    # -----------------------------------------------------------------------
+    # Nó Preparar Escalação
+    # -----------------------------------------------------------------------
+    async def _node_preparar_escalacao(self, state: ConversationState) -> dict:
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+        try:
+            # Em vez de deferir, injetamos a resposta dizendo que a pergunta foi encaminhada -> a lógica de mandar pro WhatsApp vem melhor isolada na manager que posso chamar asincronamente
+            fallback_msg = (
+                "Sua pergunta é muito importante e específica para o andamento do seu caso particular. "
+                "Para garantir a melhor orientação jurídica, encaminhei sua mensagem imediatamente "
+                "para o advogado responsável, que analisará a questão e retornará em breve."
+            )
+            return {
+                "resposta_ia": fallback_msg,
+                "resposta_verificada": fallback_msg,
+                "precisa_regenerar": False,
+            }
+        except Exception as exc:
+            _erros_total.labels(no="preparar_escalacao").inc()
+            log.error("preparar_escalacao_erro_inesperado", erro=str(exc))
+            return {"erro": f"preparar_escalacao:{exc}"}
 
     # -----------------------------------------------------------------------
     # Nó 2 — buscar_dados
@@ -643,9 +698,7 @@ class ConversationOrchestrator:
             )
 
             # Detecta termos jurídicos no andamento e monta glossário contextual
-            termos_detectados = self._translator.identificar_termos_tecnicos(
-                ultimo_andamento
-            )
+            termos_detectados = self._translator.identificar_termos_tecnicos(ultimo_andamento)
             glossario_andamento: dict[str, str] = {}
             for termo in termos_detectados:
                 trad = self._translator.traduzir_termo(termo)
@@ -700,9 +753,7 @@ class ConversationOrchestrator:
 
             # Tenta dicionário local antes do Claude (somente para duvida_termo)
             if intencao == "duvida_termo":
-                traducao_local = self._translator.traduzir_termo(
-                    state["mensagem_original"]
-                )
+                traducao_local = self._translator.traduzir_termo(state["mensagem_original"])
                 if traducao_local:
                     log.debug("termo_traduzido_dicionario_local")
                     return {
@@ -738,9 +789,7 @@ class ConversationOrchestrator:
                     numero_cnj=dados.get("numero_cnj", "N/D"),
                     tribunal=dados.get("tribunal", "N/D"),
                     vara=dados.get("vara", "N/D"),
-                    ultimo_andamento=dados.get(
-                        "ultimo_andamento", "sem movimentação recente"
-                    ),
+                    ultimo_andamento=dados.get("ultimo_andamento", "sem movimentação recente"),
                     data_ultimo_andamento=dados.get("data_ultimo_andamento", "N/D"),
                     polo_cliente=dados.get("polo_cliente", "N/D"),
                     andamentos_recentes=andamentos_str,
@@ -749,12 +798,9 @@ class ConversationOrchestrator:
                 glossario = dados.get("glossario_andamento") or {}
                 if glossario:
                     linhas = "\n".join(
-                        f"- {termo}: {definicao}"
-                        for termo, definicao in glossario.items()
+                        f"- {termo}: {definicao}" for termo, definicao in glossario.items()
                     )
-                    system_prompt += (
-                        f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
-                    )
+                    system_prompt += f"\n\n<glossario_termos>\n{linhas}\n</glossario_termos>"
 
             elif intencao == "perspectivas" and dados:
                 # Explica por que não é possível fornecer previsões (compliance OAB)
@@ -764,9 +810,7 @@ class ConversationOrchestrator:
                     numero_cnj=dados.get("numero_cnj", "N/D"),
                     tribunal=dados.get("tribunal", "N/D"),
                     polo_cliente=dados.get("polo_cliente", "N/D"),
-                    ultimo_andamento=dados.get(
-                        "ultimo_andamento", "sem movimentação recente"
-                    ),
+                    ultimo_andamento=dados.get("ultimo_andamento", "sem movimentação recente"),
                 )
 
             elif intencao == "duvida_geral" and dados:
@@ -836,8 +880,7 @@ class ConversationOrchestrator:
             custo_anterior = Decimal(tokens_anteriores.get("custo_str", "0"))
             tokens_atualizados = {
                 "input": tokens_anteriores.get("input", 0) + resultado["tokens_input"],
-                "output": tokens_anteriores.get("output", 0)
-                + resultado["tokens_output"],
+                "output": tokens_anteriores.get("output", 0) + resultado["tokens_output"],
                 "custo_str": str(custo_anterior + resultado["custo"]),
             }
 
@@ -886,9 +929,7 @@ class ConversationOrchestrator:
                     "está ciente e entrará em contato com você em breve. 🤝"
                 )
             else:
-                fallback_msg = MENSAGENS_FALLBACK.get(
-                    "indisponivel", TEMPLATE_ERRO_GENERICO
-                )
+                fallback_msg = MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO)
 
             return {
                 "resposta_ia": fallback_msg,
@@ -988,9 +1029,7 @@ class ConversationOrchestrator:
         )
 
         resposta_final = (
-            state.get("resposta_verificada")
-            or state.get("resposta_ia")
-            or TEMPLATE_ERRO_GENERICO
+            state.get("resposta_verificada") or state.get("resposta_ia") or TEMPLATE_ERRO_GENERICO
         )
         tokens = state.get("tokens_usados") or {"input": 0, "output": 0}
         custo = Decimal(tokens.get("custo_str", "0"))
@@ -1010,9 +1049,7 @@ class ConversationOrchestrator:
 
                 if instance and numero:
                     try:
-                        await self._evolution.enviar_texto(
-                            instance, numero, resposta_final
-                        )
+                        await self._evolution.enviar_texto(instance, numero, resposta_final)
                         log.info(
                             "mensagem_enviada_whatsapp",
                             numero_parcial=numero[:4] + "***",
@@ -1039,9 +1076,7 @@ class ConversationOrchestrator:
                     resposta_final,
                 )
 
-                await self._salvar_interacao(
-                    session, state, resposta_final, tokens, custo
-                )
+                await self._salvar_interacao(session, state, resposta_final, tokens, custo)
 
             log.info(
                 "fluxo_concluido",
@@ -1130,8 +1165,31 @@ class ConversationOrchestrator:
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
 
+        # Nó Avaliar Escalação
+        state.update(await self._node_avaliar_escalacao(state))  # type: ignore[typeddict-item]
+        if state.get("erro"):
+            await self._node_tratar_erro(state)
+            return state  # type: ignore[return-value]
+
+        if state.get("requer_escalacao"):
+            state.update(await self._node_preparar_escalacao(state))  # type: ignore[typeddict-item]
+            if state.get("erro"):
+                await self._node_tratar_erro(state)
+                return state  # type: ignore[return-value]
+            state.update(await self._node_enviar_resposta(state))  # type: ignore[typeddict-item]
+            if state.get("erro"):
+                await self._node_tratar_erro(state)
+            return state  # type: ignore[return-value]
+
         # Nó 2: buscar dados (se intenção exige processo)
-        if state["intencao"] in ("status", "duvida_termo", "duvida_geral", "reclamacao", "perspectivas", "saudacao"):
+        if state["intencao"] in (
+            "status",
+            "duvida_termo",
+            "duvida_geral",
+            "reclamacao",
+            "perspectivas",
+            "saudacao",
+        ):
             state.update(await self._node_buscar_dados(state))  # type: ignore[typeddict-item]
             if state.get("erro"):
                 await self._node_tratar_erro(state)
@@ -1202,11 +1260,7 @@ _translator_singleton: JuridicalTranslator | None = None
 
 
 def _criar_translator() -> JuridicalTranslator:
-    return (
-        _translator_singleton
-        if _translator_singleton is not None
-        else JuridicalTranslator()
-    )
+    return _translator_singleton if _translator_singleton is not None else JuridicalTranslator()
 
 
 def inicializar_orchestrador_worker() -> None:
@@ -1249,9 +1303,7 @@ def executar_fluxo_orquestrador(
                 ),
                 session_factory=async_session_factory,
             )
-            return await orchestrador.processar(
-                id_escritorio, id_cliente, mensagem, tipo
-            )
+            return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo)
         finally:
             await redis_client.close()
 

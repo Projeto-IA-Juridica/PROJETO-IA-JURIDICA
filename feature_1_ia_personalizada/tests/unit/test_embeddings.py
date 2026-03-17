@@ -13,7 +13,7 @@ Cobre:
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -50,7 +50,7 @@ class _FakePipeline:
         self._redis = redis
         self._ops: list[tuple] = []
 
-    def setex(self, key: str, ttl: int, value: str) -> "_FakePipeline":
+    def setex(self, key: str, ttl: int, value: str) -> _FakePipeline:
         self._ops.append((key, ttl, value))
         return self
 
@@ -79,6 +79,7 @@ async def test_cache_hit_nao_chama_api():
 
     # Pré-popula cache manualmente
     from feature_1_ia_personalizada.services.rag.embeddings import _cache_key
+
     redis._store[_cache_key(texto)] = json.dumps(vetor)
 
     with patch.object(gen, "_gerar_provedor_batch", new_callable=AsyncMock) as mock_api:
@@ -104,6 +105,7 @@ async def test_cache_miss_chama_api_e_cacheia():
 
     # Verifica que foi cacheado
     from feature_1_ia_personalizada.services.rag.embeddings import _cache_key
+
     cached_raw = redis._store.get(_cache_key("audiência de instrução"))
     assert cached_raw is not None
     assert json.loads(cached_raw) == vetor_esperado
@@ -118,7 +120,9 @@ async def test_fallback_voyage_para_openai():
 
     vetor_openai = _vetor_fake()
 
-    with patch.object(gen, "_voyage_batch", new_callable=AsyncMock, side_effect=Exception("timeout")):
+    with patch.object(
+        gen, "_voyage_batch", new_callable=AsyncMock, side_effect=Exception("timeout")
+    ):
         with patch.object(
             gen, "_openai_batch", new_callable=AsyncMock, return_value=[vetor_openai]
         ):
@@ -136,9 +140,7 @@ async def test_gerar_batch_preserva_ordem():
     textos = ["texto A", "texto B", "texto C"]
     vetores = [[float(i)] * EMBEDDING_DIM for i in range(len(textos))]
 
-    with patch.object(
-        gen, "_gerar_provedor_batch", new_callable=AsyncMock, return_value=vetores
-    ):
+    with patch.object(gen, "_gerar_provedor_batch", new_callable=AsyncMock, return_value=vetores):
         resultado = await gen.gerar_batch(textos)
 
     assert len(resultado) == 3

@@ -13,8 +13,7 @@ Cobre:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -26,7 +25,6 @@ from feature_1_ia_personalizada.services.rag.retriever import (
     _tokenizar,
 )
 from feature_1_ia_personalizada.services.rag.vector_store import ResultadoBusca
-from shared.config.constants import RAG_TOP_K_FINAL
 
 # ---------------------------------------------------------------------------
 # Fábrica de ResultadoBusca para testes
@@ -75,9 +73,7 @@ async def test_retorna_vazio_quando_sem_resultado_relevante():
     store = _make_store_mock(candidatos)
     retriever = RAGRetriever(vector_store=store)
 
-    resultado = await retriever.buscar(
-        query="prazo recursal", escritorio_id=1
-    )
+    resultado = await retriever.buscar(query="prazo recursal", escritorio_id=1)
 
     assert resultado == ""
 
@@ -132,8 +128,7 @@ def test_mmr_seleciona_k_itens():
 def test_mmr_sem_duplicidade():
     """_mmr não deve retornar o mesmo candidato duas vezes."""
     candidatos = [
-        _resultado(i, f"Conteúdo texto jurídico item {i}", distancia=0.05 * i)
-        for i in range(1, 6)
+        _resultado(i, f"Conteúdo texto jurídico item {i}", distancia=0.05 * i) for i in range(1, 6)
     ]
     resultado = _mmr(candidatos, k=3)
     ids = [r.id for r in resultado]
@@ -159,7 +154,9 @@ def test_mmr_prefere_diversidade():
     chunk_similar = _resultado(1, texto_base, distancia=0.15)
     chunk_duplicado = _resultado(2, texto_base + " réu autor", distancia=0.16)
     # Chunk 3 é diferente (fala de outro tema)
-    chunk_diferente = _resultado(3, "prazo recursal apelação contrarrazões tribunal", distancia=0.17)
+    chunk_diferente = _resultado(
+        3, "prazo recursal apelação contrarrazões tribunal", distancia=0.17
+    )
 
     resultado = _mmr([chunk_similar, chunk_duplicado, chunk_diferente], k=2)
 

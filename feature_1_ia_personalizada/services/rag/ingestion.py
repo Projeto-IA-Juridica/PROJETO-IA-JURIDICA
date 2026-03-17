@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from feature_1_ia_personalizada.services.rag.embeddings import EmbeddingGenerator
 from shared.config.settings import settings
-from shared.models.documento_rag import EMBEDDING_DIM, TIPOS_VALIDOS, DocumentoRag
+from shared.models.documento_rag import TIPOS_VALIDOS, DocumentoRag
 
 logger = structlog.get_logger(__name__)
 
@@ -36,20 +36,16 @@ logger = structlog.get_logger(__name__)
 # Constantes de chunking
 # ---------------------------------------------------------------------------
 
-_CHUNK_SIZE = 512       # tokens por chunk
-_CHUNK_OVERLAP = 50     # tokens de sobreposição entre chunks consecutivos
+_CHUNK_SIZE = 512  # tokens por chunk
+_CHUNK_OVERLAP = 50  # tokens de sobreposição entre chunks consecutivos
 
 # Expressões regulares para extração de metadados jurídicos
-_RE_CNJ = re.compile(
-    r"\b(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b"
-)
+_RE_CNJ = re.compile(r"\b(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\b")
 _RE_TRIBUNAL = re.compile(
     r"\b(STF|STJ|TST|TSE|STM|TRF\d|TJ[A-Z]{2,3}|TRT\d{1,2}|TRE-[A-Z]{2})\b",
     re.IGNORECASE,
 )
-_RE_DATA = re.compile(
-    r"\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\b"
-)
+_RE_DATA = re.compile(r"\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}|\d{1,2}\s+de\s+\w+\s+de\s+\d{4})\b")
 
 # Padrões de limpeza de texto extraído por OCR / digital
 _RE_PAGINA = re.compile(r"^\s*[Pp][áa]g(?:ina)?\.?\s*\d+\s*$", re.MULTILINE)
@@ -242,11 +238,15 @@ class DocumentoIngester:
     async def _ja_ingerido(self, doc_hash: str, escritorio_id: int) -> bool:
         """Verifica se o doc_hash já existe para este escritório."""
         async with self._session_factory() as session:
-            stmt = select(DocumentoRag.id).where(
-                DocumentoRag.doc_hash == doc_hash,
-                DocumentoRag.escritorio_id == escritorio_id,
-                DocumentoRag.ativo.is_(True),
-            ).limit(1)
+            stmt = (
+                select(DocumentoRag.id)
+                .where(
+                    DocumentoRag.doc_hash == doc_hash,
+                    DocumentoRag.escritorio_id == escritorio_id,
+                    DocumentoRag.ativo.is_(True),
+                )
+                .limit(1)
+            )
             result = await session.execute(stmt)
             return result.scalar() is not None
 
@@ -276,19 +276,14 @@ class DocumentoIngester:
                 meta["data_doc"] = match.group(1)
 
         # Claude — somente se ainda faltam campos importantes
-        campos_faltando = [
-            c for c in ("numero_cnj", "tribunal", "tipo_acao")
-            if c not in meta
-        ]
+        campos_faltando = [c for c in ("numero_cnj", "tribunal", "tipo_acao") if c not in meta]
         if campos_faltando:
             trecho = texto[:2000]  # primeiras 2000 chars são suficientes para metadados
             meta.update(await self._extrair_metadata_claude(trecho, campos_faltando))
 
         return meta
 
-    async def _extrair_metadata_claude(
-        self, trecho: str, campos: list[str]
-    ) -> dict[str, Any]:
+    async def _extrair_metadata_claude(self, trecho: str, campos: list[str]) -> dict[str, Any]:
         """Extrai campos específicos via Claude Haiku (barato e rápido)."""
         campos_str = ", ".join(campos)
         prompt = (
@@ -303,6 +298,7 @@ class DocumentoIngester:
                 messages=[{"role": "user", "content": prompt}],
             )
             import json
+
             raw = resp.content[0].text
 
             # Extrai o objeto JSON usando regex — robusto contra filler conversacional
@@ -343,7 +339,7 @@ class DocumentoIngester:
                     doc_hash=doc_hash,
                     ativo=True,
                 )
-                for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+                for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False))
             ]
             session.add_all(objetos)
             await session.commit()

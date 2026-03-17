@@ -207,7 +207,9 @@ class VitoriaPreditor:
         casos = await self._buscar_casos_similares(indice, tipo_acao)
         _estatistica_duration.observe(time.perf_counter() - _t0)
 
-        favoraveis, desfavoraveis, neutros = self._contar_desfechos(casos, polo_cliente) if casos else (0, 0, 0)
+        favoraveis, desfavoraveis, neutros = (
+            self._contar_desfechos(casos, polo_cliente) if casos else (0, 0, 0)
+        )
         total_desfechos = favoraveis + desfavoraveis + neutros
         escopo = "tribunal"
 
@@ -273,7 +275,9 @@ class VitoriaPreditor:
             escopo=escopo,
         )
 
-        disclaimer = DISCLAIMER_ESTATISTICA if escopo == "tribunal" else DISCLAIMER_ESTATISTICA_NACIONAL
+        disclaimer = (
+            DISCLAIMER_ESTATISTICA if escopo == "tribunal" else DISCLAIMER_ESTATISTICA_NACIONAL
+        )
 
         _estatistica_total.labels(resultado="exibida").inc()
         return EstatisticaProcessual(
@@ -533,8 +537,7 @@ class VitoriaPreditor:
 
         if polo_cliente.lower() == "reu":
             fatores.append(
-                "Perspectiva ajustada para polo réu "
-                "(cliente está sendo processado nesta ação)"
+                "Perspectiva ajustada para polo réu " "(cliente está sendo processado nesta ação)"
             )
 
         return fatores

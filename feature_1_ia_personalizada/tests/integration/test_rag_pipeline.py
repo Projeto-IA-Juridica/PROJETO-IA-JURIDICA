@@ -27,12 +27,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from feature_1_ia_personalizada.api.routes.rag import (
-    get_embedding_generator,
     get_rag_retriever,
     get_redis,
 )
 from shared.models.documento_rag import EMBEDDING_DIM
-
 
 # ---------------------------------------------------------------------------
 # Helpers de setup
@@ -63,7 +61,7 @@ class _FakePipeline:
         self._redis = redis
         self._ops: list[tuple] = []
 
-    def setex(self, key: str, ttl: int, value: str) -> "_FakePipeline":
+    def setex(self, key: str, ttl: int, value: str) -> _FakePipeline:
         self._ops.append((key, ttl, value))
         return self
 
@@ -222,9 +220,7 @@ async def test_buscar_sem_auth_retorna_401():
     """POST /rag/buscar sem autenticação deve retornar 401."""
     from feature_1_ia_personalizada.api.app import app
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.post(
             "/rag/buscar",
             json={"query": "prazo recursal"},
@@ -326,12 +322,13 @@ async def test_pipeline_ingestao_texto_completo():
         side_effect=lambda textos: [[0.1] * EMBEDDING_DIM for _ in textos]
     )
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings, patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
-        new_callable=AsyncMock,
-        return_value={},
+    with (
+        patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
+            new_callable=AsyncMock,
+            return_value={},
+        ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
@@ -398,9 +395,7 @@ async def test_pipeline_deduplicacao_segundo_ingest():
 
     emb_mock = AsyncMock()
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings:
+    with patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings:
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=emb_mock,

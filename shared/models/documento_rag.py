@@ -21,16 +21,14 @@ from __future__ import annotations
 from typing import Any
 
 import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, SmallInteger, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
-from pgvector.sqlalchemy import Vector
 
-TIPOS_VALIDOS = frozenset(
-    {"peticao", "sentenca", "jurisprudencia", "tese", "parecer"}
-)
+TIPOS_VALIDOS = frozenset({"peticao", "sentenca", "jurisprudencia", "tese", "parecer"})
 
 # Dimensão fixa usada pela coluna e por todos os geradores de embedding.
 # Alterar aqui exige nova migration + reindexação completa.
@@ -72,9 +70,7 @@ class DocumentoRag(Base, TenantMixin, TimestampMixin):
     doc_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Soft delete — nunca remove fisicamente para preservar histórico
-    ativo: Mapped[bool] = mapped_column(
-        Boolean, server_default=sa.text("true"), nullable=False
-    )
+    ativo: Mapped[bool] = mapped_column(Boolean, server_default=sa.text("true"), nullable=False)
 
     def __repr__(self) -> str:
         return (

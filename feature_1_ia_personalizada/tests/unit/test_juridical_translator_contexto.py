@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from feature_1_ia_personalizada.services.ai.juridical_translator import JuridicalTranslator
 
 MODULE = "feature_1_ia_personalizada.services.ai.juridical_translator"

@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import hashlib
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from feature_1_ia_personalizada.services.rag.ingestion import (
     DocumentoIngester,
-    IngestaoResultado,
     _chunkar,
     _limpar_texto,
 )
@@ -85,9 +84,7 @@ def _make_session_factory(session: _FakeSession):
 def _make_embedding_mock(n_chunks: int) -> AsyncMock:
     """Retorna mock de EmbeddingGenerator.gerar_batch que retorna n_chunks vetores."""
     mock = AsyncMock()
-    mock.gerar_batch = AsyncMock(
-        return_value=[[0.1] * EMBEDDING_DIM for _ in range(n_chunks)]
-    )
+    mock.gerar_batch = AsyncMock(return_value=[[0.1] * EMBEDDING_DIM for _ in range(n_chunks)])
     return mock
 
 
@@ -103,9 +100,7 @@ async def test_tipo_invalido_retorna_erro():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(0)
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings:
+    with patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings:
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,
@@ -139,9 +134,7 @@ async def test_deduplicacao_retorna_duplicata():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(0)
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings:
+    with patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings:
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,
@@ -176,9 +169,9 @@ async def test_deduplicacao_por_texto_limpo():
     hash1 = hashlib.sha256(limpo1.encode()).hexdigest()
     hash2 = hashlib.sha256(limpo2.encode()).hexdigest()
 
-    assert hash1 == hash2, (
-        "Textos com diferença apenas em artefatos de paginação devem ter o mesmo hash após limpeza"
-    )
+    assert (
+        hash1 == hash2
+    ), "Textos com diferença apenas em artefatos de paginação devem ter o mesmo hash após limpeza"
 
 
 # ---------------------------------------------------------------------------
@@ -202,12 +195,13 @@ async def test_chunks_sao_inseridos_no_banco():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(n)
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings, patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata",
-        new_callable=AsyncMock,
-        return_value={"numero_cnj": "0001234-56.2024.8.26.0001", "tribunal": "TJSP"},
+    with (
+        patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata",
+            new_callable=AsyncMock,
+            return_value={"numero_cnj": "0001234-56.2024.8.26.0001", "tribunal": "TJSP"},
+        ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
@@ -240,9 +234,7 @@ async def test_texto_vazio_apos_limpeza_retorna_erro():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(0)
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings:
+    with patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings:
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,
@@ -294,13 +286,14 @@ async def test_regex_extrai_numero_cnj():
 
     claude_mock = AsyncMock()
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings, patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
-        new_callable=AsyncMock,
-        return_value={},
-    ) as mock_claude:
+    with (
+        patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
+            new_callable=AsyncMock,
+            return_value={},
+        ) as mock_claude,
+    ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,
@@ -332,13 +325,14 @@ async def test_claude_nao_chamado_quando_regex_encontra_tudo():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(1)
 
-    with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.settings"
-    ) as mock_settings, patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
-        new_callable=AsyncMock,
-        return_value={},
-    ) as mock_claude:
+    with (
+        patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
+            new_callable=AsyncMock,
+            return_value={},
+        ) as mock_claude,
+    ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,

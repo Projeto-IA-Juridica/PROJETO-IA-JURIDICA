@@ -6,9 +6,7 @@ Módulo responsável por fornecer dependências de banco de dados para o FastAPI
 
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from shared.database.connection import async_session_factory
 

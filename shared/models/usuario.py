@@ -61,6 +61,16 @@ class Usuario(Base, TimestampMixin, TenantMixin):
         comment="Número OAB (apenas para advogados)",
     )
 
+    # --- Escalação / WhatsApp ---
+    whatsapp_numero: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="Número de WhatsApp com DDI e DDD (ex: 5511999999999)",
+    )
+    escalacao_ativa: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, server_default="true"
+    )
+
     # --- Status ---
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     ultimo_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

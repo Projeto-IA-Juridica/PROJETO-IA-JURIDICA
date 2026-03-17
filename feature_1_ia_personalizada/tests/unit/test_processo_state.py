@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from feature_1_ia_personalizada.services.ai.processo_state import (
-    ProcessoStateManager,
     _PROXIMO_PASSO,
+    ProcessoStateManager,
     _classificar_fase,
     _estado_inicial,
 )

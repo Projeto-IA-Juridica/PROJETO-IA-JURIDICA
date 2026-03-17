@@ -156,9 +156,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 # Dependências reais/modelos
 from shared.database.session import get_db
 from shared.models.base import Base
+from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.usuario import Usuario
-from shared.models.cliente import Cliente
 from shared.security.encryption import hash_senha
 from shared.security.jwt import criar_token
 
