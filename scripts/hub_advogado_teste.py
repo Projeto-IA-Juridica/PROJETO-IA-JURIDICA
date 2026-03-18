@@ -11,6 +11,7 @@ Fluxo demonstrado:
   4. Cada cliente tem seu próprio ConversationOrchestrator (LangGraph completo)
   5. Boas-vindas automáticas geradas pelo orchestrator (intenção: saudacao)
   6. Chat com classificação de intenção, fact-check e resposta contextualizada
+  7. Score de Risco Processual — visível apenas para o advogado (Feature 2)
 
 Dependências de infraestrutura zeradas:
   - Banco de dados → session_factory mockada com dados reais do DataJud
@@ -68,6 +69,10 @@ from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslato
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
 )
+from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+    ScoreRiscoCalculator,
+)
+
 # ---------------------------------------------------------------------------
 # Padrões CNJ
 # ---------------------------------------------------------------------------
@@ -109,6 +114,140 @@ _TJ_INDICES: dict[str, str] = {
     "27": "api_publica_tjto",
 }
 _DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br"
+
+# ---------------------------------------------------------------------------
+# Score de Risco — instância única (stateless, segura para reuso)
+# ---------------------------------------------------------------------------
+
+_score_calculator = ScoreRiscoCalculator()
+
+
+def _calcular_score(cliente: dict, dados_dj: dict | None) -> dict | None:
+    """
+    Calcula o score de risco usando os dados já disponíveis (CSV + DataJud).
+    Não faz nenhuma chamada HTTP extra — reutiliza o que já foi buscado.
+    Retorna dict com score, nivel, interpretacao e componentes, ou None se sem processo.
+    """
+    if not cliente.get("numero_cnj"):
+        return None
+
+    class _Proxy:
+        pass
+
+    p = _Proxy()
+    p.polo_cliente    = cliente.get("polo_cliente") or "autor"
+    p.fase_processual = None   # DataJud público não expõe fase diretamente
+    p.valor_causa     = None   # não vem do CSV neste demo
+
+    # Extrai tipo_acao do DataJud se disponível
+    if dados_dj:
+        classe = dados_dj.get("classe", {})
+        p.tipo_acao = (
+            classe.get("nome") if isinstance(classe, dict) else str(classe)
+        ) or None
+    else:
+        p.tipo_acao = None
+
+    # datajud_data no formato esperado pelo calculator
+    # A API pública não retorna tempo_medio nem taxa_procedencia →
+    # esses componentes ficam em 50 (neutro), score é calculado com o que há
+    datajud_data = {
+        "tempo_medio_tramitacao_dias": dados_dj.get("tempo_medio_tramitacao_dias") if dados_dj else None,
+        "taxa_procedencia_autor":      dados_dj.get("taxa_procedencia_autor") if dados_dj else None,
+    }
+
+    try:
+        r = _score_calculator.calcular(p, datajud_data)
+        return {
+            "score":         r.score,
+            "nivel":         r.nivel,
+            "interpretacao": r.interpretacao,
+            "componentes":   r.componentes.model_dump(),
+        }
+    except Exception:
+        return None
+
+
+def _cor_nivel(nivel: str) -> str:
+    return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(nivel, "#555")
+
+
+def _render_score_card(score_data: dict) -> None:
+    """Renderiza o card de Score de Risco Processual. Uso exclusivo do advogado."""
+    score  = score_data["score"]
+    nivel  = score_data["nivel"]
+    interp = score_data["interpretacao"]
+    comp   = score_data["componentes"]
+    cor    = _cor_nivel(nivel)
+
+    emojis = {"baixo": "🟢", "moderado": "🟡", "alto": "🔴", "critico": "🟣"}
+    emoji  = emojis.get(nivel, "⚪")
+
+    st.markdown(
+        f"""
+        <div style="
+            border: 1.5px solid {cor};
+            border-radius: 10px;
+            padding: 14px 18px;
+            background: {cor}18;
+            margin-bottom: 8px;
+        ">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <span style="font-size:13px; font-weight:600; color:{cor}; text-transform:uppercase; letter-spacing:.05em;">
+                    {emoji} Score de Risco Processual
+                </span>
+                <span style="font-size:22px; font-weight:700; color:{cor};">
+                    {score}<span style="font-size:13px; font-weight:400; color:#888;">/100</span>
+                </span>
+            </div>
+            <div style="background:#e0e0e0; border-radius:4px; height:7px; margin-bottom:10px;">
+                <div style="width:{score}%; background:{cor}; height:7px; border-radius:4px;"></div>
+            </div>
+            <div style="font-size:12px; color:#555; line-height:1.5;">
+                {interp}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Ver detalhamento dos componentes"):
+        nomes = {
+            "complexidade_juridica": "Complexidade jurídica",
+            "duracao_estimada":      "Duração estimada",
+            "historico_vara":        "Histórico da vara",
+            "valor_causa":           "Valor da causa",
+            "fase_processual":       "Fase processual",
+        }
+        pesos = {
+            "complexidade_juridica": "25%",
+            "duracao_estimada":      "25%",
+            "historico_vara":        "20%",
+            "valor_causa":           "15%",
+            "fase_processual":       "15%",
+        }
+        for chave, valor in comp.items():
+            label = nomes.get(chave, chave)
+            peso  = pesos.get(chave, "")
+            bar_color = _cor_nivel("alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo")
+            st.markdown(
+                f"""
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
+                        <span style="color:#444;">{label} <span style="color:#aaa;">({peso})</span></span>
+                        <span style="font-weight:600; color:{bar_color};">{valor}/100</span>
+                    </div>
+                    <div style="background:#e0e0e0; border-radius:3px; height:5px;">
+                        <div style="width:{valor}%; background:{bar_color}; height:5px; border-radius:3px;"></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        st.caption(
+            "⚠️ Este score é de uso interno do advogado. "
+            "Não representa previsão de resultado — compliance OAB Provimento 205/2021."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +422,6 @@ class _MemoriaEmRam(ConversationMemory):
         return list(self._hist)
 
     async def salvar_mensagem(self, *args, **kwargs) -> None:
-        # args: escritorio_id, cliente_id, role, content
         role, content = str(args[2]), str(args[3])
         self._hist.append({"role": role, "content": content})
 
@@ -303,7 +441,7 @@ def _fake_escritorio(nome: str) -> MagicMock:
     obj = MagicMock()
     obj.id = 1
     obj.nome = nome
-    obj.webhook_whatsapp_instance = None  # sem Evolution API → não envia WhatsApp
+    obj.webhook_whatsapp_instance = None
     return obj
 
 
@@ -317,10 +455,6 @@ def _fake_cliente(cliente: dict) -> MagicMock:
 
 
 def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | None:
-    """
-    Monta o objeto Processo a partir do CSV + dados reais do DataJud.
-    Retorna None se o cliente não tem processo cadastrado.
-    """
     if not cliente.get("numero_cnj"):
         return None
 
@@ -333,17 +467,12 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
     obj.cliente_id = 1
 
     if dados_datajud:
-        # Dados reais do DataJud
         tribunal = dados_datajud.get("tribunal", {})
         obj.tribunal = tribunal.get("nome", "N/D") if isinstance(tribunal, dict) else str(tribunal)
-        # DataJud não expõe vara diretamente; usa grau quando disponível
         grau = dados_datajud.get("grau", "")
         obj.vara = grau if grau else "N/D"
-
-        # Tipo de ação (classe processual) — alimenta o VitoriaPreditor
         classe = dados_datajud.get("classe", {})
         obj.tipo_acao = (classe.get("nome") if isinstance(classe, dict) else str(classe)) or None
-
         movimentos = dados_datajud.get("movimentos", [])
         if movimentos and isinstance(movimentos[0], dict):
             ultimo = movimentos[0]
@@ -357,7 +486,6 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
             obj.ultimo_andamento = "sem movimentação recente"
             obj.data_ultimo_andamento = None
     else:
-        # Sem dados do DataJud — preenche com placeholders
         obj.tribunal = "N/D"
         obj.vara = "N/D"
         obj.tipo_acao = None
@@ -368,31 +496,21 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
 
 
 def _fake_jusbrasil(dados_datajud: dict | None) -> JusbrasilClient:
-    """
-    Jusbrasil fake que retorna os movimentos reais do DataJud no formato esperado
-    pelo orchestrator: [{"descricao": str, "data": str}]
-    """
     client = AsyncMock(spec=JusbrasilClient)
-
     if dados_datajud:
         movimentos = dados_datajud.get("movimentos", [])
         andamentos = [
-            {
-                "descricao": m.get("nome", ""),
-                "data": (m.get("dataHora") or "")[:10],
-            }
+            {"descricao": m.get("nome", ""), "data": (m.get("dataHora") or "")[:10]}
             for m in movimentos
             if isinstance(m, dict) and m.get("nome")
         ]
     else:
         andamentos = []
-
     client.sincronizar_andamentos = AsyncMock(return_value=andamentos)
     return client
 
 
 def _fake_cache() -> MagicMock:
-    """Cache sempre vazio — força busca no Jusbrasil (que retorna dados DataJud)."""
     cache = AsyncMock()
     cache.get_andamentos = AsyncMock(return_value=None)
     cache.set_andamentos = AsyncMock()
@@ -400,17 +518,12 @@ def _fake_cache() -> MagicMock:
 
 
 def _fake_evolution() -> MagicMock:
-    """Evolution API no-op — não envia WhatsApp no demo."""
     client = AsyncMock()
     client.enviar_texto = AsyncMock()
     return client
 
 
 def _make_session_factory(escritorio_nome: str, cliente: dict, dados_datajud: dict | None):
-    """
-    Cria uma session_factory mockada que retorna entidades populadas com
-    dados reais do CSV e do DataJud, no mesmo contrato esperado pelo orchestrator.
-    """
     escritorio = _fake_escritorio(escritorio_nome)
     cliente_obj = _fake_cliente(cliente)
     processo_obj = _fake_processo(cliente, dados_datajud)
@@ -431,7 +544,6 @@ def _make_session_factory(escritorio_nome: str, cliente: dict, dados_datajud: di
             return None
 
         session.get = _get
-
         resultado = MagicMock()
         resultado.scalars.return_value.all.return_value = processos
         session.execute = AsyncMock(return_value=resultado)
@@ -453,13 +565,6 @@ def criar_orchestrator(
     cliente: dict,
     dados_datajud: dict | None,
 ) -> tuple[ConversationOrchestrator, _MemoriaEmRam]:
-    """
-    Instancia o ConversationOrchestrator real do projeto com:
-    - LangGraph completo (classificação → busca → geração → fact-check → resposta)
-    - Memória in-memory por cliente
-    - Session factory mockada com dados reais do DataJud
-    - Jusbrasil fake que expõe movimentos reais do DataJud
-    """
     memoria = _MemoriaEmRam()
 
     orchestrator = ConversationOrchestrator(
@@ -472,10 +577,6 @@ def criar_orchestrator(
         session_factory=_make_session_factory(escritorio_nome, cliente, dados_datajud),
     )
 
-    # No demo, desabilita a verificação factual por string exata do FactChecker.
-    # O FactChecker compara a resposta do Claude com dados brutos do banco (texto exato),
-    # mas aqui o Claude traduz para linguagem simples — o que é o comportamento correto.
-    # A camada de filtro de linguagem (pareceres, promessas) continua ativa normalmente.
     async def _sem_verificacao_de_dados(_processo_id: str) -> dict:
         return {}
 
@@ -528,13 +629,11 @@ with st.sidebar:
 
     if arquivo_csv:
         csv_hash = hash(arquivo_csv.getvalue())
-        # Só reprocessa se for um arquivo diferente do último importado
         if st.session_state.get("csv_hash") != csv_hash:
             clientes_importados, erros_csv = parsear_csv(arquivo_csv.getvalue())
             st.session_state["clientes_hub"] = clientes_importados
             st.session_state["erros_hub"] = erros_csv
             st.session_state["csv_hash"] = csv_hash
-            # Limpa orchestrators apenas quando o CSV muda de verdade
             for key in list(st.session_state.keys()):
                 if key.startswith(("orch_", "mem_", "chat_", "welcome_", "datajud_")):
                     del st.session_state[key]
@@ -602,6 +701,7 @@ if not clientes:
         |-------|-----------|
         | Upload CSV | Parser in-memory |
         | Consulta de processo | API real DataJud (CNJ) |
+        | Score de risco | ScoreRiscoCalculator (Feature 2) |
         | Classificação de intenção | Claude (LangGraph nó 1) |
         | Busca de dados | Session factory com dados DataJud injetados |
         | Geração de resposta | Claude com prompts do projeto |
@@ -622,7 +722,7 @@ if not clientes:
 
         ### Exemplos de perguntas para testar
 
-        - *"Qual é o status do meu processo?"* → intent: status, usa dados DataJud + VitoriaPreditor
+        - *"Qual é o status do meu processo?"* → intent: status, usa dados DataJud
         - *"O que significa concluso para sentença?"* → intent: duvida_termo
         - *"Como funciona uma audiência de instrução?"* → intent: duvida_geral
         - *"Estou muito ansioso com esse processo..."* → intent: desabafo
@@ -697,10 +797,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                 ("Nascimento", cliente.get("data_nascimento") or "—"),
                 ("Profissão", cliente.get("profissao") or "—"),
                 ("Empresa", cliente.get("empresa") or "—"),
-                (
-                    "Status",
-                    "🟢 Ativo" if cliente["status"] != "inativo" else "🔴 Inativo",
-                ),
+                ("Status", "🟢 Ativo" if cliente["status"] != "inativo" else "🔴 Inativo"),
             ]
             st.markdown(_tabela_md(linhas_info))
 
@@ -711,24 +808,17 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                 st.info("Nenhum processo cadastrado para este cliente.")
             elif dados_dj:
                 tribunal = dados_dj.get("tribunal", {})
-                nome_trib = (
-                    tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
-                )
+                nome_trib = tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
                 classe = dados_dj.get("classe", {})
                 nome_classe = classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
                 assuntos = dados_dj.get("assuntos", [])
                 assunto_str = (
-                    ", ".join(
-                        a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]
-                    )
-                    or "—"
+                    ", ".join(a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]) or "—"
                 )
                 movimentos = dados_dj.get("movimentos", [])
                 ultimo_mov = movimentos[0] if movimentos else {}
                 nome_mov = ultimo_mov.get("nome", "—") if isinstance(ultimo_mov, dict) else "—"
-                data_mov = (
-                    (ultimo_mov.get("dataHora") or "")[:10] if isinstance(ultimo_mov, dict) else "—"
-                )
+                data_mov = (ultimo_mov.get("dataHora") or "")[:10] if isinstance(ultimo_mov, dict) else "—"
                 data_ajuiz = (dados_dj.get("dataAjuizamento") or "")[:10] or "—"
 
                 linhas_proc: list[tuple[str, str]] = [
@@ -763,6 +853,16 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     icon="⚠️",
                 )
 
+        # ── Score de Risco Processual (uso exclusivo do advogado) ───────────
+
+        if cliente.get("numero_cnj"):
+            st.markdown("#### 🔒 Score de Risco — Painel do Advogado")
+            score_data = _calcular_score(cliente, dados_dj)
+            if score_data:
+                _render_score_card(score_data)
+            else:
+                st.info("Score disponível após consulta ao DataJud.")
+
         st.divider()
 
         # ── Chat com orchestrator LangGraph ─────────────────────────────────
@@ -775,7 +875,6 @@ for tab, cliente in zip(tabs, clientes, strict=False):
         tokens_key = f"tokens_{cid}"
         welcome_key = f"welcome_{cid}"
 
-        # Boas-vindas automáticas via orchestrator (intenção: saudacao)
         if not st.session_state.get(welcome_key):
             with st.spinner("Orchestrator gerando boas-vindas (intent: saudacao)..."):
                 try:
@@ -791,9 +890,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     intencao_bv = resultado_bv.get("intencao", "saudacao")
                     fallback_bv = resultado_bv.get("usando_fallback", False)
                 except Exception:
-                    boas_vindas = (
-                        f"Olá, {cliente['nome'].split()[0]}! " f"Bem-vindo(a) ao {escritorio_nome}."
-                    )
+                    boas_vindas = f"Olá, {cliente['nome'].split()[0]}! Bem-vindo(a) ao {escritorio_nome}."
                     intencao_bv = "erro"
                     fallback_bv = True
 
@@ -806,7 +903,6 @@ for tab, cliente in zip(tabs, clientes, strict=False):
             )
             st.session_state[welcome_key] = True
 
-        # Cabeçalho do chat
         col_chat_title, col_tokens = st.columns([3, 1])
         with col_chat_title:
             st.markdown("#### Chat — Orchestrator LangGraph")
@@ -815,7 +911,6 @@ for tab, cliente in zip(tabs, clientes, strict=False):
             if tk["in"] or tk["out"]:
                 st.caption(f"tokens acumulados: `{tk['in']}↑ {tk['out']}↓`")
 
-        # Histórico de mensagens
         for msg in st.session_state[chat_key]:
             avatar = "⚖️" if msg["role"] == "assistant" else "👤"
             with st.chat_message(msg["role"], avatar=avatar):
@@ -826,16 +921,12 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     if meta.get("intencao"):
                         partes.append(f"intent: `{meta['intencao']}`")
                     if meta.get("tokens_in") or meta.get("tokens_out"):
-                        partes.append(
-                            f"tokens: `{meta.get('tokens_in', 0)}↑ "
-                            f"{meta.get('tokens_out', 0)}↓`"
-                        )
+                        partes.append(f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`")
                     if meta.get("fallback"):
                         partes.append("⚠️ fallback")
                     if partes:
                         st.caption(" · ".join(partes))
 
-        # Input do usuário
         if prompt := st.chat_input(
             "Pergunte sobre o processo, termos jurídicos ou tire dúvidas...",
             key=f"input_{cid}",
@@ -861,19 +952,13 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                         fallback = resultado.get("usando_fallback", False)
                         ti = tokens.get("input", 0)
                         to = tokens.get("output", 0)
-
                         st.session_state[tokens_key]["in"] += ti
                         st.session_state[tokens_key]["out"] += to
-
                     except Exception as exc:
-                        resposta = (
-                            "Desculpe, ocorreu um erro no processamento. "
-                            f"Tente novamente. ({exc})"
-                        )
+                        resposta = f"Desculpe, ocorreu um erro no processamento. Tente novamente. ({exc})"
                         intencao, ti, to, fallback = "erro", 0, 0, True
 
                 st.markdown(resposta)
-
                 partes = [f"intent: `{intencao}`"]
                 if ti or to:
                     partes.append(f"tokens: `{ti}↑ {to}↓`")
@@ -885,12 +970,7 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                 {
                     "role": "assistant",
                     "content": resposta,
-                    "meta": {
-                        "intencao": intencao,
-                        "tokens_in": ti,
-                        "tokens_out": to,
-                        "fallback": fallback,
-                    },
+                    "meta": {"intencao": intencao, "tokens_in": ti, "tokens_out": to, "fallback": fallback},
                 }
             )
             st.rerun()
