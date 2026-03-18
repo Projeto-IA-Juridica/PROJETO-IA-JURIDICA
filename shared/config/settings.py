@@ -93,6 +93,14 @@ class Settings(BaseSettings):
             ) from exc
         return v
 
+    @field_validator("REDIS_URL", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", mode="before")
+    @classmethod
+    def fix_redis_ssl_cert_reqs(cls, v: str) -> str:
+        """Corrige a flag de SSL do Redis vinda de provedores como Railway."""
+        if isinstance(v, str) and "CERT_NONE" in v:
+            return v.replace("CERT_NONE", "none")
+        return v
+
     @field_validator("JWT_SECRET_KEY")
     @classmethod
     def validar_jwt_secret(cls, v: str) -> str:
