@@ -9,6 +9,7 @@ from shared.schemas.processo import (
     ProcessoList,
     ProcessoResponse,
     ProcessoUpdate,
+    _NIVEIS_SCORE_VALIDOS,
 )
 from shared.utils.lgpd import registrar_acesso
 
@@ -43,13 +44,25 @@ async def list_processos(
     status_processo: str | None = Query(None, alias="status"),
     cliente_id: int | None = None,
     search: str | None = Query(None, min_length=3, description="Busca por CNJ"),
+    score_nivel: str | None = Query(
+        None,
+        description="Filtra por nível de risco: baixo | moderado | alto | critico",
+    ),
 ):
     """
     Lista os processos do escritório logado (paginado).
     - Exclusivo: Oculta dados de outros escritórios (Multi-tenant).
-    - Suporta filtros opcionais por status, cliente_id ou busca de CNJ.
+    - Suporta filtros opcionais por status, cliente_id, busca de CNJ e score_nivel.
     """
     escritorio_id = _get_escritorio_id(request)
+
+    # Valida score_nivel antes de qualquer I/O
+    if score_nivel is not None and score_nivel not in _NIVEIS_SCORE_VALIDOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"score_nivel inválido. Opções: {sorted(_NIVEIS_SCORE_VALIDOS)}",
+        )
+
     registrar_acesso(
         _get_user_id(request),
         f"processos:escritorio:{escritorio_id}",
@@ -57,7 +70,6 @@ async def list_processos(
         _get_ip(request),
     )
 
-    # Montando a query de filtro base
     stmt = select(Processo).where(Processo.escritorio_id == escritorio_id)
 
     if status_processo:
@@ -65,24 +77,20 @@ async def list_processos(
     if cliente_id:
         stmt = stmt.where(Processo.cliente_id == cliente_id)
     if search:
-        # Busca literal por substring no número CNJ
         stmt = stmt.where(Processo.numero_cnj.ilike(f"%{search}%"))
+    if score_nivel:
+        stmt = stmt.where(Processo.score_nivel == score_nivel)
 
-    # Contagem Total (para paginação)
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = await db.scalar(count_stmt)
 
-    # Ordenação e Paginação (Offset/Limit)
     stmt = stmt.order_by(Processo.created_at.desc())
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
 
-    # Executa a busca
     result = await db.execute(stmt)
     processos = result.scalars().all()
 
-    # Cálculo do Links de Paginação (básico)
     total_valid = total or 0
-    _total_pages = max(1, (total_valid + per_page - 1) // per_page)
 
     return ProcessoList(
         items=list(processos),  # type: ignore[arg-type]
@@ -108,7 +116,6 @@ async def create_processo(
         _get_ip(request),
     )
 
-    # Impede cadastro duplicado de CNJ para o mesmo escritório
     stmt = select(Processo).where(
         and_(
             Processo.escritorio_id == escritorio_id,
@@ -128,19 +135,22 @@ async def create_processo(
         cliente_id=payload.cliente_id,
         polo_cliente=payload.polo_cliente,
         tipo_acao=payload.tipo_acao,
-        status="ativo",  # status inicial padrão
+        status="ativo",
         monitoramento_ativo=True,
     )
 
     db.add(novo_processo)
-    await db.flush()  # Para obtermos o ID para o retorno, sem comitar a transação explícitamente ainda (session handle faz)
+    await db.flush()
 
     return novo_processo
 
 
 @router.get("/{processo_id}", response_model=ProcessoResponse)
 async def get_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
-    """Detalha um processo específico, garantindo que pertença ao escritório do usuário."""
+    """
+    Detalha um processo específico, garantindo que pertença ao escritório do usuário.
+    Inclui score de risco quando calculado (null se o worker ainda não processou).
+    """
     escritorio_id = _get_escritorio_id(request)
 
     processo = await db.get(Processo, processo_id)
@@ -170,7 +180,6 @@ async def update_processo(
 
     registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "escrita", _get_ip(request))
 
-    # Atualiza em lote usando pydantic exclude_unset pra não sobrescrever os Nones com None cego
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(processo, key, value)
@@ -183,8 +192,7 @@ async def update_processo(
 @router.delete("/{processo_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     """
-    Remove ('soft delete' transformando em arquivado/encerrado, ou hard delete) o processo.
-    Para segurança no judiciário, faremos "Soft Delete" mudando o status e desativando o robô.
+    Soft delete: arquiva o processo e desativa o monitoramento.
     """
     escritorio_id = _get_escritorio_id(request)
 
@@ -194,7 +202,6 @@ async def delete_processo(processo_id: int, request: Request, db: AsyncSession =
 
     registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request))
 
-    # Soft Delete:
     processo.status = "arquivado"
     processo.monitoramento_ativo = False
 

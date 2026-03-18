@@ -14,6 +14,7 @@ Processos (monitor_processos.py):
     query_processos_monitorados(limite)
     query_processo_por_id(id_processo)
     update_ultimo_andamento(id_processo, texto, data_iso)
+    update_score_risco(id_processo, score, nivel, componentes, interpretacao, atualizado_em)
 
 Relacionamento (mensagens_relacionamento.py):
     query_clientes_relacionamento()
@@ -102,6 +103,9 @@ async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
                 "data_ultimo_andamento": p.data_ultimo_andamento,
                 "tipo_acao": p.tipo_acao,
                 "polo_cliente": p.polo_cliente,
+                # Campos usados pelo ScoreRiscoCalculator (Feature 2)
+                "fase_processual": p.fase_processual,
+                "valor_causa": float(p.valor_causa) if p.valor_causa is not None else None,
             }
             for p in result.scalars().all()
         ]
@@ -122,6 +126,11 @@ async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
             "id": p.id,
             "numero": p.numero_cnj,
             "data_ultimo_andamento": p.data_ultimo_andamento,
+            "tipo_acao": p.tipo_acao,
+            "polo_cliente": p.polo_cliente,
+            # Campos usados pelo ScoreRiscoCalculator (Feature 2)
+            "fase_processual": p.fase_processual,
+            "valor_causa": float(p.valor_causa) if p.valor_causa is not None else None,
         }
 
 
@@ -148,6 +157,56 @@ async def _update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) 
 def update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None:
     """UPDATE processos SET ultimo_andamento, data_ultimo_andamento WHERE id."""
     _run(_update_ultimo_andamento(id_processo, texto, data_iso))
+
+
+async def _update_score_risco(
+    id_processo: int,
+    score: int,
+    nivel: str,
+    componentes: dict[str, Any],
+    interpretacao: str,
+    atualizado_em: datetime,
+) -> None:
+    async with async_session_factory() as session:
+        await session.execute(
+            update(ProcessoModel)
+            .where(ProcessoModel.id == id_processo)
+            .values(
+                score_risco=score,
+                score_nivel=nivel,
+                score_componentes=componentes,
+                score_interpretacao=interpretacao,
+                score_atualizado_em=atualizado_em,
+            )
+        )
+        await session.commit()
+
+
+def update_score_risco(
+    id_processo: int,
+    score: int,
+    nivel: str,
+    componentes: dict[str, Any],
+    interpretacao: str,
+    atualizado_em: datetime,
+) -> None:
+    """
+    UPDATE processos SET score_risco, score_nivel, score_componentes,
+    score_interpretacao, score_atualizado_em WHERE id.
+
+    Chamado pelo monitor_processos.py após cada ciclo de monitoramento.
+    Persiste todos os campos de score em um único UPDATE.
+    """
+    _run(
+        _update_score_risco(
+            id_processo,
+            score,
+            nivel,
+            componentes,
+            interpretacao,
+            atualizado_em,
+        )
+    )
 
 
 # ===========================================================================
