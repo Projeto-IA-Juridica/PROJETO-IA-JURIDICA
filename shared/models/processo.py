@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -123,6 +124,36 @@ class Processo(Base, TimestampMixin, TenantMixin):
             "Fase atual: conhecimento | instrucao | saneamento | "
             "julgamento | recurso | execucao | encerrado"
         ),
+    )
+
+    # --- Score de Risco Processual (Feature 2) ---
+    # Uso interno do advogado — nunca exposto diretamente ao cliente.
+    # NÃO representa probabilidade de vitória (compliance OAB Provimento 205/2021).
+    # Calculado pelo worker monitor_processos a cada novo andamento.
+    score_risco: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        nullable=True,
+        index=False,  # índice parcial criado via migração 004
+        comment="Score de complexidade/risco 0–100. Calculado pelo worker.",
+    )
+    score_nivel: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="baixo | moderado | alto | critico",
+    )
+    score_componentes: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="Detalhamento dos 5 componentes do score (para o painel do advogado)",
+    )
+    score_interpretacao: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Texto explicativo gerado para o advogado — sem previsão de resultado",
+    )
+    score_atualizado_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     # --- Integração Jusbrasil ---

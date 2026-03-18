@@ -28,15 +28,12 @@ from shared.utils.validators import validar_numero_processo
 
 _POLOS_VALIDOS = {"autor", "reu", "terceiro"}
 _FREQUENCIAS_VALIDAS = {"diario", "semanal"}
-# Nota: status é gerenciado pelo sistema (não validado aqui).
-# Valores possíveis: ativo | arquivado | suspenso | encerrado
+_NIVEIS_SCORE_VALIDOS = {"baixo", "moderado", "alto", "critico"}
 
 # ---------------------------------------------------------------------------
 # Schemas auxiliares
 # ---------------------------------------------------------------------------
 
-# Tipos de andamento definidos pelo DataCleaner — usados como Literal para
-# garantir que apenas valores conhecidos sejam aceitos
 TipoAndamento = Literal[
     "despacho", "sentença", "decisão", "petição", "certidão", "audiência", "outro"
 ]
@@ -162,10 +159,28 @@ class ProcessoResponse(BaseModel):
     valor_causa: Decimal | None
     jusbrasil_id: str | None
     monitoramento_ativo: bool
-    # str | None para compatibilidade com registros legados que possam ter NULL
     frequencia_monitoramento: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    # --- Score de Risco (Feature 2) ---
+    # Todos opcionais: null enquanto o worker não calculou ainda.
+    # Uso interno do advogado — NÃO comunicar probabilidade de resultado ao cliente (OAB).
+    score_risco: int | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Score de complexidade/risco 0–100 (uso interno do advogado)",
+    )
+    score_nivel: str | None = Field(
+        default=None,
+        description="baixo | moderado | alto | critico",
+    )
+    score_interpretacao: str | None = Field(
+        default=None,
+        description="Texto explicativo para o advogado",
+    )
+    score_atualizado_em: datetime | None = Field(default=None)
 
 
 class ProcessoComAndamentos(ProcessoResponse):
