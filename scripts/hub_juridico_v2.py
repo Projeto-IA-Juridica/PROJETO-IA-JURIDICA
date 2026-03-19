@@ -1683,7 +1683,573 @@ def page_configuracoes() -> None:
 
 
 # =============================================================================
-# SEÇÃO 10 — Sidebar + Main (ponto de entrada)
+# SEÇÃO 10 — PÁGINA: Analytics de Satisfação e Retenção (Feature 5)
+# =============================================================================
+
+
+def _gerar_dados_analytics(clientes: list[dict]) -> dict:
+    """
+    Gera dados analytics a partir dos clientes carregados na sessão.
+    Combina dados reais (tokens, intenções, NPS coletados) com valores simulados para demo.
+    Seed determinística por conjunto de clientes — dados consistentes dentro da sessão.
+    """
+    import random
+
+    seed = sum(hash(c["nome"]) for c in clientes) if clientes else 42
+    rng = random.Random(seed)
+    n = max(len(clientes), 1)
+
+    # ── Resumo ────────────────────────────────────────────────────────────────
+    total_interacoes = sum(
+        max(1, st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) // 500)
+        + rng.randint(4, 18)
+        for c in clientes
+    ) if clientes else rng.randint(40, 120)
+
+    clientes_ativos = max(1, n - rng.randint(0, max(0, n - 1)))
+
+    # NPS: usa notas reais coletadas na sessão; completa com sintéticas
+    nps_reais = [
+        st.session_state[f"nps_{c['id']}"]
+        for c in clientes
+        if f"nps_{c['id']}" in st.session_state
+    ]
+    if nps_reais:
+        nps_medio = round(sum(nps_reais) / len(nps_reais), 1)
+    else:
+        nps_medio = round(rng.uniform(3.2, 4.8), 1)
+    nps_anterior = round(nps_medio + rng.uniform(-0.5, 0.5), 1)
+    variacao = nps_medio - nps_anterior
+    variacao_str = f"+{variacao:.1f}" if variacao >= 0 else f"{variacao:.1f}"
+
+    # ── Eficiência ────────────────────────────────────────────────────────────
+    tempo_ms = rng.randint(800, 2000)
+    interacoes_sem_humano = int(total_interacoes * rng.uniform(0.55, 0.85))
+    pct_autonomia = round(interacoes_sem_humano / total_interacoes * 100, 1) if total_interacoes else 0.0
+    horas_eco = round(interacoes_sem_humano * 8 / 60, 1)
+    custo_total = round(
+        sum(
+            (st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) * 3 +
+             st.session_state.get(f"tokens_{c['id']}", {}).get("out", 0) * 15) / 1_000_000
+            for c in clientes
+        ) or rng.uniform(0.10, 2.50),
+        4,
+    )
+
+    # ── Tendência semanal (8 semanas) ─────────────────────────────────────────
+    from datetime import timedelta
+    tendencia = []
+    semana_base = datetime(2026, 1, 19)
+    for i in range(8):
+        semana_dt = semana_base + timedelta(weeks=i)
+        label = f"{semana_dt.year}-{semana_dt.strftime('W%W')}"
+        tot = rng.randint(8, 35)
+        saidas = rng.randint(int(tot * 0.5), tot)
+        tendencia.append({
+            "semana": label,
+            "total_interacoes": tot,
+            "nps_medio": round(rng.uniform(3.0, 5.0), 1),
+            "autonomia_pct": round(saidas / tot * 100, 1),
+        })
+
+    # ── Ranking de clientes ───────────────────────────────────────────────────
+    ranking = []
+    for c in clientes:
+        nps_cli = st.session_state.get(f"nps_{c['id']}")
+        if nps_cli is None:
+            nps_cli = rng.choice([None, None, round(rng.uniform(1.0, 5.0), 1)])
+        ultimo_contato_dias = rng.randint(1, 60)
+        sem_contato_recente = ultimo_contato_dias > 30
+        em_risco = sem_contato_recente and nps_cli is not None and nps_cli <= 3
+        ranking.append({
+            "cliente_id": c["id"],
+            "nome": c["nome"],
+            "nps_medio": nps_cli,
+            "total_interacoes": rng.randint(3, 25),
+            "ultimo_contato_dias": ultimo_contato_dias,
+            "em_risco": em_risco,
+            "sem_avaliacao": nps_cli is None,
+        })
+    ranking.sort(key=lambda r: (
+        not r["em_risco"],
+        not r["sem_avaliacao"],
+        r["nps_medio"] if r["nps_medio"] is not None else 999,
+    ))
+
+    return {
+        "resumo": {
+            "total_interacoes": total_interacoes,
+            "clientes_ativos": clientes_ativos,
+            "nps_medio": nps_medio,
+            "nps_anterior": nps_anterior,
+            "variacao_nps": variacao_str,
+        },
+        "eficiencia": {
+            "tempo_resposta_medio_ms": tempo_ms,
+            "interacoes_sem_humano": interacoes_sem_humano,
+            "percentual_autonomia": pct_autonomia,
+            "horas_economizadas_estimadas": horas_eco,
+            "custo_total_usd": custo_total,
+        },
+        "tendencia_semanal": tendencia,
+        "por_cliente": ranking,
+        "score_risco_distribuicao": {
+            "baixo": rng.randint(0, max(0, n - 2)),
+            "moderado": rng.randint(0, max(0, n - 1)),
+            "alto": rng.randint(0, max(0, n // 2)),
+            "critico": rng.randint(0, 1),
+        },
+    }
+
+
+def _render_tendencia_chart(tendencia: list[dict]) -> None:
+    """Barras HTML in-line — sem dependência de plotly/matplotlib."""
+    if not tendencia:
+        st.info("Sem dados de tendência.")
+        return
+    max_tot = max(t["total_interacoes"] for t in tendencia) or 1
+    bars = '<div style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:8px 0;">'
+    for t in tendencia:
+        pct = t["total_interacoes"] / max_tot * 100
+        nps = t["nps_medio"]
+        cor = "#4CAF50" if nps >= 4.0 else "#FF9800" if nps >= 3.0 else "#f44336"
+        semana_label = t["semana"].split("-W")[-1] if "-W" in t["semana"] else t["semana"]
+        bars += (
+            f'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'
+            f'<span style="font-size:9px;color:#666;">{t["total_interacoes"]}</span>'
+            f'<div style="width:100%;height:{pct:.0f}%;background:{cor};border-radius:3px 3px 0 0;min-height:4px;"'
+            f' title="{t["semana"]}: {t["total_interacoes"]} interações, NPS {nps}, {t["autonomia_pct"]}% autonomia">'
+            f'</div>'
+            f'<span style="font-size:8px;color:#888;">W{semana_label}</span>'
+            f'</div>'
+        )
+    bars += "</div>"
+    bars += '<div style="font-size:10px;color:#888;margin-top:4px;">🟢 NPS≥4 · 🟠 NPS≥3 · 🔴 NPS&lt;3 — altura = volume de interações</div>'
+    st.markdown(bars, unsafe_allow_html=True)
+
+
+def page_analytics() -> None:
+    """Feature 5 — Analytics de Satisfação e Retenção."""
+    st.title("📊 Analytics de Satisfação e Retenção")
+    st.caption(
+        "Feature 5 — NPS, eficiência da IA, tendência semanal e ranking de clientes. "
+        "Demo: dados calculados a partir dos clientes e conversas da sessão atual."
+    )
+
+    clientes: list[dict] = st.session_state.get("clientes_hub", [])
+    if not clientes:
+        st.warning("Nenhum cliente carregado. Complete o Onboarding e importe clientes primeiro.")
+        if st.button("Ir para Onboarding"):
+            st.session_state["pagina"] = "onboarding"
+            st.rerun()
+        return
+
+    dados = _gerar_dados_analytics(clientes)
+    resumo = dados["resumo"]
+    eficiencia = dados["eficiencia"]
+    tendencia = dados["tendencia_semanal"]
+    ranking = dados["por_cliente"]
+
+    tab_dash, tab_nps, tab_export, tab_prometheus = st.tabs([
+        "📈 Dashboard", "⭐ Pesquisa NPS", "📥 Exportar", "🔧 Prometheus",
+    ])
+
+    # =========================================================================
+    # Tab 1 — Dashboard
+    # =========================================================================
+    with tab_dash:
+        col_periodo, _ = st.columns([1, 3])
+        with col_periodo:
+            st.selectbox(
+                "Período de análise",
+                [7, 30, 90],
+                index=1,
+                format_func=lambda d: f"Últimos {d} dias",
+                key="analytics_dias",
+            )
+
+        st.divider()
+
+        # Resumo
+        st.subheader("📋 Resumo do Período")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Total Interações", resumo["total_interacoes"])
+        c2.metric("Clientes Ativos", resumo["clientes_ativos"])
+        c3.metric("NPS Médio", f"{resumo['nps_medio']:.1f} ⭐", delta=resumo["variacao_nps"])
+        c4.metric("NPS Anterior", f"{resumo['nps_anterior']:.1f}")
+        c5.metric("Variação NPS", resumo["variacao_nps"])
+
+        st.divider()
+
+        # Eficiência
+        st.subheader("⚡ Eficiência da IA")
+        ce1, ce2, ce3, ce4, ce5 = st.columns(5)
+        ce1.metric("Tempo Resposta Médio", f"{eficiencia['tempo_resposta_medio_ms']} ms")
+        ce2.metric("Interações sem Humano", eficiencia["interacoes_sem_humano"])
+        ce3.metric("Autonomia", f"{eficiencia['percentual_autonomia']:.1f}%")
+        ce4.metric("Horas Economizadas", f"{eficiencia['horas_economizadas_estimadas']:.1f}h")
+        ce5.metric("Custo Total Claude", f"US$ {eficiencia['custo_total_usd']:.4f}")
+
+        pct = eficiencia["percentual_autonomia"]
+        cor_auto = "#4CAF50" if pct >= 70 else "#FF9800" if pct >= 50 else "#f44336"
+        st.markdown(
+            f"""<div style="margin:8px 0;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                    <span>Taxa de Autonomia da IA</span>
+                    <span style="font-weight:600;color:{cor_auto};">{pct:.1f}%</span>
+                </div>
+                <div style="background:#e0e0e0;border-radius:4px;height:10px;">
+                    <div style="width:{pct}%;background:{cor_auto};height:10px;border-radius:4px;"></div>
+                </div>
+                <div style="font-size:11px;color:#888;margin-top:3px;">
+                    {eficiencia['interacoes_sem_humano']} de {resumo['total_interacoes']}
+                    interações resolvidas sem intervenção humana
+                </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+        st.divider()
+
+        # Tendência semanal
+        st.subheader("📅 Tendência Semanal (últimas 8 semanas)")
+        _render_tendencia_chart(tendencia[-8:])
+        with st.expander("Ver dados tabulados"):
+            for t in tendencia:
+                emoji_nps = "🟢" if t["nps_medio"] >= 4.0 else "🟠" if t["nps_medio"] >= 3.0 else "🔴"
+                st.caption(
+                    f"**{t['semana']}** — {t['total_interacoes']} interações · "
+                    f"NPS {emoji_nps} {t['nps_medio']:.1f} · Autonomia {t['autonomia_pct']:.1f}%"
+                )
+
+        st.divider()
+
+        # Ranking de clientes
+        st.subheader("👥 Ranking de Clientes")
+        st.caption("Em risco (NPS baixo + sem contato recente) aparece primeiro; sem avaliação em segundo.")
+        for r in ranking:
+            cor_card = "#ffebee" if r["em_risco"] else "#fff8e1" if r["sem_avaliacao"] else "#f1f8e9"
+            borda = "#ef9a9a" if r["em_risco"] else "#ffe082" if r["sem_avaliacao"] else "#a5d6a7"
+            status_icon = "🔴 Em Risco" if r["em_risco"] else ("⚪ Sem Avaliação" if r["sem_avaliacao"] else "🟢 Ok")
+            nps_str = f"{r['nps_medio']:.1f} ⭐" if r["nps_medio"] is not None else "—"
+            st.markdown(
+                f"""<div style="border:1px solid {borda};border-radius:8px;padding:10px 14px;
+                             background:{cor_card};margin-bottom:6px;display:flex;
+                             justify-content:space-between;align-items:center;">
+                    <div>
+                        <span style="font-weight:600;">{r['nome']}</span>
+                        <span style="font-size:11px;color:#666;margin-left:8px;">{status_icon}</span>
+                    </div>
+                    <div style="text-align:right;font-size:12px;color:#555;">
+                        NPS: <strong>{nps_str}</strong> ·
+                        {r['total_interacoes']} interações ·
+                        último contato há {r['ultimo_contato_dias']}d
+                    </div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+        # Score de risco distribuição
+        st.divider()
+        st.subheader("🔒 Distribuição de Score de Risco (Feature 2)")
+        score_dist = dados["score_risco_distribuicao"]
+        total_score = sum(score_dist.values()) or 1
+        niveis = [
+            ("baixo", "🟢"), ("moderado", "🟡"), ("alto", "🔴"), ("critico", "🟣"),
+        ]
+        for col, (nivel, emoji) in zip(st.columns(4), niveis):
+            qtd = score_dist.get(nivel, 0)
+            col.metric(f"{emoji} {nivel.capitalize()}", qtd,
+                       help=f"{qtd / total_score * 100:.0f}% dos processos")
+
+    # =========================================================================
+    # Tab 2 — Pesquisa NPS
+    # =========================================================================
+    with tab_nps:
+        st.subheader("⭐ Pesquisa de Satisfação NPS")
+        st.markdown("""
+        Simula o fluxo completo de coleta NPS via WhatsApp (Feature 5):
+        1. Advogado dispara pesquisa → `solicitar_nps_cliente` (Celery) envia mensagem
+        2. Cliente responde 1–5 → webhook detecta, salva `satisfacao`, remove `aguardando_nps`
+        3. Nota ≤ 3 → alerta automático enviado a advogados com `escalacao_ativa=True`
+        """)
+        st.divider()
+
+        if "nps_estados" not in st.session_state:
+            st.session_state["nps_estados"] = {}
+        nps_estados: dict = st.session_state["nps_estados"]
+
+        col_enviar, col_responder = st.columns(2)
+
+        with col_enviar:
+            st.markdown("#### 📤 1. Enviar Pesquisa NPS")
+            st.caption("Simula o task Celery com deduplicação Redis (`nps:solicitado:{id}` TTL 30d).")
+            cliente_sel = st.selectbox(
+                "Selecionar cliente",
+                options=clientes,
+                format_func=lambda c: c["nome"],
+                key="nps_cliente_sel",
+            )
+            if cliente_sel:
+                cid = cliente_sel["id"]
+                estado = nps_estados.get(cid, {})
+                if estado.get("aguardando_nps"):
+                    st.info(f"⏳ Pesquisa já enviada para **{cliente_sel['nome']}** — aguardando resposta.")
+                elif estado.get("nps_registrado") is not None:
+                    nota_reg = estado["nps_registrado"]
+                    emoji_n = "🟢" if nota_reg >= 4 else "🟡" if nota_reg == 3 else "🔴"
+                    st.success(f"✅ NPS registrado: {emoji_n} **{nota_reg}/5** para {cliente_sel['nome']}")
+                    if st.button("🔄 Enviar nova pesquisa", key="nps_nova"):
+                        nps_estados[cid] = {}
+                        st.rerun()
+                else:
+                    template_nps = (
+                        f"Olá {cliente_sel['nome'].split()[0]}! 😊\n\n"
+                        "Como você avalia o atendimento do nosso escritório?\n"
+                        "Responda com um número de **1 a 5**:\n\n"
+                        "1 — Muito insatisfeito\n2 — Insatisfeito\n"
+                        "3 — Neutro\n4 — Satisfeito\n5 — Muito satisfeito\n\n"
+                        "Sua opinião é muito importante para nós! 🙏"
+                    )
+                    with st.expander("Ver mensagem WhatsApp"):
+                        st.code(template_nps, language=None)
+                    if st.button(
+                        f"📱 Enviar NPS para {cliente_sel['nome'].split()[0]}",
+                        type="primary",
+                        key="btn_enviar_nps",
+                    ):
+                        nps_estados[cid] = {"aguardando_nps": True}
+                        st.success("✅ Pesquisa enviada! Interação salva com `aguardando_nps=True`.")
+                        st.caption(f"🔒 Redis key: `nps:solicitado:{cid}` — TTL 30 dias (anti-spam)")
+                        st.rerun()
+
+        with col_responder:
+            st.markdown("#### 📩 2. Simular Resposta do Cliente")
+            st.caption("Simula o webhook `/webhook/whatsapp` recebendo a nota via WhatsApp.")
+            aguardando = [c for c in clientes if nps_estados.get(c["id"], {}).get("aguardando_nps")]
+            if not aguardando:
+                st.info("Nenhum cliente aguardando resposta NPS. Envie uma pesquisa primeiro.")
+            else:
+                cliente_resp = st.selectbox(
+                    "Cliente respondendo",
+                    options=aguardando,
+                    format_func=lambda c: c["nome"],
+                    key="nps_resp_sel",
+                )
+                if cliente_resp:
+                    nota_input = st.select_slider(
+                        "Nota enviada pelo cliente",
+                        options=[1, 2, 3, 4, 5],
+                        value=4,
+                        format_func=lambda n: f"{n} — " + {
+                            1: "Muito insatisfeito 😡", 2: "Insatisfeito 😞",
+                            3: "Neutro 😐", 4: "Satisfeito 😊", 5: "Muito satisfeito 🤩",
+                        }[n],
+                        key="nota_slider",
+                    )
+                    if st.button("✅ Registrar Resposta", type="primary", key="btn_registrar_nps"):
+                        cid_resp = cliente_resp["id"]
+                        nps_estados[cid_resp] = {"nps_registrado": nota_input, "aguardando_nps": False}
+                        st.session_state[f"nps_{cid_resp}"] = float(nota_input)
+                        st.success(
+                            f"✅ `satisfacao = {nota_input}` registrado para **{cliente_resp['nome']}**. "
+                            "Flag `aguardando_nps` removida do `metadata_json`."
+                        )
+                        agradecimento = (
+                            f"Obrigado pela avaliação, {cliente_resp['nome'].split()[0]}! "
+                            "Seu feedback é muito importante para continuarmos melhorando. 🙏"
+                        )
+                        st.info(f"📱 **Agradecimento enviado:** {agradecimento}")
+                        if nota_input <= 3:
+                            st.error(
+                                f"⚠️ **ALERTA NPS BAIXO — nota {nota_input}/5**\n\n"
+                                f"Cliente: {cliente_resp['nome']}\n\n"
+                                "Em produção: alerta enviado via WhatsApp a todos os advogados "
+                                "com `escalacao_ativa=True`.",
+                                icon="🚨",
+                            )
+                        st.rerun()
+
+        st.divider()
+        st.subheader("📊 NPS Coletados nesta Sessão")
+        registrados = [
+            (c, nps_estados[c["id"]]["nps_registrado"])
+            for c in clientes
+            if nps_estados.get(c["id"], {}).get("nps_registrado") is not None
+        ]
+        if not registrados:
+            st.info("Nenhuma nota NPS registrada ainda nesta sessão.")
+        else:
+            nps_vals = [nota for _, nota in registrados]
+            media_nps = sum(nps_vals) / len(nps_vals)
+            col_m1, col_m2, col_m3 = st.columns(3)
+            col_m1.metric("NPS Médio", f"{media_nps:.1f} ⭐")
+            col_m2.metric("Respostas", len(registrados))
+            col_m3.metric("Em Risco (≤ 3)", sum(1 for n in nps_vals if n <= 3))
+            for cliente_r, nota in sorted(registrados, key=lambda x: x[1]):
+                emoji_r = "🟢" if nota >= 4 else "🟡" if nota == 3 else "🔴"
+                st.caption(f"{emoji_r} **{cliente_r['nome']}** — nota **{nota}/5**")
+
+    # =========================================================================
+    # Tab 3 — Exportar CSV
+    # =========================================================================
+    with tab_export:
+        st.subheader("📥 Exportar Relatório de Interações")
+        st.caption(
+            "Simula `GET /chat/stats/export?mes=YYYY-MM&formato=csv` "
+            "(ExportadorAnalytics.gerar_csv). CSV com BOM UTF-8 para compatibilidade com Excel."
+        )
+
+        col_mes, col_fmt = st.columns(2)
+        with col_mes:
+            mes_sel = st.selectbox(
+                "Mês de referência",
+                ["2026-03", "2026-02", "2026-01", "2025-12"],
+                index=0,
+            )
+        with col_fmt:
+            st.text_input("Formato", value="CSV (UTF-8 BOM)", disabled=True)
+
+        def _gerar_csv_demo(mes: str, clientes_lista: list[dict]) -> bytes:
+            import csv as csv_mod
+            import random
+            output = io.StringIO()
+            writer = csv_mod.writer(output)
+            writer.writerow([
+                "id", "data", "cliente_id", "nome_cliente", "direcao",
+                "mensagem_cliente", "tokens_input", "tokens_output",
+                "custo_estimado_usd", "satisfacao", "autonomia",
+            ])
+            rng2 = random.Random(hash(mes))
+            row_id = 1
+            for c in clientes_lista:
+                satisfacao = st.session_state.get(f"nps_{c['id']}", "")
+                n_rows = rng2.randint(3, 10)
+                for j in range(n_rows):
+                    dia = rng2.randint(1, 28)
+                    data_str = f"{mes}-{dia:02d}T{rng2.randint(8, 18):02d}:{rng2.randint(0, 59):02d}:00+00:00"
+                    ti = rng2.randint(200, 800)
+                    to = rng2.randint(100, 400)
+                    custo = round((ti * 3 + to * 15) / 1_000_000, 6)
+                    writer.writerow([
+                        row_id, data_str, c["id"], c["nome"],
+                        "recebida" if j % 2 == 0 else "enviada",
+                        f"Mensagem demo {j + 1}",
+                        ti, to, custo,
+                        satisfacao if j == n_rows - 1 else "",
+                        "sim" if rng2.random() > 0.3 else "não",
+                    ])
+                    row_id += 1
+            return b"\xef\xbb\xbf" + output.getvalue().encode("utf-8")
+
+        csv_bytes = _gerar_csv_demo(mes_sel, clientes)
+        st.download_button(
+            label=f"📥 Baixar relatorio_interacoes_{mes_sel}.csv",
+            data=csv_bytes,
+            file_name=f"relatorio_interacoes_{mes_sel}.csv",
+            mime="text/csv; charset=utf-8",
+            type="primary",
+            use_container_width=True,
+        )
+        with st.expander("Preview das primeiras linhas"):
+            preview_lines = csv_bytes.decode("utf-8-sig").split("\n")[:6]
+            st.code("\n".join(preview_lines), language="text")
+        st.caption(
+            "Em produção: SELECT projetado por coluna (não ORM completo), "
+            "`isoformat()` para datas, `utf-8-sig` para BOM."
+        )
+
+    # =========================================================================
+    # Tab 4 — Prometheus
+    # =========================================================================
+    with tab_prometheus:
+        st.subheader("🔧 Métricas Prometheus")
+        st.caption(
+            "Em produção: `GET /metrics` expõe gauges para o Grafana. "
+            "Aqui simulamos os valores atuais dos 3 gauges do escritório (escritorio_id=1)."
+        )
+
+        nps_gauge_val = resumo["nps_medio"]
+        autonomia_gauge_val = eficiencia["percentual_autonomia"]
+
+        _ESCALACAO_INTENCOES = {
+            "parecer_juridico", "estrategia_processual",
+            "negociacao", "decisao_judicial_impacto_alto",
+        }
+        escalacoes = sum(
+            sum(v for k, v in st.session_state.get(f"tokens_{c['id']}", {}).get("intencoes", {}).items()
+                if k in _ESCALACAO_INTENCOES)
+            for c in clientes
+        )
+
+        st.divider()
+        col_g1, col_g2, col_g3 = st.columns(3)
+
+        def _gauge_card(titulo: str, valor_str: str, sublabel: str, cor: str) -> str:
+            return (
+                f'<div style="border:1px solid {cor};border-radius:8px;padding:16px;'
+                f'background:{cor}18;text-align:center;">'
+                f'<div style="font-size:28px;font-weight:700;color:{cor};">{valor_str}</div>'
+                f'<div style="font-size:11px;color:#666;">labels: escritorio_id="1"</div>'
+                f'<div style="font-size:10px;color:#888;margin-top:4px;">{sublabel}</div>'
+                f'</div>'
+            )
+
+        with col_g1:
+            st.markdown("#### `nps_score_gauge`")
+            cor = "#4CAF50" if nps_gauge_val >= 4.0 else "#FF9800" if nps_gauge_val >= 3.0 else "#f44336"
+            st.markdown(_gauge_card("NPS Score", f"{nps_gauge_val:.1f}", "Gauge — NPS médio atual", cor), unsafe_allow_html=True)
+
+        with col_g2:
+            st.markdown("#### `ia_autonomia_percent_gauge`")
+            cor = "#4CAF50" if autonomia_gauge_val >= 70 else "#FF9800" if autonomia_gauge_val >= 50 else "#f44336"
+            st.markdown(_gauge_card("Autonomia IA", f"{autonomia_gauge_val:.1f}%", "Gauge — % autonomia da IA", cor), unsafe_allow_html=True)
+
+        with col_g3:
+            st.markdown("#### `escalacoes_pendentes_gauge`")
+            cor = "#f44336" if escalacoes > 0 else "#4CAF50"
+            st.markdown(_gauge_card("Escalações", str(escalacoes), "Gauge — escalações pendentes", cor), unsafe_allow_html=True)
+
+        st.divider()
+        with st.expander("Ver formato raw (como aparece em /metrics)"):
+            st.code(
+                f"# HELP nps_score_gauge NPS médio atual por escritório\n"
+                f"# TYPE nps_score_gauge gauge\n"
+                f'nps_score_gauge{{escritorio_id="1"}} {nps_gauge_val:.1f}\n\n'
+                f"# HELP ia_autonomia_percent_gauge Percentual de autonomia da IA\n"
+                f"# TYPE ia_autonomia_percent_gauge gauge\n"
+                f'ia_autonomia_percent_gauge{{escritorio_id="1"}} {autonomia_gauge_val:.1f}\n\n'
+                f"# HELP escalacoes_pendentes_gauge Interações com escalacao pendente\n"
+                f"# TYPE escalacoes_pendentes_gauge gauge\n"
+                f'escalacoes_pendentes_gauge{{escritorio_id="1"}} {escalacoes}',
+                language="text",
+            )
+
+        st.markdown("""
+        **Segurança do endpoint `/metrics`:**
+        - `METRICS_TOKEN` env var → `Authorization: Bearer <token>` (comparação HMAC segura)
+        - Segunda camada: restrição de IP a nível de infra (nginx / load balancer)
+        - Sem token configurado → modo dev (warning no log, sem bloqueio)
+
+        **Integração Grafana:**
+        ```yaml
+        scrape_configs:
+          - job_name: hub-juridico
+            static_configs:
+              - targets: [api:8000]
+            metrics_path: /metrics
+            bearer_token: ${METRICS_TOKEN}
+        ```
+        """)
+        st.info(
+            "`_atualizar_metricas_prometheus()` é chamada apenas em cache miss do dashboard "
+            "(não a cada request), evitando writes desnecessários ao Prometheus.",
+            icon="ℹ️",
+        )
+
+
+# =============================================================================
+# SEÇÃO 11 — Sidebar + Main (ponto de entrada)
 # =============================================================================
 
 
@@ -1700,13 +2266,17 @@ def _render_sidebar() -> None:
         # Navegação
         paginas_disponiveis = ["🚀 Onboarding"]
         if onboarding_ok or clientes:
-            paginas_disponiveis += ["👥 Hub do Advogado", "📚 Base RAG", "⚙️ Configurações"]
+            paginas_disponiveis += [
+                "👥 Hub do Advogado", "📚 Base RAG",
+                "📊 Analytics", "⚙️ Configurações",
+            ]
 
         pagina_selecionada = st.radio("Navegação", paginas_disponiveis, label_visibility="collapsed")
         mapa = {
             "🚀 Onboarding": "onboarding",
             "👥 Hub do Advogado": "hub",
             "📚 Base RAG": "rag",
+            "📊 Analytics": "analytics",
             "⚙️ Configurações": "config",
         }
         st.session_state["pagina"] = mapa.get(pagina_selecionada, "onboarding")
@@ -1821,6 +2391,8 @@ def main() -> None:
         page_hub()
     elif pagina == "rag":
         page_rag()
+    elif pagina == "analytics":
+        page_analytics()
     elif pagina == "config":
         page_configuracoes()
 
