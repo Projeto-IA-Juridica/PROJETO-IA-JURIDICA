@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     FLOWER_USER: str = "admin"
     FLOWER_PASSWORD: str | None = None  # None = sem auth (só dev local)
 
+    # Prometheus scraping — Bearer token
+    # None em dev: endpoint aberto (apenas localmente).
+    # Em produção: obrigatório + restringir acesso por IP na infra (nginx/firewall).
+    METRICS_TOKEN: str | None = None
+
     # Segurança / LGPD
     ENCRYPTION_KEY: str  # Fernet key (base64 urlsafe) — validado abaixo
 

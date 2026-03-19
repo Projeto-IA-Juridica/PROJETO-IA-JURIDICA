@@ -21,6 +21,7 @@ from shared.database.worker_queries import (
 )
 from shared.database.worker_queries import (
     insert_interacao,
+    query_clientes_nps_pendente,
     query_clientes_relacionamento,
     query_ultima_interacao_batch,
 )
@@ -497,6 +498,90 @@ def verificar_clientes_sem_contato(self) -> dict:
     return {
         "status": "ok",
         "enviados": enviados,
+        "candidatos": len(candidatos),
+    }
+
+
+TEMPLATE_NPS = (
+    "Olá, {nome_cliente}! 😊\n\n"
+    "Como avalia o atendimento do {nome_escritorio} até agora?\n"
+    "Responda com um número de *1 a 5*:\n"
+    "1 = Muito insatisfeito  |  5 = Muito satisfeito"
+)
+
+TEMPO_30_DIAS_NPS = 30 * 24 * 60 * 60  # TTL Redis: 30 dias
+
+
+@shared_task(bind=True)
+def solicitar_nps_cliente(self) -> dict:
+    """
+    Roda diariamente. Identifica clientes cujo processo teve andamento há
+    exatamente 7 dias e envia pesquisa de NPS via WhatsApp.
+    Garante no máximo 1 envio por cliente por mês via Redis.
+    """
+    candidatos = query_clientes_nps_pendente()
+
+    enviados = 0
+    ignorados = 0
+
+    for lote in dividir_em_lotes(candidatos, TAMANHO_LOTE):
+        for cliente in lote:
+            inicio = time.time()
+
+            # Deduplicação mensal — chave por cliente, TTL 30 dias
+            chave_envio = chave("nps:solicitado", cliente.id)
+            if ja_enviado_recentemente(chave_envio):
+                ignorados += 1
+                continue
+
+            chave_bloqueio = chave("lock:nps", cliente.id)
+            if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
+                ignorados += 1
+                continue
+
+            texto = TEMPLATE_NPS.format(
+                nome_cliente=cliente.nome,
+                nome_escritorio=cliente.nome_escritorio,
+            )
+
+            WhatsAppService.enviar_mensagem(
+                id_cliente=cliente.id,
+                telefone=cliente.telefone,
+                texto=texto,
+            )
+
+            # Marca ANTES das operações não-críticas
+            marcar_enviado(chave_envio, TEMPO_30_DIAS_NPS)
+            _mensagens_relacionamento_enviadas_total.labels(tipo="nps_solicitado").inc()
+            enviados += 1
+
+            try:
+                processo = buscar_processo_ativo_do_cliente(cliente.id)
+                salvar_interacao(
+                    id_cliente=cliente.id,
+                    id_processo=processo.id if processo else None,
+                    texto=texto,
+                    metadata_json={
+                        "tipo_relacionamento": "nps_solicitado",
+                        "aguardando_nps": True,
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    "salvar_interacao_nps_falhou",
+                    cliente_id=cliente.id,
+                    erro=str(e),
+                )
+
+            if time.time() - inicio > TEMPO_ALERTA_POR_CLIENTE:
+                logger.warning("timeout_por_cliente", tipo="nps_solicitado", cliente_id=cliente.id)
+
+        time.sleep(1)
+
+    return {
+        "status": "ok",
+        "enviados": enviados,
+        "ignorados": ignorados,
         "candidatos": len(candidatos),
     }
 

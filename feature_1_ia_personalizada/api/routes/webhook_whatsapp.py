@@ -185,7 +185,13 @@ async def receive_message(
         )
         return {"status": "ignored", "reason": "Client or Lawyer not registered"}
 
-    # 3. Disparar o Worker (Processamento via Celery assíncrono)
+    # 3. Verificar se é resposta de pesquisa NPS (1-5)
+    nps_processado = await _processar_resposta_nps(texto, cliente, escritorio, db)
+    if nps_processado:
+        _webhook_processing_time.observe(time.perf_counter() - _inicio)
+        return {"status": "nps_registrado"}
+
+    # 4. Disparar o Worker (Processamento via Celery assíncrono)
     # A IA fará todo o trabalho pesado longe da Main Thread do FastAPI
     tipo_mensagem = "texto"
     if "audioMessage" in (msg_content if isinstance(msg_content, dict) else {}):
@@ -211,3 +217,110 @@ async def receive_message(
     )
 
     return {"status": "queued"}
+
+
+async def _processar_resposta_nps(
+    texto: str,
+    cliente: Cliente,
+    escritorio: Escritorio,
+    db: AsyncSession,
+) -> bool:
+    """
+    Verifica se o cliente estava aguardando NPS e a mensagem é um número 1-5.
+    Retorna True se a mensagem foi identificada como resposta NPS e processada,
+    para que o webhook não a encaminhe à IA.
+    """
+    # Só processa se for dígito 1-5 isolado
+    texto_limpo = texto.strip()
+    if texto_limpo not in {"1", "2", "3", "4", "5"}:
+        return False
+
+    nota = int(texto_limpo)
+
+    # Busca última interação com aguardando_nps=True para este cliente
+    from shared.models.interacao import Interacao as InteracaoModel
+
+    stmt = (
+        select(InteracaoModel)
+        .where(
+            InteracaoModel.cliente_id == cliente.id,
+            InteracaoModel.metadata_json["aguardando_nps"] == True,  # noqa: E712
+        )
+        .order_by(InteracaoModel.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    interacao_nps = result.scalar_one_or_none()
+
+    if not interacao_nps:
+        # Não havia NPS pendente — mensagem "1-5" tratada como texto normal
+        return False
+
+    # Registra nota e limpa flag
+    meta = dict(interacao_nps.metadata_json or {})
+    meta.pop("aguardando_nps", None)
+    interacao_nps.satisfacao = nota
+    interacao_nps.metadata_json = meta
+    await db.commit()
+
+    logger.info(
+        "nps_registrado",
+        cliente_id=cliente.id,
+        escritorio_id=escritorio.id,
+        nota=nota,
+    )
+
+    # Envia agradecimento e, se NPS baixo, alerta os advogados
+    from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
+    from shared.config.settings import settings
+
+    evo = EvolutionClient(
+        base_url=settings.EVOLUTION_API_URL,
+        api_key=settings.EVOLUTION_API_KEY,
+    )
+    try:
+        agradecimento = (
+            f"Obrigado pela avaliação, {cliente.nome}! "
+            "Seu feedback é muito importante para continuarmos melhorando o atendimento. 🙏"
+        )
+        await evo.enviar_texto(
+            escritorio.webhook_whatsapp_instance,
+            cliente.telefone_whatsapp,
+            agradecimento,
+        )
+
+        if nota <= 3:
+            from shared.models.usuario import Usuario
+
+            stmt_adv = select(Usuario).where(
+                Usuario.escritorio_id == escritorio.id,
+                Usuario.ativo == True,  # noqa: E712
+                Usuario.escalacao_ativa == True,  # noqa: E712
+                Usuario.whatsapp_numero.isnot(None),
+            )
+            advogados = (await db.execute(stmt_adv)).scalars().all()
+
+            alerta = (
+                f"⚠️ *ALERTA — NPS BAIXO*\n"
+                f"Cliente: {cliente.nome}\n"
+                f"Nota: {nota}/5\n\n"
+                f"Recomendado entrar em contato para verificar a satisfação."
+            )
+            for adv in advogados:
+                await evo.enviar_texto(
+                    escritorio.webhook_whatsapp_instance,
+                    adv.whatsapp_numero,
+                    alerta,
+                )
+            logger.info(
+                "nps_alerta_enviado",
+                cliente_id=cliente.id,
+                nota=nota,
+                advogados_alertados=len(advogados),
+            )
+    except Exception as e:
+        logger.error("nps_envio_mensagem_falhou", cliente_id=cliente.id, erro=str(e))
+    finally:
+        await evo.close()
+
+    return True
