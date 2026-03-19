@@ -9,7 +9,11 @@ referenciam escritorio_id para garantir isolamento multi-tenant.
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Integer, String, UniqueConstraint
+from datetime import time
+from datetime import datetime
+
+from sqlalchemy import Boolean, Integer, SmallInteger, String, Text, Time, UniqueConstraint
+from sqlalchemy import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin
@@ -63,6 +67,66 @@ class Escritorio(Base, TimestampMixin):
         String(100),
         nullable=True,
         comment="Nome da instância na Evolution API",
+    )
+
+    # --- Persona da IA ---
+    persona_nome: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        default="Assistente Jurídico",
+        comment="Nome da IA exibido aos clientes",
+    )
+    persona_tom: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        default="formal",
+        comment="Tom da IA: formal | amigavel | neutro",
+    )
+    horario_inicio: Mapped[time | None] = mapped_column(
+        Time(),
+        nullable=True,
+        comment="Início do horário de atendimento",
+    )
+    horario_fim: Mapped[time | None] = mapped_column(
+        Time(),
+        nullable=True,
+        comment="Fim do horário de atendimento",
+    )
+
+    # --- Onboarding ---
+    onboarding_etapa: Mapped[int | None] = mapped_column(
+        SmallInteger(),
+        nullable=True,
+        default=0,
+        comment="Etapa atual do onboarding (0-5)",
+    )
+    onboarding_completo: Mapped[bool | None] = mapped_column(
+        Boolean(),
+        nullable=True,
+        default=False,
+        comment="Indica se o onboarding foi concluído",
+    )
+    onboarding_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        comment="Timestamp de conclusão do onboarding",
+    )
+
+    # --- Templates Personalizados ---
+    template_boas_vindas: Mapped[str | None] = mapped_column(
+        Text(),
+        nullable=True,
+        comment="Template personalizado de boas-vindas",
+    )
+    template_atualizacao: Mapped[str | None] = mapped_column(
+        Text(),
+        nullable=True,
+        comment="Template personalizado de atualização processual",
+    )
+    template_sem_novidade: Mapped[str | None] = mapped_column(
+        Text(),
+        nullable=True,
+        comment="Template personalizado para quando não há novidades",
     )
 
     # --- Relacionamentos ---

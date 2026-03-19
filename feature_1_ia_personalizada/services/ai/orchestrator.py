@@ -65,6 +65,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
+    gerar_instrucao_persona,
 )
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManager
@@ -90,7 +91,9 @@ from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
 
-_TIMEOUT_FLUXO_SEGUNDOS = 60.0  # guarda-chuva contra nós travados (Jusbrasil, Evolution, Claude)
+_TIMEOUT_FLUXO_SEGUNDOS = 120.0   # guard absoluto de último recurso (não deve ser atingido)
+_TIMEOUT_CLAUDE_SEGUNDOS = 25.0   # timeout por chamada ao Claude
+_TIMEOUT_JUSBRASIL_SEGUNDOS = 20.0  # timeout por chamada ao Jusbrasil/cache
 
 # ---------------------------------------------------------------------------
 # Métricas Prometheus
@@ -240,6 +243,7 @@ class ConversationOrchestrator:
         self._translator = translator
         self._jusbrasil = jusbrasil_client
         self._cache = cache_manager
+        self._redis: Redis = cache_manager._redis  # reutiliza conexão já existente
         self._evolution = evolution_client
         self._session_factory = session_factory
         self._escalacao_manager = EscalacaoManager(
@@ -422,6 +426,39 @@ class ConversationOrchestrator:
         escritorio = await session.get(Escritorio, escritorio_id)
         cliente = await session.get(Cliente, cliente_id)
         return escritorio, cliente
+
+    async def _obter_persona(
+        self,
+        redis: Redis,
+        escritorio_id: int,
+        escritorio: "Escritorio | None",
+    ) -> str:
+        """
+        Retorna o bloco XML de persona para injetar nos prompts.
+        Cacheia no Redis por 1h — persona muda raramente.
+        """
+        cache_key = f"escritorio_persona:{escritorio_id}"
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return cached  # type: ignore[return-value]
+        except Exception:
+            pass  # Redis indisponível — segue sem cache
+
+        persona_nome = "Assistente Jurídico"
+        persona_tom = "neutro"
+        if escritorio:
+            persona_nome = escritorio.persona_nome or persona_nome
+            persona_tom = escritorio.persona_tom or persona_tom
+
+        instrucao = gerar_instrucao_persona(persona_nome, persona_tom)
+
+        try:
+            await redis.set(cache_key, instrucao, ex=3600)  # TTL 1h
+        except Exception:
+            pass
+
+        return instrucao
 
     async def _salvar_interacao(
         self,
@@ -644,10 +681,8 @@ class ConversationOrchestrator:
             motivo = state.get("motivo_escalacao") or "indefinido"
             mensagem_cliente = state["mensagem_original"]
             
-            # Aqui podemos despachar a task em background nativamente usando asyncio_create_task 
-            # ou rodar inline. Para não atrasar a resposta ao cliente, vamos despachar background.
-            import asyncio
-            asyncio.create_task(
+            # Despacha escalação em background para não atrasar resposta ao cliente.
+            _task = asyncio.create_task(
                 self._escalacao_manager.avaliar_e_notificar_advogados(
                     escritorio_id=state["escritorio_id"],
                     cliente_id=state["cliente_id"],
@@ -657,6 +692,17 @@ class ConversationOrchestrator:
                     instancia_whatsapp=instancia_whatsapp,
                 )
             )
+
+            def _log_escalacao_error(task: asyncio.Task) -> None:
+                if not task.cancelled() and (exc := task.exception()):
+                    logger.error(
+                        "escalacao_background_falhou",
+                        escritorio_id=state["escritorio_id"],
+                        erro=str(exc),
+                    )
+                    _erros_total.labels(no="escalacao_background").inc()
+
+            _task.add_done_callback(_log_escalacao_error)
 
             fallback_msg = (
                 "Sua pergunta é muito importante e específica para o andamento do seu caso particular. "
@@ -708,12 +754,25 @@ class ConversationOrchestrator:
                     "tipo_acao": getattr(processo, "tipo_acao", None),
                     "tribunal": processo.tribunal,
                 }
-                andamentos, contexto_rag = await asyncio.gather(
-                    self._jusbrasil.sincronizar_andamentos(numero_cnj),
-                    self._buscar_rag(state, contexto_processo_para_rag),
-                )
-                await self._cache.set_andamentos(numero_cnj, andamentos)
-                log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
+                try:
+                    andamentos, contexto_rag = await asyncio.wait_for(
+                        asyncio.gather(
+                            self._jusbrasil.sincronizar_andamentos(numero_cnj),
+                            self._buscar_rag(state, contexto_processo_para_rag),
+                        ),
+                        timeout=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                    )
+                    await self._cache.set_andamentos(numero_cnj, andamentos)
+                    log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
+                except TimeoutError:
+                    # Jusbrasil lento → degrada gracefully com dados do banco
+                    log.warning(
+                        "jusbrasil_timeout_usando_dados_banco",
+                        timeout_s=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                        cnj=numero_cnj,
+                    )
+                    andamentos = []
+                    contexto_rag = ""
 
             ultimo_andamento = (
                 andamentos[0].get("descricao", "")
@@ -801,6 +860,11 @@ class ConversationOrchestrator:
                 )
             nome_escritorio = escritorio.nome if escritorio else "Escritório"
             nome_cliente = cliente.nome if cliente else "cliente"
+
+            # Carrega persona (cacheada no Redis por 1h)
+            persona_instrucao = await self._obter_persona(
+                self._redis, state["escritorio_id"], escritorio
+            )
 
             # Monta system_prompt baseado na intenção
             if intencao == "status" and dados:
@@ -896,17 +960,24 @@ class ConversationOrchestrator:
                     nome_cliente=nome_cliente,
                 )
 
+            # Prefixa persona (nome + tom) no system_prompt
+            if persona_instrucao:
+                system_prompt = persona_instrucao + system_prompt
+
             # Injeta contexto RAG no prompt quando disponível
             # (só presente para intenções que passam por buscar_dados)
             contexto_rag = state.get("contexto_rag") or ""
             if contexto_rag:
                 system_prompt += f"\n\n{contexto_rag}"
 
-            resultado = await self._claude.enviar_mensagem(
-                system_prompt=system_prompt,
-                mensagens_historico=state.get("historico", []),
-                mensagem_usuario=state["mensagem_original"],
-                intencao=intencao,
+            resultado = await asyncio.wait_for(
+                self._claude.enviar_mensagem(
+                    system_prompt=system_prompt,
+                    mensagens_historico=state.get("historico", []),
+                    mensagem_usuario=state["mensagem_original"],
+                    intencao=intencao,
+                ),
+                timeout=_TIMEOUT_CLAUDE_SEGUNDOS,
             )
 
             tokens_anteriores = state.get("tokens_usados") or {"input": 0, "output": 0}
@@ -924,10 +995,15 @@ class ConversationOrchestrator:
                 "precisa_regenerar": False,
             }
 
-        except RuntimeError as exc:
-            # Claude indisponível → ativar fallback com mensagem pré-definida
+        except (RuntimeError, TimeoutError) as exc:
+            # Claude indisponível ou lento demais → ativar fallback com mensagem pré-definida
             _erros_total.labels(no="gerar_resposta").inc()
-            log.error("claude_indisponivel_ativando_fallback", erro=str(exc))
+            _is_timeout = isinstance(exc, TimeoutError)
+            log.error(
+                "claude_timeout_ativando_fallback" if _is_timeout else "claude_indisponivel_ativando_fallback",
+                erro=str(exc),
+                timeout_s=_TIMEOUT_CLAUDE_SEGUNDOS if _is_timeout else None,
+            )
 
             intencao = state.get("intencao", "outro")
             dados = state.get("dados_processo") or {}

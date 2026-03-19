@@ -32,6 +32,48 @@ _FORMATO_WHATSAPP = (
 )
 
 # ---------------------------------------------------------------------------
+# PERSONA — instrução de tom injetada no topo de qualquer prompt
+# ---------------------------------------------------------------------------
+
+_TOM_FORMAL = (
+    "Trate o cliente com formalidade respeitosa: use 'o senhor' / 'a senhora' ao se dirigir a ele(a). "
+    "Linguagem precisa, clara e profissional, sem informalidades."
+)
+
+_TOM_AMIGAVEL = (
+    "Trate o cliente de forma próxima e descontraída: use 'você', linguagem leve mas ainda profissional. "
+    "Pode usar um emoji ocasional (com moderação). Seja caloroso(a) e acessível."
+)
+
+_TOM_NEUTRO = (
+    "Trate o cliente de forma cordial e direta: nem muito formal, nem informal. "
+    "Use 'você', linguagem clara e objetiva."
+)
+
+_TOM_MAP: dict[str, str] = {
+    "formal": _TOM_FORMAL,
+    "amigavel": _TOM_AMIGAVEL,
+    "neutro": _TOM_NEUTRO,
+}
+
+
+def gerar_instrucao_persona(persona_nome: str, persona_tom: str) -> str:
+    """
+    Retorna um bloco XML de persona para ser prefixado em qualquer system prompt.
+
+    Uso no orchestrator:
+        system_prompt = gerar_instrucao_persona(persona_nome, persona_tom) + system_prompt
+    """
+    tom_instrucao = _TOM_MAP.get(persona_tom, _TOM_NEUTRO)
+    return (
+        f"<persona>\n"
+        f"Você se chama {persona_nome}. Ao se apresentar, use este nome.\n"
+        f"{tom_instrucao}\n"
+        f"</persona>\n\n"
+    )
+
+
+# ---------------------------------------------------------------------------
 # PROMPT BASE — identidade e regras gerais da IA
 # ---------------------------------------------------------------------------
 

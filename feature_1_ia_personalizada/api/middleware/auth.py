@@ -30,8 +30,10 @@ ROTAS_PUBLICAS = [
 
 # Rotas com match EXATO (não prefixo) — evita vazar proteção de sub-rotas.
 # Ex: /admin/import (HTML) é público, mas /admin/import/clientes (POST) exige JWT.
+# /onboarding/register é público; demais rotas /onboarding/* exigem JWT.
 ROTAS_PUBLICAS_EXATAS = [
     "/admin/import",
+    "/onboarding/register",
 ]
 
 

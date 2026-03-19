@@ -9,7 +9,7 @@ Schemas Pydantic para o recurso Escritório.
 - EscritorioList    → alias tipado de PaginatedResponse[EscritorioResponse]
 """
 
-from datetime import datetime
+from datetime import datetime, time
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -26,6 +26,7 @@ from shared.utils.validators import (
 # ---------------------------------------------------------------------------
 
 _PLANOS_VALIDOS = {"basico", "profissional", "enterprise"}
+_TONS_VALIDOS = {"formal", "amigavel", "neutro"}
 
 # ---------------------------------------------------------------------------
 # Schemas
@@ -90,6 +91,11 @@ class EscritorioUpdate(BaseModel):
     max_processos: int | None = Field(default=None, ge=1)
     max_clientes: int | None = Field(default=None, ge=1)
     webhook_whatsapp_instance: str | None = Field(default=None, max_length=100)
+    # Persona
+    persona_nome: str | None = Field(default=None, max_length=100)
+    persona_tom: str | None = Field(default=None, description="formal | amigavel | neutro")
+    horario_inicio: time | None = None
+    horario_fim: time | None = None
 
     @field_validator("oab_responsavel")
     @classmethod
@@ -120,6 +126,16 @@ class EscritorioUpdate(BaseModel):
             raise ValueError(f"Plano inválido — opções: {', '.join(sorted(_PLANOS_VALIDOS))}")
         return normalizado
 
+    @field_validator("persona_tom")
+    @classmethod
+    def validar_persona_tom(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        normalizado = v.lower().strip()
+        if normalizado not in _TONS_VALIDOS:
+            raise ValueError(f"Tom inválido — opções: {', '.join(sorted(_TONS_VALIDOS))}")
+        return normalizado
+
 
 class EscritorioResponse(BaseModel):
     """Representação pública do escritório — retornada nos endpoints."""
@@ -139,6 +155,15 @@ class EscritorioResponse(BaseModel):
     max_processos: int
     max_clientes: int
     webhook_whatsapp_instance: str | None
+    # Persona
+    persona_nome: str | None = "Assistente Jurídico"
+    persona_tom: str | None = "formal"
+    horario_inicio: time | None = None
+    horario_fim: time | None = None
+    # Onboarding
+    onboarding_etapa: int | None = 0
+    onboarding_completo: bool | None = False
+    onboarding_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

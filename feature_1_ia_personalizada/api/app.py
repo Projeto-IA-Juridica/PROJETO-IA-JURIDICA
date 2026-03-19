@@ -130,6 +130,7 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     chat,
     health,
     metrics,
+    onboarding,
     processos,
     rag,
     webhook_whatsapp,
@@ -211,6 +212,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(health)
 app.include_router(metrics)
 app.include_router(auth)
+app.include_router(onboarding)
 app.include_router(processos)
 app.include_router(chat)
 app.include_router(rag)
