@@ -148,8 +148,8 @@
 
 #### 5.1 — Índices SQL para performance de analytics
 
-- [ ] Criar `alembic/versions/005_add_analytics_indexes.py`
-- [ ] Criar índices:
+- [x] Criar `alembic/versions/005_add_analytics_indexes.py`
+- [x] Criar índices:
   ```sql
   CREATE INDEX CONCURRENTLY ON interacoes (escritorio_id, created_at DESC);
   CREATE INDEX CONCURRENTLY ON interacoes (escritorio_id, satisfacao) WHERE satisfacao IS NOT NULL;
@@ -157,14 +157,14 @@
   CREATE INDEX CONCURRENTLY ON interacoes (cliente_id, created_at DESC);
   CREATE INDEX CONCURRENTLY ON interacoes (escritorio_id, tipo, created_at);
   ```
-- [ ] Usar `CONCURRENTLY` para não bloquear tabela em produção
+- [x] Usar `CONCURRENTLY` para não bloquear tabela em produção
 - **Arquivo:** `alembic/versions/005_add_analytics_indexes.py`
 - **Critério:** queries de dashboard executam em < 200ms com 100k linhas
 
 #### 5.2 — Serviço `AnalyticsCalculadora`
 
-- [ ] Criar `feature_1_ia_personalizada/services/analytics/calculadora.py`
-- [ ] Método `resumo_periodo(escritorio_id, dias=30) -> dict`:
+- [x] Criar `feature_1_ia_personalizada/services/analytics/calculadora.py`
+- [x] Método `resumo_periodo(escritorio_id, dias=30) -> dict`:
   - Total de interações (entrada + saída)
   - Clientes únicos ativos no período
   - NPS médio atual vs período anterior (variação absoluta)
@@ -184,7 +184,7 @@
 
 #### 5.3 — Expandir rota `/chat/stats/dashboard`
 
-- [ ] Em `feature_1_ia_personalizada/api/routes/chat.py`, GET `/chat/stats/dashboard` passar a retornar estrutura completa:
+- [x] Em `feature_1_ia_personalizada/api/routes/chat.py`, GET `/chat/stats/dashboard` passar a retornar estrutura completa:
   - `resumo` (NPS, interações, clientes ativos, variação)
   - `eficiencia` (autonomia %, horas economizadas, custo USD, tempo médio resposta)
   - `por_cliente` (top 20 com NPS, interações, status de risco)

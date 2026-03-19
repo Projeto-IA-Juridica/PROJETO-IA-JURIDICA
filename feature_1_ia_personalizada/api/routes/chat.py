@@ -46,11 +46,25 @@ class SendMessageRequest(BaseModel):
     tipo: str = "texto"
 
 
-class ChatStatsResponse(BaseModel):
+class ResumoDashboard(BaseModel):
     total_interacoes: int
-    total_tokens: int
-    custo_total_usd: Decimal
+    clientes_ativos: int
+    nps_medio: float
+    nps_anterior: float
+    variacao_nps: str
 
+
+class EficienciaDashboard(BaseModel):
+    tempo_resposta_medio_ms: int
+    interacoes_sem_humano: int
+    percentual_autonomia: float
+    horas_economizadas_estimadas: float
+    custo_total_usd: float
+
+
+class ChatStatsResponse(BaseModel):
+    resumo: ResumoDashboard
+    eficiencia: EficienciaDashboard
 
 def _get_escritorio_id(request: Request) -> int:
     if not hasattr(request.state, "user_payload"):
@@ -144,24 +158,16 @@ async def send_proactive_message(
 
 @router.get("/stats/dashboard", response_model=ChatStatsResponse)
 async def get_chat_stats(request: Request, db: AsyncSession = Depends(get_db)):
-    """Retorna estatísticas gerais de uso da I.A. pelo escritório (tokens e grana gasta)."""
+    """Retorna estatísticas gerais de uso da I.A. pelo escritório (NPS, tempo poupado, etc)."""
     escritorio_id = _get_escritorio_id(request)
 
-    stmt_count = select(func.count(Interacao.id)).where(Interacao.escritorio_id == escritorio_id)
-    total_interacoes = await db.scalar(stmt_count) or 0
+    from feature_1_ia_personalizada.services.analytics.calculadora import CalculadoraAnalytics
+    calculadora = CalculadoraAnalytics(db, escritorio_id)
 
-    stmt_tokens = select(func.sum(Interacao.tokens_input + Interacao.tokens_output)).where(
-        Interacao.escritorio_id == escritorio_id
-    )
-    total_tokens = await db.scalar(stmt_tokens) or 0
-
-    stmt_custos = select(func.sum(Interacao.custo_estimado)).where(
-        Interacao.escritorio_id == escritorio_id
-    )
-    custo_total = await db.scalar(stmt_custos) or Decimal("0.0")
+    resumo = await calculadora.obter_resumo()
+    eficiencia = await calculadora.obter_eficiencia()
 
     return ChatStatsResponse(
-        total_interacoes=total_interacoes,
-        total_tokens=total_tokens,
-        custo_total_usd=custo_total,
+        resumo=resumo,
+        eficiencia=eficiencia
     )
