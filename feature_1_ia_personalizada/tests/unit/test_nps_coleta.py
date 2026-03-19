@@ -242,7 +242,7 @@ async def test_erro_no_envio_nao_propaga_excecao():
     evo_mock.close = AsyncMock()
 
     with patch(
-        "feature_1_ia_personalizada.api.routes.webhook_whatsapp.EvolutionClient",
+        "feature_1_ia_personalizada.services.messaging.evolution_client.EvolutionClient",
         return_value=evo_mock,
     ):
         result = await _processar_resposta_nps("4", _cliente_mock(), _escritorio_mock(), db)

@@ -5,19 +5,20 @@ Estratégia:
   - CalculadoraAnalytics é mockada para evitar queries PostgreSQL-específicas
     (date_trunc) que não funcionam no SQLite de testes.
   - get_redis é substituído por FakeAnalyticsRedis em memória.
+  - get_db é substituído por AsyncMock — evita criar tabelas JSONB no SQLite.
   - Testa: estrutura do payload, parâmetro ?dias=, cache hit/miss, 422 para
     parâmetros inválidos e exportação CSV.
 """
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from feature_1_ia_personalizada.api.routes.chat import get_redis
+from shared.database.session import get_db
 
 
 # ---------------------------------------------------------------------------
@@ -92,19 +93,67 @@ def _patch_calculadora(monkeypatch=None):
 # Fixtures
 # ---------------------------------------------------------------------------
 
-
-@pytest.fixture
-async def client_com_auth(async_client: AsyncClient, escritorio_factory, auth_token):
-    """Client autenticado com escritório criado."""
-    escritorio = await escritorio_factory()
-    token = auth_token(user_id=1, escritorio_id=escritorio.id)
-    async_client.headers.update({"Authorization": f"Bearer {token}"})
-    return async_client, escritorio
+_ESCRITORIO_ID = 42  # ID fixo — sem banco real nestes testes
 
 
 @pytest.fixture
-def fake_redis():
-    return _FakeAnalyticsRedis()
+async def app_client():
+    """
+    AsyncClient sem banco real — get_db e get_redis completamente mockados.
+    Evita criar tabelas JSONB incompatíveis com SQLite.
+    """
+    from feature_1_ia_personalizada.api.app import app
+    from shared.security.jwt import criar_token
+
+    mock_db = AsyncMock()
+    mock_db.execute.return_value = AsyncMock(all=lambda: [])
+    redis_store = _FakeAnalyticsRedis()
+
+    async def _override_db():
+        yield mock_db
+
+    async def _override_redis():
+        yield redis_store
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_redis] = _override_redis
+
+    token = criar_token(user_id=1, escritorio_id=_ESCRITORIO_ID, role="admin")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        yield client, redis_store
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def app_client_sem_auth():
+    """Client sem token de autenticação."""
+    from feature_1_ia_personalizada.api.app import app
+
+    mock_db = AsyncMock()
+    redis_store = _FakeAnalyticsRedis()
+
+    async def _override_db():
+        yield mock_db
+
+    async def _override_redis():
+        yield redis_store
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_redis] = _override_redis
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        yield client
+
+    app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -113,28 +162,15 @@ def fake_redis():
 
 
 @pytest.mark.asyncio
-async def test_dashboard_retorna_estrutura_completa(client_com_auth, fake_redis):
+async def test_dashboard_retorna_estrutura_completa(app_client):
     """GET /chat/stats/dashboard retorna todos os campos esperados."""
-    client, _ = client_com_auth
-
-    from feature_1_ia_personalizada.api.app import app
-
-    async def _override_redis():
-        yield fake_redis
-
-    app.dependency_overrides[get_redis] = _override_redis
+    client, _ = app_client
 
     with (
         _patch_calculadora(),
         patch("feature_1_ia_personalizada.api.routes.chat._atualizar_metricas_prometheus"),
-        patch(
-            "feature_1_ia_personalizada.api.routes.chat.select",
-            side_effect=Exception("skip score"),  # força degradação graciosa
-        ),
     ):
         response = await client.get("/chat/stats/dashboard")
-
-    app.dependency_overrides.pop(get_redis, None)
 
     assert response.status_code == 200
     data = response.json()
@@ -145,17 +181,11 @@ async def test_dashboard_retorna_estrutura_completa(client_com_auth, fake_redis)
     assert "tendencia_semanal" in data
     assert "score_risco_distribuicao" in data
 
-    resumo = data["resumo"]
-    assert resumo["total_interacoes"] == 100
-    assert resumo["nps_medio"] == 4.1
-    assert resumo["variacao_nps"] == "+0.2"
-
-    eficiencia = data["eficiencia"]
-    assert eficiencia["percentual_autonomia"] == 70.0
-
-    assert len(data["tendencia_semanal"]) == 1
+    assert data["resumo"]["total_interacoes"] == 100
+    assert data["resumo"]["nps_medio"] == 4.1
+    assert data["resumo"]["variacao_nps"] == "+0.2"
+    assert data["eficiencia"]["percentual_autonomia"] == 70.0
     assert data["tendencia_semanal"][0]["semana"] == "2026-W10"
-
     assert data["por_cliente"][0]["em_risco"] is True
     assert data["por_cliente"][0]["sem_avaliacao"] is False
 
@@ -166,63 +196,36 @@ async def test_dashboard_retorna_estrutura_completa(client_com_auth, fake_redis)
 
 
 @pytest.mark.asyncio
-async def test_dashboard_dias_7(client_com_auth, fake_redis):
+async def test_dashboard_dias_7(app_client):
     """`?dias=7` é aceito e passado à calculadora."""
-    client, _ = client_com_auth
-
-    from feature_1_ia_personalizada.api.app import app
-
-    async def _override_redis():
-        yield fake_redis
-
-    app.dependency_overrides[get_redis] = _override_redis
+    client, _ = app_client
 
     with (
         _patch_calculadora() as mock_cls,
         patch("feature_1_ia_personalizada.api.routes.chat._atualizar_metricas_prometheus"),
-        patch("feature_1_ia_personalizada.api.routes.chat.select", side_effect=Exception("skip")),
     ):
         response = await client.get("/chat/stats/dashboard?dias=7")
-        # Verifica que CalculadoraAnalytics foi instanciada com dias=7
         mock_cls.assert_called_once()
-        _, kwargs = mock_cls.call_args
-        assert kwargs.get("dias") == 7 or mock_cls.call_args[0][2] == 7
+        # Terceiro argumento posicional ou kwarg dias=7
+        call_args = mock_cls.call_args
+        dias_passado = call_args.kwargs.get("dias") or call_args.args[2]
+        assert dias_passado == 7
 
-    app.dependency_overrides.pop(get_redis, None)
     assert response.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_dashboard_dias_invalido_retorna_422(client_com_auth, fake_redis):
+async def test_dashboard_dias_invalido_retorna_422(app_client):
     """`?dias=15` não é valor permitido → 422."""
-    client, _ = client_com_auth
-
-    from feature_1_ia_personalizada.api.app import app
-
-    async def _override_redis():
-        yield fake_redis
-
-    app.dependency_overrides[get_redis] = _override_redis
-
+    client, _ = app_client
     response = await client.get("/chat/stats/dashboard?dias=15")
-
-    app.dependency_overrides.pop(get_redis, None)
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_dashboard_sem_autenticacao_retorna_401(async_client: AsyncClient, fake_redis):
+async def test_dashboard_sem_autenticacao_retorna_401(app_client_sem_auth):
     """Sem token → 401."""
-    from feature_1_ia_personalizada.api.app import app
-
-    async def _override_redis():
-        yield fake_redis
-
-    app.dependency_overrides[get_redis] = _override_redis
-
-    response = await async_client.get("/chat/stats/dashboard")
-
-    app.dependency_overrides.pop(get_redis, None)
+    response = await app_client_sem_auth.get("/chat/stats/dashboard")
     assert response.status_code == 401
 
 
@@ -232,67 +235,39 @@ async def test_dashboard_sem_autenticacao_retorna_401(async_client: AsyncClient,
 
 
 @pytest.mark.asyncio
-async def test_dashboard_cache_miss_e_hit(client_com_auth):
+async def test_dashboard_cache_miss_e_hit(app_client):
     """Primeira chamada (miss) calcula; segunda (hit) retorna do cache."""
-    client, escritorio = client_com_auth
-
-    from feature_1_ia_personalizada.api.app import app
-
-    redis_store = _FakeAnalyticsRedis()
-
-    async def _override_redis():
-        yield redis_store
-
-    app.dependency_overrides[get_redis] = _override_redis
+    client, _ = app_client
 
     with (
         _patch_calculadora() as mock_cls,
         patch("feature_1_ia_personalizada.api.routes.chat._atualizar_metricas_prometheus"),
-        patch("feature_1_ia_personalizada.api.routes.chat.select", side_effect=Exception("skip")),
     ):
-        # --- Cache miss ---
         r1 = await client.get("/chat/stats/dashboard?dias=30")
         assert r1.status_code == 200
-        assert mock_cls.called  # calculadora foi chamada
+        assert mock_cls.called
 
         mock_cls.reset_mock()
 
-        # --- Cache hit ---
         r2 = await client.get("/chat/stats/dashboard?dias=30")
         assert r2.status_code == 200
-        assert not mock_cls.called  # calculadora NÃO foi chamada de novo
+        assert not mock_cls.called  # cache hit — calculadora não chamada
 
-    app.dependency_overrides.pop(get_redis, None)
-
-    # Payload idêntico nas duas chamadas
     assert r1.json()["resumo"]["total_interacoes"] == r2.json()["resumo"]["total_interacoes"]
 
 
 @pytest.mark.asyncio
-async def test_dashboard_cache_separado_por_dias(client_com_auth):
+async def test_dashboard_cache_separado_por_dias(app_client):
     """`?dias=7` e `?dias=30` usam chaves de cache distintas."""
-    client, _ = client_com_auth
-
-    from feature_1_ia_personalizada.api.app import app
-
-    redis_store = _FakeAnalyticsRedis()
-
-    async def _override_redis():
-        yield redis_store
-
-    app.dependency_overrides[get_redis] = _override_redis
+    client, _ = app_client
 
     with (
         _patch_calculadora() as mock_cls,
         patch("feature_1_ia_personalizada.api.routes.chat._atualizar_metricas_prometheus"),
-        patch("feature_1_ia_personalizada.api.routes.chat.select", side_effect=Exception("skip")),
     ):
         await client.get("/chat/stats/dashboard?dias=30")
         await client.get("/chat/stats/dashboard?dias=7")
-        # Calculadora chamada duas vezes — chaves distintas, sem cache hit cruzado
-        assert mock_cls.call_count == 2
-
-    app.dependency_overrides.pop(get_redis, None)
+        assert mock_cls.call_count == 2  # chaves distintas, sem cache hit cruzado
 
 
 # ---------------------------------------------------------------------------
@@ -301,29 +276,27 @@ async def test_dashboard_cache_separado_por_dias(client_com_auth):
 
 
 @pytest.mark.asyncio
-async def test_export_csv_formato_invalido(client_com_auth):
+async def test_export_csv_formato_invalido(app_client):
     """formato=pdf → 422."""
-    client, _ = client_com_auth
+    client, _ = app_client
     response = await client.get("/chat/stats/export?mes=2026-03&formato=pdf")
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_export_csv_mes_ausente(client_com_auth):
+async def test_export_csv_mes_ausente(app_client):
     """Sem ?mes → 422."""
-    client, _ = client_com_auth
+    client, _ = app_client
     response = await client.get("/chat/stats/export?formato=csv")
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_export_csv_mes_invalido(client_com_auth):
+async def test_export_csv_mes_invalido(app_client):
     """?mes=2026-3 (sem zero) → 422."""
-    client, _ = client_com_auth
+    client, _ = app_client
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.chat.ExportadorAnalytics"
-    ) as mock_exp:
+    with patch("feature_1_ia_personalizada.api.routes.chat.ExportadorAnalytics") as mock_exp:
         mock_exp.return_value.gerar_csv.side_effect = ValueError("Formato inválido")
         response = await client.get("/chat/stats/export?mes=2026-3")
 
@@ -331,15 +304,12 @@ async def test_export_csv_mes_invalido(client_com_auth):
 
 
 @pytest.mark.asyncio
-async def test_export_csv_retorna_arquivo(client_com_auth):
+async def test_export_csv_retorna_arquivo(app_client):
     """CSV gerado corretamente → Content-Disposition com nome do arquivo."""
-    client, _ = client_com_auth
-
+    client, _ = app_client
     csv_bytes = b"id,data\n1,2026-03-01\n"
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.chat.ExportadorAnalytics"
-    ) as mock_exp:
+    with patch("feature_1_ia_personalizada.api.routes.chat.ExportadorAnalytics") as mock_exp:
         mock_exp.return_value.gerar_csv = AsyncMock(return_value=csv_bytes)
         response = await client.get("/chat/stats/export?mes=2026-03&formato=csv")
 

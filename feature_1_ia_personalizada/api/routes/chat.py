@@ -12,6 +12,8 @@ from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.services.analytics.calculadora import CalculadoraAnalytics
+from feature_1_ia_personalizada.services.analytics.exportador import ExportadorAnalytics
 from feature_1_ia_personalizada.workers.send_notifications import (
     processar_mensagem_recebida,
 )
@@ -225,8 +227,6 @@ async def get_chat_stats(
         logger.warning("analytics_cache_read_error", error=str(e))
 
     # --- Cache miss: calcula ---
-    from feature_1_ia_personalizada.services.analytics.calculadora import CalculadoraAnalytics
-
     calc = CalculadoraAnalytics(db, escritorio_id, dias=dias)
 
     resumo_raw, eficiencia_raw, tendencia_raw, ranking_raw = (
@@ -362,8 +362,6 @@ async def exportar_relatorio(
         raise HTTPException(status_code=422, detail="Parâmetro 'mes' obrigatório (ex: ?mes=2026-03).")
 
     escritorio_id = _get_escritorio_id(request)
-
-    from feature_1_ia_personalizada.services.analytics.exportador import ExportadorAnalytics
 
     exportador = ExportadorAnalytics(db, escritorio_id)
     try:
