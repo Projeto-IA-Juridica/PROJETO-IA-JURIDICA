@@ -137,6 +137,39 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
 )
 
 
+_QUERIES_FREQUENTES = [
+    "qual o status do meu processo",
+    "quando vai terminar meu processo",
+    "o que aconteceu no meu processo",
+    "houve alguma novidade",
+    "qual a próxima audiência",
+    "meu processo foi julgado",
+]
+
+
+async def _warmup_embeddings(redis_client) -> None:
+    """
+    Pré-aquece embeddings das queries mais comuns no cache Redis (TTL 24h).
+    Falha silenciosamente — nunca deve travar o startup.
+    """
+    try:
+        from feature_1_ia_personalizada.services.rag.embeddings import EmbeddingGenerator
+        import redis.asyncio as aioredis
+
+        # Cria cliente Redis separado com decode_responses=False (embeddings são bytes JSON)
+        redis_bytes = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
+        gen = EmbeddingGenerator(redis_client=redis_bytes)
+        try:
+            await gen.gerar_batch(_QUERIES_FREQUENTES)
+            print(f"✅ Warm-up RAG: {len(_QUERIES_FREQUENTES)} embeddings pré-aquecidos.")
+        finally:
+            await gen.aclose()
+            await redis_bytes.aclose()
+    except Exception as exc:
+        # Não bloqueia startup — embeddings serão gerados sob demanda
+        print(f"⚠️  Warm-up de embeddings ignorado: {exc}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Executado ao iniciar o servidor (Startup)
@@ -152,6 +185,9 @@ async def lifespan(app: FastAPI):
         print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
     except Exception as e:
         print(f"❌ Erro ao conectar no Redis: {e}")
+
+    # Pré-aquece embeddings das queries mais comuns (P4)
+    await _warmup_embeddings(app.state.redis_client)
 
     yield
 

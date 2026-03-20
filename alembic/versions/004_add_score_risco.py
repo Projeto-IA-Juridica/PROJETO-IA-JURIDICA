@@ -7,7 +7,7 @@ NÃO representa probabilidade de vitória — compliance OAB Provimento 205/2021
 Calculado pelo worker monitor_processos.py a cada ciclo de monitoramento.
 
 Revision ID: 004
-Revises: 003
+Revises: e4bcb5d405fa
 Create Date: 2026-03-18
 """
 
@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision = "004"
-down_revision = "003_add_processo_state"
+down_revision = "e4bcb5d405fa"
 branch_labels = None
 depends_on = None
 

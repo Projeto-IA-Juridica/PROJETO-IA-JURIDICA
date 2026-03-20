@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any
 
@@ -169,16 +170,22 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         ultima_data_encontrada = data_iso
         ultimo_texto_limpo = texto_limpo
 
-    # 2️⃣ Atualizar banco com último andamento
-    if ultima_data_encontrada:
-        update_ultimo_andamento(
-            id_processo,
-            ultimo_texto_limpo or "",
-            ultima_data_encontrada,
-        )
+    # 2️⃣ Atualizar banco e recalcular score em paralelo — operações independentes entre si.
+    # ThreadPoolExecutor: seguro porque cada função usa sua própria sessão síncrona de DB.
+    futures = {}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        if ultima_data_encontrada:
+            futures["andamento"] = executor.submit(
+                update_ultimo_andamento,
+                id_processo,
+                ultimo_texto_limpo or "",
+                ultima_data_encontrada,
+            )
+        futures["score"] = executor.submit(_atualizar_score, dados_processo, datajud_data)
 
-    # 3️⃣ Recalcular score de risco — reutiliza datajud_data já buscado (sem nova chamada HTTP)
-    _atualizar_score(dados_processo, datajud_data)
+    # Propaga exceções de update_ultimo_andamento (crítico); score já tem graceful degradation interna
+    if "andamento" in futures:
+        futures["andamento"].result()
 
     return {
         "id_processo": id_processo,
