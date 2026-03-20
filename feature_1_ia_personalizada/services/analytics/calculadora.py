@@ -185,6 +185,8 @@ class CalculadoraAnalytics:
         for row in rows:
             nps = round(float(row.nps_medio), 1) if row.nps_medio else None
             ultimo = row.ultimo_contato
+            if ultimo is not None and ultimo.tzinfo is None:
+                ultimo = ultimo.replace(tzinfo=timezone.utc)
             sem_contato_recente = (ultimo is None) or (ultimo < dt_30_dias)
             # em_risco: avaliou mal E está sem contato recente
             em_risco = sem_contato_recente and nps is not None and nps <= 3

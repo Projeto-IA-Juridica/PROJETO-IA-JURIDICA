@@ -151,7 +151,12 @@ def fake_redis() -> FakeRedis:
 # ---------------------------------------------------------------------------
 
 from faker import Faker
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# SQLite não conhece JSONB (tipo PostgreSQL). Faz JSONB se comportar como JSON no SQLite.
+if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
+    SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
 
 # Dependências reais/modelos
 from shared.database.session import get_db
@@ -288,3 +293,9 @@ async def async_client(db_session):
         yield client
 
     app.dependency_overrides.clear()
+
+
+# Alias para testes de integração que precisam de acesso direto à sessão
+@pytest.fixture
+async def async_db(db_session: AsyncSession) -> AsyncGenerator[AsyncSession, None]:
+    yield db_session
