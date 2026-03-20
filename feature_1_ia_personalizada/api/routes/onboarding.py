@@ -179,17 +179,17 @@ def _preview_boas_vindas(persona_nome: str, persona_tom: str, nome_escritorio: s
     """Gera uma preview do texto de apresentação da IA."""
     if persona_tom == "amigavel":
         return (
-            f"Oi! Eu sou {persona_nome}, assistente digital do {nome_escritorio}. "
+            f"Oi! Eu sou {persona_nome}, do {nome_escritorio}. "
             "Estou aqui pra te ajudar com informações sobre seu processo. 😊"
         )
     elif persona_tom == "neutro":
         return (
-            f"Olá. Sou {persona_nome}, assistente do {nome_escritorio}. "
+            f"Olá. Sou {persona_nome}, do {nome_escritorio}. "
             "Estou disponível para informações sobre seu processo."
         )
     else:  # formal
         return (
-            f"Prezado(a) cliente, sou {persona_nome}, assistente jurídico digital do {nome_escritorio}. "
+            f"Prezado(a) cliente, meu nome é {persona_nome} e faço parte do time do {nome_escritorio}. "
             "Estou à sua disposição para esclarecimentos sobre seu processo."
         )
 

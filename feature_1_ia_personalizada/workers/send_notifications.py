@@ -80,10 +80,9 @@ MENSAGEM_ERRO_PADRAO = (
 
 MENSAGEM_BOAS_VINDAS = (
     "Olá, {nome}! 👋 Seja bem-vindo(a).\n\n"
-    "Sou a assistente jurídica digital do escritório e estou aqui para facilitar\n"
-    "o acompanhamento do seu processo e esclarecer dúvidas rápidas.\n\n"
+    "Estou aqui para facilitar o acompanhamento do seu processo e esclarecer dúvidas rápidas.\n\n"
     "⚠️ _As informações enviadas por aqui não substituem a orientação jurídica formal do seu advogado._\n\n"
-    "Quando precisar, é só me chamar! ⚖️"
+    "Quando precisar, é só chamar! ⚖️"
 )
 
 
