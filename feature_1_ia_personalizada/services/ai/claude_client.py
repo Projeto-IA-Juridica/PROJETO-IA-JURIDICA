@@ -195,6 +195,40 @@ class ClaudeClient:
             "custo": _calcular_custo(tokens_in, tokens_out),
         }
 
+    async def chamar_direto(
+        self,
+        system_prompt: str,
+        mensagem: str,
+        modelo: str,
+        max_tokens: int,
+        temperature: float = 0.3,
+    ) -> dict:
+        """
+        Chamada com modelo e parâmetros explícitos — usada quando o caller
+        precisa de um modelo diferente do padrão (ex: Haiku para CRM).
+
+        Returns:
+            {"resposta": str, "tokens_input": int, "tokens_output": int, "custo": Decimal}
+        """
+        async def _chamar() -> anthropic.types.Message:
+            return await self._client.messages.create(
+                model=modelo,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                messages=[{"role": "user", "content": mensagem}],
+            )
+
+        response = await _com_retry(_chamar)
+        tokens_in = response.usage.input_tokens
+        tokens_out = response.usage.output_tokens
+        return {
+            "resposta": _extrair_texto(response),
+            "tokens_input": tokens_in,
+            "tokens_output": tokens_out,
+            "custo": _calcular_custo(tokens_in, tokens_out),
+        }
+
     async def classificar_intencao(self, system_prompt: str, mensagem: str) -> str:
         """
         Chamada leve usada apenas para classificar a intenção.

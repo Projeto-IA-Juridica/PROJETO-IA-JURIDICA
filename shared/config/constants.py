@@ -148,3 +148,58 @@ SCORE_RISCO_PRAZO_MAX_REFERENCIA: Final[int] = 2_000
 # Salário-mínimo de referência para faixas de valor da causa
 # Atualizar a cada reajuste do SM
 SCORE_RISCO_SALARIO_MINIMO_REF: Final[float] = 1_518.00
+
+
+# ---------------------------------------------------------------------------
+# 9) Score CRM (Feature 7)
+# ---------------------------------------------------------------------------
+# Usado por CRMScoreCalculator em score_calculator.py.
+# NÃO representa probabilidade de satisfação futura — é um indicador operacional.
+# Os pesos devem somar 1.0.
+# ---------------------------------------------------------------------------
+
+CRM_SCORE_PESOS: Final[dict[str, float]] = {
+    "nps":         0.35,
+    "contato":     0.20,
+    "risco":       0.20,
+    "engajamento": 0.10,
+    "escalacoes":  0.15,
+}
+
+# Pontuação por nota NPS (1–5); None → 40pts (sem dados = neutro)
+CRM_NPS_PONTOS: Final[dict[int, int]] = {5: 100, 4: 80, 3: 50, 2: 20, 1: 0}
+CRM_NPS_PONTOS_NULO: Final[int] = 40
+
+# Pontuação por dias sem contato
+CRM_CONTATO_PONTOS: Final[list[tuple[int, int]]] = [
+    (7,   100),   # 0–7 dias
+    (30,   70),   # 8–30 dias
+    (60,   30),   # 31–60 dias
+    (9999,  0),   # > 60 dias
+]
+
+# Pontuação por pior score de processo (None = sem processo)
+CRM_RISCO_PONTOS: Final[dict[str | None, int]] = {
+    None:      60,
+    "baixo":   90,
+    "moderado": 70,
+    "alto":    40,
+    "critico": 10,
+}
+
+# Pontuação por interações nos últimos 30 dias
+CRM_ENGAJAMENTO_PONTOS: Final[list[tuple[int, int]]] = [
+    (10,  100),   # > 10 interações/mês
+    (5,    70),   # 5–10
+    (1,    40),   # 1–4
+    (0,     0),   # 0
+]
+
+# Mapeamento score → nível CRM
+CRM_NIVEL_FAIXAS: Final[list[tuple[int, str]]] = [
+    (76, "excelente"),
+    (51, "satisfeito"),
+    (26, "neutro"),
+    (11, "em_risco"),
+    (0,  "critico"),
+]

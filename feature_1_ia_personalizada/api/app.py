@@ -128,6 +128,7 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     admin_import,
     auth,
     chat,
+    crm,
     health,
     metrics,
     onboarding,
@@ -250,6 +251,7 @@ app.include_router(metrics)
 app.include_router(auth)
 app.include_router(onboarding)
 app.include_router(processos)
+app.include_router(crm.router)
 app.include_router(chat)
 app.include_router(rag)
 app.include_router(webhook_whatsapp)

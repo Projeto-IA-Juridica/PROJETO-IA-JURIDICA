@@ -20,9 +20,12 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Enum,
     Index,
     Integer,
+    SmallInteger,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -89,6 +92,40 @@ class Cliente(Base, TimestampMixin, TenantMixin):
 
     # --- Status ---
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # --- CRM Inteligente ---
+    crm_nivel: Mapped[str | None] = mapped_column(
+        Enum(
+            "excelente",
+            "satisfeito",
+            "neutro",
+            "em_risco",
+            "critico",
+            name="crm_nivel_enum",
+        ),
+        nullable=True,
+        comment="excelente | satisfeito | neutro | em_risco | critico",
+    )
+    crm_score: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        nullable=True,
+        comment="Score composto 0–100 calculado deterministicamente",
+    )
+    crm_resumo: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Texto gerado pelo Claude explicando o porquê da classificação (≤ 3 frases)",
+    )
+    crm_acao_sugerida: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Ação concreta sugerida pelo Claude para o advogado",
+    )
+    crm_analisado_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Timestamp de quando a análise CRM foi calculada",
+    )
 
     # --- Relacionamentos ---
     escritorio: Mapped["Escritorio"] = relationship(  # noqa: F821

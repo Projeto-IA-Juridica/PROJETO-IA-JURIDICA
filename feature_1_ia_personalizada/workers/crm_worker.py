@@ -1,0 +1,152 @@
+"""
+feature_1_ia_personalizada/workers/crm_worker.py
+==================================================
+Tasks Celery para análise CRM:
+
+- crm_analisar_cliente   → analisa um cliente (fila "ia")
+- crm_analisar_escritorio → dispara análise de todos os clientes ativos (fila "ia")
+
+Debounce via Redis key `crm_debounce:{cliente_id}` TTL 1h —
+não re-dispara se já foi disparado na última hora.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+import redis
+import structlog
+from celery import chord
+from sqlalchemy import select
+
+from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
+from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer
+from shared.config.settings import settings
+from shared.database.session import get_async_session
+from shared.models.cliente import Cliente
+
+from .celery_app import DLQTask, celery_app
+
+logger = structlog.get_logger(__name__)
+
+_DEBOUNCE_TTL_SEGUNDOS = 3600  # 1 hora
+_MAX_SIMULTANEAS = 10          # máx análises paralelas por escritório (chord)
+
+
+def _redis_client() -> redis.Redis:
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+# ---------------------------------------------------------------------------
+# Task 1 — análise de um único cliente
+# ---------------------------------------------------------------------------
+
+@celery_app.task(
+    name="feature_1_ia_personalizada.workers.crm_worker.crm_analisar_cliente",
+    base=DLQTask,
+    max_retries=2,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    queue="ia",
+)
+def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
+    log = logger.bind(cliente_id=cliente_id, escritorio_id=escritorio_id)
+    log.info("crm_worker.analisar_cliente.iniciando")
+
+    async def _run() -> dict[str, Any]:
+        async with get_async_session() as db:
+            claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
+            analyzer = CRMAnalyzer(claude_client=claude, db=db)
+            result = await analyzer.analisar_cliente(cliente_id, escritorio_id)
+            return {
+                "cliente_id": cliente_id,
+                "nivel": result.nivel,
+                "score": result.score,
+                "cache_hit": result.cache_hit,
+                "tokens_input": result.tokens_input,
+                "tokens_output": result.tokens_output,
+            }
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        # Graceful degradation: log e re-raise para o retry/DLQ
+        log.error("crm_worker.analisar_cliente.falhou", erro=str(exc))
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Task 2 — análise de todos os clientes ativos de um escritório
+# ---------------------------------------------------------------------------
+
+@celery_app.task(
+    name="feature_1_ia_personalizada.workers.crm_worker.crm_analisar_escritorio",
+    base=DLQTask,
+    max_retries=1,
+    queue="ia",
+)
+def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
+    log = logger.bind(escritorio_id=escritorio_id)
+    log.info("crm_worker.analisar_escritorio.iniciando")
+
+    async def _buscar_clientes() -> list[int]:
+        async with get_async_session() as db:
+            stmt = select(Cliente.id).where(
+                Cliente.escritorio_id == escritorio_id,
+                Cliente.ativo == True,
+            )
+            rows = (await db.execute(stmt)).all()
+            return [r.id for r in rows]
+
+    cliente_ids = asyncio.run(_buscar_clientes())
+    total = len(cliente_ids)
+    log.info("crm_worker.analisar_escritorio.clientes_encontrados", total=total)
+
+    if not cliente_ids:
+        return {"total_clientes": 0, "job_ids": []}
+
+    # Enfileira em lotes de _MAX_SIMULTANEAS usando chord para controlar paralelismo
+    job_ids: list[str] = []
+    for i in range(0, total, _MAX_SIMULTANEAS):
+        lote = cliente_ids[i : i + _MAX_SIMULTANEAS]
+        tasks = [
+            crm_analisar_cliente.signature(
+                args=(cid, escritorio_id),
+                queue="ia",
+                immutable=True,
+            )
+            for cid in lote
+        ]
+        resultado = chord(tasks)(
+            celery_app.signature("celery.chord_unlock", queue="ia")
+        )
+        job_ids.append(str(resultado.id) if resultado else f"lote_{i}")
+
+    return {"total_clientes": total, "job_ids": job_ids}
+
+
+# ---------------------------------------------------------------------------
+# Função utilitária — debounce para trigger do webhook
+# ---------------------------------------------------------------------------
+
+def disparar_analise_com_debounce(cliente_id: int, escritorio_id: int) -> bool:
+    """
+    Dispara crm_analisar_cliente apenas se não houver análise recente.
+    Usa Redis key `crm_debounce:{cliente_id}` com TTL de 1 hora.
+
+    Returns:
+        True se disparou, False se estava no debounce.
+    """
+    r = _redis_client()
+    chave = f"crm_debounce:{cliente_id}"
+
+    # SET NX — só seta se a chave não existir (atômico)
+    setado = r.set(chave, "1", ex=_DEBOUNCE_TTL_SEGUNDOS, nx=True)
+    if not setado:
+        logger.debug("crm_worker.debounce.skip", cliente_id=cliente_id)
+        return False
+
+    crm_analisar_cliente.delay(cliente_id, escritorio_id)
+    logger.info("crm_worker.debounce.disparado", cliente_id=cliente_id)
+    return True

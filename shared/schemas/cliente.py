@@ -175,6 +175,13 @@ class ClienteResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # CRM — opcionais (None até a primeira análise)
+    crm_nivel: str | None = None
+    crm_score: int | None = None
+    crm_resumo: str | None = None
+    crm_acao_sugerida: str | None = None
+    crm_analisado_em: datetime | None = None
+
 
 class ClienteAceiteLGPD(BaseModel):
     """Schema para registrar o aceite dos termos LGPD pelo cliente."""
@@ -196,6 +203,24 @@ class ClienteAceiteLGPD(BaseModel):
                 "O aceite LGPD deve ser confirmado (true) — não é possível registrar recusa"
             )
         return v
+
+
+class CRMClienteCard(BaseModel):
+    """Retorno otimizado para a listagem CRM — inclui métricas agregadas."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    nome: str
+    telefone_whatsapp: str
+    crm_nivel: str | None
+    crm_score: int | None
+    crm_resumo: str | None
+    crm_acao_sugerida: str | None
+    crm_analisado_em: datetime | None
+    total_processos: int
+    nps_medio: float | None
+    ultimo_contato: datetime | None
 
 
 # Alias tipado para listagens paginadas de clientes
