@@ -5,11 +5,11 @@
 
 ---
 
-## Status Geral (atualizado em 2026-03-20)
+## Status Geral (atualizado em 2026-03-21)
 
 | Feature | Status | Observações |
 |---------|--------|-------------|
-| Feature 7 — CRM Inteligente | **🔴 Não iniciada** | Spec completa em Sprint 4 |
+| Feature 7 — CRM Inteligente | **100% ✅** | Totalmente implementada e testada |
 | Feature 3 — Resumo Inteligente | **100% ✅** | Totalmente implementada e testada |
 | Feature 2 — Score de Risco | **100% ✅** | Implementada dentro de `vitoria_preditor.py`; ver nota 2.2 |
 | Feature 5 — Analytics | **100% ✅** | Totalmente implementada e testada |
@@ -143,14 +143,14 @@
 
 - [x] `shared/schemas/processo.py` — campos `score_risco: int | None`, `score_nivel: str | None`, `score_interpretacao: str | None` adicionados (linhas 169–179)
 - [x] `feature_1_ia_personalizada/api/routes/processos.py` — GET `/processos/{id}` retorna campos de score
-- [ ] GET `/processos` (listagem) filtro `?score_nivel=alto` — não verificado na rota de listagem
+- [x] GET `/processos` (listagem) filtro `?score_nivel=alto` — implementado em `processos.py` (linhas 47–82)
 
 #### 2.5 — Testes ✅
 
 - [x] `feature_1_ia_personalizada/tests/unit/test_vitoria_preditor.py` — testa `ScoreRiscoCalculator.calcular()`, componentes e interpretação
-- [ ] `feature_1_ia_personalizada/tests/unit/test_score_risco.py` — não criado (testes estão em `test_vitoria_preditor.py`)
+- [x] `feature_1_ia_personalizada/tests/unit/test_score_risco.py` — criado em `tests/unit/test_score_risco.py` (fórmula, pesos, compliance OAB)
 - [ ] `feature_1_ia_personalizada/tests/unit/test_vitoria_preditor_deprecated.py` — não criado
-- [ ] `feature_1_ia_personalizada/tests/integration/test_score_api.py` — não criado; filtro `?score_nivel=` não testado
+- [x] `feature_1_ia_personalizada/tests/integration/test_score_api.py` — criado; GET /{id} + filtro por nível testados
 
 ---
 
@@ -308,7 +308,7 @@
 
 - [x] `feature_1_ia_personalizada/tests/unit/test_escalacao_detector.py` — intenções da lista detectadas; fallback semântico
 - [x] `feature_1_ia_personalizada/tests/integration/test_escalacao_fluxo.py` — fluxo completo: mensagem → detectada → advogado notificado → aprovação → cliente recebe
-- [ ] `feature_1_ia_personalizada/tests/unit/test_escalacao_contexto.py` — não encontrado
+- [x] `feature_1_ia_personalizada/tests/unit/test_escalacao_contexto.py` — criado em `tests/unit/test_escalacao_contexto.py`
 
 ---
 
@@ -480,7 +480,7 @@
 
 **Objetivo:** o advogado acessa uma visão CRM de todos os seus clientes com classificação de satisfação gerada por IA, motivo da classificação e ação sugerida (ligar, enviar atualização, sem ação necessária). Tudo calculado a partir de dados reais já existentes no sistema — sem dados imaginários.
 
-**Status: 🔴 Não iniciada**
+**Status: 100% concluída ✅**
 
 **Premissa de custo:** Claude é chamado apenas quando o perfil do cliente muda de forma significativa (nova interação, novo andamento, novo NPS). Não há chamada Claude em cada requisição de API.
 
@@ -510,14 +510,14 @@
 
 #### 7.1 — Migração SQL: colunas CRM em `clientes`
 
-- [ ] Criar `alembic/versions/009_add_crm_cliente.py`
-- [ ] Adicionar em `clientes`:
+- [x] Criar `alembic/versions/009_add_crm_cliente.py`
+- [x] Adicionar em `clientes`:
   - `crm_nivel VARCHAR(20) DEFAULT NULL` — `excelente` | `satisfeito` | `neutro` | `em_risco` | `critico`
   - `crm_score SMALLINT DEFAULT NULL` — 0 a 100 (score composto determinístico)
   - `crm_resumo TEXT DEFAULT NULL` — texto gerado pelo Claude explicando o porquê da classificação
   - `crm_acao_sugerida TEXT DEFAULT NULL` — ação concreta sugerida pelo Claude para o advogado
   - `crm_analisado_em TIMESTAMPTZ DEFAULT NULL` — quando a análise foi calculada
-- [ ] Criar índices:
+- [x] Criar índices:
   ```sql
   CREATE INDEX ON clientes (escritorio_id, crm_nivel);
   CREATE INDEX ON clientes (escritorio_id, crm_analisado_em DESC) WHERE crm_nivel IS NOT NULL;
@@ -529,8 +529,8 @@
 
 #### 7.2 — ORM: atualizar `Cliente` e schema
 
-- [ ] Adicionar 5 colunas em `shared/models/cliente.py` (após coluna `ativo`)
-- [ ] Atualizar `shared/schemas/cliente.py`:
+- [x] Adicionar 5 colunas em `shared/models/cliente.py` (após coluna `ativo`)
+- [x] Atualizar `shared/schemas/cliente.py`:
   - Adicionar campos opcionais em `ClienteResponse`: `crm_nivel`, `crm_score`, `crm_resumo`, `crm_acao_sugerida`, `crm_analisado_em`
   - Criar schema `CRMClienteCard` (retorno otimizado para a listagem CRM):
     ```python
@@ -553,12 +553,12 @@
 
 #### 7.3 — Serviço `CRMDataAggregator`
 
-- [ ] Criar `feature_1_ia_personalizada/services/crm/aggregator.py`
-- [ ] Classe `CRMDataAggregator(db: AsyncSession)` com método:
+- [x] Criar `feature_1_ia_personalizada/services/crm/aggregator.py`
+- [x] Classe `CRMDataAggregator(db: AsyncSession)` com método:
   ```python
   async def coletar_contexto_cliente(cliente_id: int, escritorio_id: int) -> CRMContexto
   ```
-- [ ] `CRMContexto` (dataclass/Pydantic) deve conter:
+- [x] `CRMContexto` (dataclass/Pydantic) deve conter:
   - `cliente`: nome, profissao, empresa, data_nascimento
   - `nps_historico`: lista dos últimos 6 registros `{data, nota}`
   - `nps_medio_3m`: float | None
@@ -571,21 +571,21 @@
   - `escalacoes_pendentes`: int
   - `escalacoes_rejeitadas_30d`: int
   - `ultimas_mensagens`: lista dos últimos 5 pares `{pergunta_cliente, resposta_ia}` (para contexto do Claude)
-- [ ] Todas as queries em uma única passagem com JOINs otimizados (não N+1)
-- [ ] Multi-tenant: sempre filtrar por `escritorio_id`
+- [x] Todas as queries em uma única passagem com JOINs otimizados (não N+1)
+- [x] Multi-tenant: sempre filtrar por `escritorio_id`
 - **Arquivo:** `feature_1_ia_personalizada/services/crm/aggregator.py`
 
 ---
 
 #### 7.4 — Serviço `CRMScoreCalculator`
 
-- [ ] Criar `feature_1_ia_personalizada/services/crm/score_calculator.py`
-- [ ] Função pura `calcular_score_crm(contexto: CRMContexto) -> CRMScore`
-- [ ] `CRMScore` contém:
+- [x] Criar `feature_1_ia_personalizada/services/crm/score_calculator.py`
+- [x] Função pura `calcular_score_crm(contexto: CRMContexto) -> CRMScore`
+- [x] `CRMScore` contém:
   - `score: int` (0–100)
   - `nivel: str` (excelente/satisfeito/neutro/em_risco/critico)
   - `fatores: dict` (detalhamento de cada componente para debug/auditoria)
-- [ ] Fórmula ponderada:
+- [x] Fórmula ponderada:
 
   | Componente | Peso | Lógica |
   |------------|------|--------|
@@ -595,17 +595,17 @@
   | Engajamento | 10% | >10 interações/mês → 100pts; 5–10 → 70pts; 1–4 → 40pts; 0 → 0pts |
   | Histórico de escalações | 15% | 0 pendentes + 0 rejeitadas → 100pts; pendente → 30pts; rejeitada → 10pts |
 
-- [ ] Sem chamada Claude — cálculo determinístico e instantâneo
-- [ ] Exportar constantes de peso em `shared/config/constants.py` como `CRM_SCORE_PESOS`
+- [x] Sem chamada Claude — cálculo determinístico e instantâneo
+- [x] Exportar constantes de peso em `shared/config/constants.py` como `CRM_SCORE_PESOS`
 - **Arquivo:** `feature_1_ia_personalizada/services/crm/score_calculator.py`
 
 ---
 
 #### 7.5 — Serviço `CRMAnalyzer` (Claude)
 
-- [ ] Criar `feature_1_ia_personalizada/services/crm/analyzer.py`
-- [ ] Classe `CRMAnalyzer(claude_client, db: AsyncSession)`
-- [ ] Método principal:
+- [x] Criar `feature_1_ia_personalizada/services/crm/analyzer.py`
+- [x] Classe `CRMAnalyzer(claude_client, db: AsyncSession)`
+- [x] Método principal:
   ```python
   async def analisar_cliente(cliente_id: int, escritorio_id: int) -> CRMAnaliseResult
   ```
@@ -620,13 +620,13 @@
       tokens_output: int
       custo: Decimal
   ```
-- [ ] Fluxo interno:
+- [x] Fluxo interno:
   1. `CRMDataAggregator.coletar_contexto_cliente()` → dados reais
   2. `CRMScoreCalculator.calcular_score_crm()` → score determinístico
   3. Se score igual ao último calculado E `crm_analisado_em < 24h` → retorna cache (sem chamar Claude)
   4. Chama Claude com prompt compacto (ver 7.6)
   5. Persiste resultado em `clientes` via UPDATE
-- [ ] Prompt construído em `feature_1_ia_personalizada/services/ai/prompts.py`:
+- [x] Prompt construído em `feature_1_ia_personalizada/services/ai/prompts.py`:
   - `SYSTEM_PROMPT_CRM_ANALISE` — instrução de papel (analista CRM de escritório jurídico)
   - Input para o Claude:
     ```
@@ -653,26 +653,26 @@
 
 #### 7.6 — Worker Celery `crm_worker.py`
 
-- [ ] Criar `feature_1_ia_personalizada/workers/crm_worker.py`
-- [ ] Task `crm_analisar_cliente(cliente_id: int, escritorio_id: int)`:
+- [x] Criar `feature_1_ia_personalizada/workers/crm_worker.py`
+- [x] Task `crm_analisar_cliente(cliente_id: int, escritorio_id: int)`:
   - Fila `ia` (mesma das outras tasks de IA)
   - Chama `CRMAnalyzer.analisar_cliente()`
   - Retorna o `CRMAnaliseResult`
   - Graceful degradation: se Claude falhar, persiste apenas o score determinístico (sem resumo)
-- [ ] Task `crm_analisar_escritorio(escritorio_id: int)`:
+- [x] Task `crm_analisar_escritorio(escritorio_id: int)`:
   - Busca todos os `clientes.id` ativos do escritório
   - Para cada cliente: dispara `crm_analisar_cliente.delay(cliente_id, escritorio_id)`
   - Rate-limit interno: máx 10 análises simultâneas por escritório (Celery chord)
   - Retorna `{total_clientes, job_ids: []}`
-- [ ] Trigger automático: ao final de cada interação processada em `webhook_whatsapp.py`, disparar `crm_analisar_cliente.delay()` para o cliente (debounce via Redis key `crm_debounce:{cliente_id}` TTL 1h — não re-dispara se já foi disparado na última hora)
+- [x] Trigger automático: ao final de cada interação processada em `webhook_whatsapp.py`, disparar `crm_analisar_cliente.delay()` para o cliente (debounce via Redis key `crm_debounce:{cliente_id}` TTL 1h — não re-dispara se já foi disparado na última hora)
 - **Arquivo:** `feature_1_ia_personalizada/workers/crm_worker.py`
 
 ---
 
 #### 7.7 — Rotas CRM
 
-- [ ] Criar `feature_1_ia_personalizada/api/routes/crm.py`
-- [ ] Registrar em `app.py`
+- [x] Criar `feature_1_ia_personalizada/api/routes/crm.py`
+- [x] Registrar em `app.py`
 
 **Endpoints:**
 
@@ -713,7 +713,7 @@ GET  /crm/resumo
 
 #### 7.8 — Integração no `hub_juridico_v2.py` (demo)
 
-- [ ] Adicionar aba "CRM" no Streamlit com:
+- [x] Adicionar aba "CRM" no Streamlit com:
   - Botão "Analisar todos os clientes" → executa análise mockada
   - Tabela CRM colorida por nível (vermelho = crítico, amarelo = em_risco, verde = excelente)
   - Para cada cliente: nome, nível (badge), resumo, ação sugerida
@@ -726,7 +726,7 @@ GET  /crm/resumo
 
 **Unitários (sem banco, sem Claude):**
 
-- [ ] `feature_1_ia_personalizada/tests/unit/test_crm_score_calculator.py`
+- [x] `feature_1_ia_personalizada/tests/unit/test_crm_score_calculator.py`
   - Pesos somam 100%
   - Cada componente: NPS nulo → 40pts; cliente sem contato > 60d → 0pts
   - Score 0–10 → nivel `critico`; 76–100 → nivel `excelente`
@@ -734,7 +734,7 @@ GET  /crm/resumo
   - Cliente crítico: NPS=1, sem contato 90d, escalação rejeitada → score ≤ 10
   - Compliance OAB: `crm_resumo` não menciona vitória/derrota/probabilidade
 
-- [ ] `feature_1_ia_personalizada/tests/unit/test_crm_analyzer.py`
+- [x] `feature_1_ia_personalizada/tests/unit/test_crm_analyzer.py`
   - Cache hit: não chama Claude se `crm_analisado_em < 24h` E score não mudou
   - Claude falha: persiste score determinístico sem resumo (graceful degradation)
   - Output do Claude parseado corretamente em `CRMAnaliseResult`
@@ -742,7 +742,7 @@ GET  /crm/resumo
 
 **Integração (banco real SQLite):**
 
-- [ ] `feature_1_ia_personalizada/tests/integration/test_crm_real.py`
+- [x] `feature_1_ia_personalizada/tests/integration/test_crm_real.py`
   - Insere clientes, interações e processos reais no banco
   - `CRMDataAggregator`: agrega corretamente sem duplicar dados
   - Multi-tenant: cliente de outro escritório não aparece
@@ -778,15 +778,15 @@ GET  /crm/resumo
 
 #### Critério de Aceite (Definition of Done)
 
-- [ ] `alembic upgrade head` sem erros; 5 colunas CRM visíveis em `clientes`
-- [ ] `GET /crm/clientes` retorna lista paginada com `CRMClienteCard` correto
-- [ ] `POST /crm/clientes/{id}/analisar` persiste `crm_nivel`, `crm_resumo` e `crm_acao_sugerida` no banco
-- [ ] Score determinístico passa todos os testes unitários sem chamar Claude
-- [ ] Claude chamado apenas 1x por cliente quando score muda (cache funciona)
-- [ ] Multi-tenancy: cliente de outro escritório retorna 404 em todos os endpoints
-- [ ] `crm_resumo` não contém palavras proibidas: "vitória", "ganhar", "perder", "probabilidade de"
-- [ ] Worker `crm_analisar_escritorio` processa 100 clientes sem timeout (< 60s fila)
-- [ ] Todos os testes passando: 2 unitários + 1 integração (≥ 15 cenários total)
+- [x] `alembic upgrade head` sem erros; 5 colunas CRM visíveis em `clientes`
+- [x] `GET /crm/clientes` retorna lista paginada com `CRMClienteCard` correto
+- [x] `POST /crm/clientes/{id}/analisar` persiste `crm_nivel`, `crm_resumo` e `crm_acao_sugerida` no banco
+- [x] Score determinístico passa todos os testes unitários sem chamar Claude
+- [x] Claude chamado apenas 1x por cliente quando score muda (cache funciona)
+- [x] Multi-tenancy: cliente de outro escritório retorna 404 em todos os endpoints
+- [x] `crm_resumo` não contém palavras proibidas: "vitória", "ganhar", "perder", "probabilidade de"
+- [x] Worker `crm_analisar_escritorio` processa 100 clientes sem timeout (< 60s fila)
+- [x] Todos os testes passando: 2 unitários + 1 integração (≥ 15 cenários total)
 
 ---
 
