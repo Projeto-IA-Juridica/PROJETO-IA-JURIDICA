@@ -44,7 +44,7 @@ def _escritorio_id(request: Request) -> int:
 
 
 def _redis(request: Request):
-    return request.app.state.redis_client
+    return getattr(request.app.state, "redis_client", None)
 
 
 async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -> CRMClienteCard:

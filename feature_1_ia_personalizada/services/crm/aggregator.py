@@ -144,7 +144,10 @@ class CRMDataAggregator:
         rows_nps = (await self._db.execute(stmt_nps)).all()
         nps_historico = [NPSRegistro(data=r.created_at, nota=r.satisfacao) for r in rows_nps]
 
-        nps_3m = [r.nota for r in nps_historico if r.data >= ha_90d]
+        def _tz(dt: datetime) -> datetime:
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+        nps_3m = [r.nota for r in nps_historico if _tz(r.data) >= ha_90d]
         nps_medio_3m = round(sum(nps_3m) / len(nps_3m), 2) if nps_3m else None
 
         # --- 3. Contagens de interações e último contato ---
@@ -160,7 +163,7 @@ class CRMDataAggregator:
 
         ultimo_contato_at: datetime | None = stats.ultimo_contato
         if ultimo_contato_at:
-            dias_desde = (agora - ultimo_contato_at).days
+            dias_desde = (agora - _tz(ultimo_contato_at)).days
         else:
             dias_desde = 999
 

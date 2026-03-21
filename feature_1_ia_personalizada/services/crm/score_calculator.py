@@ -50,10 +50,11 @@ def _pontos_contato(dias: int) -> int:
 
 
 def _pontos_engajamento(total_30d: int) -> int:
-    for minimo, pontos in reversed(CRM_ENGAJAMENTO_PONTOS):
-        if total_30d > minimo:
+    # Itera do maior limite para o menor; retorna ao primeiro `total > limite`
+    for limite, pontos in CRM_ENGAJAMENTO_PONTOS:
+        if total_30d > limite:
             return pontos
-    return CRM_ENGAJAMENTO_PONTOS[-1][1]  # 0 interações → 0pts
+    return 0  # total_30d == 0
 
 
 def _pontos_escalacoes(pendentes: int, rejeitadas_30d: int) -> int:

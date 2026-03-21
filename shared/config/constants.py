@@ -187,12 +187,13 @@ CRM_RISCO_PONTOS: Final[dict[str | None, int]] = {
     "critico": 10,
 }
 
-# Pontuação por interações nos últimos 30 dias
+# Pontuação por interações nos últimos 30 dias.
+# Semântica: se total_30d > limite → pontos. Iterar em ordem decrescente de limite.
+# >10 → 100pts | 5–10 → 70pts | 1–4 → 40pts | 0 → 0pts
 CRM_ENGAJAMENTO_PONTOS: Final[list[tuple[int, int]]] = [
-    (10,  100),   # > 10 interações/mês
-    (5,    70),   # 5–10
-    (1,    40),   # 1–4
-    (0,     0),   # 0
+    (10, 100),   # > 10 interações/mês
+    (4,   70),   # > 4 (ou seja, 5–10)
+    (0,   40),   # > 0 (ou seja, 1–4)
 ]
 
 # Mapeamento score → nível CRM

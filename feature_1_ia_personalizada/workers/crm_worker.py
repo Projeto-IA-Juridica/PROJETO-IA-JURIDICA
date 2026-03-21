@@ -23,7 +23,7 @@ from sqlalchemy import select
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer
 from shared.config.settings import settings
-from shared.database.session import get_async_session
+from shared.database.session import get_session_factory
 from shared.models.cliente import Cliente
 
 from .celery_app import DLQTask, celery_app
@@ -55,7 +55,8 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
     log.info("crm_worker.analisar_cliente.iniciando")
 
     async def _run() -> dict[str, Any]:
-        async with get_async_session() as db:
+        factory = get_session_factory()
+        async with factory() as db:
             claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
             analyzer = CRMAnalyzer(claude_client=claude, db=db)
             result = await analyzer.analisar_cliente(cliente_id, escritorio_id)
@@ -91,7 +92,8 @@ def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
     log.info("crm_worker.analisar_escritorio.iniciando")
 
     async def _buscar_clientes() -> list[int]:
-        async with get_async_session() as db:
+        factory = get_session_factory()
+        async with factory() as db:
             stmt = select(Cliente.id).where(
                 Cliente.escritorio_id == escritorio_id,
                 Cliente.ativo == True,
