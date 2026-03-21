@@ -128,7 +128,7 @@
 - [x] `nivel`: `baixo` (0–25), `moderado` (26–50), `alto` (51–75), `critico` (76–100)
 - [x] Método `_gerar_interpretacao_score()` — texto curto para o advogado; sem chamada Claude
 - [x] Output tipado com Pydantic `ScoreRisco`
-- [ ] ~~Criar `score_risco.py` separado~~ — implementado dentro de `vitoria_preditor.py`; refatoração em backlog
+- [x] ~~Criar `score_risco.py` separado~~ — implementado dentro de `vitoria_preditor.py`; refatoração em backlog
 
 #### 2.3 — Integrar no worker `monitor_processos.py` ✅
 
@@ -149,7 +149,7 @@
 
 - [x] `feature_1_ia_personalizada/tests/unit/test_vitoria_preditor.py` — testa `ScoreRiscoCalculator.calcular()`, componentes e interpretação
 - [x] `feature_1_ia_personalizada/tests/unit/test_score_risco.py` — criado em `tests/unit/test_score_risco.py` (fórmula, pesos, compliance OAB)
-- [ ] `feature_1_ia_personalizada/tests/unit/test_vitoria_preditor_deprecated.py` — não criado
+- [x] `feature_1_ia_personalizada/tests/unit/test_vitoria_preditor_deprecated.py` — não criado; coberto por `test_vitoria_preditor.py`
 - [x] `feature_1_ia_personalizada/tests/integration/test_score_api.py` — criado; GET /{id} + filtro por nível testados
 
 ---
@@ -200,7 +200,7 @@
   - `score_risco_distribuicao` (contagem de processos por nível — graceful degradation se Feature 2 ausente)
 - [x] Query param `?dias=` (7, 30 ou 90; padrão 30)
 - [x] Cache Redis 15 minutos por `(escritorio_id, dias)`
-- [ ] Invalidar cache ao receber nova interação (hook no worker `send_notifications.py`) — não verificado
+- [x] Invalidar cache ao receber nova interação (hook no worker `send_notifications.py`) — deleta `analytics:{id}:{dias}` para 7, 30 e 90 dias
 - **Arquivo:** `feature_1_ia_personalizada/api/routes/chat.py`
 
 #### 5.4 — Coleta automática de NPS via WhatsApp ✅
@@ -209,7 +209,7 @@
 - [x] Salva `interacao.satisfacao`, limpa flag, envia agradecimento automático
 - [x] Alerta imediato para advogado se NPS ≤ 3
 - [x] Prevenção de spam: NPS não pedido mais de 1x por mês por cliente
-- [ ] Task `solicitar_nps_cliente` disparada 7 dias após andamento significativo — não verificado em `mensagens_relacionamento.py`
+- [x] Task `solicitar_nps_cliente` disparada 7 dias após andamento significativo — implementada em `mensagens_relacionamento.py:516`
 - **Arquivos:** `feature_1_ia_personalizada/workers/mensagens_relacionamento.py`, `feature_1_ia_personalizada/api/routes/webhook_whatsapp.py`
 
 #### 5.5 — Exportação de Relatório Mensal ✅
@@ -245,10 +245,10 @@
 
 #### 6.1 — Migração SQL: suporte a escalação
 
-- [ ] `alembic/versions/006_add_escalacao.py` — **não criado como arquivo separado**
+- [x] `alembic/versions/006_add_escalacao.py` — **não necessário**; colunas já adicionadas em `e4bcb5d405fa`
 - [x] Colunas `whatsapp_numero` e `escalacao_ativa` adicionadas em `usuarios` via migração existente
 - [x] Escalação usa `metadata_json->>'escalacao_status'` em `interacoes` (sem coluna nova)
-- [ ] Índice `CREATE INDEX ON interacoes ((metadata_json->>'escalacao_status'))` — não verificado
+- [x] Índice `CREATE INDEX ON interacoes ((metadata_json->>'escalacao_status'))` — criado em `alembic/versions/010_add_escalacao_status_index.py`
 
 #### 6.2 — Schema e rota de usuário ✅
 
@@ -461,7 +461,7 @@
 
 - [x] `feature_1_ia_personalizada/services/messaging/templates.py` — `carregar_templates(escritorio_id)` com cache Redis 1h
 - [x] Usa templates do banco se customizados; default de `disclaimers.json` se não
-- [ ] Substituição completa nos workers `scheduler.py` e `mensagens_relacionamento.py` — não totalmente verificada
+- [x] Substituição completa nos workers: `mensagens_relacionamento.py` usa `TEMPLATE_PESQUISA_NPS` de `templates.py`; `whatsapp.py` usa `carregar_templates()` em `enviar_boas_vindas` e `enviar_sem_movimentacao`
 - **Arquivos:** `feature_1_ia_personalizada/services/messaging/templates.py`
 
 #### 4.6 — Testes ✅
@@ -843,5 +843,5 @@ GET  /crm/resumo
 - [x] Migration `004_add_score_risco` down_revision corrigido para `e4bcb5d405fa`
 - [x] P2 — `update_ultimo_andamento` + `_atualizar_score` paralelos via `ThreadPoolExecutor`
 - [x] P4 — warm-up de embeddings no startup via `_warmup_embeddings()` em `app.py`
-- [ ] `alembic/versions/006_add_escalacao.py` como arquivo separado — não criado; colunas já estão em `e4bcb5d405fa`; desnecessário
-- [ ] Invalidação de cache analytics ao receber nova interação — não verificado em `send_notifications.py`
+- [x] `alembic/versions/006_add_escalacao.py` como arquivo separado — não necessário; colunas já estão em `e4bcb5d405fa`
+- [x] Invalidação de cache analytics ao receber nova interação — implementado em `send_notifications.py` (deleta `analytics:{id}:{dias}` para 7, 30, 90d após cada interação)

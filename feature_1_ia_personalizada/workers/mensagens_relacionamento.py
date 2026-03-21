@@ -15,6 +15,7 @@ from prometheus_client import Counter
 from feature_1_ia_personalizada.services.integrations.google_sheets import (
     GoogleSheetsClient as _RealGoogleSheetsClient,
 )
+from feature_1_ia_personalizada.services.messaging.templates import TEMPLATE_PESQUISA_NPS
 from shared.config.settings import settings
 from shared.database.worker_queries import (
     enviar_mensagem_whatsapp as _enviar_whatsapp,
@@ -502,13 +503,6 @@ def verificar_clientes_sem_contato(self) -> dict:
     }
 
 
-TEMPLATE_NPS = (
-    "Olá, {nome_cliente}! 😊\n\n"
-    "Como avalia o atendimento do {nome_escritorio} até agora?\n"
-    "Responda com um número de *1 a 5*:\n"
-    "1 = Muito insatisfeito  |  5 = Muito satisfeito"
-)
-
 TEMPO_30_DIAS_NPS = 30 * 24 * 60 * 60  # TTL Redis: 30 dias
 
 
@@ -539,7 +533,7 @@ def solicitar_nps_cliente(self) -> dict:
                 ignorados += 1
                 continue
 
-            texto = TEMPLATE_NPS.format(
+            texto = TEMPLATE_PESQUISA_NPS.format(
                 nome_cliente=cliente.nome,
                 nome_escritorio=cliente.nome_escritorio,
             )

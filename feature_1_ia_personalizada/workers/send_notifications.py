@@ -297,6 +297,14 @@ def processar_mensagem_recebida(
             dados=resultado,
         )
 
+        # Invalida cache de analytics para que o dashboard reflita a nova interação
+        try:
+            r = get_redis()
+            for dias in (7, 30, 90):
+                r.delete(f"analytics:{id_escritorio}:{dias}")
+        except Exception:
+            pass  # cache opcional — nunca bloqueia a task
+
         return {"status": "ok"}
 
     except Exception as erro:

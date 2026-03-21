@@ -15,6 +15,7 @@ from shared.models.interacao import Interacao
 from shared.models.processo import Processo as ProcessoModel
 
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
+from .templates import carregar_templates
 
 logger = structlog.get_logger(__name__)
 
@@ -277,12 +278,9 @@ class WhatsAppService:
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
     async def enviar_boas_vindas(self, escritorio_id: int, cliente_id: int) -> dict[str, Any]:
-        texto = (
-            "Olá! 👋 Seja bem-vindo(a).\n"
-            "Este canal é para atualizações e dúvidas rápidas do seu atendimento.\n"
-            "⚠️ Aviso: informações enviadas aqui não substituem orientação jurídica formal.\n"
-            "Se precisar de algo, é só responder esta mensagem."
-        )
+        async with async_session_factory() as db:
+            tmpl = await carregar_templates(escritorio_id, db=db)
+        texto = tmpl["boas_vindas"]
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=None)
 
     async def enviar_pesquisa_satisfacao(
@@ -331,10 +329,9 @@ class WhatsAppService:
         if contexto is None:
             return {"ok": False, "erro": "processo_nao_encontrado"}
         escritorio_id, cliente_id = contexto
-        texto = (
-            "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
-            "Isso é comum e não significa necessariamente um problema."
-        )
+        async with async_session_factory() as db:
+            tmpl = await carregar_templates(escritorio_id, db=db)
+        texto = tmpl["sem_novidade"]
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
 
