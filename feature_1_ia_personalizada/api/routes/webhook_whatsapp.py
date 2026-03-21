@@ -9,6 +9,7 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.workers.crm_worker import disparar_analise_com_debounce
 from feature_1_ia_personalizada.workers.send_notifications import (
     enviar_boas_vindas_escritorio,
     processar_mensagem_recebida,
@@ -205,6 +206,9 @@ async def receive_message(
         mensagem=texto,
         tipo=tipo_mensagem,
     )
+
+    # 7.10 — CRM: dispara análise com debounce (1h) após cada interação
+    disparar_analise_com_debounce(cliente.id, escritorio.id)
 
     _mensagens_recebidas.labels(escritorio_id=str(escritorio.id), tipo=tipo_mensagem).inc()
     _webhook_processing_time.observe(time.perf_counter() - _inicio)
