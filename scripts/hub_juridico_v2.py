@@ -1683,6 +1683,208 @@ def page_configuracoes() -> None:
 
 
 # =============================================================================
+# =============================================================================
+# SEÇÃO 9B — PÁGINA: CRM Inteligente (Feature 7)
+# =============================================================================
+
+_CRM_CORES = {
+    "excelente": "#2ecc71",
+    "satisfeito": "#27ae60",
+    "neutro":     "#f39c12",
+    "em_risco":   "#e67e22",
+    "critico":    "#e74c3c",
+}
+
+_CRM_ICONES = {
+    "excelente": "🟢",
+    "satisfeito": "🟢",
+    "neutro":     "🟡",
+    "em_risco":   "🟠",
+    "critico":    "🔴",
+}
+
+
+def _calcular_crm_mock(cliente: dict) -> dict:
+    """
+    Calcula score CRM mockado a partir dos dados do cliente na sessão.
+    Usa o CRMScoreCalculator real com um CRMContexto sintético.
+    """
+    from feature_1_ia_personalizada.services.crm.aggregator import (
+        CRMContexto, NPSRegistro, ProcessoResumo,
+    )
+    from feature_1_ia_personalizada.services.crm.score_calculator import calcular_score_crm
+    from datetime import UTC, datetime, timedelta
+    import random
+
+    seed = hash(cliente["nome"]) % 10000
+    rng = random.Random(seed)
+
+    nps_nota = st.session_state.get(f"nps_{cliente['id']}")
+    nps_historico = [NPSRegistro(data=datetime.now(UTC), nota=nps_nota)] if nps_nota else []
+    nps_medio = float(nps_nota) if nps_nota else None
+
+    tem_processo = bool(cliente.get("numero_cnj"))
+    processos = (
+        [ProcessoResumo(
+            numero_cnj=cliente["numero_cnj"],
+            tipo_acao=cliente.get("tipo_acao"),
+            fase_processual=None,
+            score_nivel=rng.choice(["baixo", "moderado", "alto"]),
+            score_interpretacao=None,
+        )]
+        if tem_processo else []
+    )
+
+    ctx = CRMContexto(
+        cliente_id=cliente["id"],
+        escritorio_id=1,
+        nome=cliente["nome"],
+        profissao=cliente.get("profissao"),
+        empresa=cliente.get("empresa"),
+        data_nascimento=None,
+        nps_historico=nps_historico,
+        nps_medio_3m=nps_medio,
+        total_interacoes_30d=rng.randint(0, 15),
+        total_interacoes_90d=rng.randint(5, 40),
+        dias_desde_ultimo_contato=rng.randint(0, 90),
+        ultimo_contato_at=datetime.now(UTC) - timedelta(days=rng.randint(0, 90)),
+        processos_ativos=processos,
+        pior_score_risco=processos[0].score_nivel if processos else None,
+        escalacoes_pendentes=rng.choice([0, 0, 0, 1]),
+        escalacoes_rejeitadas_30d=rng.choice([0, 0, 1]),
+        crm_score_anterior=None,
+        crm_analisado_em_anterior=None,
+        crm_resumo_anterior=None,
+        crm_acao_sugerida_anterior=None,
+    )
+
+    crm = calcular_score_crm(ctx)
+    return {
+        "nivel": crm.nivel,
+        "score": crm.score,
+        "fatores": crm.fatores,
+        "dias_contato": ctx.dias_desde_ultimo_contato,
+        "interacoes_30d": ctx.total_interacoes_30d,
+    }
+
+
+def _badge_nivel(nivel: str) -> str:
+    cor = _CRM_CORES.get(nivel, "#999")
+    icone = _CRM_ICONES.get(nivel, "⚪")
+    return f'<span style="background:{cor};color:white;padding:2px 8px;border-radius:8px;font-size:0.8em">{icone} {nivel.replace("_", " ").upper()}</span>'
+
+
+def page_crm() -> None:
+    """Feature 7 — CRM Inteligente."""
+    st.title("🤝 CRM Inteligente")
+    st.caption("Classificação de satisfação e sugestões de ação geradas por IA para cada cliente.")
+
+    clientes = st.session_state.get("clientes_hub", [])
+    if not clientes:
+        st.warning("Nenhum cliente carregado. Faça o onboarding primeiro.")
+        return
+
+    # ── Controles ─────────────────────────────────────────────────────────────
+    col_btn, col_filtro, col_busca = st.columns([2, 2, 3])
+    with col_btn:
+        analisar = st.button("🔄 Analisar todos os clientes", use_container_width=True)
+    with col_filtro:
+        filtro_nivel = st.selectbox(
+            "Filtrar por nível",
+            ["Todos", "critico", "em_risco", "neutro", "satisfeito", "excelente"],
+            label_visibility="collapsed",
+        )
+    with col_busca:
+        busca = st.text_input("Buscar por nome", placeholder="Digite o nome...", label_visibility="collapsed")
+
+    # Dispara ou carrega análises
+    if analisar or "crm_resultados" not in st.session_state:
+        with st.spinner("Calculando scores CRM..."):
+            resultados = {}
+            for c in clientes:
+                resultados[c["id"]] = _calcular_crm_mock(c)
+            st.session_state["crm_resultados"] = resultados
+        st.success(f"✅ {len(clientes)} cliente(s) analisado(s)")
+
+    resultados = st.session_state.get("crm_resultados", {})
+
+    # ── Resumo por nível ───────────────────────────────────────────────────────
+    st.divider()
+    contagens = {n: 0 for n in _CRM_CORES}
+    for r in resultados.values():
+        contagens[r["nivel"]] = contagens.get(r["nivel"], 0) + 1
+
+    cols = st.columns(5)
+    for col, (nivel, total) in zip(cols, contagens.items()):
+        cor = _CRM_CORES[nivel]
+        with col:
+            st.markdown(
+                f'<div style="border-left:4px solid {cor};padding-left:8px">'
+                f'<div style="font-size:1.6em;font-weight:bold">{total}</div>'
+                f'<div style="color:{cor};font-size:0.85em">{nivel.replace("_"," ").upper()}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
+    # ── Tabela de clientes ─────────────────────────────────────────────────────
+    clientes_filtrados = [
+        c for c in clientes
+        if c["id"] in resultados
+        and (filtro_nivel == "Todos" or resultados[c["id"]]["nivel"] == filtro_nivel)
+        and (not busca or busca.lower() in c["nome"].lower())
+    ]
+    clientes_filtrados.sort(key=lambda c: resultados[c["id"]]["score"])
+
+    if not clientes_filtrados:
+        st.info("Nenhum cliente corresponde aos filtros.")
+        return
+
+    for cliente in clientes_filtrados:
+        r = resultados[cliente["id"]]
+        nivel = r["nivel"]
+        cor = _CRM_CORES[nivel]
+
+        with st.container(border=True):
+            col_info, col_score, col_detalhe = st.columns([4, 2, 3])
+
+            with col_info:
+                st.markdown(
+                    f"**{cliente['nome']}** &nbsp; {_badge_nivel(nivel)}",
+                    unsafe_allow_html=True,
+                )
+                st.caption(
+                    f"📞 {cliente.get('telefone','—')} · "
+                    f"💼 {cliente.get('profissao','—')} · "
+                    f"📋 {'com processo' if cliente.get('numero_cnj') else 'sem processo'}"
+                )
+
+            with col_score:
+                st.metric("Score CRM", f"{r['score']}/100")
+                st.caption(f"⏱ {r['dias_contato']}d sem contato · 💬 {r['interacoes_30d']} msgs/mês")
+
+            with col_detalhe:
+                with st.expander("Ver fatores"):
+                    for nome_fator, dados in r["fatores"].items():
+                        pct = int(dados["contribuicao"])
+                        st.progress(
+                            min(dados["pontos"] / 100, 1.0),
+                            text=f"{nome_fator}: {dados['pontos']}pts → {pct} contrib.",
+                        )
+
+                # Ação sugerida baseada no nível
+                if nivel == "critico":
+                    st.error("📞 Ligar imediatamente", icon="🚨")
+                elif nivel == "em_risco":
+                    st.warning("📩 Enviar atualização do processo", icon="⚠️")
+                elif nivel == "neutro":
+                    st.info("💬 Check-in de relacionamento", icon="ℹ️")
+                else:
+                    st.success("✅ Nenhuma ação necessária", icon="✅")
+
+
+# =============================================================================
 # SEÇÃO 10 — PÁGINA: Analytics de Satisfação e Retenção (Feature 5)
 # =============================================================================
 
@@ -2267,7 +2469,7 @@ def _render_sidebar() -> None:
         paginas_disponiveis = ["🚀 Onboarding"]
         if onboarding_ok or clientes:
             paginas_disponiveis += [
-                "👥 Hub do Advogado", "📚 Base RAG",
+                "👥 Hub do Advogado", "🤝 CRM", "📚 Base RAG",
                 "📊 Analytics", "⚙️ Configurações",
             ]
 
@@ -2275,6 +2477,7 @@ def _render_sidebar() -> None:
         mapa = {
             "🚀 Onboarding": "onboarding",
             "👥 Hub do Advogado": "hub",
+            "🤝 CRM": "crm",
             "📚 Base RAG": "rag",
             "📊 Analytics": "analytics",
             "⚙️ Configurações": "config",
@@ -2391,6 +2594,8 @@ def main() -> None:
         page_hub()
     elif pagina == "rag":
         page_rag()
+    elif pagina == "crm":
+        page_crm()
     elif pagina == "analytics":
         page_analytics()
     elif pagina == "config":
