@@ -11,7 +11,7 @@
 
   <!-- NAV -->
   <nav>
-    <div class="logo"><span class="logo-lume">Amicus</span></div>
+    <a href="#" class="logo"><span class="logo-lume">Amicus</span></a>
     <ul>
       <li><a href="#recursos">Recursos</a></li>
       <li><a href="#beneficios">Benefícios</a></li>
@@ -205,15 +205,15 @@
   <!-- PERSONALIZAÇÃO -->
   <section id="personalizacao">
     <div class="perso-header reveal">
-      <div>
+      <div class="perso-header-left">
         <div class="section-tag">Identidade do escritório</div>
         <div class="perso-big">A cara do seu escritório, <em>na IA</em></div>
-        <div class="perso-badge">Configuração sem conhecimento técnico</div>
+        <p class="perso-desc">
+          A Amicus não é uma IA genérica. Ela assume a persona do seu escritório — nome, tom de voz
+          e especialidades — para que cada cliente sinta que está falando com a sua equipe.
+        </p>
       </div>
-      <p class="perso-desc">
-        A Amicus não é uma IA genérica. Ela assume a persona do seu escritório — nome, tom de voz
-        e especialidades — para que cada cliente sinta que está falando com a sua equipe.
-      </p>
+      <div class="perso-badge">✦ Configuração sem conhecimento técnico</div>
     </div>
 
     <div class="perso-cards reveal">
@@ -295,32 +295,6 @@
     </div>
   </footer>
 
-  <script>
-    // Scroll reveal
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // Nav scrolled shadow
-    const nav = document.querySelector('nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 40);
-    });
-
-    // Active nav link on scroll
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('nav ul a');
-    const sectionObserver = new IntersectionObserver(entries => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          navLinks.forEach(a => {
-            a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id);
-          });
-        }
-      });
-    }, { threshold: 0.4 });
-    sections.forEach(s => sectionObserver.observe(s));
-  </script>
+  <script src="script.js" defer></script>
 </body>
 </html>
