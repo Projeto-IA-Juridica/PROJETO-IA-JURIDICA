@@ -615,6 +615,183 @@ No [mensagens_relacionamento.py](../feature_1_ia_personalizada/workers/mensagens
 
 ---
 
+## Feature 3 — Prospecção Inteligente (Redesenhada)
+
+### O que entrega
+Motor de captação de clientes para advogados. O sistema analisa o histórico de processos do escritório para identificar em quais áreas e tipos de empresa ele se destaca, depois cruza com dados de empresas-alvo (processos públicos + dados da Receita Federal + funcionários via LinkedIn API) e gera uma fila de leads qualificados e pontuados. O advogado vê: "Empresa X tem 3 processos trabalhistas em aberto, a funcionária Y (cargo: Diretora de RH) trabalha lá — seu escritório vence 78% dos casos trabalhistas neste setor."
+
+### Problema que resolve
+Advogados prospectam de forma aleatória. Não sabem onde têm vantagem competitiva, não conectam o histórico de vitórias com oportunidades de mercado. Esta feature transforma os dados que já estão no banco em inteligência comercial.
+
+### O que já existe e será reaproveitado
+
+- **`processos` + `interacoes` tables** → fonte de verdade do histórico do escritório — taxa de sucesso, tipos de causa, setores de clientes
+- **`datajud_client.py`** → busca processos públicos das empresas-alvo por CNPJ (já integrado)
+- **`jusbrasil_client.py`** → complementa com dados processuais das empresas (já integrado)
+- **`cache_manager.py`** → cacheia perfis de empresa (Receita Federal) e resultados LinkedIn por CNPJ
+- **`claude_client.py`** → gera análise narrativa do DNA do advogado e justificativa de cada lead
+- **`TenantMixin`** → isolamento por `escritorio_id` automático
+- **`crm/aggregator.py`** → lógica de agregação de dados por cliente reaproveitável para empresa-alvo
+
+### Modelo de Dados — Novos
+
+```sql
+-- alembic/versions/011_add_prospeccao.py
+
+-- Perfil de especialidade do escritório (calculado periodicamente)
+CREATE TABLE dna_escritorio (
+    id              SERIAL PRIMARY KEY,
+    escritorio_id   INTEGER NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+    area_juridica   VARCHAR(100) NOT NULL,   -- 'trabalhista' | 'civil' | 'consumidor' | etc.
+    setor_empresa   VARCHAR(100),            -- 'varejo' | 'saude' | 'tech' | etc.
+    total_processos INTEGER DEFAULT 0,
+    taxa_sucesso    NUMERIC(5,2),            -- 0-100
+    ticket_medio    NUMERIC(10,2),
+    atualizado_em   TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (escritorio_id, area_juridica, setor_empresa)
+);
+
+-- Empresas monitoradas para prospecção
+CREATE TABLE empresas_prospeccao (
+    id              SERIAL PRIMARY KEY,
+    escritorio_id   INTEGER NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+    cnpj            VARCHAR(18) NOT NULL,
+    razao_social    VARCHAR(500),
+    setor           VARCHAR(100),
+    porte           VARCHAR(50),             -- 'MEI' | 'ME' | 'EPP' | 'MEDIO' | 'GRANDE'
+    dados_receita   JSONB DEFAULT '{}',      -- dados brutos da Receita Federal
+    processos_ativos INTEGER DEFAULT 0,
+    score_match     SMALLINT DEFAULT 0,      -- 0-100: afinidade com o escritório
+    score_motivo    TEXT,                    -- explicação gerada pelo Claude
+    status          VARCHAR(50) DEFAULT 'identificada',  -- identificada | qualificada | abordada | convertida
+    criado_em       TIMESTAMPTZ DEFAULT NOW(),
+    atualizado_em   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Leads individuais (funcionário de empresa-alvo)
+CREATE TABLE leads_prospeccao (
+    id              SERIAL PRIMARY KEY,
+    escritorio_id   INTEGER NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+    empresa_id      INTEGER NOT NULL REFERENCES empresas_prospeccao(id) ON DELETE CASCADE,
+    nome            VARCHAR(255),
+    cargo           VARCHAR(255),
+    linkedin_url    VARCHAR(500),
+    linkedin_id     VARCHAR(100),            -- ID LinkedIn para deduplicação
+    area_atuacao    VARCHAR(100),            -- ex: 'RH', 'Jurídico', 'Financeiro'
+    relevancia      VARCHAR(50),             -- 'alta' | 'media' | 'baixa'
+    motivo          TEXT,                    -- ex: "Diretora de RH em empresa com 5 processos trabalhistas"
+    status          VARCHAR(50) DEFAULT 'novo',  -- novo | visualizado | contatado | descartado
+    criado_em       TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX ON dna_escritorio (escritorio_id, taxa_sucesso DESC);
+CREATE INDEX ON empresas_prospeccao (escritorio_id, score_match DESC, status);
+CREATE INDEX ON leads_prospeccao (escritorio_id, empresa_id, relevancia);
+```
+
+### Arquitetura de Serviços — Novos
+
+```
+feature_1_ia_personalizada/services/prospeccao/
+│
+├── dna_analyzer.py          # Calcula especialidades do escritório a partir dos processos
+├── empresa_intel.py         # Busca dados de empresa: Receita Federal + DataJud
+├── linkedin_client.py       # Wrapper LinkedIn API (People Search / Company Employees)
+├── lead_scorer.py           # Score de afinidade escritório × empresa × funcionário
+└── prospeccao_pipeline.py   # Orquestra o fluxo completo
+```
+
+### Fluxo Completo
+
+```
+1. ANÁLISE DE DNA (roda 1x/semana via Celery Beat)
+   ────────────────────────────────────────────────
+   Worker: calcular_dna_escritorio(escritorio_id)
+       ├─ Query: processos por área jurídica + setor do cliente
+       ├─ Calcula taxa_sucesso por combinação (área × setor)
+       ├─ Gera análise narrativa via Claude: "Seu escritório vence 78% dos casos
+       │   trabalhistas no setor de varejo com 3+ funcionários..."
+       └─ Salva em dna_escritorio
+
+2. ANÁLISE DE EMPRESA-ALVO (sob demanda ou em lote)
+   ────────────────────────────────────────────────
+   POST /prospeccao/empresa  { cnpj: "..." }
+       ├─ Receita Federal API → razão social, porte, CNAE (setor), sócios
+       ├─ DataJud → processos ativos da empresa por área jurídica
+       ├─ Calcula score_match: sobreposição entre áreas dos processos e DNA do escritório
+       ├─ Claude gera score_motivo: "Alta afinidade: empresa tem 4 processos trabalhistas
+       │   ativos e seu escritório tem taxa de 78% em casos similares no varejo."
+       └─ Salva em empresas_prospeccao
+
+3. ENRIQUECIMENTO COM LINKEDIN (por empresa qualificada)
+   ────────────────────────────────────────────────────
+   Worker: enriquecer_empresa_linkedin(empresa_id)
+       ├─ LinkedIn API: busca funcionários da empresa por CNPJ/nome
+       ├─ Filtra por cargos relevantes (RH, Jurídico, Financeiro, Diretoria)
+       ├─ Para cada pessoa: avalia relevância com base nos processos da empresa
+       │      ex: processos trabalhistas → Diretora de RH = alta relevância
+       └─ Salva em leads_prospeccao com motivo gerado
+
+4. PIPELINE DE PROSPECÇÃO (interface do advogado)
+   ────────────────────────────────────────────────
+   GET /prospeccao/leads?status=novo&relevancia=alta
+       └─ Retorna leads ranqueados com: nome, cargo, empresa, motivo, score
+```
+
+### Novas Rotas
+
+```
+POST   /prospeccao/empresa                → Analisa empresa por CNPJ
+GET    /prospeccao/empresas               → Lista empresas monitoradas (com score)
+GET    /prospeccao/leads                  → Lista leads (filtros: status, relevância, área)
+PATCH  /prospeccao/leads/{id}/status      → Atualiza status do lead (visualizado/contatado/descartado)
+GET    /prospeccao/dna                    → Perfil de especialidade do escritório
+POST   /prospeccao/dna/recalcular         → Força recálculo do DNA
+```
+
+### Dependências Adicionais
+
+```
+# requests para Receita Federal (síncrono, simples)
+# LinkedIn API SDK — ou httpx (já no projeto)
+# Nenhuma nova dependência crítica
+```
+
+### Integração com LinkedIn API
+
+```python
+# linkedin_client.py
+# Endpoint: GET /v2/search/blended?q=companiesV2&...
+# Requer: LinkedIn Partner Program (aprovação necessária)
+# Escopo: r_liteprofile, r_emailaddress, w_member_social
+
+# Alternativa sem aprovação imediata:
+# - Usar apenas dados da Receita Federal (sócios/representantes)
+# - DataJud traz CPF/nome das partes → algumas são pessoas físicas = funcionários
+# - Enriquecer com LinkedIn manualmente via URL fornecida pelo advogado
+```
+
+### Workaround para LinkedIn API Restrita
+
+Enquanto a aprovação do LinkedIn Partner Program não chega, o fluxo funciona sem LinkedIn:
+- **Receita Federal** traz sócios e representantes legais da empresa
+- **DataJud** traz partes dos processos (pessoas físicas que processaram ou foram processadas pela empresa)
+- O advogado pode adicionar manualmente o perfil LinkedIn de um lead (campo `linkedin_url`)
+- Quando a aprovação chegar, o enriquecimento automático é ligado via feature flag
+
+### Worker de Manutenção
+
+```
+workers/prospeccao_worker.py
+
+Tasks:
+  calcular_dna_escritorio     → 1x/semana por escritório ativo
+  enriquecer_empresa_linkedin → sob demanda após empresa ser qualificada
+  atualizar_processos_empresa → 1x/semana, atualiza contagem via DataJud
+```
+
+---
+
 ## Ordem de Implementação Recomendada
 
 ```

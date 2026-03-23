@@ -40,7 +40,7 @@ TOTAL DO PROJETO:  ~30% do roadmap completo
 | F1.6 | Escalação para Advogado | **✅ ~95%** | Funcional; ver nota 1 |
 | F1.7 | CRM Inteligente | **✅ 100%** | Score IA via Claude |
 | **F2** | Controladoria (Projuris) | **❌ 0%** | Não iniciada |
-| **F3** | Conexões (Chat interno) | **❌ 0%** | Não iniciada |
+| **F3** | Prospecção Inteligente (LinkedIn + DataJud) | **❌ 0%** | Aguarda LinkedIn Partner Program |
 | **F4** | ML de Prazos | **❌ 0%** | Não iniciada |
 | **F5** | App Mobile (B2C) | **❌ 0%** | Não iniciada |
 | **F6** | Integração nativa com CRMs | **❌ 0%** | Não iniciada |
@@ -134,11 +134,24 @@ IA avisa advogados sobre deveres e prazos do dia via WhatsApp, integrado ao Proj
 - Workers: cron às 6h, 12h, 18h
 - **Bloqueio:** acesso à API Projuris (contrato necessário)
 
-#### Feature 3 — Conexões (Chat Interno)
-Chat interno entre funcionários de escritórios e empresas clientes (estilo LinkedIn jurídico).
-- Servidor WebSocket
-- ACL com Casbin
-- Distribuição automática de tarefas entre advogados
+#### Feature 3 — Prospecção Inteligente
+Motor de captação de clientes para advogados: analisa o DNA do escritório (em quais tipos de causa e setores ele se sai melhor) e cruza com dados de empresas-alvo e seus funcionários via LinkedIn API, gerando uma fila de leads qualificados e pontuados.
+
+**Fluxo central:**
+1. **DNA do Advogado** — analisa o histórico de processos do escritório (já no banco) e identifica áreas de especialidade, setores onde mais vence, perfil ideal de cliente
+2. **Intelligence de Empresa** — dada uma empresa (CNPJ ou nome), busca:
+   - Processos públicos envolvendo a empresa (DataJud — já integrado)
+   - Dados cadastrais e sócios via Receita Federal (API pública gratuita)
+   - Funcionários e cargos via LinkedIn API
+3. **Matching & Score** — cruza o perfil do advogado com as necessidades jurídicas da empresa e perfil dos funcionários, gerando um score de afinidade
+4. **Pipeline de Prospecção** — lista ranqueada de leads (empresa + funcionário + motivo de match) para o advogado abordar
+
+**APIs necessárias:**
+- LinkedIn API (People Search / Company Employees) — requer aprovação de parceiro
+- Receita Federal / ReceitaWS (gratuita) — dados de CNPJ e sócios
+- DataJud CNJ (já integrado) — processos públicos das empresas
+
+**Pré-requisito:** aprovação no LinkedIn Partner Program (pode levar semanas; avaliar alternativas como Sales Navigator API ou enriquecimento via Receita Federal + DataJud apenas)
 
 #### Feature 4 — ML de Prazos
 Predição de prazos processuais com Random Forest / XGBoost.
