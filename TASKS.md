@@ -112,8 +112,8 @@ ALTER TABLE escritorios
 | 3.1 — Role guard (`require_advogado`) | ✅ Concluída |
 | 3.2 — `ReceitaFederalClient` | ✅ Concluída |
 | 3.3 — `LinkedInClient` (com fallback) | ✅ Concluída |
-| 3.4 — Migration `leads_prospeccao` + modelo SQLAlchemy | ✅ Concluída (precisa de `tipo_lead`) |
-| 3.4b — Atualizar migration: `tipo_lead` + `dna_prospeccao` em escritorios | ⬜ Pendente |
+| 3.4 — Migration `leads_prospeccao` + modelo SQLAlchemy | ✅ Concluída |
+| 3.4b — Atualizar migration: `tipo_lead` + `dna_prospeccao` em escritorios | ✅ Concluída |
 | 3.5 — `DNAAdvogadoService` | ⬜ Pendente |
 | 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ⬜ Pendente |
 | 3.7 — `EmpresaIntelligenceService` (B2B) | ⬜ Pendente |
