@@ -116,7 +116,7 @@ ALTER TABLE escritorios
 | 3.4b — Atualizar migration: `tipo_lead` + `dna_prospeccao` em escritorios | ✅ Concluída |
 | 3.5 — `DNAAdvogadoService` | ✅ Concluída |
 | 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ✅ Concluída |
-| 3.7 — `EmpresaIntelligenceService` (B2B) | ⬜ Pendente |
+| 3.7 — `EmpresaIntelligenceService` (B2B) | ✅ Concluída |
 | 3.8 — `PessoaIntelligenceService` (B2C) | ⬜ Pendente |
 | 3.9 — `MatchingService` (suporta empresa e pessoa) | ⬜ Pendente |
 | 3.10 — Prompts para DNA e Matching | ⬜ Pendente |
