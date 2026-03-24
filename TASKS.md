@@ -1,8 +1,8 @@
-# TASKS — Feature 3: Prospecção Inteligente (LinkedIn + DataJud)
+# TASKS — Feature 3: Prospecção Inteligente
 
-> **Escopo:** motor de captação de clientes para advogados. Analisa o DNA do escritório e cruza com dados de empresas-alvo e seus funcionários, gerando uma fila de leads qualificados e pontuados.
-> **Acesso:** exclusivo para `advogado` e `admin` — clientes nunca têm acesso a nada aqui.
-> **Referência:** [README.md#feature-3](README.md) — seção "Feature 3 — Prospecção Inteligente"
+> **Escopo:** motor de captação de clientes para advogados. O DNA do escritório guia o tipo de lead gerado — empresas (B2B) para escritórios corporativos/trabalhistas, pessoas físicas (B2C) para família/consumidor/previdência.
+> **Acesso:** exclusivo para `advogado` e `admin`.
+> **Referência:** [README.md](README.md) — seção "Feature 3 — Prospecção Inteligente"
 
 ---
 
@@ -10,40 +10,54 @@
 
 | Entrega | Descrição |
 |---|---|
-| **DNA do Advogado** | Analisa o histórico de processos do escritório (já no banco) e identifica: áreas de especialidade, setores onde mais atua, tipo de ação mais recorrente, perfil de cliente ideal. Resultado salvo como JSON no `escritorio`. |
-| **Intelligence de Empresa** | Dado um CNPJ ou nome de empresa, agrega: dados cadastrais + sócios (Receita Federal), processos públicos envolvendo a empresa (DataJud), funcionários e cargos (LinkedIn — quando disponível). |
-| **Matching & Score** | Claude cruza o DNA do advogado com as necessidades jurídicas detectadas na empresa e gera um score de afinidade 0–100 + razão do match. |
-| **Pipeline de Prospecção** | Lista ranqueada de leads (empresa + contato + score + motivo) que o advogado pode acessar, filtrar e atualizar o status (novo → contatado → qualificado → descartado). |
+| **DNA do Advogado** | Analisa o histórico de processos do escritório e classifica as especialidades, setores de atuação e o tipo de lead ideal (empresa ou pessoa). |
+| **Descoberta via DataJud** | Usa DataJud como motor principal: busca quem está litigando nos tipos de ação que o escritório domina. Leads descobertos já têm demanda jurídica comprovada. |
+| **Enriquecimento** | Empresas → Receita Federal (porte, setor, sócios) + LinkedIn opcional. Pessoas → apenas dados do processo público (nome, polo, fase). |
+| **Matching & Score** | Claude cruza o DNA com os dados do lead e gera score 0–100 + motivo + abordagem personalizada. |
+| **Pipeline de Prospecção** | Lista ranqueada de leads com status gerenciável (novo → contatado → qualificado → descartado). Suporta os dois tipos no mesmo pipeline. |
 
 ---
 
-## O que já existe e SERÁ reaproveitado
+## Compliance — LGPD e OAB
 
-| Componente | Arquivo | Como será usado |
-|---|---|---|
-| `datajud_client.py` | `services/legal_data/datajud_client.py` | Buscar processos públicos de uma empresa pelo nome/CNPJ. Já tem retry e cache Redis. |
-| `ClaudeClient` | `services/ai/claude_client.py` | Gerar análise de DNA do escritório e score de matching. Wrapper com retry já pronto. |
-| `TenantMixin` | `shared/models/base.py` | Isolamento por `escritorio_id` automático em todas as novas tabelas. |
-| `processos` table | `shared/models/processo.py` | Fonte de dados para o DNA do advogado: `tipo_acao`, `polo_cliente`, `fase_processual`, `score_risco`. |
-| `cache_manager` (Redis) | `services/` | Cachear respostas da Receita Federal (TTL 24h) e DataJud (TTL 6h) por CNPJ. |
-| `require_advogado` | `api/middleware/auth.py` | Role guard já implementado (3.1) — bloqueia qualquer role que não seja advogado/admin. |
-| `get_escritorio_id_advogado` | `api/middleware/auth.py` | Extrai `escritorio_id` do token — todas as rotas novas usam isso. |
-| `escritorio` model | `shared/models/escritorio.py` | Campo `metadata_json` (JSONB já existente) — salvar o DNA do advogado sem nova coluna. |
-| Alembic migrations | `alembic/versions/` | Padrão já estabelecido — nova migration para tabela `leads_prospeccao`. |
+Esta seção deve ser lida antes de qualquer implementação. Viola esses limites = risco de suspensão de OAB.
+
+### OAB — Captação Indevida de Clientela (Provimento 205/2021)
+
+| Regra | Como aplicamos |
+|---|---|
+| Proibido contatar pessoa física de forma não solicitada usando dados de litígio | Leads B2C **nunca** mostram telefone, email ou dado de contato — só nome e contexto processual. O advogado aborda pela via processual, não por cold call. |
+| Proibido usar processo judicial para captação mercantil explícita | O score e o motivo gerados pelo Claude **nunca** afirmam "esse cliente vai perder" ou "você tem chance nesse caso" — só descrevem o contexto. |
+| Material de prospecção não pode prometer resultado | `SYSTEM_PROMPT_MATCH_SCORE` e `SYSTEM_PROMPT_DNA_ADVOGADO` têm restrição explícita de nunca prever resultado. |
+| Proibição de abordagem direta em corredores de fóruns e similares | Fora do escopo do sistema — responsabilidade do advogado no uso. |
+
+### LGPD — Lei 13.709/2018
+
+| Dado | Tipo | Base legal | Limite |
+|---|---|---|---|
+| CNPJ, razão social, sócios | Dados de empresa (não são dados pessoais pela LGPD) | N/A | Sem restrição — são públicos |
+| Nome de pessoa física em processo público | Dado pessoal | Legítimo interesse + dado publicizado pelo titular (art. 7º, IX) | Só nome e contexto processual. **Nunca CPF, telefone, endereço.** |
+| Nome de sócio via Receita Federal | Dado pessoal publicizado | Legítimo interesse | Só nome e qualificação (sócio-administrador, etc.) |
+| Contato LinkedIn | Dado pessoal | Requer consentimento ou legítimo interesse específico | Só disponível se LinkedIn aprovado; nunca armazenar email |
+
+**Regra prática implementada no código:**
+- Lead do tipo `pessoa`: campos `cpf`, `telefone`, `email` **não existem** no modelo — impedido por design, não só por regra
+- Lead do tipo `empresa`: sócios armazenados apenas com nome + qualificação (sem CPF dos sócios)
+- Nenhum dado de pessoa física vai para o Redis em texto plano
 
 ---
 
 ## Fontes de dados
 
-| Dado | Origem | Custo / Acesso | Status |
-|---|---|---|---|
-| Histórico de processos do escritório | `processos` table (banco local) | Zero — dados próprios | ✅ Disponível |
-| Processos públicos de uma empresa | DataJud CNJ | Gratuito, sem chave | ✅ Disponível (`datajud_client.py`) |
-| Dados cadastrais + sócios de CNPJ | ReceitaWS (`receitaws.com.br/v1/cnpj/{cnpj}`) | Gratuito, sem chave, rate limit moderado | ✅ Disponível |
-| Funcionários e cargos | LinkedIn People/Company API | Requer LinkedIn Partner Program (semanas de aprovação) | ⚠️ Bloqueado — implementar com fallback gracioso |
-| Análise de DNA e scoring | Claude (Anthropic API) | Custo por token — usar Haiku para volume | ✅ Disponível |
+| Dado | Origem | Tipo de lead | Custo / Acesso | Status |
+|---|---|---|---|---|
+| Histórico de processos do escritório | `processos` table | Ambos | Zero | ✅ Disponível |
+| Empresas/pessoas litigando por tipo de ação | DataJud CNJ | Ambos | Gratuito | ✅ Disponível |
+| Dados cadastrais + sócios de empresa | ReceitaWS | Empresa | Gratuito, rate limit moderado | ✅ Implementado |
+| Funcionários e cargos | LinkedIn API | Empresa | Requer Partner Program | ✅ Implementado com fallback |
+| Análise de DNA e scoring | Claude Haiku | Ambos | ~$0.001 por lead | ✅ Disponível |
 
-> **Estratégia para o LinkedIn:** o cliente `LinkedInClient` é implementado com interface definida, mas opera em modo **degradado** quando sem credenciais: retorna `{"disponivel": false, "motivo": "aguardando_aprovacao_linkedin_partner"}`. O pipeline funciona sem LinkedIn usando apenas Receita Federal + DataJud. Quando as credenciais chegarem, basta configurar `LINKEDIN_CLIENT_ID` e `LINKEDIN_CLIENT_SECRET` no `.env`.
+> **DataJud como motor de descoberta:** em vez de o advogado buscar um CNPJ específico, o sistema busca no DataJud por `tipo_acao` — retornando quem já está em litígio nessa área. Essa inversão é o diferencial: os leads chegam com necessidade jurídica comprovada.
 
 ---
 
@@ -57,39 +71,36 @@ advogado      → acesso total (ver e criar leads do próprio escritório)
 admin         → acesso total
 ```
 
-Todas as rotas usam `Depends(get_escritorio_id_advogado)` — isolamento multi-tenant garantido.
-
 ---
 
-## Modelo de Dados — Nova Tabela
+## Modelo de Dados
+
+### Atualização na tabela `leads_prospeccao` (já criada na 3.4)
+
+A migration 011 precisa de um campo `tipo_lead` e a remoção do que não se aplica a pessoas:
 
 ```sql
--- alembic/versions/011_add_leads_prospeccao.py
+-- Adicionar à migration 011 ou criar 011b
+ALTER TABLE leads_prospeccao
+    ADD COLUMN tipo_lead VARCHAR(10) NOT NULL DEFAULT 'empresa';
+    -- 'empresa' | 'pessoa'
 
-CREATE TABLE leads_prospeccao (
-    id                  SERIAL PRIMARY KEY,
-    escritorio_id       INTEGER NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
-    cnpj                VARCHAR(18) NOT NULL,
-    empresa_nome        VARCHAR(500) NOT NULL,
-    empresa_setor       VARCHAR(200),
-    empresa_porte       VARCHAR(50),          -- MEI | ME | EPP | MEDIO | GRANDE
-    socios              JSONB DEFAULT '[]',   -- [{nome, qualificacao, data_entrada}]
-    processos_publicos  JSONB DEFAULT '[]',   -- [{numero_cnj, tipo_acao, fase, polo}]
-    contatos_linkedin   JSONB DEFAULT '[]',   -- [{nome, cargo, url_perfil}] — vazio se sem LinkedIn
-    score_match         SMALLINT DEFAULT NULL, -- 0-100
-    score_motivo        TEXT DEFAULT NULL,     -- texto gerado pelo Claude explicando o match
-    status              VARCHAR(50) DEFAULT 'novo',  -- novo | contatado | qualificado | descartado
-    notas_advogado      TEXT DEFAULT NULL,     -- campo livre para o advogado anotar
-    fonte_descoberta    VARCHAR(100),          -- 'manual' | 'sugerido_ia' | 'importado'
-    criado_em           TIMESTAMPTZ DEFAULT NOW(),
-    atualizado_em       TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE (escritorio_id, cnpj)
-);
+-- Para leads do tipo 'pessoa':
+-- empresa_nome armazena o nome da pessoa
+-- cnpj armazena o número CNJ do processo (não um CNPJ real)
+-- socios permanece vazio []
+-- contatos_linkedin permanece vazio []
+-- processos_publicos contém o processo que originou o lead
+-- NUNCA armazenar CPF, telefone ou email de pessoa física
+```
 
-CREATE INDEX ON leads_prospeccao (escritorio_id, score_match DESC)
-    WHERE score_match IS NOT NULL;
+### Campo `dna_prospeccao` no `escritorios`
 
-CREATE INDEX ON leads_prospeccao (escritorio_id, status);
+```sql
+ALTER TABLE escritorios
+    ADD COLUMN dna_prospeccao JSONB DEFAULT NULL;
+-- Estrutura: {especialidades, setores_alvo, tipo_lead_predominante,
+--             perfil_cliente_ideal, diferenciais, gerado_em}
 ```
 
 ---
@@ -99,296 +110,311 @@ CREATE INDEX ON leads_prospeccao (escritorio_id, status);
 | Subtarefa | Status |
 |---|---|
 | 3.1 — Role guard (`require_advogado`) | ✅ Concluída |
-| 3.2 — `ReceitaFederalClient` | ⬜ Pendente |
-| 3.3 — `LinkedInClient` (com fallback) | ⬜ Pendente |
-| 3.4 — Migration `leads_prospeccao` + modelo SQLAlchemy | ⬜ Pendente |
+| 3.2 — `ReceitaFederalClient` | ✅ Concluída |
+| 3.3 — `LinkedInClient` (com fallback) | ✅ Concluída |
+| 3.4 — Migration `leads_prospeccao` + modelo SQLAlchemy | ✅ Concluída (precisa de `tipo_lead`) |
+| 3.4b — Atualizar migration: `tipo_lead` + `dna_prospeccao` em escritorios | ⬜ Pendente |
 | 3.5 — `DNAAdvogadoService` | ⬜ Pendente |
-| 3.6 — `EmpresaIntelligenceService` | ⬜ Pendente |
-| 3.7 — `MatchingService` | ⬜ Pendente |
-| 3.8 — Prompts para DNA e Matching | ⬜ Pendente |
-| 3.9 — Schemas Pydantic | ⬜ Pendente |
-| 3.10 — Rotas `/prospeccao/*` | ⬜ Pendente |
-| 3.11 — Testes unitários | ⬜ Pendente |
-| 3.12 — Testes de integração | ⬜ Pendente |
+| 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ⬜ Pendente |
+| 3.7 — `EmpresaIntelligenceService` (B2B) | ⬜ Pendente |
+| 3.8 — `PessoaIntelligenceService` (B2C) | ⬜ Pendente |
+| 3.9 — `MatchingService` (suporta empresa e pessoa) | ⬜ Pendente |
+| 3.10 — Prompts para DNA e Matching | ⬜ Pendente |
+| 3.11 — Schemas Pydantic | ⬜ Pendente |
+| 3.12 — Rotas `/prospeccao/*` | ⬜ Pendente |
+| 3.13 — Testes unitários | ⬜ Pendente |
+| 3.14 — Testes de integração | ⬜ Pendente |
 
 ---
 
-## 3.1 — Role guard ✅ (já feito)
+## 3.1 — Role guard ✅ (feito)
 
-Funções `require_advogado`, `get_escritorio_id_advogado` e `get_advogado_id` adicionadas em `feature_1_ia_personalizada/api/middleware/auth.py`.
+`require_advogado`, `get_escritorio_id_advogado`, `get_advogado_id` em `api/middleware/auth.py`.
 
 ---
 
-## 3.2 — `ReceitaFederalClient`
+## 3.2 — `ReceitaFederalClient` ✅ (feito)
 
-**Objetivo:** buscar dados de CNPJ na API pública ReceitaWS — razão social, porte, setor (CNAE), endereço, sócios.
+`services/prospeccao/receita_federal_client.py` — busca CNPJ com cache Redis 24h, retry, rate limit gracioso.
 
-**Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/receita_federal_client.py`
+---
 
-- [ ] Criar classe `ReceitaFederalClient`
-- [ ] Método `async buscar_cnpj(cnpj: str) -> EmpresaDados | None`:
-  - Normaliza CNPJ (remove `.`, `/`, `-`) antes de chamar
-  - `GET https://receitaws.com.br/v1/cnpj/{cnpj}` via `httpx.AsyncClient`
-  - Timeout 10s; retries 2x com backoff 1s
-  - Se status 429 (rate limit): espera 60s e tenta uma vez mais
-  - Se status 4xx/5xx: retorna `None` (graceful degradation — não quebra o fluxo)
-  - Cacheia resposta no Redis: chave `receita:{cnpj}`, TTL 24h (dados raramente mudam)
-  - Loga `cnpj`, `status_code`, `cache_hit` via structlog
-- [ ] Método `async buscar_por_nome(nome: str, uf: str | None = None) -> list[EmpresaResumida]`:
-  - Usa `https://receitaws.com.br/v1/cnpj/search?query={nome}&uf={uf}` se disponível
-  - Fallback: retorna lista vazia se endpoint de busca não disponível na versão gratuita
-- [ ] Dataclass interna `EmpresaDados`:
-  ```python
-  cnpj: str
-  razao_social: str
-  nome_fantasia: str | None
-  situacao: str           # ATIVA | BAIXADA | SUSPENSA
-  porte: str              # MEI | ME | EPP | DEMAIS
-  cnae_principal: str     # código + descrição
-  uf: str
-  municipio: str
-  socios: list[dict]      # [{nome, qualificacao, data_entrada}]
+## 3.3 — `LinkedInClient` ✅ (feito)
+
+`services/prospeccao/linkedin_client.py` — modo degradado sem credenciais, filtro de cargos por substring (intencionalmente permissivo), cache 7 dias.
+
+---
+
+## 3.4 — Migration + modelo ✅ (feito, precisa de complemento em 3.4b)
+
+`alembic/versions/011_add_leads_prospeccao.py` + `shared/models/lead_prospeccao.py`.
+
+---
+
+## 3.4b — Atualizar modelo e migration: `tipo_lead` + `dna_prospeccao`
+
+**Objetivo:** adicionar `tipo_lead` na tabela `leads_prospeccao` e `dna_prospeccao` na tabela `escritorios`.
+
+**Arquivo a criar:** `alembic/versions/012_add_tipo_lead_e_dna.py`
+
+- [ ] `upgrade()`:
+  ```sql
+  ALTER TABLE leads_prospeccao
+      ADD COLUMN tipo_lead VARCHAR(10) NOT NULL DEFAULT 'empresa';
+
+  CREATE INDEX ix_leads_tipo ON leads_prospeccao (escritorio_id, tipo_lead);
+
+  ALTER TABLE escritorios
+      ADD COLUMN dna_prospeccao JSONB DEFAULT NULL;
   ```
+- [ ] `downgrade()`: DROP COLUMN em ambas
 
-**Arquivo a tocar:**
-- `requirements-f1.txt` — verificar se `httpx` já está listado (provavelmente sim, FastAPI depende dele)
+**Arquivo a tocar:** `shared/models/lead_prospeccao.py`
+- [ ] Adicionar `tipo_lead: Mapped[str] = mapped_column(String(10), server_default="empresa", nullable=False)`
 
-**Critério de aceite:** CNPJ válido retorna `EmpresaDados`; CNPJ inexistente retorna `None`; segunda chamada para o mesmo CNPJ vem do Redis (cache_hit=True no log); rate limit não quebra o serviço.
+**Arquivo a tocar:** `shared/models/escritorio.py`
+- [ ] Adicionar `dna_prospeccao: Mapped[dict | None] = mapped_column(JSONB, nullable=True)`
 
----
-
-## 3.3 — `LinkedInClient` (com fallback)
-
-**Objetivo:** wrapper para a LinkedIn API com degradação graciosa — o sistema funciona sem LinkedIn, e quando as credenciais chegarem basta configurar as variáveis de ambiente.
-
-**Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/linkedin_client.py`
-
-- [ ] Criar classe `LinkedInClient`
-- [ ] `__init__`: verifica `settings.LINKEDIN_CLIENT_ID` e `settings.LINKEDIN_CLIENT_SECRET`. Se ausentes, seta `self.disponivel = False`
-- [ ] Método `async buscar_funcionarios(empresa_nome: str, empresa_linkedin_id: str | None = None) -> list[ContatoLinkedIn]`:
-  - Se `not self.disponivel`: retorna `[]` imediatamente (sem erro, sem log de warning excessivo)
-  - Se disponível: chama LinkedIn People Search API com o nome da empresa como filtro
-  - Filtra cargos relevantes para prospecção jurídica: `["CEO", "CFO", "Diretor", "Gerente Jurídico", "Compliance", "General Counsel", "Sócio", "Presidente"]`
-  - Retorna máx 10 contatos por empresa
-  - Cache Redis: chave `linkedin:{empresa_id}`, TTL 7 dias
-- [ ] Dataclass `ContatoLinkedIn`:
-  ```python
-  nome: str
-  cargo: str
-  url_perfil: str | None
-  empresa: str
-  ```
-- [ ] Adicionar `LINKEDIN_CLIENT_ID` e `LINKEDIN_CLIENT_SECRET` em `shared/config/settings.py` como campos opcionais (`str | None = None`)
-
-**Arquivo a tocar:**
-- `shared/config/settings.py` — adicionar as duas variáveis opcionais
-- `docs/guides/secrets.md` — documentar as variáveis (quando LinkedIn for aprovado)
-
-**Critério de aceite:** sem variáveis de env configuradas → `disponivel=False`, método retorna `[]` sem erro; com variáveis configuradas → faz chamada real (testável com mock). Nunca levanta exceção para o chamador.
-
----
-
-## 3.4 — Migration + modelo SQLAlchemy `LeadProspeccao`
-
-**Objetivo:** criar a tabela `leads_prospeccao` e o modelo ORM correspondente.
-
-**Arquivo a criar (migration):** `alembic/versions/011_add_leads_prospeccao.py`
-
-- [ ] Criar migration com o SQL definido na seção "Modelo de Dados" acima
-- [ ] `upgrade()`: CREATE TABLE + 2 índices
-- [ ] `downgrade()`: DROP TABLE (cascata)
-- [ ] `down_revision` apontar para a migration mais recente (verificar com `alembic heads`)
-
-**Arquivo a criar (modelo):** `shared/models/lead_prospeccao.py`
-
-- [ ] Criar classe `LeadProspeccao(Base, TenantMixin, TimestampMixin)`:
-  ```python
-  __tablename__ = "leads_prospeccao"
-
-  id: Mapped[int] = mapped_column(primary_key=True)
-  cnpj: Mapped[str] = mapped_column(String(18), nullable=False)
-  empresa_nome: Mapped[str] = mapped_column(String(500), nullable=False)
-  empresa_setor: Mapped[str | None] = mapped_column(String(200))
-  empresa_porte: Mapped[str | None] = mapped_column(String(50))
-  socios: Mapped[dict] = mapped_column(JSONB, default=list)
-  processos_publicos: Mapped[dict] = mapped_column(JSONB, default=list)
-  contatos_linkedin: Mapped[dict] = mapped_column(JSONB, default=list)
-  score_match: Mapped[int | None] = mapped_column(SmallInteger)
-  score_motivo: Mapped[str | None] = mapped_column(Text)
-  status: Mapped[str] = mapped_column(String(50), default="novo")
-  notas_advogado: Mapped[str | None] = mapped_column(Text)
-  fonte_descoberta: Mapped[str | None] = mapped_column(String(100))
-  ```
-- [ ] Exportar `LeadProspeccao` em `shared/models/__init__.py`
-
-**Critério de aceite:** `alembic upgrade head` sem erros; tabela visível no schema com os dois índices; `alembic downgrade -1` reverte sem erro.
+**Critério de aceite:** `alembic upgrade head` passa; modelo reflete os campos; `downgrade -1` reverte.
 
 ---
 
 ## 3.5 — `DNAAdvogadoService`
 
-**Objetivo:** analisar o histórico de processos do escritório e gerar um perfil de especialização — as áreas, setores e tipos de causa onde o escritório tem mais experiência e resultados.
+**Objetivo:** ler o histórico de processos do escritório e gerar o perfil de especialização — incluindo qual tipo de lead faz sentido (empresa ou pessoa).
 
 **Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/dna_advogado.py`
 
-- [ ] Criar classe `DNAAdvogadoService`
-- [ ] Método `async gerar_dna(escritorio_id: int) -> DNAEscritorio`:
-  1. Query em `processos` filtrando por `escritorio_id` e `status = 'ativo'` + processos encerrados dos últimos 2 anos:
-     - `COUNT(*) GROUP BY tipo_acao ORDER BY COUNT DESC LIMIT 10` — top tipos de ação
-     - Distribuição de `polo_cliente` (autor vs réu)
-     - Distribuição de `score_nivel` (perfil de complexidade)
-     - `fase_processual` mais frequente (onde os processos estão)
-  2. Se menos de 5 processos no banco: retorna DNA com `dados_insuficientes=True` (sem chamar Claude)
-  3. Com dados suficientes: chamar `ClaudeClient` com `SYSTEM_PROMPT_DNA_ADVOGADO` (ver 3.8) para gerar:
-     - `especialidades: list[str]` — 3–5 áreas do direito
-     - `setores_alvo: list[str]` — setores de empresa mais prováveis como clientes
-     - `perfil_cliente_ideal: str` — parágrafo descrevendo o cliente ideal
-     - `diferenciais: list[str]` — pontos fortes do escritório para usar na abordagem
-  4. Salvar resultado em `escritorio.metadata_json["dna_prospeccao"]` + `dna_atualizado_em`
-  5. Cachear no Redis: chave `dna:{escritorio_id}`, TTL 6h
-- [ ] Método `async obter_dna(escritorio_id: int) -> DNAEscritorio`:
-  - Tenta Redis → tenta `escritorio.metadata_json["dna_prospeccao"]` → chama `gerar_dna()` se nenhum
+- [ ] Classe `DNAAdvogadoService`
+- [ ] Método `async gerar_dna(escritorio_id: int, db: AsyncSession) -> DNAEscritorio`:
+  1. Query em `processos` por `escritorio_id`:
+     - `COUNT(*) GROUP BY tipo_acao ORDER BY COUNT DESC LIMIT 10`
+     - Distribuição de `polo_cliente` (autor/réu)
+     - Distribuição de `fase_processual`
+  2. Com < 5 processos → retorna `DNAEscritorio(dados_insuficientes=True)` sem Claude
+  3. Com ≥ 5 processos → chama Claude com `SYSTEM_PROMPT_DNA_ADVOGADO`:
+     - `especialidades: list[str]` — áreas do direito
+     - `setores_alvo: list[str]` — setores de empresa (para B2B) ou perfis de pessoa (para B2C)
+     - `tipo_lead_predominante: "empresa" | "pessoa" | "ambos"`
+     - `perfil_cliente_ideal: str`
+     - `diferenciais: list[str]`
+  4. Persiste em `escritorio.dna_prospeccao` (JSONB)
+  5. Cacheia no Redis: `dna:{escritorio_id}`, TTL 6h
+- [ ] Método `async obter_dna(escritorio_id: int, db: AsyncSession) -> DNAEscritorio`:
+  - Redis → banco (`escritorio.dna_prospeccao`) → `gerar_dna()`
 - [ ] Dataclass `DNAEscritorio`:
   ```python
   escritorio_id: int
   especialidades: list[str]
   setores_alvo: list[str]
+  tipo_lead_predominante: str   # 'empresa' | 'pessoa' | 'ambos'
   perfil_cliente_ideal: str
   diferenciais: list[str]
-  top_tipos_acao: list[dict]   # [{tipo, contagem, percentual}]
+  top_tipos_acao: list[dict]    # [{tipo, contagem, percentual}]
   dados_insuficientes: bool
   gerado_em: datetime
   ```
 
-**Arquivo a tocar:**
-- `shared/database/worker_queries.py` — adicionar `get_distribuicao_processos(escritorio_id)`
-
-**Critério de aceite:** com 0–4 processos → `dados_insuficientes=True`, sem chamada Claude; com 5+ processos → retorna DNA completo; segunda chamada no TTL vem do Redis.
+**Critério de aceite:** < 5 processos → sem Claude; ≥ 5 → DNA completo com `tipo_lead_predominante` inferido corretamente (trabalhista → empresa; família → pessoa).
 
 ---
 
-## 3.6 — `EmpresaIntelligenceService`
+## 3.6 — `DataJudProspeccaoClient`
 
-**Objetivo:** dado um CNPJ, agregar dados de todas as fontes (Receita Federal, DataJud, LinkedIn) em um objeto único para ser avaliado pelo `MatchingService`.
+**Objetivo:** extensão do `datajud_client.py` existente para buscar leads por tipo de ação — o motor de descoberta da feature.
+
+> Diferente do uso atual (busca por CNJ), aqui buscamos *quem está litigando* em determinado tipo de ação.
+
+**Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/datajud_prospeccao.py`
+
+- [ ] Classe `DataJudProspeccaoClient`
+- [ ] Método `async buscar_litigantes(tipo_acao: str, tribunal: str | None, limite: int = 20) -> list[LitiganteEncontrado]`:
+  - Query ElasticSearch no DataJud filtrando por `classe.nome` ou `assunto.nome` contendo o tipo de ação
+  - Retorna partes do processo: nome, tipo (pessoa física ou jurídica), polo, número CNJ
+  - Deduplicação por nome — mesmo litigante em múltiplos processos conta uma vez (mas acumula contagem)
+  - Cache Redis: `datajud_prosp:{tipo_acao}:{tribunal}`, TTL 6h
+- [ ] Dataclass `LitiganteEncontrado`:
+  ```python
+  nome: str
+  tipo: str                  # 'pessoa_juridica' | 'pessoa_fisica'
+  polo: str                  # 'ativo' | 'passivo'
+  processos_count: int       # quantas vezes aparece nos resultados
+  numero_cnj_exemplo: str    # um CNJ representativo para contexto
+  tipo_acao: str
+  tribunal: str
+  ```
+- [ ] Método `async identificar_cnpj(nome_empresa: str) -> str | None`:
+  - Busca CNPJ pelo nome na Receita Federal (helper para quando o DataJud retorna nome sem CNPJ)
+  - Usa `ReceitaFederalClient.buscar_por_nome()` quando disponível
+
+**Arquivo a tocar:** não toca no `datajud_client.py` existente — cliente separado para não quebrar o monitoramento de processos.
+
+**Critério de aceite:** busca por "reclamação trabalhista" retorna empresas com processos ativos; busca por "divórcio" retorna pessoas físicas; deduplicação funciona.
+
+---
+
+## 3.7 — `EmpresaIntelligenceService` (B2B)
+
+**Objetivo:** dado um litigante identificado como pessoa jurídica, agregar dados de todas as fontes e preparar para o matching.
 
 **Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/empresa_intelligence.py`
 
-- [ ] Criar classe `EmpresaIntelligenceService`
-- [ ] Método `async pesquisar(cnpj: str, escritorio_id: int) -> EmpresaInteligencia`:
-  1. Normalizar e validar CNPJ (reusando `validators.py` se houver validador de CNPJ)
-  2. Chamar em paralelo com `asyncio.gather` (timeout 15s total):
-     - `ReceitaFederalClient.buscar_cnpj(cnpj)` → dados cadastrais
-     - `DataJudClient.buscar_processos_empresa(cnpj_ou_nome)` → processos públicos
-     - `LinkedInClient.buscar_funcionarios(empresa_nome)` → contatos (retorna [] se indisponível)
-  3. Se Receita Federal retornar `None` (empresa não encontrada): retornar erro claro ao usuário (`EmpresaNaoEncontrada`)
-  4. Montar `EmpresaInteligencia` com dados consolidados de todas as fontes
-  5. Salvar snapshot no Redis: chave `empresa_intel:{cnpj}:{escritorio_id}`, TTL 6h
+- [ ] Classe `EmpresaIntelligenceService`
+- [ ] Método `async enriquecer(litigante: LitiganteEncontrado, escritorio_id: int) -> EmpresaInteligencia | None`:
+  1. Identificar CNPJ: via `litigante.cnpj` (se disponível) ou `DataJudProspeccaoClient.identificar_cnpj(nome)`
+  2. Se CNPJ não encontrado: tenta criar lead só com nome + dados DataJud (sem Receita Federal)
+  3. `asyncio.gather`:
+     - `ReceitaFederalClient.buscar_cnpj(cnpj)` → cadastro + sócios
+     - `LinkedInClient.buscar_funcionarios(nome)` → contatos ([] se indisponível)
+  4. Monta `EmpresaInteligencia`
+  5. Cache Redis: `empresa_intel:{cnpj}`, TTL 6h
 - [ ] Dataclass `EmpresaInteligencia`:
   ```python
-  cnpj: str
+  cnpj: str | None            # None se não identificado
   razao_social: str
-  nome_fantasia: str | None
   situacao: str
   porte: str
   setor_cnae: str
-  socios: list[dict]
-  processos_publicos: list[dict]     # lista de processos do DataJud
-  total_processos_publicos: int
-  tipos_acao_envolvida: list[str]    # tipos únicos de ação
-  contatos_linkedin: list[dict]      # vazio se LinkedIn indisponível
+  socios: list[dict]          # só nome + qualificacao (sem CPF — LGPD)
+  processos_count: int
+  tipos_acao_envolvida: list[str]
+  contatos_linkedin: list[dict]
   linkedin_disponivel: bool
   ```
 
-**Critério de aceite:** CNPJ válido → retorna `EmpresaInteligencia` com dados de pelo menos Receita + DataJud; LinkedIn indisponível não quebra o fluxo; chamadas externas rodam em paralelo (não sequencial).
+---
+
+## 3.8 — `PessoaIntelligenceService` (B2C)
+
+**Objetivo:** dado um litigante identificado como pessoa física, coletar apenas dados do processo público — sem nenhum dado pessoal adicional.
+
+**Compliance:** este serviço é o mais sensível da feature. Qualquer dado coletado além do processo público viola LGPD ou OAB.
+
+**Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/pessoa_intelligence.py`
+
+- [ ] Classe `PessoaIntelligenceService`
+- [ ] Método `async enriquecer(litigante: LitiganteEncontrado) -> PessoaInteligencia`:
+  - **NÃO busca CPF** — proibido por design
+  - **NÃO busca telefone ou email** — proibido por design
+  - Usa apenas o que o DataJud já retornou: nome, polo, tipo de ação, tribunal, fase
+  - Verifica se a pessoa é a parte que *provavelmente* precisa de advogado:
+    - Trabalhista: polo ativo (empregado sem representação) → lead válido
+    - Consumidor: polo ativo → lead válido
+    - Família: ambos os polos podem precisar de advogado
+- [ ] Dataclass `PessoaInteligencia`:
+  ```python
+  nome: str                   # nome público do processo
+  polo: str                   # 'ativo' | 'passivo'
+  tipo_acao: str
+  tribunal: str
+  fase_processual: str
+  numero_cnj_exemplo: str     # para o advogado verificar no sistema do tribunal
+  # SEM: cpf, telefone, email, endereço
+  ```
+- [ ] Método estático `validar_compliance(litigante: LitiganteEncontrado) -> bool`:
+  - Retorna `False` (descarta o lead) se o tipo de ação envolver dados especialmente sensíveis: saúde, orientação sexual, religião (art. 11 LGPD)
+  - Ex: "internação compulsória", "curatela por doença mental" → não prospectar
+
+**Critério de aceite:** nenhum campo CPF/telefone/email no dataclass; `validar_compliance` descarta ações com dados sensíveis; código revisável por um DPO sem mudanças.
 
 ---
 
-## 3.7 — `MatchingService`
+## 3.9 — `MatchingService`
 
-**Objetivo:** cruzar o DNA do advogado com a inteligência da empresa e gerar um score de afinidade com justificativa — respondendo: "por que este escritório seria a escolha certa para essa empresa?".
+**Objetivo:** cruzar DNA do advogado com os dados do lead (empresa ou pessoa) e gerar score + abordagem. Suporta os dois tipos com lógicas separadas.
 
 **Arquivo a criar:** `feature_1_ia_personalizada/services/prospeccao/matching.py`
 
-- [ ] Criar classe `MatchingService`
-- [ ] Método `async calcular_score(dna: DNAEscritorio, empresa: EmpresaInteligencia) -> ResultadoMatch`:
-  1. **Score heurístico** (rápido, sem Claude) — pré-filtro antes de gastar tokens:
-     - +30 pts: empresa tem processos públicos em tipos de ação que coincidem com especialidades do escritório
-     - +20 pts: setor CNAE da empresa está em `dna.setores_alvo`
-     - +15 pts: empresa tem 3+ processos públicos (indica demanda jurídica ativa)
-     - +15 pts: contatos LinkedIn com cargo jurídico/diretoria encontrados
-     - +10 pts: empresa é MÉDIA ou GRANDE porte
-     - +10 pts: empresa ATIVA (não baixada/suspensa)
-     - Score máximo heurístico: 100
-  2. Se score heurístico < 30: retornar `ResultadoMatch(score=score_heuristico, motivo="Baixa afinidade com o perfil do escritório", gerado_por_ia=False)` — sem chamar Claude
-  3. Se score heurístico ≥ 30: chamar Claude com `SYSTEM_PROMPT_MATCH_SCORE` (ver 3.8):
-     - Claude refina o score (pode subir ou descer até 20 pts)
-     - Claude gera `motivo` — parágrafo explicando o match para o advogado usar na abordagem
-     - Claude gera `abordagem_sugerida` — como o advogado deve iniciar o contato
-  4. Retornar `ResultadoMatch`
+- [ ] Classe `MatchingService`
+- [ ] Método `async calcular_score(dna: DNAEscritorio, inteligencia: EmpresaInteligencia | PessoaInteligencia) -> ResultadoMatch`:
+  - Detecta o tipo pelo `isinstance` e delega para método privado
+- [ ] Método `_score_heuristico_empresa(dna, empresa) -> int`:
+  - +30: processos da empresa em tipos de ação = especialidades do escritório
+  - +20: setor CNAE em `dna.setores_alvo`
+  - +15: empresa com 3+ processos (demanda ativa)
+  - +15: contatos LinkedIn encontrados
+  - +10: porte MÉDIA ou GRANDE
+  - +10: situação ATIVA
+- [ ] Método `_score_heuristico_pessoa(dna, pessoa) -> int`:
+  - +35: tipo de ação = especialidade do escritório (peso maior pois é o único sinal forte)
+  - +25: polo compatível com o perfil típico do cliente do escritório
+  - +20: fase processual inicial (pessoa pode ainda não ter advogado)
+  - +20: tipo de ação com alta recorrência no escritório (> 30% dos processos)
+- [ ] Se score < 30: retorna sem Claude (`gerado_por_ia=False`)
+- [ ] Se score ≥ 30: chama Claude com `SYSTEM_PROMPT_MATCH_SCORE`:
+  - Refina score, gera `motivo` e `abordagem_sugerida`
+  - Para B2C: `abordagem_sugerida` não pode mencionar dados pessoais nem cold call — só via processo
 - [ ] Dataclass `ResultadoMatch`:
   ```python
-  score: int                   # 0-100
-  motivo: str                  # por que esse match é relevante
-  abordagem_sugerida: str      # como abordar essa empresa
-  gerado_por_ia: bool          # False se score heurístico < 30 (economia de tokens)
-  componentes: dict            # detalhamento do score heurístico
+  score: int
+  motivo: str
+  abordagem_sugerida: str
+  gerado_por_ia: bool
+  tipo_lead: str              # 'empresa' | 'pessoa'
+  componentes: dict
   ```
-
-**Critério de aceite:** empresa sem nenhuma sobreposição com o DNA → score < 30, sem chamada Claude; empresa com 2+ sobreposições → Claude chamado e score refinado; `abordagem_sugerida` não faz previsões de resultado.
 
 ---
 
-## 3.8 — Prompts para Prospecção
+## 3.10 — Prompts
 
 **Arquivo a tocar:** `feature_1_ia_personalizada/services/ai/prompts.py`
 
-- [ ] Adicionar `SYSTEM_PROMPT_DNA_ADVOGADO`:
-  - Variáveis: `{nome_escritorio}`, `{top_tipos_acao}` (JSON), `{total_processos}`, `{distribuicao_polo}`, `{distribuicao_complexidade}`
-  - Instrução: gerar JSON com `especialidades`, `setores_alvo`, `perfil_cliente_ideal`, `diferenciais`
-  - Output: JSON válido — sem texto adicional
-  - Max tokens: 600; modelo: Claude Haiku
+- [ ] `SYSTEM_PROMPT_DNA_ADVOGADO`:
+  - Input: `{nome_escritorio}`, `{top_tipos_acao}` (JSON), `{total_processos}`, `{distribuicao_polo}`
+  - Output JSON: `{especialidades, setores_alvo, tipo_lead_predominante, perfil_cliente_ideal, diferenciais}`
+  - Restrição: `tipo_lead_predominante` deve ser inferido das especialidades:
+    - trabalhista/tributário/contratos/societário → `"empresa"`
+    - família/divórcio/inventário/previdência/consumidor → `"pessoa"`
+    - mistura de ambos → `"ambos"`
 
-- [ ] Adicionar `SYSTEM_PROMPT_MATCH_SCORE`:
-  - Variáveis: `{dna_escritorio}` (JSON), `{empresa_intel}` (JSON), `{score_heuristico}`
-  - Instrução: analisar a afinidade, ajustar o score, gerar motivo e abordagem sugerida
-  - Output: JSON com `score_refinado`, `motivo`, `abordagem_sugerida`
-  - Regras: nunca prometer resultados; focar em necessidades jurídicas da empresa; Tom direto e profissional
-  - Max tokens: 500; modelo: Claude Haiku
-
-**Critério de aceite:** ambos os prompts retornam JSON parseable pelo `json.loads()`; sem instruções que violem OAB.
+- [ ] `SYSTEM_PROMPT_MATCH_SCORE`:
+  - Input: `{dna_escritorio}` (JSON), `{dados_lead}` (JSON), `{tipo_lead}`, `{score_heuristico}`
+  - Output JSON: `{score_refinado, motivo, abordagem_sugerida}`
+  - Restrições por tipo:
+    - B2B: abordagem pode mencionar o contato (sócio, LinkedIn)
+    - B2C: abordagem **nunca** menciona cold call, dados pessoais ou "vi que você tem um processo"
+    - Ambos: nunca prever resultado, nunca citar OAB como barreira
 
 ---
 
-## 3.9 — Schemas Pydantic
+## 3.11 — Schemas Pydantic
 
 **Arquivo a criar:** `shared/schemas/prospeccao.py`
 
-- [ ] `EmpresaBuscarRequest`:
-  ```python
-  cnpj: str = Field(..., description="CNPJ com ou sem formatação")
-  ```
-- [ ] `LeadProspeccaoCreate`:
-  ```python
-  cnpj: str
-  notas_advogado: str | None = None
-  fonte_descoberta: str = "manual"
-  ```
-- [ ] `LeadProspeccaoResponse`:
+- [ ] `LeadProspeccaoResponse` — campos comuns a empresa e pessoa:
   ```python
   id: int
-  cnpj: str
-  empresa_nome: str
-  empresa_setor: str | None
-  empresa_porte: str | None
+  tipo_lead: Literal["empresa", "pessoa"]
+  nome: str                       # razao_social ou nome da pessoa
   score_match: int | None
   score_motivo: str | None
+  abordagem_sugerida: str | None
   status: str
   notas_advogado: str | None
-  contatos_linkedin: list[dict]
-  processos_publicos_count: int
-  linkedin_disponivel: bool
+  fonte_descoberta: str | None
   criado_em: datetime
-  atualizado_em: datetime
+  # Campos exclusivos empresa (None para pessoa)
+  cnpj: str | None
+  empresa_setor: str | None
+  empresa_porte: str | None
+  socios: list[dict]
+  contatos_linkedin: list[dict]
+  linkedin_disponivel: bool
+  # Campos exclusivos pessoa (None para empresa)
+  polo_processo: str | None
+  tipo_acao_origem: str | None
+  numero_cnj_exemplo: str | None
+  # Sempre presente
+  processos_publicos_count: int
+  ```
+- [ ] `DescobertaRequest`:
+  ```python
+  tipo_lead: Literal["empresa", "pessoa", "auto"]  # auto = usa DNA
+  tipo_acao: str          # ex: "reclamação trabalhista"
+  tribunal: str | None    # ex: "TRT15" — None = todos
+  limite: int = 20
+  score_minimo: int = 40
   ```
 - [ ] `LeadStatusUpdate`:
   ```python
@@ -399,167 +425,94 @@ Funções `require_advogado`, `get_escritorio_id_advogado` e `get_advogado_id` a
   ```python
   total: int
   leads: list[LeadProspeccaoResponse]
-  dna_disponivel: bool       # False se escritório tem < 5 processos
-  linkedin_disponivel: bool  # False se sem credenciais LinkedIn
+  dna_disponivel: bool
+  linkedin_disponivel: bool
+  aviso_lgpd: str | None    # preenchido quando pipeline contém leads B2C
   ```
-- [ ] `DNAEscritorioResponse`:
-  ```python
-  especialidades: list[str]
-  setores_alvo: list[str]
-  perfil_cliente_ideal: str
-  diferenciais: list[str]
-  dados_insuficientes: bool
-  gerado_em: datetime | None
-  ```
-- [ ] Exportar todos em `shared/schemas/__init__.py`
+- [ ] `DNAEscritorioResponse`
+- [ ] Exportar em `shared/schemas/__init__.py`
 
 ---
 
-## 3.10 — Rotas `/prospeccao/*`
+## 3.12 — Rotas `/prospeccao/*`
 
 **Arquivo a criar:** `feature_1_ia_personalizada/api/routes/prospeccao.py`
 
-- [ ] `GET /prospeccao/dna`
-  - `Depends(get_escritorio_id_advogado)`
-  - Chama `DNAAdvogadoService.obter_dna(escritorio_id)`
-  - Response: `DNAEscritorioResponse`
-  - Se `dados_insuficientes=True`: retorna 200 com `dados_insuficientes=True` (não é erro)
-
-- [ ] `POST /prospeccao/dna/atualizar`
-  - `Depends(get_escritorio_id_advogado)`
-  - Força regeneração do DNA (invalida cache Redis)
-  - Chama `DNAAdvogadoService.gerar_dna(escritorio_id)`
-  - Response: `DNAEscritorioResponse`
-
-- [ ] `POST /prospeccao/empresa`
-  - `Depends(get_escritorio_id_advogado)`
-  - Body: `EmpresaBuscarRequest`
-  - Chama `EmpresaIntelligenceService.pesquisar(cnpj, escritorio_id)`
-  - Chama `MatchingService.calcular_score(dna, empresa_intel)`
-  - Salva `LeadProspeccao` no banco (ou atualiza se CNPJ já existe para o escritório)
-  - Response: `LeadProspeccaoResponse`
-  - Se empresa não encontrada na Receita Federal: 404 com mensagem clara
-
-- [ ] `GET /prospeccao/pipeline`
-  - `Depends(get_escritorio_id_advogado)`
-  - Query params: `?status=novo&score_minimo=50&page=1&per_page=20`
-  - Lista `leads_prospeccao` do escritório ordenados por `score_match DESC`
-  - Response: `PipelineResponse`
-
-- [ ] `PATCH /prospeccao/{lead_id}/status`
-  - `Depends(get_escritorio_id_advogado)`
-  - Body: `LeadStatusUpdate`
-  - Valida que `lead_id` pertence ao `escritorio_id` do token (403 se não pertencer)
-  - Atualiza `status` e `notas_advogado`
-  - Response: `LeadProspeccaoResponse`
-
-- [ ] `DELETE /prospeccao/{lead_id}`
-  - `Depends(get_escritorio_id_advogado)`
-  - Valida tenant, hard delete (leads não têm valor histórico crítico)
-  - Response: 204 No Content
-
-- [ ] Registrar router em `feature_1_ia_personalizada/api/app.py`:
-  ```python
-  from feature_1_ia_personalizada.api.routes.prospeccao import router as prospeccao_router
-  app.include_router(prospeccao_router)
-  ```
+- [ ] `GET /prospeccao/dna` — retorna DNA atual ou `dados_insuficientes=True`
+- [ ] `POST /prospeccao/dna/atualizar` — força regeneração do DNA
+- [ ] `POST /prospeccao/descobrir` — motor principal:
+  - Body: `DescobertaRequest`
+  - Fluxo: DataJud busca litigantes → filtra pelo tipo → enriquece (empresa ou pessoa) → calcula score → salva leads com score ≥ `score_minimo`
+  - Retorna: `PipelineResponse` com leads recém-descobertos
+  - Para leads B2C: injeta `aviso_lgpd` no response com disclaimer OAB
+- [ ] `GET /prospeccao/pipeline` — lista leads salvos com filtros
+- [ ] `PATCH /prospeccao/{id}/status` — atualiza status + notas
+- [ ] `DELETE /prospeccao/{id}` — remove lead
 
 ---
 
-## 3.11 — Testes unitários
+## 3.13 — Testes unitários
 
-- [ ] `tests/unit/test_receita_federal_client.py`
-  - Mock `httpx.AsyncClient` — CNPJ válido retorna dados corretos
-  - CNPJ inexistente (404) → retorna `None`
-  - Rate limit (429) → retenta uma vez e retorna
-  - Cache Redis hit → sem chamada HTTP
-  - CNPJ inválido (não numérico) → retorna `None` sem HTTP call
-
-- [ ] `tests/unit/test_linkedin_client.py`
-  - Sem variáveis de env → `disponivel=False`, `buscar_funcionarios()` retorna `[]`
-  - Com mock de credenciais → faz chamada, retorna lista filtrada por cargo
-  - Rate limit → retorna `[]` sem exceção
-
-- [ ] `tests/unit/test_dna_advogado.py`
-  - < 5 processos no banco → `dados_insuficientes=True`, sem Claude
-  - ≥ 5 processos → Claude chamado, JSON parseado corretamente
-  - Cache hit → sem query ao banco, sem Claude
-  - `gerar_dna()` após erro do Claude → retorna DNA parcial (só dados heurísticos)
-
-- [ ] `tests/unit/test_matching_service.py`
-  - Score heurístico < 30 → `gerado_por_ia=False`, sem Claude
-  - Score heurístico ≥ 30 → Claude chamado, score refinado
-  - Empresa BAIXADA → desconta pontos (ou bloqueia matching)
-  - Todos os 6 critérios heurísticos testados individualmente
-
-- [ ] `tests/unit/test_empresa_intelligence.py`
-  - Receita + DataJud + LinkedIn (mock) → `EmpresaInteligencia` completa
-  - LinkedIn indisponível → `EmpresaInteligencia` com `linkedin_disponivel=False`, sem erro
-  - Receita retorna `None` → levanta `EmpresaNaoEncontrada`
-  - Chamadas externas rodam em paralelo (verificar com mock de timing)
+- [ ] `test_dna_advogado.py` — especialidades trabalhistas → `tipo_lead_predominante = "empresa"`; família → `"pessoa"`
+- [ ] `test_datajud_prospeccao.py` — busca por tipo_acao retorna litigantes; deduplicação funciona
+- [ ] `test_empresa_intelligence.py` — Receita + DataJud + LinkedIn (mock); sem CNPJ → lead parcial
+- [ ] `test_pessoa_intelligence.py` — sem CPF/telefone/email no dataclass; `validar_compliance` descarta ações sensíveis
+- [ ] `test_matching_empresa.py` — heurística ponto a ponto; score < 30 não chama Claude
+- [ ] `test_matching_pessoa.py` — heurística B2C; abordagem_sugerida não contém cold call
 
 ---
 
-## 3.12 — Testes de integração
+## 3.14 — Testes de integração
 
-- [ ] `tests/integration/test_prospeccao_routes.py`
-  - Setup: escritório, advogado, 5 processos no banco
-  - `GET /prospeccao/dna` com token advogado → 200 + `DNAEscritorioResponse`
-  - `GET /prospeccao/dna` com token cliente → 403
-  - `POST /prospeccao/empresa` com CNPJ válido (mock Receita + DataJud) → 200 + lead salvo no banco
-  - `POST /prospeccao/empresa` com CNPJ já existente para o escritório → atualiza, não duplica
-  - `GET /prospeccao/pipeline` → lista leads com paginação e filtro por status
-  - `PATCH /prospeccao/{id}/status` com lead de outro escritório → 403
-  - `DELETE /prospeccao/{id}` → 204, lead removido do banco
-  - Multi-tenant: advogado de escritório B não vê leads de escritório A
+- [ ] `test_prospeccao_routes.py`:
+  - Role guard: cliente → 403, advogado → 200
+  - `POST /prospeccao/descobrir` com mock DataJud → leads salvos no banco
+  - Pipeline B2C: `aviso_lgpd` presente no response
+  - Lead de outro escritório → 403 no PATCH
+  - Deduplicação: mesmo CNPJ pesquisado duas vezes → atualiza, não duplica
 
 ---
 
-## Arquivos novos a criar (resumo)
+## Arquivos criados até agora
 
 ```
-feature_1_ia_personalizada/
-└── api/
-│   └── routes/
-│       └── prospeccao.py                 # Rotas /prospeccao/*
-└── services/
-    └── prospeccao/
-        ├── __init__.py
-        ├── receita_federal_client.py     # ReceitaFederalClient
-        ├── linkedin_client.py            # LinkedInClient (com fallback)
-        ├── dna_advogado.py               # DNAAdvogadoService
-        ├── empresa_intelligence.py       # EmpresaIntelligenceService
-        └── matching.py                   # MatchingService
+✅ feature_1_ia_personalizada/api/middleware/auth.py          (+require_advogado)
+✅ feature_1_ia_personalizada/services/prospeccao/__init__.py
+✅ feature_1_ia_personalizada/services/prospeccao/receita_federal_client.py
+✅ feature_1_ia_personalizada/services/prospeccao/linkedin_client.py
+✅ shared/models/lead_prospeccao.py
+✅ alembic/versions/011_add_leads_prospeccao.py
+```
 
-shared/
-├── models/
-│   └── lead_prospeccao.py                # Modelo ORM LeadProspeccao
-└── schemas/
-    └── prospeccao.py                     # Todos os schemas de resposta
+## Arquivos a criar
+
+```
+feature_1_ia_personalizada/services/prospeccao/
+├── dna_advogado.py               # 3.5
+├── datajud_prospeccao.py         # 3.6
+├── empresa_intelligence.py       # 3.7
+├── pessoa_intelligence.py        # 3.8
+└── matching.py                   # 3.9
+
+feature_1_ia_personalizada/api/routes/
+└── prospeccao.py                 # 3.12
+
+shared/schemas/
+└── prospeccao.py                 # 3.11
 
 alembic/versions/
-└── 011_add_leads_prospeccao.py           # Migration
+└── 012_add_tipo_lead_e_dna.py    # 3.4b
 ```
 
-## Arquivos existentes a modificar (resumo)
+## Arquivos existentes a modificar
 
 ```
-feature_1_ia_personalizada/services/ai/prompts.py
-  → + SYSTEM_PROMPT_DNA_ADVOGADO
-  → + SYSTEM_PROMPT_MATCH_SCORE
-
-feature_1_ia_personalizada/api/app.py
-  → + include_router(prospeccao_router)
-
-shared/config/settings.py
-  → + LINKEDIN_CLIENT_ID: str | None = None
-  → + LINKEDIN_CLIENT_SECRET: str | None = None
-
-shared/models/__init__.py
-  → + LeadProspeccao
-
-shared/schemas/__init__.py
-  → + exportar schemas de prospeccao.py
+shared/models/lead_prospeccao.py     → + tipo_lead
+shared/models/escritorio.py          → + dna_prospeccao JSONB
+shared/schemas/__init__.py           → + exports de prospeccao.py
+feature_1_ia_personalizada/api/app.py → + include_router(prospeccao_router)
+feature_1_ia_personalizada/services/ai/prompts.py → + 2 prompts
+shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 ```
 
 ---
@@ -567,16 +520,15 @@ shared/schemas/__init__.py
 ## Ordem de implementação
 
 ```
-3.1 ✅ (role guard — feito)
-  → 3.4 (migration + modelo)
-    → 3.2 (ReceitaFederalClient)     ← pode ser paralelo com 3.3
-    → 3.3 (LinkedInClient)           ← pode ser paralelo com 3.2
-      → 3.5 (DNAAdvogadoService)     ← depende de queries no banco
-        → 3.6 (EmpresaIntelligenceService)  ← depende de 3.2 + 3.3
-          → 3.8 (Prompts)            ← pode ser paralelo com 3.7
-          → 3.7 (MatchingService)    ← depende de 3.5 + 3.6
-            → 3.9 (Schemas)
-              → 3.10 (Rotas)
-                → 3.11 (Testes unit)
-                  → 3.12 (Testes integração)
+3.4b (tipo_lead + dna_prospeccao)
+  → 3.5 (DNAAdvogadoService)
+    → 3.6 (DataJudProspeccaoClient)  ← pode ser paralelo com 3.7 e 3.8
+    → 3.7 (EmpresaIntelligenceService)
+    → 3.8 (PessoaIntelligenceService)
+      → 3.9 (MatchingService)
+        → 3.10 (Prompts)     ← pode ser paralelo com 3.11
+        → 3.11 (Schemas)
+          → 3.12 (Rotas)
+            → 3.13 (Testes unit)
+              → 3.14 (Testes integração)
 ```

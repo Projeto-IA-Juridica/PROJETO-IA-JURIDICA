@@ -14,6 +14,7 @@ from shared.models.base import Base, TenantMixin, TimestampMixin
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
+from shared.models.lead_prospeccao import LeadProspeccao
 from shared.models.processo import Processo
 from shared.models.usuario import Usuario
 
@@ -28,4 +29,5 @@ __all__ = [
     "Cliente",
     "Processo",
     "Interacao",
+    "LeadProspeccao",
 ]

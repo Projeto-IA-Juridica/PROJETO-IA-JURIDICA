@@ -14,6 +14,7 @@ from datetime import datetime
 
 from sqlalchemy import Boolean, Integer, SmallInteger, String, Text, Time, UniqueConstraint
 from sqlalchemy import TIMESTAMP
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.models.base import Base, TimestampMixin
@@ -128,6 +129,12 @@ class Escritorio(Base, TimestampMixin):
         nullable=True,
         comment="Template personalizado para quando não há novidades",
     )
+
+    # --- Feature 3: Prospecção Inteligente ---
+    # Perfil de especialização gerado pelo DNAAdvogadoService.
+    # Estrutura: {especialidades, setores_alvo, tipo_lead_predominante,
+    #             perfil_cliente_ideal, diferenciais, gerado_em}
+    dna_prospeccao: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
 
     # --- Relacionamentos ---
     usuarios: Mapped[list["Usuario"]] = relationship(  # noqa: F821

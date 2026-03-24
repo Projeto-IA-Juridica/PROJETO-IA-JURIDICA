@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     GOOGLE_SHEETS_ID: str | None = None
     GOOGLE_CREDENTIALS_PATH: str | None = None
 
+    # LinkedIn API — Feature 3 (Prospecção Inteligente)
+    # Requer aprovação no LinkedIn Partner Program antes de usar.
+    # Sem essas variáveis o LinkedInClient opera em modo degradado (retorna []).
+    LINKEDIN_CLIENT_ID: str | None = None
+    LINKEDIN_CLIENT_SECRET: str | None = None
+
     # CORS
     CORS_ALLOWED_ORIGINS: list[str] = [
         "https://app.conciergejuridico.com",
