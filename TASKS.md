@@ -114,8 +114,8 @@ ALTER TABLE escritorios
 | 3.3 — `LinkedInClient` (com fallback) | ✅ Concluída |
 | 3.4 — Migration `leads_prospeccao` + modelo SQLAlchemy | ✅ Concluída |
 | 3.4b — Atualizar migration: `tipo_lead` + `dna_prospeccao` em escritorios | ✅ Concluída |
-| 3.5 — `DNAAdvogadoService` | ⬜ Pendente |
-| 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ⬜ Pendente |
+| 3.5 — `DNAAdvogadoService` | ✅ Concluída |
+| 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ✅ Concluída |
 | 3.7 — `EmpresaIntelligenceService` (B2B) | ⬜ Pendente |
 | 3.8 — `PessoaIntelligenceService` (B2C) | ⬜ Pendente |
 | 3.9 — `MatchingService` (suporta empresa e pessoa) | ⬜ Pendente |

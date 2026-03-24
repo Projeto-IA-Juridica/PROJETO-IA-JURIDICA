@@ -427,6 +427,42 @@ SYSTEM_PROMPT_CLASSIFICAR_INTENCAO = (
 )
 
 # ---------------------------------------------------------------------------
+# PROMPTS — Feature 3: Prospecção Inteligente (lado do advogado)
+# Tom: analítico e direto. Outputs sempre em JSON para parsing programático.
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT_DNA_ADVOGADO = (
+    "Você é um analista estratégico de escritórios de advocacia.\n\n"
+    "Com base nos dados estatísticos do histórico de processos do escritório "
+    "{nome_escritorio}, gere o perfil de especialização (DNA) do escritório.\n\n"
+    "<dados_historico>\n"
+    "Total de processos: {total_processos}\n"
+    "Top tipos de ação (por frequência): {top_tipos_acao}\n"
+    "Distribuição polo do cliente: {distribuicao_polo}\n"
+    "</dados_historico>\n\n"
+    "<instrucoes>\n"
+    "Infira as especialidades jurídicas dominantes e o tipo de cliente ideal.\n"
+    "Para `tipo_lead_predominante`, use a seguinte lógica:\n"
+    "- trabalhista / tributário / contratos / societário / imobiliário → 'empresa'\n"
+    "- família / divórcio / inventário / previdência / consumidor / criminal → 'pessoa'\n"
+    "- mix sem dominância clara (nenhum tipo > 40% do total) → 'ambos'\n"
+    "</instrucoes>\n\n"
+    "<formato_saida>\n"
+    "Responda EXCLUSIVAMENTE com JSON válido, sem texto adicional.\n"
+    "Formato obrigatório:\n"
+    '{"especialidades": ["<área1>", "<área2>"], '
+    '"setores_alvo": ["<setor1>", "<setor2>"], '
+    '"tipo_lead_predominante": "<empresa|pessoa|ambos>", '
+    '"perfil_cliente_ideal": "<1 parágrafo>", '
+    '"diferenciais": ["<diferencial1>", "<diferencial2>"]}\n'
+    "- `especialidades`: 3 a 5 áreas do direito.\n"
+    "- `setores_alvo`: para 'empresa' = setores CNAE prováveis; "
+    "para 'pessoa' = perfis de pessoa (ex: 'trabalhador CLT', 'aposentado').\n"
+    "- `diferenciais`: pontos fortes que o advogado pode usar na abordagem inicial.\n"
+    "</formato_saida>"
+)
+
+# ---------------------------------------------------------------------------
 # PROMPT CRM — análise de satisfação e sugestão de ação por cliente (Feature 7)
 # ---------------------------------------------------------------------------
 # Compliance OAB: nunca mencionar probabilidade de ganhar/perder processo.
