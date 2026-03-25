@@ -64,6 +64,10 @@ from feature_1_ia_personalizada.services.ai.prompts import gerar_instrucao_perso
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import ScoreRiscoCalculator
+from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
+from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
+from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
+from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
 
 # ── PyMuPDF opcional (extração de PDF no demo RAG) ────────────────────────────
 
@@ -2451,6 +2455,575 @@ def page_analytics() -> None:
 
 
 # =============================================================================
+# SEÇÃO 12 — Prospecção Inteligente (Feature 3)
+# =============================================================================
+
+_PROSPECCAO_TIPOS_ACAO = [
+    "Reclamação Trabalhista",
+    "Horas Extras",
+    "Rescisão Indireta",
+    "Ação de Cobrança",
+    "Indenização por Danos Morais",
+    "Ação de Divórcio",
+    "Execução de Título Extrajudicial",
+    "Ação Consumerista",
+    "Rescisão Contratual",
+    "Acidente de Trabalho",
+]
+
+_EMPRESAS_DEMO = [
+    {"razao_social": "Metalúrgica São Paulo LTDA", "cnpj": "11.222.333/0001-81",
+     "porte": "MEDIA", "setor": "indústria", "situacao": "ATIVA", "processos": 8},
+    {"razao_social": "Comércio e Distribuição Norte S/A", "cnpj": "22.333.444/0001-92",
+     "porte": "GRANDE", "setor": "comércio", "situacao": "ATIVA", "processos": 15},
+    {"razao_social": "Tech Solutions LTDA ME", "cnpj": "33.444.555/0001-03",
+     "porte": "PEQUENA", "setor": "tecnologia", "situacao": "ATIVA", "processos": 3},
+    {"razao_social": "Transporte e Logística Brasil LTDA", "cnpj": "44.555.666/0001-14",
+     "porte": "MEDIA", "setor": "transporte", "situacao": "ATIVA", "processos": 12},
+    {"razao_social": "Construtora ABC S/A", "cnpj": "55.666.777/0001-25",
+     "porte": "GRANDE", "setor": "construção civil", "situacao": "ATIVA", "processos": 20},
+    {"razao_social": "Varejo Fashion LTDA", "cnpj": "66.777.888/0001-36",
+     "porte": "MEDIA", "setor": "varejo", "situacao": "ATIVA", "processos": 6},
+    {"razao_social": "Hospital e Clínica Central S/A", "cnpj": "77.888.999/0001-47",
+     "porte": "GRANDE", "setor": "saúde", "situacao": "ATIVA", "processos": 18},
+    {"razao_social": "Agro Sul Grãos LTDA", "cnpj": "88.999.000/0001-58",
+     "porte": "MEDIA", "setor": "agronegócio", "situacao": "ATIVA", "processos": 4},
+    {"razao_social": "Supermercados RegionalMais S/A", "cnpj": "99.000.111/0001-69",
+     "porte": "GRANDE", "setor": "varejo alimentício", "situacao": "ATIVA", "processos": 25},
+    {"razao_social": "Indústria de Calçados Norte LTDA", "cnpj": "10.111.222/0001-70",
+     "porte": "MEDIA", "setor": "indústria", "situacao": "ATIVA", "processos": 7},
+]
+
+_PESSOAS_DEMO = [
+    {"nome": "Carlos Eduardo Martins", "polo": "ativo", "fase": "Conhecimento",
+     "cnj": "0001234-56.2024.5.02.0100"},
+    {"nome": "Ana Beatriz Santos", "polo": "ativo", "fase": "Conhecimento",
+     "cnj": "0002345-67.2024.5.02.0200"},
+    {"nome": "Roberto José Ferreira", "polo": "ativo", "fase": "Instrução",
+     "cnj": "0003456-78.2024.5.02.0300"},
+    {"nome": "Juliana Costa Lima", "polo": "ativo", "fase": "Conhecimento",
+     "cnj": "0004567-89.2024.5.02.0400"},
+    {"nome": "Paulo Henrique Oliveira", "polo": "ativo", "fase": "Petição Inicial",
+     "cnj": "0005678-90.2024.5.02.0500"},
+    {"nome": "Maria Aparecida Souza", "polo": "ativo", "fase": "Conhecimento",
+     "cnj": "0006789-01.2024.5.02.0600"},
+    {"nome": "Fernando Augusto Rocha", "polo": "ativo", "fase": "Conhecimento",
+     "cnj": "0007890-12.2024.5.02.0700"},
+    {"nome": "Sandra Regina Alves", "polo": "ativo", "fase": "Distribuição",
+     "cnj": "0008901-23.2024.5.02.0800"},
+]
+
+_ESPECIALIDADES_POR_TIPO_ACAO: dict[str, list[str]] = {
+    "Reclamação Trabalhista":        ["reclamação trabalhista", "horas extras"],
+    "Horas Extras":                  ["horas extras", "reclamação trabalhista"],
+    "Rescisão Indireta":             ["rescisão indireta", "reclamação trabalhista"],
+    "Acidente de Trabalho":          ["acidente de trabalho", "indenização por danos morais"],
+    "Ação de Cobrança":              ["ação de cobrança", "execução de título extrajudicial"],
+    "Indenização por Danos Morais":  ["indenização por danos morais", "ação consumerista"],
+    "Ação de Divórcio":              ["ação de divórcio", "guarda e visitação"],
+    "Execução de Título Extrajudicial": ["execução de título extrajudicial", "ação de cobrança"],
+    "Ação Consumerista":             ["ação consumerista", "indenização por danos morais"],
+    "Rescisão Contratual":           ["rescisão contratual", "ação de cobrança"],
+}
+
+
+def _gerar_dna_demo(tipo_acao_ref: str | None = None, nome_escritorio: str = "") -> DNAEscritorio:
+    """
+    Gera um DNA sintético coerente com o tipo_acao mais recente buscado.
+    Sem tipo_acao: assume perfil trabalhista (mais comum no mercado).
+    """
+    tipo = tipo_acao_ref or "Reclamação Trabalhista"
+    especialidades = _ESPECIALIDADES_POR_TIPO_ACAO.get(tipo, ["reclamação trabalhista"])
+    especialidades = list(dict.fromkeys(especialidades + ["indenização por danos morais"]))[:4]
+
+    # B2B para ações tipicamente movidas contra empresas; B2C para demais
+    b2b_tipos = {"Reclamação Trabalhista", "Horas Extras", "Rescisão Indireta",
+                 "Acidente de Trabalho", "Rescisão Contratual", "Ação de Cobrança",
+                 "Execução de Título Extrajudicial"}
+    tipo_lead = "empresa" if tipo in b2b_tipos else "pessoa"
+    setores = ["indústria", "comércio", "serviços", "transporte"] if tipo_lead == "empresa" else []
+
+    return DNAEscritorio(
+        escritorio_id=1,
+        especialidades=especialidades,
+        setores_alvo=setores,
+        tipo_lead_predominante=tipo_lead,
+        perfil_cliente_ideal=(
+            f"{'Empresas de médio e grande porte' if tipo_lead == 'empresa' else 'Trabalhadores e consumidores'} "
+            f"com demandas em {especialidades[0]}"
+        ),
+        diferenciais=["Atendimento ágil", "Especialização setorial", "Transparência no processo"],
+        top_tipos_acao=[
+            {"tipo": especialidades[0], "contagem": 65, "percentual": 65.0},
+            {"tipo": especialidades[1] if len(especialidades) > 1 else especialidades[0],
+             "contagem": 25, "percentual": 25.0},
+        ],
+        dados_insuficientes=False,
+    )
+
+
+def _cor_score_prospeccao(score: int) -> str:
+    if score >= 75:
+        return "#2e7d32"
+    if score >= 50:
+        return "#f57c00"
+    if score >= 30:
+        return "#1565c0"
+    return "#757575"
+
+
+def _render_lead_card_prospeccao(lead: dict) -> None:
+    score = lead.get("score", 0)
+    cor = _cor_score_prospeccao(score)
+    tipo = lead.get("tipo_lead", "empresa")
+    icone = "🏢" if tipo == "empresa" else "👤"
+    status = lead.get("status", "novo")
+    status_cfg = {
+        "novo":        ("#1565c0", "#e3f2fd"),
+        "contatado":   ("#f57c00", "#fff3e0"),
+        "qualificado": ("#2e7d32", "#e8f5e9"),
+        "descartado":  ("#757575", "#f5f5f5"),
+    }
+    s_cor, s_bg = status_cfg.get(status, ("#555", "#f0f0f0"))
+    gerado_ia = lead.get("gerado_por_ia", False)
+    ia_badge = (
+        '<span style="font-size:10px;background:#7b1fa2;color:white;padding:1px 6px;'
+        'border-radius:8px;margin-left:6px;">✨ IA</span>'
+        if gerado_ia else ""
+    )
+    st.markdown(
+        f"""
+        <div style="border:1px solid {cor}40;border-left:4px solid {cor};border-radius:8px;
+                    padding:14px 16px;margin-bottom:8px;background:#fafafa;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-size:15px;font-weight:600;">
+                    {icone} {lead.get('nome', '—')}{ia_badge}
+                </span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span style="background:{s_bg};color:{s_cor};padding:2px 8px;border-radius:10px;
+                                 font-size:11px;font-weight:600;">{status.upper()}</span>
+                    <span style="font-size:22px;font-weight:700;color:{cor};">{score}
+                        <span style="font-size:11px;color:#888;font-weight:400;">/100</span>
+                    </span>
+                </div>
+            </div>
+            <div style="font-size:12px;color:#444;margin-bottom:4px;">
+                <strong>Motivo:</strong> {lead.get('motivo', '—')}
+            </div>
+            <div style="font-size:12px;color:#1565c0;">
+                💡 <em>{lead.get('abordagem', '—')}</em>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _buscar_e_pontuar_leads(
+    tipo_acao: str,
+    tipo_lead: str,
+    dna: DNAEscritorio,
+    limite: int,
+    score_minimo: int,
+) -> list[dict]:
+    """
+    Gera candidatos demo com dados realistas, enriquece e pontua
+    usando o MatchingService real (heurística + Claude Sonnet ≥ 30pts).
+    """
+    import random
+    rng = random.Random(hash(tipo_acao + tipo_lead) % 2**32)
+
+    svc = MatchingService(anthropic_api_key=ANTHROPIC_API_KEY)
+    leads: list[dict] = []
+
+    if tipo_lead == "empresa":
+        pool = rng.sample(_EMPRESAS_DEMO, min(limite, len(_EMPRESAS_DEMO)))
+        for emp in pool:
+            intel = EmpresaInteligencia(
+                razao_social=emp["razao_social"],
+                processos_count=emp["processos"],
+                tipos_acao_envolvida=[tipo_acao],
+                cnpj=emp["cnpj"],
+                situacao=emp["situacao"],
+                porte=emp["porte"],
+                setor_cnae=emp["setor"],
+                socios=[
+                    {"nome": "José Administrador", "qualificacao": "Administrador"},
+                    {"nome": "Maria Sócia", "qualificacao": "Sócia"},
+                ],
+                contatos_linkedin=(
+                    [{"nome": "Ana Gerente", "cargo": "Gerente Jurídico", "url_perfil": ""}]
+                    if emp["porte"] in ("MEDIA", "GRANDE") else []
+                ),
+                linkedin_disponivel=False,
+                enriquecimento_parcial=False,
+            )
+            resultado = asyncio.run(svc.calcular_score(dna=dna, inteligencia=intel))
+            if resultado.score < score_minimo:
+                continue
+            leads.append({
+                "id": len(leads),
+                "nome": emp["razao_social"],
+                "tipo_lead": "empresa",
+                "cnpj": emp["cnpj"],
+                "setor": emp["setor"],
+                "porte": emp["porte"],
+                "processos": emp["processos"],
+                "score": resultado.score,
+                "motivo": resultado.motivo,
+                "abordagem": resultado.abordagem_sugerida,
+                "gerado_por_ia": resultado.gerado_por_ia,
+                "componentes": resultado.componentes,
+                "status": "novo",
+                "tipo_acao_busca": tipo_acao,
+            })
+    else:
+        pool = rng.sample(_PESSOAS_DEMO, min(limite, len(_PESSOAS_DEMO)))
+        for p in pool:
+            intel = PessoaInteligencia(
+                nome=p["nome"],
+                polo=p["polo"],
+                tipo_acao=tipo_acao,
+                tribunal="TRT2",
+                fase_processual=p["fase"],
+                numero_cnj_exemplo=p["cnj"],
+            )
+            resultado = asyncio.run(svc.calcular_score(dna=dna, inteligencia=intel))
+            if resultado.score < score_minimo:
+                continue
+            leads.append({
+                "id": len(leads),
+                "nome": p["nome"],
+                "tipo_lead": "pessoa",
+                "polo": p["polo"],
+                "fase": p["fase"],
+                "cnj": p["cnj"],
+                "score": resultado.score,
+                "motivo": resultado.motivo,
+                "abordagem": resultado.abordagem_sugerida,
+                "gerado_por_ia": resultado.gerado_por_ia,
+                "componentes": resultado.componentes,
+                "status": "novo",
+                "tipo_acao_busca": tipo_acao,
+            })
+
+    leads.sort(key=lambda l: -l["score"])
+    return leads
+
+
+def page_prospeccao() -> None:
+    """Feature 3 — Prospecção Inteligente (B2B + B2C)."""
+    st.title("🔍 Prospecção Inteligente")
+    st.caption(
+        "Motor de captação de leads qualificados: DataJud CNJ → Receita Federal → LinkedIn → "
+        "Score heurístico + Claude Sonnet."
+    )
+
+    ob = st.session_state.get("onboarding", {})
+
+    if "leads_prospeccao" not in st.session_state:
+        st.session_state["leads_prospeccao"] = []
+    if "dna_escritorio" not in st.session_state:
+        st.session_state["dna_escritorio"] = _gerar_dna_demo(nome_escritorio=ob.get("nome_escritorio", ""))
+    if "dna_tipo_acao_ref" not in st.session_state:
+        st.session_state["dna_tipo_acao_ref"] = None
+
+    dna: DNAEscritorio = st.session_state["dna_escritorio"]
+    leads_total = len(st.session_state["leads_prospeccao"])
+
+    tab_dna, tab_descobrir, tab_pipeline = st.tabs([
+        "🧬 DNA do Escritório",
+        "🔎 Descobrir Leads",
+        f"📋 Pipeline  ({leads_total} lead{'s' if leads_total != 1 else ''})",
+    ])
+
+    # ── TAB 1 — DNA do Escritório ──────────────────────────────────────────────
+    with tab_dna:
+        st.markdown("### Perfil Estratégico do Escritório")
+        st.caption(
+            "O DNA é inferido a partir do tipo de ação pesquisado e determina quais leads "
+            "recebem score mais alto. Em produção é gerado pelo `DNAAdvogadoService` a partir "
+            "do histórico real de processos (`POST /prospeccao/dna/atualizar`)."
+        )
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Especialidades**")
+            for esp in dna.especialidades:
+                st.markdown(f"- {esp.title()}")
+            st.markdown("**Tipo de lead predominante**")
+            tipo_badge = "🏢 Empresa (B2B)" if dna.tipo_lead_predominante == "empresa" else "👤 Pessoa (B2C)"
+            st.info(tipo_badge)
+
+        with col_b:
+            if dna.setores_alvo:
+                st.markdown("**Setores-alvo**")
+                for s in dna.setores_alvo:
+                    st.markdown(f"- {s.title()}")
+            st.markdown("**Perfil do cliente ideal**")
+            st.write(dna.perfil_cliente_ideal)
+
+        if dna.top_tipos_acao:
+            st.divider()
+            st.markdown("**Distribuição de tipos de ação**")
+            for t in dna.top_tipos_acao:
+                pct = t.get("percentual", 0)
+                cor = "#1976d2" if pct >= 40 else "#555"
+                st.markdown(
+                    f"""<div style="margin-bottom:8px;">
+                        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px;">
+                            <span>{t['tipo']}</span>
+                            <span style="color:{cor};font-weight:600;">{pct:.0f}%</span>
+                        </div>
+                        <div style="background:#e0e0e0;border-radius:3px;height:5px;">
+                            <div style="width:{pct}%;background:{cor};height:5px;border-radius:3px;"></div>
+                        </div></div>""",
+                    unsafe_allow_html=True,
+                )
+
+        st.divider()
+        if st.button("🔄 Regenerar DNA", help="Recalcula o DNA com base no último tipo de ação pesquisado"):
+            tipo_ref = st.session_state.get("dna_tipo_acao_ref")
+            st.session_state["dna_escritorio"] = _gerar_dna_demo(
+                tipo_acao_ref=tipo_ref,
+                nome_escritorio=ob.get("nome_escritorio", ""),
+            )
+            st.success("DNA atualizado.")
+            st.rerun()
+
+        with st.expander("ℹ️ Como o DNA funciona em produção"):
+            st.markdown("""
+**`GET /prospeccao/dna`** → retorna o DNA salvo (cache Redis 6h).
+
+**`POST /prospeccao/dna/atualizar`** → regenera via `DNAAdvogadoService`:
+1. Agrega os tipos de ação dos últimos 90 dias do escritório
+2. Classifica se o perfil é B2B ou B2C pelo polo predominante
+3. Chama **Claude Haiku** para nomear as especialidades e sugerir setores-alvo
+4. Persiste em `escritorio.dna_prospeccao` (JSONB) + cache Redis (TTL 6h)
+5. Fallback: `dados_insuficientes=True` quando há menos de 5 processos
+""")
+
+    # ── TAB 2 — Descobrir Leads ────────────────────────────────────────────────
+    with tab_descobrir:
+        st.markdown("### Buscar Novos Leads")
+        st.caption(
+            "Selecione um tipo de ação. O motor busca litigantes no DataJud CNJ, "
+            "enriquece com Receita Federal + LinkedIn e pontua com Claude Sonnet."
+        )
+
+        with st.form("form_descobrir_leads"):
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                tipo_acao = st.selectbox("Tipo de ação", _PROSPECCAO_TIPOS_ACAO)
+                tipo_lead = st.radio(
+                    "Tipo de lead",
+                    ["empresa", "pessoa"],
+                    horizontal=True,
+                    format_func=lambda x: "🏢 Empresa (B2B)" if x == "empresa" else "👤 Pessoa (B2C)",
+                )
+            with col_f2:
+                score_minimo = st.slider("Score mínimo para qualificar", 0, 100, 40)
+                limite = st.slider("Candidatos a analisar", 1, 10, 5)
+
+            submitted = st.form_submit_button("🚀 Buscar e Qualificar Leads", use_container_width=True, type="primary")
+
+        if submitted:
+            if not ANTHROPIC_API_KEY:
+                st.error("❌ Configure ANTHROPIC_API_KEY para usar o motor de IA.")
+            else:
+                # Atualiza DNA para refletir o tipo_acao buscado
+                st.session_state["dna_tipo_acao_ref"] = tipo_acao
+                dna = _gerar_dna_demo(tipo_acao_ref=tipo_acao, nome_escritorio=ob.get("nome_escritorio", ""))
+                st.session_state["dna_escritorio"] = dna
+
+                with st.spinner(f"Consultando DataJud → enriquecendo → Claude Sonnet... (~{limite * 4}s)"):
+                    try:
+                        novos = _buscar_e_pontuar_leads(
+                            tipo_acao=tipo_acao,
+                            tipo_lead=tipo_lead,
+                            dna=dna,
+                            limite=limite,
+                            score_minimo=score_minimo,
+                        )
+                        existentes = st.session_state.get("leads_prospeccao", [])
+                        chaves = {(l["nome"], l["tipo_lead"]) for l in existentes}
+                        inseridos = 0
+                        for lead in novos:
+                            if (lead["nome"], lead["tipo_lead"]) not in chaves:
+                                lead["id"] = len(existentes) + inseridos
+                                existentes.append(lead)
+                                inseridos += 1
+                        st.session_state["leads_prospeccao"] = existentes
+
+                        if inseridos:
+                            st.success(f"✅ {inseridos} novo(s) lead(s) adicionado(s) ao pipeline (score ≥ {score_minimo})")
+                        elif novos:
+                            st.info("Todos os leads encontrados já estavam no pipeline.")
+                        else:
+                            st.warning(
+                                f"Nenhum candidato atingiu score ≥ {score_minimo}. "
+                                "Reduza o score mínimo ou mude o tipo de ação."
+                            )
+
+                        if novos:
+                            st.divider()
+                            st.markdown(f"**{len(novos)} lead(s) qualificado(s) nesta busca:**")
+                            for lead in novos:
+                                _render_lead_card_prospeccao(lead)
+                                if lead.get("componentes"):
+                                    with st.expander(f"🔬 Componentes do score — {lead['nome']}"):
+                                        for comp, pts in lead["componentes"].items():
+                                            label = comp.replace("_", " ").title()
+                                            st.markdown(f"- **{label}:** +{pts} pts")
+
+                        st.rerun()
+
+                    except Exception as exc:
+                        st.error(f"Erro durante a prospecção: {exc}")
+
+        # Aviso LGPD automático quando há leads B2C
+        leads_atuais = st.session_state.get("leads_prospeccao", [])
+        if any(l.get("tipo_lead") == "pessoa" for l in leads_atuais):
+            st.divider()
+            st.warning(
+                "⚠️ **Aviso LGPD / OAB Prov. 205/2021** — "
+                "Este pipeline contém leads de pessoas físicas identificadas em processos públicos. "
+                "A abordagem deve respeitar o art. 7º da LGPD: não utilize dados pessoais para "
+                "contato direto não solicitado. Canais permitidos: publicação processual, "
+                "correspondência via tribunal ou publicidade institucional segmentada.",
+                icon="⚠️",
+            )
+
+        st.divider()
+        with st.expander("ℹ️ Fluxo completo em produção"):
+            st.markdown("""
+**`POST /prospeccao/descobrir`** executa o motor completo:
+
+| Etapa | Serviço | Detalhe |
+|-------|---------|---------|
+| 1 | `DataJudProspeccaoClient` | ElasticSearch CNJ — busca litigantes por `tipo_acao` |
+| 2 | `EmpresaIntelligenceService` | Receita Federal (CNPJ, porte, sócios) + LinkedIn (cargos) |
+| 3 | `PessoaIntelligenceService` | Dados do processo público — sem CPF/telefone/email (LGPD art. 11) |
+| 4 | `MatchingService._score_heuristico_*` | Heurística B2B (6 componentes) ou B2C (4 componentes) |
+| 5 | `MatchingService._refinar_com_claude` | Claude Sonnet refina score + gera motivo e abordagem (só se score ≥ 30) |
+| 6 | `_salvar_lead` | Persiste no banco com deduplicação por CNPJ (empresa) ou número CNJ (pessoa) |
+
+**Heurística B2B:**
++30 especialidade match · +20 setor CNAE · +15 demanda ativa (≥3 proc.) · +15 LinkedIn · +10 porte · +10 ATIVA
+
+**Heurística B2C:**
++35 especialidade match · +25 polo compatível · +20 fase inicial · +20 alta recorrência (>30%)
+""")
+
+    # ── TAB 3 — Pipeline ───────────────────────────────────────────────────────
+    with tab_pipeline:
+        leads = st.session_state.get("leads_prospeccao", [])
+
+        if not leads:
+            st.info("Nenhum lead no pipeline ainda. Use **Descobrir Leads** para iniciar a prospecção.")
+            return
+
+        # Filtros
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            filtro_tipo = st.selectbox(
+                "Tipo de lead", ["Todos", "empresa", "pessoa"],
+                format_func=lambda x: "Todos os tipos" if x == "Todos" else ("🏢 Empresa" if x == "empresa" else "👤 Pessoa"),
+                key="pipl_tipo",
+            )
+        with col_f2:
+            filtro_status = st.selectbox(
+                "Status", ["Todos", "novo", "contatado", "qualificado", "descartado"],
+                key="pipl_status",
+            )
+        with col_f3:
+            filtro_score = st.slider("Score mínimo", 0, 100, 0, key="pipl_score")
+
+        leads_filtrados = [
+            l for l in leads
+            if (filtro_tipo == "Todos" or l.get("tipo_lead") == filtro_tipo)
+            and (filtro_status == "Todos" or l.get("status") == filtro_status)
+            and l.get("score", 0) >= filtro_score
+        ]
+
+        # Métricas do pipeline
+        st.divider()
+        total = len(leads)
+        novos_count = sum(1 for l in leads if l.get("status") == "novo")
+        qualificados_count = sum(1 for l in leads if l.get("status") == "qualificado")
+        score_medio = int(sum(l.get("score", 0) for l in leads) / total) if total else 0
+        ia_count = sum(1 for l in leads if l.get("gerado_por_ia"))
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Total de leads", total)
+        c2.metric("Novos", novos_count)
+        c3.metric("Qualificados", qualificados_count)
+        c4.metric("Score médio", score_medio)
+        c5.metric("✨ Pontuados por IA", ia_count)
+
+        st.divider()
+        st.caption(f"Exibindo **{len(leads_filtrados)}** de **{total}** leads")
+
+        if not leads_filtrados:
+            st.info("Nenhum lead corresponde aos filtros selecionados.")
+            return
+
+        for lead in leads_filtrados:
+            _render_lead_card_prospeccao(lead)
+
+            col_c, col_q, col_d, col_r, col_del = st.columns([2, 2, 2, 2, 1])
+            s = lead.get("status", "novo")
+
+            with col_c:
+                if st.button("📞 Contatado", key=f"prosp_c_{lead['id']}", use_container_width=True,
+                             disabled=s == "contatado"):
+                    lead["status"] = "contatado"
+                    st.rerun()
+            with col_q:
+                if st.button("⭐ Qualificado", key=f"prosp_q_{lead['id']}", use_container_width=True,
+                             disabled=s == "qualificado"):
+                    lead["status"] = "qualificado"
+                    st.rerun()
+            with col_d:
+                if st.button("❌ Descartar", key=f"prosp_d_{lead['id']}", use_container_width=True,
+                             disabled=s == "descartado"):
+                    lead["status"] = "descartado"
+                    st.rerun()
+            with col_r:
+                if st.button("🔄 Reabrir", key=f"prosp_r_{lead['id']}", use_container_width=True,
+                             disabled=s == "novo"):
+                    lead["status"] = "novo"
+                    st.rerun()
+            with col_del:
+                if st.button("🗑️", key=f"prosp_del_{lead['id']}", help="Remover lead",
+                             use_container_width=True):
+                    st.session_state["leads_prospeccao"] = [
+                        l for l in leads if l["id"] != lead["id"]
+                    ]
+                    st.rerun()
+
+            st.markdown("<hr style='margin:4px 0;opacity:.15;'>", unsafe_allow_html=True)
+
+        # Exportar CSV
+        st.divider()
+        csv_linhas = ["nome,tipo_lead,score,status,setor,motivo,abordagem"]
+        for l in leads_filtrados:
+            motivo = (l.get("motivo") or "").replace('"', "'").replace("\n", " ")
+            abordagem = (l.get("abordagem") or "").replace('"', "'").replace("\n", " ")
+            setor = l.get("setor") or l.get("fase") or ""
+            csv_linhas.append(
+                f'"{l["nome"]}",{l["tipo_lead"]},{l["score"]},{l["status"]},"{setor}","{motivo}","{abordagem}"'
+            )
+        st.download_button(
+            "📥 Exportar pipeline (CSV)",
+            data="\n".join(csv_linhas),
+            file_name="pipeline_prospeccao.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+
+# =============================================================================
 # SEÇÃO 11 — Sidebar + Main (ponto de entrada)
 # =============================================================================
 
@@ -2470,7 +3043,7 @@ def _render_sidebar() -> None:
         if onboarding_ok or clientes:
             paginas_disponiveis += [
                 "👥 Hub do Advogado", "🤝 CRM", "📚 Base RAG",
-                "📊 Analytics", "⚙️ Configurações",
+                "🔍 Prospecção", "📊 Analytics", "⚙️ Configurações",
             ]
 
         pagina_selecionada = st.radio("Navegação", paginas_disponiveis, label_visibility="collapsed")
@@ -2479,6 +3052,7 @@ def _render_sidebar() -> None:
             "👥 Hub do Advogado": "hub",
             "🤝 CRM": "crm",
             "📚 Base RAG": "rag",
+            "🔍 Prospecção": "prospeccao",
             "📊 Analytics": "analytics",
             "⚙️ Configurações": "config",
         }
@@ -2596,6 +3170,8 @@ def main() -> None:
         page_rag()
     elif pagina == "crm":
         page_crm()
+    elif pagina == "prospeccao":
+        page_prospeccao()
     elif pagina == "analytics":
         page_analytics()
     elif pagina == "config":
