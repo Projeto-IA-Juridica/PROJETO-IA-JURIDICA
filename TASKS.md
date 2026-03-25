@@ -121,7 +121,7 @@ ALTER TABLE escritorios
 | 3.9 — `MatchingService` (suporta empresa e pessoa) | ✅ Concluída |
 | 3.10 — Prompts para DNA e Matching | ✅ Concluída |
 | 3.11 — Schemas Pydantic | ✅ Concluída |
-| 3.12 — Rotas `/prospeccao/*` | ⬜ Pendente |
+| 3.12 — Rotas `/prospeccao/*` | ✅ Concluída |
 | 3.13 — Testes unitários | ⬜ Pendente |
 | 3.14 — Testes de integração | ⬜ Pendente |
 
