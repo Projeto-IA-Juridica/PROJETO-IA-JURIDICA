@@ -20,6 +20,13 @@ from shared.schemas.cliente import (
     ClienteResponse,
     ClienteUpdate,
 )
+from shared.schemas.prospeccao import (
+    LeadProspeccaoResponse,
+    DescobertaRequest,
+    LeadStatusUpdate,
+    PipelineResponse,
+    DNAEscritorioResponse,
+)
 from shared.schemas.escritorio import (
     EscritorioCreate,
     EscritorioList,
