@@ -85,17 +85,40 @@ class DNAAdvogadoService:
     Gera e recupera o DNA de especialização de um escritório.
 
     Uso:
-        service = DNAAdvogadoService(claude_client, redis)
+        service = DNAAdvogadoService()          # cria dependências a partir do env
+        service = DNAAdvogadoService(claude, redis)  # injeção explícita (testes)
         dna = await service.obter_dna(escritorio_id, db)
     """
 
-    def __init__(self, claude: ClaudeClient, redis: Any) -> None:
+    def __init__(self, claude: ClaudeClient | None = None, redis: Any = None) -> None:
+        if claude is None:
+            claude = ClaudeClient()
         self._claude = claude
         self._redis = redis
 
     # ------------------------------------------------------------------
     # Interface pública
     # ------------------------------------------------------------------
+
+    async def obter_dna_salvo(
+        self, escritorio_id: int, db: AsyncSession
+    ) -> DNAEscritorio | None:
+        """
+        Retorna o DNA salvo (cache ou banco) sem gerar novo.
+        Retorna None se não houver DNA salvo ou se for dados_insuficientes.
+        """
+        cached = await self._get_cache(escritorio_id)
+        if cached is not None and not cached.dados_insuficientes:
+            return cached
+        dna_banco, _ = await self._ler_banco(escritorio_id, db)
+        return dna_banco if (dna_banco and not dna_banco.dados_insuficientes) else None
+
+    async def salvar_dna(
+        self, escritorio_id: int, dna: DNAEscritorio, db: AsyncSession
+    ) -> None:
+        """Persiste o DNA no banco e atualiza o cache."""
+        await self._persistir(escritorio_id, dna, db)
+        await self._set_cache(escritorio_id, dna)
 
     async def obter_dna(
         self, escritorio_id: int, db: AsyncSession

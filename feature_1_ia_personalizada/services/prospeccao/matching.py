@@ -23,7 +23,7 @@ import httpx
 
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
 from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
-from feature_1_ia_personalizada.services.prospeccao.dna_service import DNAEscritorio
+from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
 
 
 # ---------------------------------------------------------------------------
@@ -217,15 +217,21 @@ class MatchingService:
         if any(esp in tipo_lower for esp in especialidades_lower):
             componentes["especialidade_match"] = 35
 
-        polos_lower = {p.lower() for p in dna.polos_alvo}
-        if pessoa.polo.lower() in polos_lower:
+        # Polo compatível: se o escritório é B2C pessoa, o polo ativo é o mais comum
+        polo_preferido = "ativo" if dna.tipo_lead_predominante in ("pessoa", "ambos") else "ativo"
+        if pessoa.polo.lower() == polo_preferido:
             componentes["polo_compativel"] = 25
 
         fases_iniciais = {"conhecimento", "inicial", "distribuição", "petição inicial"}
         if pessoa.fase_processual.lower() in fases_iniciais:
             componentes["fase_inicial"] = 20
 
-        recorrentes_lower = {t.lower() for t in dna.tipos_acao_recorrentes}
+        # Tipos recorrentes: top_tipos_acao com percentual > 30%
+        recorrentes_lower = {
+            t["tipo"].lower()
+            for t in dna.top_tipos_acao
+            if t.get("percentual", 0) > 30
+        }
         if any(rec in tipo_lower for rec in recorrentes_lower):
             componentes["alta_recorrencia"] = 20
 
@@ -252,9 +258,9 @@ class MatchingService:
             "dna_escritorio": {
                 "especialidades": dna.especialidades,
                 "setores_alvo": dna.setores_alvo,
-                "polos_alvo": dna.polos_alvo,
-                "tipos_acao_recorrentes": dna.tipos_acao_recorrentes,
-                "perfil_cliente_tipico": dna.perfil_cliente_tipico,
+                "tipo_lead_predominante": dna.tipo_lead_predominante,
+                "top_tipos_acao": dna.top_tipos_acao,
+                "perfil_cliente_ideal": dna.perfil_cliente_ideal,
             },
             "lead": {k: v for k, v in asdict(inteligencia).items() if v not in (None, "", [])},
             "score_heuristico": score_heuristico,

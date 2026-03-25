@@ -76,19 +76,24 @@ class EmpresaIntelligenceService:
     Enriquece um litigante pessoa jurídica com dados de todas as fontes B2B.
 
     Uso:
-        svc = EmpresaIntelligenceService(receita_client, linkedin_client, redis)
+        svc = EmpresaIntelligenceService()                        # dependências do env
+        svc = EmpresaIntelligenceService(receita, linkedin, redis) # injeção (testes)
         inteligencia = await svc.enriquecer(litigante)
     """
 
     def __init__(
         self,
-        receita: ReceitaFederalClient,
-        linkedin: LinkedInClient,
+        receita: ReceitaFederalClient | None = None,
+        linkedin: LinkedInClient | None = None,
         redis: Any = None,
     ) -> None:
-        self._receita = receita
-        self._linkedin = linkedin
+        self._receita = receita or ReceitaFederalClient(redis=None)
+        self._linkedin = linkedin or LinkedInClient(redis=None)
         self._redis = redis
+
+    async def linkedin_disponivel(self) -> bool:
+        """Retorna True se o LinkedInClient tem credenciais configuradas."""
+        return self._linkedin.disponivel
 
     # ------------------------------------------------------------------
     # Interface pública
