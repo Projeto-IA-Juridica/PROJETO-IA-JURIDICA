@@ -23,6 +23,8 @@ import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import os
+
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_DNA_ADVOGADO
 from shared.models.escritorio import Escritorio
@@ -92,7 +94,7 @@ class DNAAdvogadoService:
 
     def __init__(self, claude: ClaudeClient | None = None, redis: Any = None) -> None:
         if claude is None:
-            claude = ClaudeClient()
+            claude = ClaudeClient(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
         self._claude = claude
         self._redis = redis
 

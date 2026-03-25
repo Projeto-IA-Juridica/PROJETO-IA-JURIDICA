@@ -334,11 +334,12 @@ async def _salvar_lead(
         empresa_porte=getattr(inteligencia, "porte", None),
         socios=getattr(inteligencia, "socios", []),
         contatos_linkedin=getattr(inteligencia, "contatos_linkedin", []),
+        linkedin_disponivel=getattr(inteligencia, "linkedin_disponivel", False),
         # Campos pessoa — sem CPF, telefone ou email (proibido por design)
         polo_processo=getattr(inteligencia, "polo", None),
         tipo_acao_origem=getattr(inteligencia, "tipo_acao", None),
         numero_cnj_exemplo=getattr(inteligencia, "numero_cnj_exemplo", None),
-        processos_publicos_count=getattr(inteligencia, "total_processos", 1),
+        processos_publicos_count=getattr(inteligencia, "processos_count", 1),
     )
     db.add(novo)
     await db.commit()

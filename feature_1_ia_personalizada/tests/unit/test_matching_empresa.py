@@ -52,6 +52,9 @@ def _empresa(
     processos: int = 5,
     linkedin_contatos: int = 2,
 ) -> EmpresaInteligencia:
+    contatos = [
+        {"nome": "Ana Gerente", "cargo": "Gerente Jurídico", "url_perfil": ""}
+    ] * linkedin_contatos
     return EmpresaInteligencia(
         razao_social="Empresa Teste LTDA",
         processos_count=processos,
@@ -61,7 +64,7 @@ def _empresa(
         porte=porte,
         setor_cnae=setor,
         socios=[{"nome": "João Sócio", "qualificacao": "Administrador"}],
-        contatos_linkedin=[{"nome": "Ana Gerente", "cargo": "Gerente Jurídico"}] * linkedin_contatos,
+        contatos_linkedin=contatos,
         linkedin_disponivel=True,
         enriquecimento_parcial=False,
     )
@@ -74,7 +77,9 @@ def _empresa(
 class TestHeuristicaEmpresa:
     def test_score_maximo_todos_componentes(self):
         """Todos os componentes positivos → score = 100 (capped)."""
-        dna = _dna_empresa(especialidades=["direito trabalhista"], setores_alvo=["indústria"])
+        # A heurística faz: especialidades_lower & tipos_empresa_lower
+        # Portanto os valores devem ser idênticos (case-insensitive)
+        dna = _dna_empresa(especialidades=["reclamação trabalhista"], setores_alvo=["indústria"])
         empresa = _empresa(
             tipos_acao=["reclamação trabalhista"],
             setor="indústria",
@@ -95,8 +100,9 @@ class TestHeuristicaEmpresa:
         assert score == 100  # sum=100, capped at 100
 
     def test_sem_match_especialidade_nao_pontua(self):
-        dna = _dna_empresa(especialidades=["tributário"])
-        empresa = _empresa(tipos_acao=["contrato de locação"], setor="tecnologia")
+        # Tipos completamente diferentes — sem interseção
+        dna = _dna_empresa(especialidades=["tributário"], setores_alvo=["tecnologia"])
+        empresa = _empresa(tipos_acao=["contrato de locação"], setor="agronegócio")
         svc = MatchingService(anthropic_api_key="sk-test")
         score, comp = svc._score_heuristico_empresa(dna, empresa)
 
@@ -142,11 +148,11 @@ class TestHeuristicaEmpresa:
 class TestScoreAbaixoLimiar:
     @pytest.mark.asyncio
     async def test_score_29_nao_chama_claude(self):
-        """Score heurístico < 30: gerado_por_ia=False, Claude não é chamado."""
-        dna = _dna_empresa(especialidades=["tributário"], setores_alvo=["tecnologia"])
+        """Score heurístico 0: gerado_por_ia=False, Claude não é chamado."""
+        dna = _dna_empresa(especialidades=["tributário"], setores_alvo=["finanças"])
         # Empresa sem match algum → score = 0
         empresa = _empresa(
-            tipos_acao=["contrato de locação"],
+            tipos_acao=["locação de imóvel"],
             setor="agronegócio",
             porte="MEI",
             situacao="BAIXADA",

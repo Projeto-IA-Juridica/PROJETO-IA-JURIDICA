@@ -171,7 +171,7 @@ class MatchingService:
         componentes: dict[str, int] = {}
 
         especialidades_lower = {e.lower() for e in dna.especialidades}
-        tipos_empresa_lower = {t.lower() for t in empresa.tipos_acao}
+        tipos_empresa_lower = {t.lower() for t in empresa.tipos_acao_envolvida}
         if especialidades_lower & tipos_empresa_lower:
             componentes["especialidade_match"] = 30
 
@@ -179,10 +179,10 @@ class MatchingService:
         if empresa.setor_cnae.lower() in setores_lower:
             componentes["setor_alvo"] = 20
 
-        if empresa.total_processos >= 3:
+        if empresa.processos_count >= 3:
             componentes["demanda_ativa"] = 15
 
-        if empresa.contatos_linkedin > 0:
+        if len(empresa.contatos_linkedin) > 0:
             componentes["linkedin_contatos"] = 15
 
         if empresa.porte.upper() in ("MEDIA", "GRANDE"):

@@ -450,11 +450,11 @@ SYSTEM_PROMPT_DNA_ADVOGADO = (
     "<formato_saida>\n"
     "Responda EXCLUSIVAMENTE com JSON válido, sem texto adicional.\n"
     "Formato obrigatório:\n"
-    '{"especialidades": ["<área1>", "<área2>"], '
+    '{{"especialidades": ["<área1>", "<área2>"], '
     '"setores_alvo": ["<setor1>", "<setor2>"], '
     '"tipo_lead_predominante": "<empresa|pessoa|ambos>", '
     '"perfil_cliente_ideal": "<1 parágrafo>", '
-    '"diferenciais": ["<diferencial1>", "<diferencial2>"]}\n'
+    '"diferenciais": ["<diferencial1>", "<diferencial2>"]}}\n'
     "- `especialidades`: 3 a 5 áreas do direito.\n"
     "- `setores_alvo`: para 'empresa' = setores CNAE prováveis; "
     "para 'pessoa' = perfis de pessoa (ex: 'trabalhador CLT', 'aposentado').\n"

@@ -122,8 +122,8 @@ ALTER TABLE escritorios
 | 3.10 — Prompts para DNA e Matching | ✅ Concluída |
 | 3.11 — Schemas Pydantic | ✅ Concluída |
 | 3.12 — Rotas `/prospeccao/*` | ✅ Concluída |
-| 3.13 — Testes unitários | ⬜ Pendente |
-| 3.14 — Testes de integração | ⬜ Pendente |
+| 3.13 — Testes unitários | ✅ Concluída |
+| 3.14 — Testes de integração | ✅ Concluída |
 
 ---
 
@@ -451,20 +451,20 @@ ALTER TABLE escritorios
 
 ---
 
-## 3.13 — Testes unitários
+## 3.13 — Testes unitários ✅
 
-- [ ] `test_dna_advogado.py` — especialidades trabalhistas → `tipo_lead_predominante = "empresa"`; família → `"pessoa"`
-- [ ] `test_datajud_prospeccao.py` — busca por tipo_acao retorna litigantes; deduplicação funciona
-- [ ] `test_empresa_intelligence.py` — Receita + DataJud + LinkedIn (mock); sem CNPJ → lead parcial
-- [ ] `test_pessoa_intelligence.py` — sem CPF/telefone/email no dataclass; `validar_compliance` descarta ações sensíveis
-- [ ] `test_matching_empresa.py` — heurística ponto a ponto; score < 30 não chama Claude
-- [ ] `test_matching_pessoa.py` — heurística B2C; abordagem_sugerida não contém cold call
+- [x] `test_dna_advogado.py` — especialidades trabalhistas → `tipo_lead_predominante = "empresa"`; família → `"pessoa"`
+- [x] `test_datajud_prospeccao.py` — busca por tipo_acao retorna litigantes; deduplicação funciona
+- [x] `test_empresa_intelligence.py` — Receita + DataJud + LinkedIn (mock); sem CNPJ → lead parcial
+- [x] `test_pessoa_intelligence.py` — sem CPF/telefone/email no dataclass; `validar_compliance` descarta ações sensíveis
+- [x] `test_matching_empresa.py` — heurística ponto a ponto; score < 30 não chama Claude
+- [x] `test_matching_pessoa.py` — heurística B2C; abordagem_sugerida não contém cold call
 
 ---
 
-## 3.14 — Testes de integração
+## 3.14 — Testes de integração ✅
 
-- [ ] `test_prospeccao_routes.py`:
+- [x] `test_prospeccao_routes.py`:
   - Role guard: cliente → 403, advogado → 200
   - `POST /prospeccao/descobrir` com mock DataJud → leads salvos no banco
   - Pipeline B2C: `aviso_lgpd` presente no response

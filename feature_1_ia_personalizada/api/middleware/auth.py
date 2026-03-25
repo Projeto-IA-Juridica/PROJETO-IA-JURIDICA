@@ -6,12 +6,18 @@ Middleware Global de Autenticação JWT.
 Intercepta todas as requisições na API. Se a rota não for pública,
 tenta extrair o token do header `Authorization: Bearer <token>`,
 valida e injeta os dados do usuário em `request.state.current_user`.
+
+Também expõe dependências FastAPI para controle de acesso por role:
+- require_advogado: garante que o usuário seja advogado ou admin
+- get_escritorio_id_advogado: retorna o escritorio_id do token
+- get_advogado_id: retorna o user_id do token
 """
 
 import secrets
 
-from fastapi import Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -136,3 +142,83 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         # 4.  Deixa a requisição seguir seu fluxo normal - fica autorizado
         response = await call_next(request)
         return response
+
+
+# ---------------------------------------------------------------------------
+# Dependências FastAPI para controle de acesso por role
+# ---------------------------------------------------------------------------
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _get_payload(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """Extrai e valida o JWT da requisição, retornando o payload."""
+    token: str | None = None
+    if credentials:
+        token = credentials.credentials
+    elif hasattr(request.state, "user_payload"):
+        # Já validado pelo middleware — reaproveita
+        return request.state.user_payload
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token JWT ausente. Use 'Authorization: Bearer <token>'",
+        )
+    try:
+        payload = validar_token(token)
+    except (ValueError, JWTError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
+
+    if token_esta_revogado(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token revogado. Faça login novamente.",
+        )
+    return payload
+
+
+def require_advogado(payload: dict = Depends(_get_payload)) -> dict:
+    """
+    Garante que o usuário tem role 'advogado' ou 'admin'.
+    Lança 403 para qualquer outro role (cliente, estagiario, assistente).
+    """
+    role = payload.get("role", "")
+    if role not in ("advogado", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a advogados e administradores.",
+        )
+    return payload
+
+
+def get_escritorio_id_advogado(
+    payload: dict = Depends(require_advogado),
+) -> int:
+    """Retorna o escritorio_id do token JWT (já validado como advogado/admin)."""
+    try:
+        return int(payload["escritorio_id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token não contém escritorio_id válido.",
+        ) from exc
+
+
+def get_advogado_id(
+    payload: dict = Depends(require_advogado),
+) -> int:
+    """Retorna o user_id (sub) do token JWT."""
+    try:
+        return int(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token não contém user_id válido.",
+        ) from exc
