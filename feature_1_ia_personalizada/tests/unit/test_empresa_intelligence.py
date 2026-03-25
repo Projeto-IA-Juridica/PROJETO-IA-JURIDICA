@@ -34,11 +34,11 @@ from feature_1_ia_personalizada.services.prospeccao.linkedin_client import Conta
 def _litigante_pj(nome: str = "EMPRESA TESTE LTDA (11.222.333/0001-81)") -> LitiganteEncontrado:
     return LitiganteEncontrado(
         nome=nome,
+        tipo="pessoa_juridica",
         polo="passivo",
         tipo_acao="Reclamação Trabalhista",
         tribunal="TRT-2",
-        fase_processual="Conhecimento",
-        numero_cnj="0001234-56.2024.5.02.0100",
+        numero_cnj_exemplo="0001234-56.2024.5.02.0100",
         processos_count=5,
         sem_advogado=False,
     )
