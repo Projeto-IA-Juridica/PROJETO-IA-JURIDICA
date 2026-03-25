@@ -22,9 +22,10 @@ O **Concierge Jurídico Digital** é um assistente inteligente que atua como cam
 
 ```
 MVP (Feature 1 + Infra + Sub-features):  ████████████████████  100%  ← pronto para beta
-Features 2–6 (backlog):                  ░░░░░░░░░░░░░░░░░░░░    0%  ← não iniciadas
+Feature 3 — Prospecção Inteligente:       ██████████████████░░   90%  ← LinkedIn API pendente
+Features 2, 4–6 (backlog):               ░░░░░░░░░░░░░░░░░░░░    0%  ← não iniciadas
 
-TOTAL DO PROJETO:  ~30% do roadmap completo
+TOTAL DO PROJETO:  ~45% do roadmap completo
 ```
 
 ### Tabela de Features
@@ -39,9 +40,17 @@ TOTAL DO PROJETO:  ~30% do roadmap completo
 | F1.5 | Analytics & Dashboard | **✅ 100%** | NPS, custo/interação, exportação |
 | F1.6 | Escalação para Advogado | **✅ ~95%** | Funcional; ver nota 1 |
 | F1.7 | CRM Inteligente | **✅ 100%** | Score IA via Claude |
-| **F2** | Controladoria (Projuris) | **❌ 0%** | Não iniciada |
-| **F3** | Prospecção Inteligente (LinkedIn + DataJud) | **❌ 0%** | Aguarda LinkedIn Partner Program |
-| **F4** | ML de Prazos | **❌ 0%** | Não iniciada |
+| **F2** | Controladoria (Projuris) | **❌ 0%** | Não iniciada — aguarda contrato Projuris |
+| **F3** | Prospecção Inteligente | **✅ ~90%** | Motor completo; LinkedIn real pendente de Partner Program |
+| F3.1 | DNA do Advogado | **✅ 100%** | Análise do histórico + Claude Haiku; cache Redis 6h |
+| F3.2 | DataJud — busca de litigantes | **✅ 100%** | ElasticSearch CNJ; deduplicação por tipo_acao |
+| F3.3 | Receita Federal / CNPJ | **✅ 100%** | Enriquecimento B2B (porte, sócios, situação) |
+| F3.4 | LinkedIn enrichment (B2B) | **⚠️ ~70%** | Estrutura pronta; dados reais dependem do Partner Program |
+| F3.5 | Matching & Score IA (B2B/B2C) | **✅ 100%** | Heurística + refinamento Claude; threshold 30 |
+| F3.6 | Pipeline de leads | **✅ 100%** | CRUD completo; deduplicação por CNPJ/CNJ |
+| F3.7 | Compliance LGPD/OAB (B2C) | **✅ 100%** | Sem CPF/telefone/email; aviso automático no pipeline |
+| F3.8 | Testes (89 testes) | **✅ 100%** | 6 arquivos unitários + 16 integração |
+| **F4** | ML de Prazos | **❌ 0%** | Não iniciada — aguarda volume de dados históricos |
 | **F5** | App Mobile (B2C) | **❌ 0%** | Não iniciada |
 | **F6** | Integração nativa com CRMs | **❌ 0%** | Não iniciada |
 | **Infra** | Docker, CI/CD, Monitoring | **✅ 100%** | GitHub Actions + Railway |
@@ -103,6 +112,48 @@ TOTAL DO PROJETO:  ~30% do roadmap completo
 - Upload CSV ou sincronização com **Google Sheets**
 - Validação de CPF, CNPJ, formato de telefone
 
+---
+
+## O Que Está Feito (Feature 3 — Prospecção Inteligente)
+
+### DNA do Advogado
+- Analisa o histórico de processos do escritório e extrai especialidades predominantes, setores-alvo e tipo de lead ideal (B2B empresa ou B2C pessoa)
+- Claude Haiku classifica as áreas de atuação a partir dos tipos de ação mais frequentes
+- Persistido em `escritorio.dna_prospeccao` (JSONB) + cache Redis com TTL de 6h
+- Fallback gracioso: retorna `dados_insuficientes=True` quando o escritório tem menos de 5 processos
+
+### Motor de Busca de Litigantes (DataJud)
+- Busca litigantes no DataJud CNJ por tipo de ação e tribunal
+- Deduplicação automática: acumula contagem de processos ao encontrar o mesmo litigante
+- Prioriza partes **sem advogado** (campo `sem_advogado=True`)
+- Resolução de índice por justiça: trabalhista → TRT, cível → TJ, federal → TRF
+
+### Enriquecimento B2B — EmpresaIntelligence
+- **Receita Federal** (ReceitaWS): razão social, situação cadastral, porte, sócios (sem CPF — LGPD)
+- **LinkedIn** (LinkedInClient): contatos com cargo/URL do perfil
+- Cache Redis por CNPJ (TTL 24h) — evita requisições redundantes
+- `enriquecimento_parcial=True` quando CNPJ não é encontrado na Receita Federal
+
+### Enriquecimento B2C — PessoaIntelligence (LGPD)
+- Apenas dados do processo público: nome, polo, tipo de ação, fase processual, tribunal
+- **Nunca armazena CPF, telefone, email ou endereço** (proibido por design — LGPD art. 11)
+- `validar_compliance()` descarta automaticamente ações com dados sensíveis (internação compulsória, curatela, retificação de registro civil, etc.)
+- Abordagem sugerida restrita a canais processuais e publicidade institucional (OAB Provimento 205/2021)
+
+### Matching & Score IA
+- **Heurística B2B** (0–100): especialidade match (+30), setor CNAE (+20), demanda ativa 3+ processos (+15), contatos LinkedIn (+15), porte MÉDIA/GRANDE (+10), situação ATIVA (+10)
+- **Heurística B2C** (0–100): especialidade match (+35), polo compatível (+25), fase processual inicial (+20), alta recorrência no escritório (+20)
+- Score < 30 → retorna sem chamar Claude (`gerado_por_ia=False`)
+- Score ≥ 30 → Claude refina o score, gera motivo e abordagem sugerida
+- Fallback gracioso: se Claude falhar, retorna score heurístico sem quebrar o fluxo
+
+### Pipeline de Leads
+- Rotas CRUD completas: `GET /dna`, `POST /dna/atualizar`, `POST /descobrir`, `GET /pipeline`, `PATCH /{id}/status`, `DELETE /{id}`
+- Deduplicação automática: mesmo CNPJ (empresa) ou mesmo número CNJ (pessoa) → atualiza o lead existente em vez de criar duplicata
+- Filtros no pipeline: por `tipo_lead`, `status`, `score_minimo`, com paginação
+- `aviso_lgpd` injetado automaticamente no response quando o pipeline contém leads B2C
+- Acesso exclusivo a roles `advogado` e `admin` (nunca exposto a clientes)
+
 ### Segurança & Compliance
 - **AES-256** (Fernet) para CPF, dados sensíveis em repouso
 - **TLS 1.3** em trânsito
@@ -125,6 +176,13 @@ TOTAL DO PROJETO:  ~30% do roadmap completo
 | **Documentação de API** | Pasta `docs/api/` vazia — sem Postman collection nem OpenAPI exportado | Baixo — qualidade |
 | **Diagramas de arquitetura** | `docs/architecture/` vazia | Baixo — documentação |
 
+### Pendências da Feature 3 — Prospecção Inteligente
+
+| Item | Descrição | Impacto |
+|------|-----------|---------|
+| **LinkedIn API real** | `LinkedInClient` está estruturado mas retorna dados mock quando a API não está disponível | Médio — enriquecimento B2B funcional sem LinkedIn; dados de contato ficam vazios |
+| **Migration leads_prospeccao** | `011_add_leads_prospeccao.py` e `012_add_tipo_lead_e_dna.py` criados; validar em staging | Alto — necessário antes de deploy em produção |
+
 ### Features do Roadmap (não iniciadas)
 
 #### Feature 2 — Controladoria (Projuris)
@@ -133,25 +191,6 @@ IA avisa advogados sobre deveres e prazos do dia via WhatsApp, integrado ao Proj
 - `dever_manager.py` — parser de deveres
 - Workers: cron às 6h, 12h, 18h
 - **Bloqueio:** acesso à API Projuris (contrato necessário)
-
-#### Feature 3 — Prospecção Inteligente
-Motor de captação de clientes para advogados: analisa o DNA do escritório (em quais tipos de causa e setores ele se sai melhor) e cruza com dados de empresas-alvo e seus funcionários via LinkedIn API, gerando uma fila de leads qualificados e pontuados.
-
-**Fluxo central:**
-1. **DNA do Advogado** — analisa o histórico de processos do escritório (já no banco) e identifica áreas de especialidade, setores onde mais vence, perfil ideal de cliente
-2. **Intelligence de Empresa** — dada uma empresa (CNPJ ou nome), busca:
-   - Processos públicos envolvendo a empresa (DataJud — já integrado)
-   - Dados cadastrais e sócios via Receita Federal (API pública gratuita)
-   - Funcionários e cargos via LinkedIn API
-3. **Matching & Score** — cruza o perfil do advogado com as necessidades jurídicas da empresa e perfil dos funcionários, gerando um score de afinidade
-4. **Pipeline de Prospecção** — lista ranqueada de leads (empresa + funcionário + motivo de match) para o advogado abordar
-
-**APIs necessárias:**
-- LinkedIn API (People Search / Company Employees) — requer aprovação de parceiro
-- Receita Federal / ReceitaWS (gratuita) — dados de CNPJ e sócios
-- DataJud CNJ (já integrado) — processos públicos das empresas
-
-**Pré-requisito:** aprovação no LinkedIn Partner Program (pode levar semanas; avaliar alternativas como Sales Navigator API ou enriquecimento via Receita Federal + DataJud apenas)
 
 #### Feature 4 — ML de Prazos
 Predição de prazos processuais com Random Forest / XGBoost.
@@ -204,6 +243,11 @@ Adapters para Projuris, Astrea e SAJ ADV.
 │    (Anthropic)     (Redis cache 1h)                   │
 │          │              │                             │
 │    pgvector RAG    PostgreSQL (asyncpg)                │
+│                                                      │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │       Motor de Prospecção (Feature 3)           │ │
+│  │  DNA → DataJud → Receita/LinkedIn → Match → IA  │ │
+│  └─────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
                            │
               Celery Workers (Redis broker)
@@ -254,7 +298,8 @@ PROJETO-IA-JURIDICA-13/
 │   │   ├── processo.py              ✅ Processo judicial (com score, fase)
 │   │   ├── usuario.py               ✅ Advogados/assistentes
 │   │   ├── interacao.py             ✅ Log de conversas IA-cliente
-│   │   └── documento_rag.py         ✅ Documentos vetorizados
+│   │   ├── documento_rag.py         ✅ Documentos vetorizados
+│   │   └── lead_prospeccao.py       ✅ Leads do pipeline de prospecção (F3)
 │   ├── schemas/                     ✅ Pydantic v2 (request/response)
 │   ├── database/                    ✅ AsyncEngine + sessionmaker
 │   ├── security/                    ✅ JWT + AES-256
@@ -274,7 +319,8 @@ PROJETO-IA-JURIDICA-13/
 │   │   │   ├── onboarding.py        ✅ Wizard 6 etapas
 │   │   │   ├── admin_import.py      ✅ CSV/Google Sheets
 │   │   │   ├── health.py            ✅ /health, /health/ready
-│   │   │   └── metrics.py           ✅ /metrics (Prometheus)
+│   │   │   ├── metrics.py           ✅ /metrics (Prometheus)
+│   │   │   └── prospeccao.py        ✅ /prospeccao/* (DNA, pipeline, leads)
 │   │   └── middleware/              ✅ Auth JWT, rate limit, logging
 │   │
 │   ├── services/
@@ -292,7 +338,15 @@ PROJETO-IA-JURIDICA-13/
 │   │   ├── analytics/               ✅ NPS + métricas + exportação
 │   │   ├── crm/                     ✅ Score + análise Claude
 │   │   ├── escalacao/               ✅ Escalação para advogados
-│   │   └── integrations/            ✅ Google Sheets
+│   │   ├── integrations/            ✅ Google Sheets
+│   │   └── prospeccao/              ✅ Motor de Prospecção Inteligente (F3)
+│   │       ├── dna_advogado.py      ✅ DNA do escritório (Claude Haiku + Redis 6h)
+│   │       ├── datajud_prospeccao.py ✅ Busca litigantes por tipo de ação
+│   │       ├── empresa_intelligence.py ✅ Enriquecimento B2B (Receita + LinkedIn)
+│   │       ├── pessoa_intelligence.py  ✅ Enriquecimento B2C (compliance LGPD)
+│   │       ├── matching.py          ✅ Heurística + refinamento Claude (limiar 30)
+│   │       ├── receita_federal_client.py ✅ Dados de CNPJ e sócios
+│   │       └── linkedin_client.py   ⚠️ Estrutura pronta; API real pendente de Partner
 │   │
 │   ├── workers/
 │   │   ├── celery_app.py            ✅ 3 filas: monitoramento, notificacoes, ia
@@ -308,10 +362,10 @@ PROJETO-IA-JURIDICA-13/
 │   │   └── termos_juridicos/        ✅ traducoes.json (~50 termos)
 │   │
 │   └── tests/
-│       ├── unit/                    ✅ 25+ arquivos
-│       └── integration/             ✅ 6 fluxos end-to-end
+│       ├── unit/                    ✅ 43 arquivos (inclui 6 novos de F3)
+│       └── integration/             ✅ 16 arquivos (inclui test_prospeccao_routes.py)
 │
-├── alembic/versions/                ✅ 11 migrations (incluindo pgvector + índices)
+├── alembic/versions/                ✅ 13 migrations (incluindo pgvector + leads_prospeccao + dna)
 │
 ├── frontend/                        # Landing page de marketing
 │   ├── index.html                   ✅ Página principal (semântica)
@@ -402,6 +456,12 @@ make type-check         # mypy
 | `GET` | `/chat/historico` | Histórico de conversas | JWT |
 | `GET` | `/health` | Health check (DB, Redis, Claude) | — |
 | `GET` | `/metrics` | Métricas Prometheus | — |
+| `GET` | `/prospeccao/dna` | DNA atual do escritório | JWT (advogado) |
+| `POST` | `/prospeccao/dna/atualizar` | Regenera o DNA via Claude | JWT (advogado) |
+| `POST` | `/prospeccao/descobrir` | Executa o motor de prospecção | JWT (advogado) |
+| `GET` | `/prospeccao/pipeline` | Lista leads com filtros e paginação | JWT (advogado) |
+| `PATCH` | `/prospeccao/{id}/status` | Atualiza status e notas de um lead | JWT (advogado) |
+| `DELETE` | `/prospeccao/{id}` | Remove um lead do pipeline | JWT (advogado) |
 
 ---
 
@@ -463,12 +523,14 @@ GRAFANA_CLOUD_API_KEY=...
 
 ## Próximos Passos Sugeridos
 
-1. **Agendamento de consultas** — implementar o TODO em `whatsapp.py:429` com Celery Beat
-2. **Endpoints LGPD** — exportação e exclusão de dados do titular (exigência legal)
-3. **Documentação de API** — gerar Postman collection a partir do OpenAPI automático do FastAPI (`/docs`)
-4. **Load testing** — integrar `tests/load/` ao pipeline CI
-5. **Feature 2 (Controladoria)** — próxima de maior valor para escritórios com Projuris
-6. **Feature 4 (ML de Prazos)** — requer dados históricos; iniciar coleta estruturada agora
+1. **LinkedIn Partner Program** — submeter aplicação para desbloquear People Search API e completar F3 a 100%
+2. **Migration de produção** — validar `011_add_leads_prospeccao.py` e `012_add_tipo_lead_e_dna.py` em staging antes do deploy
+3. **Agendamento de consultas** — implementar o TODO em `whatsapp.py:429` com Celery Beat
+4. **Endpoints LGPD** — exportação e exclusão de dados do titular (exigência legal — portabilidade + direito ao esquecimento)
+5. **Documentação de API** — gerar Postman collection a partir do OpenAPI automático do FastAPI (`/docs`)
+6. **Load testing** — integrar `tests/load/` ao pipeline CI
+7. **Feature 2 (Controladoria)** — próxima de maior valor para escritórios com Projuris
+8. **Feature 4 (ML de Prazos)** — requer dados históricos; iniciar coleta estruturada agora
 
 ---
 
@@ -482,8 +544,9 @@ make coverage                  # relatório HTML de cobertura
 ```
 
 - Cobertura mínima: **70%** (enforçado no CI)
-- 54 arquivos de teste (25 unitários + 6 integração + fixtures compartilhadas)
+- **1.158 testes coletados** — 43 arquivos unitários + 16 arquivos de integração + fixtures compartilhadas
 - Banco de testes: SQLite in-memory via `aiosqlite` (sem PostgreSQL necessário)
+- Feature 3 tem 89 testes dedicados: heurística de matching componente a componente, compliance LGPD, pipeline de rotas com mocks
 
 ---
 
