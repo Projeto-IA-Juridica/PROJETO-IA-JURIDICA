@@ -117,10 +117,10 @@ ALTER TABLE escritorios
 | 3.5 — `DNAAdvogadoService` | ✅ Concluída |
 | 3.6 — `DataJudProspeccaoClient` (busca por tipo_acao, não por CNJ) | ✅ Concluída |
 | 3.7 — `EmpresaIntelligenceService` (B2B) | ✅ Concluída |
-| 3.8 — `PessoaIntelligenceService` (B2C) | ⬜ Pendente |
-| 3.9 — `MatchingService` (suporta empresa e pessoa) | ⬜ Pendente |
-| 3.10 — Prompts para DNA e Matching | ⬜ Pendente |
-| 3.11 — Schemas Pydantic | ⬜ Pendente |
+| 3.8 — `PessoaIntelligenceService` (B2C) | ✅ Concluída |
+| 3.9 — `MatchingService` (suporta empresa e pessoa) | ✅ Concluída |
+| 3.10 — Prompts para DNA e Matching | ✅ Concluída |
+| 3.11 — Schemas Pydantic | ✅ Concluída |
 | 3.12 — Rotas `/prospeccao/*` | ⬜ Pendente |
 | 3.13 — Testes unitários | ⬜ Pendente |
 | 3.14 — Testes de integração | ⬜ Pendente |
