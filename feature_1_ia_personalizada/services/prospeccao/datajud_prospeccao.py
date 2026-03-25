@@ -168,7 +168,7 @@ class DataJudProspeccaoClient:
         leads = await client.buscar_litigantes("reclamação trabalhista", tribunal="TRT2")
     """
 
-    def __init__(self, api_key: str | None, redis: Any = None) -> None:
+    def __init__(self, api_key: str | None = None, redis: Any = None) -> None:
         self._api_key = api_key
         self._redis = redis
 
@@ -181,6 +181,7 @@ class DataJudProspeccaoClient:
         tipo_acao: str,
         tribunal: str | None = None,
         limite: int = 20,
+        tipo_lead: str | None = None,
     ) -> list[LitiganteEncontrado]:
         """
         Retorna lista de litigantes encontrados em processos do tipo_acao.
