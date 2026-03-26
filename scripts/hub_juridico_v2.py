@@ -712,6 +712,51 @@ def criar_orchestrator(
 # =============================================================================
 
 
+def _fragmentar_resposta(texto: str) -> list[str]:
+    """
+    Divide uma resposta longa em partes menores para simular digitação humana.
+
+    Regras:
+    - Divide por parágrafos (\\n\\n)
+    - Agrupa partes muito curtas (< 80 chars) com a seguinte para evitar bolhas pequenas demais
+    - Nunca divide no meio de uma frase
+    - Retorna lista com 1 a 4 partes no máximo
+    """
+    partes_raw = [p.strip() for p in texto.split("\n\n") if p.strip()]
+    if len(partes_raw) <= 1:
+        return [texto.strip()] if texto.strip() else []
+
+    resultado: list[str] = []
+    acumulado = ""
+    for parte in partes_raw:
+        if not acumulado:
+            acumulado = parte
+        elif len(acumulado) < 80:
+            # Parte muito curta: junta com a próxima
+            acumulado = acumulado + "\n\n" + parte
+        else:
+            resultado.append(acumulado)
+            acumulado = parte
+    if acumulado:
+        resultado.append(acumulado)
+
+    # Limita a 4 bolhas para não fragmentar demais
+    if len(resultado) > 4:
+        meio = "\n\n".join(resultado[1:-1])
+        resultado = [resultado[0], meio, resultado[-1]]
+
+    return resultado
+
+
+def _delay_digitacao(texto: str) -> float:
+    """
+    Calcula um delay realista de 'digitando' com base no tamanho do texto.
+    Simula velocidade humana (~45 palavras/min), entre 1.0s e 3.5s.
+    """
+    palavras = len(texto.split())
+    return max(1.0, min(3.5, palavras * 0.09))
+
+
 def _tabela_md(linhas: list[tuple[str, str]]) -> str:
     rows = "\n".join(f"| **{k}** | {v} |" for k, v in linhas)
     return f"| Campo | Valor |\n|-------|-------|\n{rows}"
@@ -1338,74 +1383,139 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
         avatar = "⚖️" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
-            if msg["role"] == "assistant" and msg.get("meta"):
+            # Partes de continuação (bolhas 2+) não mostram badges
+            if msg["role"] == "assistant" and msg.get("meta") and not msg["meta"].get("continuation"):
                 meta = msg["meta"]
-                partes = []
+                badges = []
                 intencao = meta.get("intencao", "")
                 rotulo = _ROTULOS_INTENCAO.get(intencao, "")
                 if rotulo:
-                    partes.append(f"_{rotulo}_")
+                    badges.append(f"_{rotulo}_")
                 if meta.get("rag_ativo"):
-                    partes.append("📚 Usando documentos do escritório")
+                    badges.append("📚 Usando documentos do escritório")
                 _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
                 if intencao in _ESCALACAO_INTENCOES:
-                    partes.append("🚨 Questão importante — advogado notificado")
-                if partes:
-                    st.caption(" · ".join(partes))
+                    badges.append("🚨 Questão importante — advogado notificado")
+                if badges:
+                    st.caption(" · ".join(badges))
+
+    # ── Buffer de mensagens ───────────────────────────────────────────────────
+    # Guarda mensagens enviadas em sequência rápida antes de processar.
+    # Quando o usuário envia várias mensagens, elas são combinadas em uma só
+    # antes de chegarem à IA — igual ao comportamento humano no WhatsApp.
+    buffer_key = f"buffer_{cid}"
+    buffer_ts_key = f"buffer_ts_{cid}"
+    if buffer_key not in st.session_state:
+        st.session_state[buffer_key] = []
 
     # Input
     prompt = st.chat_input(
         "Pergunte sobre o processo, termos jurídicos ou tire dúvidas...",
         key=f"input_{cid}",
     )
+
     if prompt and orchestrator:
+        # ── 1. Adiciona ao buffer ─────────────────────────────────────────────
+        st.session_state[buffer_key].append(prompt)
+        st.session_state[buffer_ts_key] = time.time()
+
+        # Mostra mensagem do usuário imediatamente
         st.session_state[chat_key].append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
+
+        # ── 2. Delay de leitura — IA "está lendo" ────────────────────────────
+        # Simula o tempo que um humano levaria para ler a mensagem antes de começar a digitar.
         with st.chat_message("assistant", avatar="⚖️"):
-            with st.spinner("A IA está elaborando a resposta..."):
-                try:
-                    resultado = asyncio.run(
-                        orchestrator.processar(
-                            escritorio_id=1,
-                            cliente_id=1,
-                            mensagem=prompt,
-                            tipo="texto",
-                        )
+            _ph_lendo = st.empty()
+            _ph_lendo.markdown("_lendo..._")
+            _delay_leitura = max(0.8, min(2.0, len(prompt.split()) * 0.12))
+            time.sleep(_delay_leitura)
+            _ph_lendo.empty()
+
+        # ── 3. Consolida buffer ───────────────────────────────────────────────
+        # Junta todas as mensagens pendentes em uma só antes de enviar à IA.
+        msgs_buffer = st.session_state[buffer_key]
+        if len(msgs_buffer) > 1:
+            mensagem_consolidada = "\n\n".join(msgs_buffer)
+        else:
+            mensagem_consolidada = msgs_buffer[0]
+        st.session_state[buffer_key] = []  # Limpa buffer
+
+        # ── 4. Processa com a IA ──────────────────────────────────────────────
+        resposta = ""
+        intencao, ti, to, fallback, rag_ativo = "outro", 0, 0, False, False
+        with st.chat_message("assistant", avatar="⚖️"):
+            _ph_digitando = st.empty()
+            _ph_digitando.markdown("_digitando..._")
+            try:
+                resultado = asyncio.run(
+                    orchestrator.processar(
+                        escritorio_id=1,
+                        cliente_id=1,
+                        mensagem=mensagem_consolidada,
+                        tipo="texto",
                     )
-                    resposta = resultado["resposta"]
-                    intencao = resultado.get("intencao", "outro")
-                    tokens = resultado.get("tokens_usados", {})
-                    fallback = resultado.get("usando_fallback", False)
-                    ti = tokens.get("input", 0)
-                    to = tokens.get("output", 0)
-                    rag_ativo = bool(rag_base and rag_base.total_chunks > 0)
-                    st.session_state[tokens_key]["in"] += ti
-                    st.session_state[tokens_key]["out"] += to
-                    intenções_dict = st.session_state[tokens_key].setdefault("intencoes", {})
-                    intenções_dict[intencao] = intenções_dict.get(intencao, 0) + 1
-                except Exception as exc:
-                    resposta = f"Desculpe, ocorreu um erro. Tente novamente. ({exc})"
-                    intencao, ti, to, fallback, rag_ativo = "erro", 0, 0, True, False
+                )
+                resposta = resultado["resposta"]
+                intencao = resultado.get("intencao", "outro")
+                tokens = resultado.get("tokens_usados", {})
+                fallback = resultado.get("usando_fallback", False)
+                ti = tokens.get("input", 0)
+                to = tokens.get("output", 0)
+                rag_ativo = bool(rag_base and rag_base.total_chunks > 0)
+                st.session_state[tokens_key]["in"] += ti
+                st.session_state[tokens_key]["out"] += to
+                intenções_dict = st.session_state[tokens_key].setdefault("intencoes", {})
+                intenções_dict[intencao] = intenções_dict.get(intencao, 0) + 1
+            except Exception as exc:
+                resposta = f"Desculpe, ocorreu um erro interno. Tente novamente."
+                intencao, ti, to, fallback, rag_ativo = "erro", 0, 0, True, False
+            _ph_digitando.empty()
 
-            _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
-            st.markdown(resposta)
-            partes = []
-            rotulo = _ROTULOS_INTENCAO.get(intencao, "")
-            if rotulo:
-                partes.append(f"_{rotulo}_")
-            if rag_ativo:
-                partes.append("📚 Usando documentos do escritório")
-            if intencao in _ESCALACAO_INTENCOES:
-                partes.append("🚨 Questão importante — advogado notificado")
-            if partes:
-                st.caption(" · ".join(partes))
+        # ── 5. Divide resposta em partes e exibe com delay de digitação ───────
+        _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
+        partes_resposta = _fragmentar_resposta(resposta)
 
-        st.session_state[chat_key].append({
-            "role": "assistant",
-            "content": resposta,
-            "meta": {"intencao": intencao, "tokens_in": ti, "tokens_out": to, "fallback": fallback, "rag_ativo": rag_ativo},
-        })
+        for i, parte in enumerate(partes_resposta):
+            # Delay de digitação antes de cada parte (exceto a primeira que já
+            # apareceu no lugar do "digitando..." acima)
+            if i > 0:
+                with st.chat_message("assistant", avatar="⚖️"):
+                    _ph_pt = st.empty()
+                    _ph_pt.markdown("_digitando..._")
+                    time.sleep(_delay_digitacao(parte))
+                    _ph_pt.empty()
+
+            with st.chat_message("assistant", avatar="⚖️"):
+                st.markdown(parte)
+                # Metadata badge apenas na primeira parte
+                if i == 0:
+                    badges = []
+                    rotulo = _ROTULOS_INTENCAO.get(intencao, "")
+                    if rotulo:
+                        badges.append(f"_{rotulo}_")
+                    if rag_ativo:
+                        badges.append("📚 Usando documentos do escritório")
+                    if intencao in _ESCALACAO_INTENCOES:
+                        badges.append("🚨 Questão importante — advogado notificado")
+                    if badges:
+                        st.caption(" · ".join(badges))
+
+            # Salva cada parte no histórico
+            st.session_state[chat_key].append({
+                "role": "assistant",
+                "content": parte,
+                "meta": {
+                    "intencao": intencao if i == 0 else None,
+                    "tokens_in": ti if i == 0 else 0,
+                    "tokens_out": to if i == 0 else 0,
+                    "fallback": fallback if i == 0 else False,
+                    "rag_ativo": rag_ativo if i == 0 else False,
+                    "continuation": i > 0,
+                },
+            })
+
         st.rerun()
 
 
