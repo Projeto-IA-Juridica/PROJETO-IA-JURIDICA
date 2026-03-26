@@ -259,61 +259,92 @@ def _cor_nivel(nivel: str) -> str:
     return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(nivel, "#555")
 
 
+def _explicacao_nivel(nivel: str) -> str:
+    return {
+        "baixo": (
+            "Este processo apresenta **baixo risco**. As condições são favoráveis: "
+            "o tipo de ação tem bom histórico neste tribunal, o prazo estimado é razoável "
+            "e não há fatores agravantes identificados. Você pode atender este cliente "
+            "com tranquilidade."
+        ),
+        "moderado": (
+            "Este processo tem **risco moderado**. Há alguns pontos de atenção — como o tipo "
+            "de ação ou o histórico da vara — que merecem acompanhamento próximo. "
+            "Recomendamos manter o cliente bem informado sobre cada andamento."
+        ),
+        "alto": (
+            "Este processo apresenta **alto risco**. Fatores como complexidade da ação, "
+            "valor em disputa ou histórico desfavorável no tribunal aumentam a incerteza. "
+            "Vale redobrar a atenção e alinhar expectativas reais com o cliente."
+        ),
+        "critico": (
+            "Atenção: este processo está em situação **crítica**. Múltiplos fatores de risco "
+            "foram identificados simultaneamente. É importante conversar pessoalmente com o "
+            "cliente, revisando a estratégia e os riscos envolvidos com transparência."
+        ),
+    }.get(nivel, "Análise disponível após consulta ao tribunal.")
+
+
 def _render_score_card(score_data: dict) -> None:
     score = score_data["score"]
     nivel = score_data["nivel"]
-    interp = score_data["interpretacao"]
     comp = score_data["componentes"]
     cor = _cor_nivel(nivel)
     emojis = {"baixo": "🟢", "moderado": "🟡", "alto": "🔴", "critico": "🟣"}
     emoji = emojis.get(nivel, "⚪")
+    rotulos = {
+        "baixo": "RISCO BAIXO — Processo favorável",
+        "moderado": "RISCO MODERADO — Atenção recomendada",
+        "alto": "RISCO ALTO — Acompanhamento próximo necessário",
+        "critico": "RISCO CRÍTICO — Ação imediata recomendada",
+    }
+    rotulo = rotulos.get(nivel, nivel.upper())
     st.markdown(
         f"""
         <div style="border:1.5px solid {cor};border-radius:10px;padding:14px 18px;
                     background:{cor}18;margin-bottom:8px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
                 <span style="font-size:13px;font-weight:600;color:{cor};text-transform:uppercase;
-                             letter-spacing:.05em;">{emoji} Score de Risco Processual</span>
+                             letter-spacing:.05em;">{emoji} Análise de Risco do Processo</span>
                 <span style="font-size:22px;font-weight:700;color:{cor};">
-                    {score}<span style="font-size:13px;font-weight:400;color:#888;">/100</span>
+                    {rotulo.split('—')[0].strip()}
                 </span>
             </div>
             <div style="background:#e0e0e0;border-radius:4px;height:7px;margin-bottom:10px;">
                 <div style="width:{score}%;background:{cor};height:7px;border-radius:4px;"></div>
             </div>
-            <div style="font-size:12px;color:#555;line-height:1.5;">{interp}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    with st.expander("Ver detalhamento — 5 componentes ponderados (Feature 2)"):
+    st.markdown(_explicacao_nivel(nivel))
+    with st.expander("Como chegamos a esta análise? Ver detalhes"):
         nomes = {
-            "complexidade_juridica": "Complexidade Jurídica",
-            "duracao_estimada": "Duração Estimada",
-            "historico_vara": "Histórico da Vara",
-            "valor_causa": "Valor da Causa",
-            "fase_processual": "Fase Processual",
-        }
-        pesos = {
-            "complexidade_juridica": "25%", "duracao_estimada": "25%",
-            "historico_vara": "20%", "valor_causa": "15%", "fase_processual": "15%",
+            "complexidade_juridica": ("Complexidade da Ação", "Quão complexo é este tipo de processo juridicamente"),
+            "duracao_estimada": ("Tempo Estimado", "Quanto tempo processos similares costumam durar neste tribunal"),
+            "historico_vara": ("Histórico da Vara", "Como este juízo costuma decidir casos parecidos"),
+            "valor_causa": ("Valor em Disputa", "O impacto financeiro da causa no resultado"),
+            "fase_processual": ("Fase do Processo", "Em que momento o processo se encontra atualmente"),
         }
         for chave, valor in comp.items():
-            label = nomes.get(chave, chave)
-            peso = pesos.get(chave, "")
+            label, descricao = nomes.get(chave, (chave, ""))
             bc = _cor_nivel("alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo")
+            nivel_fator = "alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo"
+            texto_nivel = {"baixo": "favorável", "moderado": "atenção", "alto": "desfavorável"}.get(nivel_fator, "")
             st.markdown(
-                f"""<div style="margin-bottom:8px;">
+                f"""<div style="margin-bottom:10px;">
                     <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
-                        <span style="color:#444;">{label} <span style="color:#aaa;">({peso})</span></span>
-                        <span style="font-weight:600;color:{bc};">{valor}/100</span>
+                        <span style="color:#444;font-weight:600;">{label}</span>
+                        <span style="font-weight:600;color:{bc};">{texto_nivel}</span>
                     </div>
-                    <div style="background:#e0e0e0;border-radius:3px;height:5px;">
+                    <div style="background:#e0e0e0;border-radius:3px;height:5px;margin-bottom:3px;">
                         <div style="width:{valor}%;background:{bc};height:5px;border-radius:3px;"></div>
-                    </div></div>""",
+                    </div>
+                    <div style="font-size:11px;color:#888;">{descricao}</div>
+                    </div>""",
                 unsafe_allow_html=True,
             )
-        st.caption("⚠️ Uso exclusivo interno — não representa previsão de resultado (OAB Provimento 205/2021).")
+        st.caption("⚠️ Esta análise é de uso interno do advogado e não representa previsão de resultado (OAB Provimento 205/2021).")
 
 
 # =============================================================================
@@ -681,6 +712,51 @@ def criar_orchestrator(
 # =============================================================================
 
 
+def _fragmentar_resposta(texto: str) -> list[str]:
+    """
+    Divide uma resposta longa em partes menores para simular digitação humana.
+
+    Regras:
+    - Divide por parágrafos (\\n\\n)
+    - Agrupa partes muito curtas (< 80 chars) com a seguinte para evitar bolhas pequenas demais
+    - Nunca divide no meio de uma frase
+    - Retorna lista com 1 a 4 partes no máximo
+    """
+    partes_raw = [p.strip() for p in texto.split("\n\n") if p.strip()]
+    if len(partes_raw) <= 1:
+        return [texto.strip()] if texto.strip() else []
+
+    resultado: list[str] = []
+    acumulado = ""
+    for parte in partes_raw:
+        if not acumulado:
+            acumulado = parte
+        elif len(acumulado) < 80:
+            # Parte muito curta: junta com a próxima
+            acumulado = acumulado + "\n\n" + parte
+        else:
+            resultado.append(acumulado)
+            acumulado = parte
+    if acumulado:
+        resultado.append(acumulado)
+
+    # Limita a 4 bolhas para não fragmentar demais
+    if len(resultado) > 4:
+        meio = "\n\n".join(resultado[1:-1])
+        resultado = [resultado[0], meio, resultado[-1]]
+
+    return resultado
+
+
+def _delay_digitacao(texto: str) -> float:
+    """
+    Calcula um delay realista de 'digitando' com base no tamanho do texto.
+    Simula velocidade humana (~45 palavras/min), entre 1.0s e 3.5s.
+    """
+    palavras = len(texto.split())
+    return max(1.0, min(3.5, palavras * 0.09))
+
+
 def _tabela_md(linhas: list[tuple[str, str]]) -> str:
     rows = "\n".join(f"| **{k}** | {v} |" for k, v in linhas)
     return f"| Campo | Valor |\n|-------|-------|\n{rows}"
@@ -731,8 +807,8 @@ def page_onboarding() -> None:
         "template_sem_novidade": "Olá {nome_cliente}, consultamos seu processo e não há novidades por enquanto.",
     })
 
-    st.title("🚀 Onboarding do Escritório")
-    st.caption("Configure seu escritório em 5 etapas e esteja operacional em 30 minutos.")
+    st.title("🚀 Configure seu Escritório")
+    st.caption("Siga as 5 etapas abaixo e em 30 minutos sua IA estará pronta para atender seus clientes.")
 
     etapa = ob["etapa"]
     nomes_etapas = [
@@ -790,25 +866,44 @@ def page_onboarding() -> None:
 
     # ── Etapa 1: Configurar IA / Persona ─────────────────────────────────────
     elif etapa == 1:
-        st.subheader("🤖 Etapa 2 — Configurar a IA Jurídica")
-        st.caption("Defina a identidade da sua IA. Ela será injetada em todos os prompts (Feature 1 + Feature 4).")
+        st.subheader("🤖 Etapa 2 — Configure como a IA vai se apresentar")
+        st.caption(
+            "Dê um nome e uma personalidade para a sua IA. "
+            "Ela vai usar essa identidade em todas as conversas com seus clientes."
+        )
 
         with st.container(border=True):
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown("**Preview da Persona**")
-                prev_nome = st.text_input("Nome da IA", value=ob.get("persona_nome", "Assistente Jurídico"))
-                prev_tom = st.selectbox("Tom de voz", ["formal", "amigavel", "neutro"],
-                                        index=["formal", "amigavel", "neutro"].index(ob.get("persona_tom", "formal")))
+                st.markdown("**Identidade da IA**")
+                prev_nome = st.text_input(
+                    "Como a IA vai se chamar?",
+                    value=ob.get("persona_nome", "Assistente Jurídico"),
+                    help='Ex: "Dra. Camila", "Atendimento Jurídico", "Assistente do Escritório"',
+                )
+                prev_tom = st.selectbox(
+                    "Tom de voz",
+                    ["formal", "amigavel", "neutro"],
+                    index=["formal", "amigavel", "neutro"].index(ob.get("persona_tom", "formal")),
+                    format_func=lambda x: {"formal": "Formal (protocolar, distante)", "amigavel": "Amigável (próximo, acolhedor)", "neutro": "Neutro (equilibrado)"}.get(x, x),
+                )
             with col2:
-                st.markdown("**Horário de Atendimento**")
-                h_ini = st.text_input("Início", value=ob.get("horario_inicio", "08:00"), placeholder="HH:MM")
-                h_fim = st.text_input("Fim", value=ob.get("horario_fim", "18:00"), placeholder="HH:MM")
+                st.markdown("**Horário de Atendimento Automático**")
+                h_ini = st.text_input("A partir de", value=ob.get("horario_inicio", "08:00"), placeholder="HH:MM")
+                h_fim = st.text_input("Até", value=ob.get("horario_fim", "18:00"), placeholder="HH:MM")
+                st.caption("Fora deste horário, a IA informa o cliente que o escritório está fechado.")
 
-        # Preview ao vivo da persona
-        st.markdown("**Preview da instrução gerada para o Claude:**")
-        instrucao = gerar_instrucao_persona(prev_nome, prev_tom)
-        st.code(instrucao, language="xml")
+        # Preview humano da persona
+        _preview_tom = {
+            "formal": "de forma formal e protocolar",
+            "amigavel": "de forma próxima e acolhedora",
+            "neutro": "com linguagem equilibrada e profissional",
+        }.get(prev_tom, "")
+        st.markdown("**Como a IA vai se comportar:**")
+        st.info(
+            f'A IA vai se apresentar como **"{prev_nome}"**, atender {_preview_tom} '
+            f'e responder mensagens entre **{h_ini}** e **{h_fim}**.'
+        )
 
         col_back, col_next = st.columns(2)
         with col_back:
@@ -1023,14 +1118,14 @@ def page_onboarding() -> None:
         col4.metric("Etapa", "5/5 ✅")
 
         st.markdown("""
-        ### Resumo do Onboarding
+        ### Seu escritório está pronto!
 
-        | Feature | Status |
-        |---------|--------|
-        | IA Personalizada (Feature 1) | ✅ Persona configurada |
-        | Score de Risco (Feature 2) | ✅ Calculando automaticamente |
-        | Base RAG (Feature 3) | ✅ Pronta para documentos |
-        | Onboarding (Feature 4) | ✅ Concluído |
+        | O que foi configurado | Status |
+        |-----------------------|--------|
+        | IA com identidade do seu escritório | ✅ Configurada |
+        | Análise automática de risco dos processos | ✅ Ativa |
+        | Personalização com documentos do escritório | ✅ Pronta para receber documentos |
+        | Cadastro e configuração do escritório | ✅ Concluído |
         """)
 
         st.info(
@@ -1177,10 +1272,10 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
                 ("Último Andamento", (ultimo.get("nome", "—") if isinstance(ultimo, dict) else "—")),
                 ("Data", ((ultimo.get("dataHora") or "")[:10] if isinstance(ultimo, dict) else "—")),
             ]))
-            st.success("Dados reais do DataJud injetados no orchestrator", icon="✅")
+            st.success("Dados do processo consultados no tribunal com sucesso.", icon="✅")
 
             if len(movimentos) > 1:
-                with st.expander("📜 Andamentos anteriores (Feature 3 — histórico para RAG)"):
+                with st.expander("📜 Ver andamentos anteriores do processo"):
                     _render_andamentos(dados_dj)
         else:
             st.markdown(_tabela_md([
@@ -1190,36 +1285,36 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
             ]))
             st.warning("Processo não encontrado no DataJud. O orchestrator responde com dados do cadastro.", icon="⚠️")
 
-    # ── Score de Risco (Feature 2) ────────────────────────────────────────────
+    # ── Score de Risco ────────────────────────────────────────────────────────
     if cliente.get("numero_cnj"):
-        st.markdown("#### 🔒 Score de Risco — Painel Exclusivo do Advogado")
+        st.markdown("#### 🔒 Análise de Risco — Painel do Advogado")
         score_data = _calcular_score(cliente, dados_dj)
         if score_data:
             _render_score_card(score_data)
         else:
             st.info("Score disponível após consulta ao DataJud com dados de classe processual.")
 
-    # ── Status RAG — injeção acontece dentro do orchestrator (Feature 3) ─────
+    # ── Status documentos do escritório ──────────────────────────────────────
     if rag_base and rag_base.total_chunks > 0:
-        # Preview do que o orchestrator vai buscar quando receber a próxima mensagem
         query_preview = f"{dados_dj.get('classe', {}).get('nome', '') if dados_dj else ''} {cliente.get('profissao', '')}"
         chunks_preview = rag_base.buscar(query_preview.strip() or "jurídico", top_k=3)
         if chunks_preview:
+            _TIPO_LABEL_HUB = {
+                "peticao": "Petição", "sentenca": "Sentença",
+                "jurisprudencia": "Jurisprudência", "tese": "Tese / Argumento", "parecer": "Parecer / FAQ",
+            }
             with st.expander(
-                f"📚 Feature 3 — RAG ativo: {rag_base.total_docs} doc(s) / {rag_base.total_chunks} chunks "
-                f"(o orchestrator injeta contexto automaticamente via `_buscar_rag`)"
+                f"📚 IA personalizada com {rag_base.total_docs} documento(s) do seu escritório — clique para ver quais serão usados"
             ):
-                st.caption(
-                    "O bloco `<contexto_juridico>` abaixo é injetado no `system_prompt` "
-                    "pelo nó `buscar_dados` do LangGraph antes de chamar o Claude."
-                )
+                st.caption("Estes são os documentos que a IA vai consultar ao responder perguntas sobre este cliente:")
                 for ch in chunks_preview:
-                    st.markdown(f"**[{ch['tipo']}] {ch['titulo']}**")
+                    tipo_nome = _TIPO_LABEL_HUB.get(ch["tipo"], ch["tipo"])
+                    st.markdown(f"**{tipo_nome}: {ch['titulo']}**")
                     st.caption(ch["texto"][:250] + "..." if len(ch["texto"]) > 250 else ch["texto"])
         else:
-            st.info(f"📚 RAG ativo ({rag_base.total_chunks} chunks) — nenhum documento relevante para este processo ainda.")
+            st.info(f"📚 {rag_base.total_docs} documento(s) do escritório disponíveis — nenhum específico para este processo ainda.")
     elif rag_base is not None:
-        st.caption("📚 Base RAG vazia — adicione documentos em **Base RAG** para enriquecer as respostas.")
+        st.caption("📚 Nenhum documento enviado ainda — acesse **Documentos do Escritório** para personalizar a IA.")
 
     st.divider()
 
@@ -1262,97 +1357,165 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
         st.session_state[welcome_key] = True
 
     # Header do chat
-    col_chat_hdr, col_tokens = st.columns([3, 1])
-    with col_chat_hdr:
-        st.markdown(f"#### 💬 Chat — {ob.get('persona_nome', 'Assistente Jurídico')}")
-        st.caption(
-            f"Persona: **{ob.get('persona_nome')}** (tom {ob.get('persona_tom')}) · "
-            f"LangGraph + FactChecker + Translator"
-        )
-    with col_tokens:
-        tk = st.session_state[tokens_key]
-        if tk["in"] or tk["out"]:
-            custo_estimado = (tk["in"] * 3 + tk["out"] * 15) / 1_000_000
-            st.caption(f"`{tk['in']}↑ {tk['out']}↓` tokens")
-            st.caption(f"Custo estimado: US$ {custo_estimado:.4f}")
+    st.markdown(f"#### 💬 Converse com {ob.get('persona_nome', 'o Assistente Jurídico')}")
+    st.caption(
+        f"A IA está configurada com a identidade **{ob.get('persona_nome')}** "
+        f"e tom de voz **{ob.get('persona_tom')}**. Ela verifica fatos antes de responder."
+    )
+
+    _ROTULOS_INTENCAO = {
+        "saudacao": "Boas-vindas",
+        "status_processo": "Consulta de andamento",
+        "duvida_termo": "Dúvida sobre termo jurídico",
+        "perspectivas": "Perspectivas do caso",
+        "parecer_juridico": "Pedido de parecer jurídico",
+        "estrategia_processual": "Estratégia processual",
+        "negociacao": "Negociação / acordo",
+        "decisao_judicial_impacto_alto": "Decisão de alto impacto",
+        "prazo": "Consulta de prazo",
+        "honorarios": "Honorários",
+        "outro": "Atendimento geral",
+        "erro": "Resposta de fallback",
+    }
 
     # Histórico
     for msg in st.session_state[chat_key]:
         avatar = "⚖️" if msg["role"] == "assistant" else "👤"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
-            if msg["role"] == "assistant" and msg.get("meta"):
+            # Partes de continuação (bolhas 2+) não mostram badges
+            if msg["role"] == "assistant" and msg.get("meta") and not msg["meta"].get("continuation"):
                 meta = msg["meta"]
-                partes = []
+                badges = []
                 intencao = meta.get("intencao", "")
-                if intencao:
-                    partes.append(f"intent: `{intencao}`")
-                if meta.get("tokens_in") or meta.get("tokens_out"):
-                    partes.append(f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`")
+                rotulo = _ROTULOS_INTENCAO.get(intencao, "")
+                if rotulo:
+                    badges.append(f"_{rotulo}_")
                 if meta.get("rag_ativo"):
-                    partes.append("📚 RAG injetado")
-                # Intenções que disparam escalação automática para o advogado
+                    badges.append("📚 Usando documentos do escritório")
                 _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
                 if intencao in _ESCALACAO_INTENCOES:
-                    partes.append("🚨 escalado → advogado notificado")
-                if meta.get("fallback"):
-                    partes.append("⚠️ fallback")
-                if partes:
-                    st.caption(" · ".join(partes))
+                    badges.append("🚨 Questão importante — advogado notificado")
+                if badges:
+                    st.caption(" · ".join(badges))
+
+    # ── Buffer de mensagens ───────────────────────────────────────────────────
+    # Guarda mensagens enviadas em sequência rápida antes de processar.
+    # Quando o usuário envia várias mensagens, elas são combinadas em uma só
+    # antes de chegarem à IA — igual ao comportamento humano no WhatsApp.
+    buffer_key = f"buffer_{cid}"
+    buffer_ts_key = f"buffer_ts_{cid}"
+    if buffer_key not in st.session_state:
+        st.session_state[buffer_key] = []
 
     # Input
     prompt = st.chat_input(
         "Pergunte sobre o processo, termos jurídicos ou tire dúvidas...",
         key=f"input_{cid}",
     )
+
     if prompt and orchestrator:
+        # ── 1. Adiciona ao buffer ─────────────────────────────────────────────
+        st.session_state[buffer_key].append(prompt)
+        st.session_state[buffer_ts_key] = time.time()
+
+        # Mostra mensagem do usuário imediatamente
         st.session_state[chat_key].append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
+
+        # ── 2. Delay de leitura — IA "está lendo" ────────────────────────────
+        # Simula o tempo que um humano levaria para ler a mensagem antes de começar a digitar.
         with st.chat_message("assistant", avatar="⚖️"):
-            with st.spinner("Orchestrator LangGraph processando..."):
-                try:
-                    resultado = asyncio.run(
-                        orchestrator.processar(
-                            escritorio_id=1,
-                            cliente_id=1,
-                            mensagem=prompt,
-                            tipo="texto",
-                        )
+            _ph_lendo = st.empty()
+            _ph_lendo.markdown("_lendo..._")
+            _delay_leitura = max(0.8, min(2.0, len(prompt.split()) * 0.12))
+            time.sleep(_delay_leitura)
+            _ph_lendo.empty()
+
+        # ── 3. Consolida buffer ───────────────────────────────────────────────
+        # Junta todas as mensagens pendentes em uma só antes de enviar à IA.
+        msgs_buffer = st.session_state[buffer_key]
+        if len(msgs_buffer) > 1:
+            mensagem_consolidada = "\n\n".join(msgs_buffer)
+        else:
+            mensagem_consolidada = msgs_buffer[0]
+        st.session_state[buffer_key] = []  # Limpa buffer
+
+        # ── 4. Processa com a IA ──────────────────────────────────────────────
+        resposta = ""
+        intencao, ti, to, fallback, rag_ativo = "outro", 0, 0, False, False
+        with st.chat_message("assistant", avatar="⚖️"):
+            _ph_digitando = st.empty()
+            _ph_digitando.markdown("_digitando..._")
+            try:
+                resultado = asyncio.run(
+                    orchestrator.processar(
+                        escritorio_id=1,
+                        cliente_id=1,
+                        mensagem=mensagem_consolidada,
+                        tipo="texto",
                     )
-                    resposta = resultado["resposta"]
-                    intencao = resultado.get("intencao", "outro")
-                    tokens = resultado.get("tokens_usados", {})
-                    fallback = resultado.get("usando_fallback", False)
-                    ti = tokens.get("input", 0)
-                    to = tokens.get("output", 0)
-                    rag_ativo = bool(rag_base and rag_base.total_chunks > 0)
-                    st.session_state[tokens_key]["in"] += ti
-                    st.session_state[tokens_key]["out"] += to
-                    intenções_dict = st.session_state[tokens_key].setdefault("intencoes", {})
-                    intenções_dict[intencao] = intenções_dict.get(intencao, 0) + 1
-                except Exception as exc:
-                    resposta = f"Desculpe, ocorreu um erro. Tente novamente. ({exc})"
-                    intencao, ti, to, fallback, rag_ativo = "erro", 0, 0, True, False
+                )
+                resposta = resultado["resposta"]
+                intencao = resultado.get("intencao", "outro")
+                tokens = resultado.get("tokens_usados", {})
+                fallback = resultado.get("usando_fallback", False)
+                ti = tokens.get("input", 0)
+                to = tokens.get("output", 0)
+                rag_ativo = bool(rag_base and rag_base.total_chunks > 0)
+                st.session_state[tokens_key]["in"] += ti
+                st.session_state[tokens_key]["out"] += to
+                intenções_dict = st.session_state[tokens_key].setdefault("intencoes", {})
+                intenções_dict[intencao] = intenções_dict.get(intencao, 0) + 1
+            except Exception as exc:
+                resposta = f"Desculpe, ocorreu um erro interno. Tente novamente."
+                intencao, ti, to, fallback, rag_ativo = "erro", 0, 0, True, False
+            _ph_digitando.empty()
 
-            _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
-            st.markdown(resposta)
-            partes = [f"intent: `{intencao}`"]
-            if ti or to:
-                partes.append(f"tokens: `{ti}↑ {to}↓`")
-            if rag_ativo:
-                partes.append("📚 RAG injetado")
-            if intencao in _ESCALACAO_INTENCOES:
-                partes.append("🚨 escalado → advogado notificado")
-            if fallback:
-                partes.append("⚠️ fallback")
-            st.caption(" · ".join(partes))
+        # ── 5. Divide resposta em partes e exibe com delay de digitação ───────
+        _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
+        partes_resposta = _fragmentar_resposta(resposta)
 
-        st.session_state[chat_key].append({
-            "role": "assistant",
-            "content": resposta,
-            "meta": {"intencao": intencao, "tokens_in": ti, "tokens_out": to, "fallback": fallback, "rag_ativo": rag_ativo},
-        })
+        for i, parte in enumerate(partes_resposta):
+            # Delay de digitação antes de cada parte (exceto a primeira que já
+            # apareceu no lugar do "digitando..." acima)
+            if i > 0:
+                with st.chat_message("assistant", avatar="⚖️"):
+                    _ph_pt = st.empty()
+                    _ph_pt.markdown("_digitando..._")
+                    time.sleep(_delay_digitacao(parte))
+                    _ph_pt.empty()
+
+            with st.chat_message("assistant", avatar="⚖️"):
+                st.markdown(parte)
+                # Metadata badge apenas na primeira parte
+                if i == 0:
+                    badges = []
+                    rotulo = _ROTULOS_INTENCAO.get(intencao, "")
+                    if rotulo:
+                        badges.append(f"_{rotulo}_")
+                    if rag_ativo:
+                        badges.append("📚 Usando documentos do escritório")
+                    if intencao in _ESCALACAO_INTENCOES:
+                        badges.append("🚨 Questão importante — advogado notificado")
+                    if badges:
+                        st.caption(" · ".join(badges))
+
+            # Salva cada parte no histórico
+            st.session_state[chat_key].append({
+                "role": "assistant",
+                "content": parte,
+                "meta": {
+                    "intencao": intencao if i == 0 else None,
+                    "tokens_in": ti if i == 0 else 0,
+                    "tokens_out": to if i == 0 else 0,
+                    "fallback": fallback if i == 0 else False,
+                    "rag_ativo": rag_ativo if i == 0 else False,
+                    "continuation": i > 0,
+                },
+            })
+
         st.rerun()
 
 
@@ -1362,10 +1525,10 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
 
 
 def page_rag() -> None:
-    st.title("📚 Base de Conhecimento Jurídico — RAG")
+    st.title("📚 Personalize a IA com os Documentos do Seu Escritório")
     st.caption(
-        "Feature 3 — Retrieval-Augmented Generation. "
-        "Faça upload de documentos jurídicos; a IA os consulta automaticamente ao responder perguntas."
+        "Envie documentos jurídicos do seu escritório — petições, jurisprudências, teses, pareceres. "
+        "A IA aprende com eles e passa a responder usando a linguagem e os argumentos que você usa no dia a dia."
     )
 
     # Inicializa base RAG na sessão
@@ -1374,10 +1537,9 @@ def page_rag() -> None:
     rag: _MockRAGBase = st.session_state["rag_base"]
 
     # ── Métricas ──────────────────────────────────────────────────────────────
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Documentos", rag.total_docs)
-    col2.metric("Chunks Indexados", rag.total_chunks)
-    col3.metric("Similaridade Mínima", "0.75 (Jaccard)")
+    col1, col2 = st.columns(2)
+    col1.metric("Documentos enviados", rag.total_docs)
+    col2.metric("Trechos aprendidos pela IA", rag.total_chunks)
 
     st.divider()
 
@@ -1385,57 +1547,62 @@ def page_rag() -> None:
     col_upload, col_config = st.columns([2, 1])
 
     with col_upload:
-        st.subheader("📤 Adicionar Documento")
+        st.subheader("📤 Enviar Documento")
         arquivo = st.file_uploader(
-            "PDF ou TXT",
+            "Selecione um arquivo PDF ou TXT",
             type=["pdf", "txt"],
-            help=f"PDF {'✅ suportado (PyMuPDF)' if _FITZ_OK else '⚠️ requer pip install pymupdf'} · TXT sempre suportado",
+            help=f"PDF {'✅ suportado' if _FITZ_OK else '⚠️ instale pymupdf para PDF'} · TXT sempre suportado",
         )
 
         if arquivo:
             col_t, col_tipo = st.columns(2)
             with col_t:
-                titulo = st.text_input("Título do documento", value=arquivo.name.rsplit(".", 1)[0])
+                titulo = st.text_input("Nome do documento", value=arquivo.name.rsplit(".", 1)[0])
             with col_tipo:
-                tipo = st.selectbox("Tipo", ["peticao", "sentenca", "jurisprudencia", "tese", "parecer"])
+                tipo = st.selectbox(
+                    "Categoria",
+                    ["peticao", "sentenca", "jurisprudencia", "tese", "parecer"],
+                    format_func=lambda x: {
+                        "peticao": "Petição",
+                        "sentenca": "Sentença",
+                        "jurisprudencia": "Jurisprudência",
+                        "tese": "Tese / Argumento",
+                        "parecer": "Parecer / FAQ",
+                    }.get(x, x),
+                )
 
-            if st.button("📥 Ingerir Documento", type="primary"):
-                with st.spinner("Extraindo texto, chunking e indexando..."):
+            if st.button("📥 Ensinar à IA", type="primary"):
+                with st.spinner("Lendo e aprendendo com o documento..."):
                     texto = _extrair_texto(arquivo.getvalue(), arquivo.name)
                     if not texto.strip():
-                        st.error("Não foi possível extrair texto do arquivo.")
+                        st.error("Não foi possível ler o arquivo. Verifique se ele contém texto.")
                     else:
                         n_chunks = rag.adicionar(titulo, tipo, texto)
                         st.success(
-                            f"✅ Documento '{titulo}' ingerido! "
-                            f"{n_chunks} chunk(s) gerados e indexados."
+                            f"✅ Documento '{titulo}' adicionado com sucesso! "
+                            f"A IA já pode usar este material nas respostas."
                         )
                         st.rerun()
 
     with col_config:
-        st.subheader("⚙️ Pipeline RAG")
+        st.subheader("💡 Como funciona?")
         st.markdown("""
-        **Implementação demo:**
-        - Chunking: 500 chars, 30-word overlap
-        - Indexação: keywords (TF-IDF-like)
-        - Busca: Jaccard similarity
-        - Re-ranking: top-3 por relevância
+        Quando o advogado ou o cliente faz uma pergunta, a IA:
 
-        **Em produção:**
-        - Embeddings: Voyage AI (`voyage-law-2`)
-        - Armazenamento: PostgreSQL + pgvector
-        - Busca: cosine similarity
-        - Re-ranking: MMR (Max Marginal Relevance)
-        - Cache: Redis TTL 1h
+        1. **Identifica** quais documentos do seu escritório são relevantes para aquela pergunta
+        2. **Lê** os trechos mais pertinentes automaticamente
+        3. **Responde** usando o raciocínio e a linguagem desses documentos
+
+        Quanto mais documentos do seu escritório você enviar, mais a IA vai soar como **você**.
         """)
 
     st.divider()
 
     # ── Guia: O que colocar na base ───────────────────────────────────────────
-    with st.expander("📋 O que colocar na base RAG para melhores resultados", expanded=rag.total_docs == 0):
+    with st.expander("📋 O que enviar para a IA aprender? (recomendações práticas)", expanded=rag.total_docs == 0):
         st.markdown("""
-        O retriever enriquece automaticamente a busca com o **tipo de ação** e **tribunal**
-        do processo do cliente — então documentos da mesma área jurídica são sempre priorizados.
+        A IA identifica automaticamente a área jurídica do processo do cliente e busca os documentos
+        mais relevantes. Por isso, quanto mais focados forem os documentos, melhor ela responde.
         """)
 
         col_g1, col_g2 = st.columns(2)
@@ -1443,80 +1610,83 @@ def page_rag() -> None:
         with col_g1:
             st.markdown("#### Por tipo de documento")
             st.markdown("""
-🟡 **`jurisprudencia`** — maior impacto
-- Acórdãos do TJSP/TRT/STJ na mesma área de atuação
-- Súmulas aplicáveis (STJ, STF, TST)
-- Julgados paradigma similares aos casos dos clientes
+🟡 **Jurisprudência** — maior impacto nas respostas
+- Acórdãos do TJSP/TRT/STJ da sua área de atuação
+- Súmulas aplicáveis aos seus casos
+- Decisões similares aos processos dos seus clientes
 
-🟠 **`tese`** — segundo maior impacto
-- Teses defensivas/ofensivas por área
-- Argumentação que o escritório usa nas petições
+🟠 **Tese / Argumento** — segundo maior impacto
+- Os argumentos que você usa nas suas petições
 - Pontos fortes e fracos de cada tipo de ação
+- Estratégias que funcionam bem no tribunal
 
-🟢 **`sentenca`** — contexto processual
-- Sentenças recebidas em casos similares (anonimizadas)
-- Padrões de fundamentação dos juízes da comarca
-- Decisões interlocutórias comuns no tribunal
+🟢 **Sentença** — contexto processual
+- Sentenças em casos similares (anonimizadas)
+- Como os juízes da sua comarca costumam fundamentar
+- Decisões interlocutórias frequentes no tribunal
 
-🟣 **`parecer`** — respostas técnicas prontas
-- FAQs internas ("O que acontece depois da citação?")
-- Explicações de fase processual por tipo de ação
-- Respostas padronizadas para perguntas frequentes
+🟣 **Parecer / FAQ** — respostas técnicas prontas
+- Perguntas frequentes dos seus clientes respondidas
+- O que acontece em cada fase do processo
+- Explicações que você dá no dia a dia
 
-🔵 **`peticao`** — linguagem do escritório
-- Petições iniciais com os argumentos usados
-- Contestações nas áreas de atuação principal
+🔵 **Petição** — linguagem do escritório
+- Petições iniciais com os seus argumentos
+- Contestações nas suas áreas principais
             """)
 
         with col_g2:
             st.markdown("#### Por área de atuação")
             st.markdown("""
 ⚖️ **Trabalhista**
-→ Súmulas TST + OJ SDI · Tese rescisão indireta / dano moral
+→ Súmulas do TST · Teses de rescisão indireta e dano moral
 
 🏥 **Cível / Indenizatório**
-→ Acórdãos TJSP por comarca · Tabela danos morais da vara
+→ Acórdãos do TJSP por comarca · Como a vara calcula danos morais
 
 💊 **Previdenciário**
-→ Portarias INSS + jurisprudência TRF · Tese por tipo de benefício
+→ Jurisprudência do TRF · Teses por tipo de benefício
 
 👨‍👩‍👧 **Família**
-→ Jurisprudência pensão + guarda · FAQ procedimentos cartório
+→ Jurisprudência sobre pensão e guarda · FAQ de procedimentos
 
 🛒 **Consumidor**
-→ CDC + Súmulas STJ · Decisões Procon da região
+→ Súmulas do STJ aplicadas · Decisões da sua região
             """)
 
             st.markdown("#### Tamanho ideal")
             st.markdown("""
-O chunker divide em blocos de **~500 palavras** (overlap de 30).
 Documentos entre **1 e 10 páginas** funcionam melhor.
 
-Para sentenças longas (+40 pág): extraia só os
-**fundamentos da decisão** (3-5 pág) e ingira essa parte.
+Para sentenças longas (mais de 40 páginas): envie apenas
+os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
             """)
 
         st.markdown("---")
-        st.markdown("#### ❌ O que **não** colocar")
+        st.markdown("#### ❌ O que **não** enviar")
         col_n1, col_n2 = st.columns(2)
         with col_n1:
             st.markdown("""
-- Petições com dados pessoais reais (sem anonimizar)
-- Documentos genéricos de internet (Wikipedia, artigos vagos)
+- Documentos com CPF, RG ou dados pessoais identificáveis (anonimize antes)
+- Artigos genéricos da internet sem aplicação prática
             """)
         with col_n2:
             st.markdown("""
-- Texto puro da lei — o Claude já sabe a lei; coloque a **aplicação** dela
-- Jurisprudência com mais de 5 anos sem revisar (muda com frequência)
+- Texto puro de lei — a IA já conhece a legislação; envie a **aplicação** dela nos seus casos
+- Jurisprudências muito antigas (mais de 5 anos) sem revisão — o entendimento muda
             """)
 
     st.divider()
 
     # ── Documentos Indexados ──────────────────────────────────────────────────
-    st.subheader("📂 Documentos na Base")
+    st.subheader("📂 Documentos que a IA já aprendeu")
     docs = rag.listar_documentos()
+    _TIPO_LABEL = {
+        "peticao": "Petição", "sentenca": "Sentença",
+        "jurisprudencia": "Jurisprudência", "tese": "Tese / Argumento", "parecer": "Parecer / FAQ",
+    }
     if not docs:
-        st.info("Nenhum documento indexado ainda. Faça upload acima.")
+        st.info("Nenhum documento enviado ainda. Clique em 'Enviar Documento' acima para começar.")
     else:
         for doc in docs:
             col_doc, col_del = st.columns([5, 1])
@@ -1525,77 +1695,34 @@ Para sentenças longas (+40 pág): extraia só os
                     "peticao": "🔵", "sentenca": "🟢", "jurisprudencia": "🟡",
                     "tese": "🟠", "parecer": "🟣",
                 }.get(doc["tipo"], "⚪")
-                st.markdown(f"{tipo_badge} **{doc['titulo']}** · `{doc['tipo']}` · {doc['chunks']} chunks")
+                tipo_nome = _TIPO_LABEL.get(doc["tipo"], doc["tipo"])
+                st.markdown(f"{tipo_badge} **{doc['titulo']}** · {tipo_nome}")
             with col_del:
                 if st.button("🗑️", key=f"del_{doc['titulo']}", help="Remover documento"):
                     removidos = rag.remover(doc["titulo"])
-                    st.info(f"Removido: {doc['titulo']} ({removidos} chunks)")
+                    st.info(f"Documento '{doc['titulo']}' removido.")
                     st.rerun()
 
     st.divider()
 
     # ── Teste de Busca ────────────────────────────────────────────────────────
-    st.subheader("🔍 Teste de Busca Semântica")
-    st.caption("Simula como a IA recupera contexto ao responder uma pergunta.")
+    st.subheader("🔍 Testar o Conhecimento da IA")
+    st.caption("Digite uma pergunta para ver quais documentos do seu escritório a IA usaria para responder.")
 
-    query = st.text_input("Consulta", placeholder="ex: prescrição trabalhista, rescisão indireta, pensão alimentícia...")
-    col_k, _ = st.columns([1, 3])
-    with col_k:
-        top_k = st.slider("Top K resultados", 1, 5, 3)
+    query = st.text_input("Pergunta de teste", placeholder="ex: prescrição trabalhista, rescisão indireta, pensão alimentícia...")
 
     if query and rag.total_chunks > 0:
-        chunks = rag.buscar(query, top_k=top_k)
+        chunks = rag.buscar(query, top_k=3)
         if chunks:
-            st.success(f"✅ {len(chunks)} chunk(s) recuperado(s)")
+            st.success(f"✅ {len(chunks)} documento(s) relevante(s) encontrado(s)")
             for i, c in enumerate(chunks, 1):
-                with st.expander(f"Chunk {i} — [{c['tipo']}] {c['titulo']}"):
+                tipo_nome = _TIPO_LABEL.get(c["tipo"], c["tipo"])
+                with st.expander(f"Documento {i} — {tipo_nome}: {c['titulo']}"):
                     st.write(c["texto"])
-                    kw_preview = list(c["keywords"])[:10]
-                    st.caption(f"Keywords: {', '.join(kw_preview)}")
-            st.subheader("Contexto que seria injetado no prompt:")
-            st.code(rag.formatar_contexto(chunks), language="xml")
         else:
-            st.warning("Nenhum chunk relevante encontrado para esta consulta.")
+            st.warning("Nenhum documento relevante encontrado para esta pergunta. Tente outros termos.")
     elif query and rag.total_chunks == 0:
-        st.warning("Base de conhecimento vazia. Adicione documentos primeiro.")
-
-    # ── Explicação do pipeline completo ──────────────────────────────────────
-    st.divider()
-    with st.expander("📖 Como o RAG se integra ao orchestrator (Feature 3)"):
-        st.markdown("""
-        ```
-        [Mensagem do cliente]
-              ↓
-        [Nó 1: Classificar Intenção] → intent: status | duvida_termo | perspectivas | ...
-              ↓ (se precisa de dados)
-        [Nó 2: Buscar Dados DB + DataJud]   [Nó 3: Buscar Contexto RAG]
-              ↓                                    ↓
-        [Nó 4: Gerar Resposta]  ← system_prompt com persona + dados processo + contexto RAG
-              ↓
-        [Nó 5: Verificar Fatos (FactChecker)]
-              ↓
-        [Nó 6: Enviar Resposta → Evolution WhatsApp]
-        ```
-
-        **Persona (Feature 4 → Feature 1):**
-        ```xml
-        <persona>
-        Você se chama {persona_nome}. Ao se apresentar, use este nome.
-        {instrução_do_tom}
-        </persona>
-        ```
-
-        O bloco `<persona>` é gerado por `gerar_instrucao_persona()` e prefixado
-        ao `SYSTEM_PROMPT_BASE` antes de cada chamada ao Claude.
-
-        **Contexto RAG:**
-        ```xml
-        <contexto_juridico>
-        [JURISPRUDENCIA — Título do Doc]
-        Texto do chunk recuperado...
-        </contexto_juridico>
-        ```
-        """)
+        st.warning("Você ainda não enviou nenhum documento. Adicione documentos acima para começar.")
 
 
 # =============================================================================
@@ -1663,7 +1790,21 @@ def page_configuracoes() -> None:
         col2.metric("DataJud", "✅ Público" if not DATAJUD_API_KEY else "✅ Com API Key")
         col3.metric("WhatsApp", "✅ Simulado" if ob.get("whatsapp_ok") else "⚠️ Não conectado")
 
-        st.subheader("Analytics de Intenções")
+        st.subheader("O que os clientes mais perguntam")
+        _ROTULOS_STATUS = {
+            "saudacao": "Boas-vindas",
+            "status_processo": "Consulta de andamento do processo",
+            "duvida_termo": "Dúvida sobre termo jurídico",
+            "perspectivas": "Perspectivas do caso",
+            "parecer_juridico": "Pedido de parecer jurídico",
+            "estrategia_processual": "Estratégia processual",
+            "negociacao": "Negociação / acordo",
+            "decisao_judicial_impacto_alto": "Decisão de alto impacto",
+            "prazo": "Consulta de prazo",
+            "honorarios": "Honorários",
+            "outro": "Atendimento geral",
+            "erro": "Resposta automática de fallback",
+        }
         clientes = st.session_state.get("clientes_hub", [])
         total_intencoes: dict[str, int] = {}
         total_tokens_in = total_tokens_out = 0
@@ -1676,14 +1817,10 @@ def page_configuracoes() -> None:
 
         if total_intencoes:
             for intent, cnt in sorted(total_intencoes.items(), key=lambda x: -x[1]):
-                st.progress(cnt / max(total_intencoes.values()), text=f"`{intent}` — {cnt}x")
+                rotulo = _ROTULOS_STATUS.get(intent, intent)
+                st.progress(cnt / max(total_intencoes.values()), text=f"{rotulo} — {cnt}x")
         else:
             st.info("Nenhuma conversa registrada ainda.")
-
-        if total_tokens_in or total_tokens_out:
-            custo = (total_tokens_in * 3 + total_tokens_out * 15) / 1_000_000
-            st.metric("Total Tokens", f"{total_tokens_in + total_tokens_out:,}")
-            st.metric("Custo Estimado Claude Sonnet", f"US$ {custo:.4f}")
 
 
 # =============================================================================
@@ -1778,10 +1915,22 @@ def _badge_nivel(nivel: str) -> str:
     return f'<span style="background:{cor};color:white;padding:2px 8px;border-radius:8px;font-size:0.8em">{icone} {nivel.replace("_", " ").upper()}</span>'
 
 
+_CRM_NIVEL_LABEL = {
+    "excelente": "Excelente",
+    "satisfeito": "Satisfeito",
+    "neutro": "Neutro",
+    "em_risco": "Em Risco",
+    "critico": "Crítico",
+}
+
+
 def page_crm() -> None:
-    """Feature 7 — CRM Inteligente."""
-    st.title("🤝 CRM Inteligente")
-    st.caption("Classificação de satisfação e sugestões de ação geradas por IA para cada cliente.")
+    """Relacionamento com Clientes."""
+    st.title("🤝 Relacionamento com Clientes")
+    st.caption(
+        "Veja quais clientes precisam de atenção agora, quais estão satisfeitos "
+        "e o que fazer em cada caso — tudo calculado automaticamente pela IA."
+    )
 
     clientes = st.session_state.get("clientes_hub", [])
     if not clientes:
@@ -1791,19 +1940,20 @@ def page_crm() -> None:
     # ── Controles ─────────────────────────────────────────────────────────────
     col_btn, col_filtro, col_busca = st.columns([2, 2, 3])
     with col_btn:
-        analisar = st.button("🔄 Analisar todos os clientes", use_container_width=True)
+        analisar = st.button("🔄 Atualizar análise", use_container_width=True)
     with col_filtro:
         filtro_nivel = st.selectbox(
-            "Filtrar por nível",
+            "Filtrar por situação",
             ["Todos", "critico", "em_risco", "neutro", "satisfeito", "excelente"],
             label_visibility="collapsed",
+            format_func=lambda x: "Todos" if x == "Todos" else _CRM_NIVEL_LABEL.get(x, x),
         )
     with col_busca:
         busca = st.text_input("Buscar por nome", placeholder="Digite o nome...", label_visibility="collapsed")
 
     # Dispara ou carrega análises
     if analisar or "crm_resultados" not in st.session_state:
-        with st.spinner("Calculando scores CRM..."):
+        with st.spinner("Analisando situação dos clientes..."):
             resultados = {}
             for c in clientes:
                 resultados[c["id"]] = _calcular_crm_mock(c)
@@ -1822,10 +1972,11 @@ def page_crm() -> None:
     for col, (nivel, total) in zip(cols, contagens.items()):
         cor = _CRM_CORES[nivel]
         with col:
+            label_nivel = _CRM_NIVEL_LABEL.get(nivel, nivel.replace("_", " ").title())
             st.markdown(
                 f'<div style="border-left:4px solid {cor};padding-left:8px">'
                 f'<div style="font-size:1.6em;font-weight:bold">{total}</div>'
-                f'<div style="color:{cor};font-size:0.85em">{nivel.replace("_"," ").upper()}</div>'
+                f'<div style="color:{cor};font-size:0.85em">{label_nivel}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -1865,16 +2016,24 @@ def page_crm() -> None:
                 )
 
             with col_score:
-                st.metric("Score CRM", f"{r['score']}/100")
-                st.caption(f"⏱ {r['dias_contato']}d sem contato · 💬 {r['interacoes_30d']} msgs/mês")
+                label_nivel_card = _CRM_NIVEL_LABEL.get(nivel, nivel)
+                st.metric("Situação", label_nivel_card)
+                st.caption(f"⏱ {r['dias_contato']} dias sem contato · 💬 {r['interacoes_30d']} mensagens/mês")
 
             with col_detalhe:
-                with st.expander("Ver fatores"):
+                with st.expander("Por que esta classificação?"):
+                    _FATOR_LABEL = {
+                        "engajamento": "Frequência de contato",
+                        "satisfacao": "Satisfação (NPS)",
+                        "risco_processo": "Risco do processo",
+                        "recencia": "Há quanto tempo sem contato",
+                        "escalacoes": "Escalações pendentes",
+                    }
                     for nome_fator, dados in r["fatores"].items():
-                        pct = int(dados["contribuicao"])
+                        label_fator = _FATOR_LABEL.get(nome_fator, nome_fator.replace("_", " ").title())
                         st.progress(
                             min(dados["pontos"] / 100, 1.0),
-                            text=f"{nome_fator}: {dados['pontos']}pts → {pct} contrib.",
+                            text=label_fator,
                         )
 
                 # Ação sugerida baseada no nível
@@ -2035,11 +2194,11 @@ def _render_tendencia_chart(tendencia: list[dict]) -> None:
 
 
 def page_analytics() -> None:
-    """Feature 5 — Analytics de Satisfação e Retenção."""
-    st.title("📊 Analytics de Satisfação e Retenção")
+    """Painel de Resultados."""
+    st.title("📊 Painel de Resultados do Escritório")
     st.caption(
-        "Feature 5 — NPS, eficiência da IA, tendência semanal e ranking de clientes. "
-        "Demo: dados calculados a partir dos clientes e conversas da sessão atual."
+        "Veja como seus clientes estão sendo atendidos, quais são os mais satisfeitos "
+        "e onde a IA está ajudando a economizar tempo."
     )
 
     clientes: list[dict] = st.session_state.get("clientes_hub", [])
@@ -2056,8 +2215,8 @@ def page_analytics() -> None:
     tendencia = dados["tendencia_semanal"]
     ranking = dados["por_cliente"]
 
-    tab_dash, tab_nps, tab_export, tab_prometheus = st.tabs([
-        "📈 Dashboard", "⭐ Pesquisa NPS", "📥 Exportar", "🔧 Prometheus",
+    tab_dash, tab_nps, tab_export = st.tabs([
+        "📈 Painel Geral", "⭐ Satisfação dos Clientes", "📥 Exportar Relatório",
     ])
 
     # =========================================================================
@@ -2088,28 +2247,27 @@ def page_analytics() -> None:
         st.divider()
 
         # Eficiência
-        st.subheader("⚡ Eficiência da IA")
-        ce1, ce2, ce3, ce4, ce5 = st.columns(5)
-        ce1.metric("Tempo Resposta Médio", f"{eficiencia['tempo_resposta_medio_ms']} ms")
-        ce2.metric("Interações sem Humano", eficiencia["interacoes_sem_humano"])
-        ce3.metric("Autonomia", f"{eficiencia['percentual_autonomia']:.1f}%")
-        ce4.metric("Horas Economizadas", f"{eficiencia['horas_economizadas_estimadas']:.1f}h")
-        ce5.metric("Custo Total Claude", f"US$ {eficiencia['custo_total_usd']:.4f}")
+        st.subheader("⚡ Quanto tempo a IA está economizando")
+        ce1, ce2, ce3, ce4 = st.columns(4)
+        ce1.metric("Tempo médio de resposta", f"{eficiencia['tempo_resposta_medio_ms']} ms", help="Tempo que a IA leva para responder um cliente")
+        ce2.metric("Atendimentos feitos pela IA", eficiencia["interacoes_sem_humano"], help="Mensagens respondidas sem precisar do advogado")
+        ce3.metric("IA respondeu sozinha", f"{eficiencia['percentual_autonomia']:.1f}%", help="Porcentagem dos atendimentos resolvidos automaticamente")
+        ce4.metric("Horas economizadas", f"{eficiencia['horas_economizadas_estimadas']:.1f}h", help="Estimativa de horas do advogado poupadas pela IA")
 
         pct = eficiencia["percentual_autonomia"]
         cor_auto = "#4CAF50" if pct >= 70 else "#FF9800" if pct >= 50 else "#f44336"
         st.markdown(
             f"""<div style="margin:8px 0;">
                 <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                    <span>Taxa de Autonomia da IA</span>
+                    <span>Atendimentos resolvidos pela IA sem intervenção do advogado</span>
                     <span style="font-weight:600;color:{cor_auto};">{pct:.1f}%</span>
                 </div>
                 <div style="background:#e0e0e0;border-radius:4px;height:10px;">
                     <div style="width:{pct}%;background:{cor_auto};height:10px;border-radius:4px;"></div>
                 </div>
                 <div style="font-size:11px;color:#888;margin-top:3px;">
-                    {eficiencia['interacoes_sem_humano']} de {resumo['total_interacoes']}
-                    interações resolvidas sem intervenção humana
+                    {eficiencia['interacoes_sem_humano']} de {resumo['total_interacoes']} mensagens
+                    respondidas sem precisar do advogado
                 </div>
             </div>""",
             unsafe_allow_html=True,
@@ -2300,10 +2458,10 @@ def page_analytics() -> None:
     # Tab 3 — Exportar CSV
     # =========================================================================
     with tab_export:
-        st.subheader("📥 Exportar Relatório de Interações")
+        st.subheader("📥 Exportar Relatório de Atendimentos")
         st.caption(
-            "Simula `GET /chat/stats/export?mes=YYYY-MM&formato=csv` "
-            "(ExportadorAnalytics.gerar_csv). CSV com BOM UTF-8 para compatibilidade com Excel."
+            "Baixe um relatório completo de todos os atendimentos do mês. "
+            "O arquivo é compatível com Excel."
         )
 
         col_mes, col_fmt = st.columns(2)
@@ -2360,98 +2518,8 @@ def page_analytics() -> None:
         with st.expander("Preview das primeiras linhas"):
             preview_lines = csv_bytes.decode("utf-8-sig").split("\n")[:6]
             st.code("\n".join(preview_lines), language="text")
-        st.caption(
-            "Em produção: SELECT projetado por coluna (não ORM completo), "
-            "`isoformat()` para datas, `utf-8-sig` para BOM."
-        )
+        st.caption("O relatório inclui todos os atendimentos, notas de satisfação e se a IA respondeu sozinha ou precisou do advogado.")
 
-    # =========================================================================
-    # Tab 4 — Prometheus
-    # =========================================================================
-    with tab_prometheus:
-        st.subheader("🔧 Métricas Prometheus")
-        st.caption(
-            "Em produção: `GET /metrics` expõe gauges para o Grafana. "
-            "Aqui simulamos os valores atuais dos 3 gauges do escritório (escritorio_id=1)."
-        )
-
-        nps_gauge_val = resumo["nps_medio"]
-        autonomia_gauge_val = eficiencia["percentual_autonomia"]
-
-        _ESCALACAO_INTENCOES = {
-            "parecer_juridico", "estrategia_processual",
-            "negociacao", "decisao_judicial_impacto_alto",
-        }
-        escalacoes = sum(
-            sum(v for k, v in st.session_state.get(f"tokens_{c['id']}", {}).get("intencoes", {}).items()
-                if k in _ESCALACAO_INTENCOES)
-            for c in clientes
-        )
-
-        st.divider()
-        col_g1, col_g2, col_g3 = st.columns(3)
-
-        def _gauge_card(titulo: str, valor_str: str, sublabel: str, cor: str) -> str:
-            return (
-                f'<div style="border:1px solid {cor};border-radius:8px;padding:16px;'
-                f'background:{cor}18;text-align:center;">'
-                f'<div style="font-size:28px;font-weight:700;color:{cor};">{valor_str}</div>'
-                f'<div style="font-size:11px;color:#666;">labels: escritorio_id="1"</div>'
-                f'<div style="font-size:10px;color:#888;margin-top:4px;">{sublabel}</div>'
-                f'</div>'
-            )
-
-        with col_g1:
-            st.markdown("#### `nps_score_gauge`")
-            cor = "#4CAF50" if nps_gauge_val >= 4.0 else "#FF9800" if nps_gauge_val >= 3.0 else "#f44336"
-            st.markdown(_gauge_card("NPS Score", f"{nps_gauge_val:.1f}", "Gauge — NPS médio atual", cor), unsafe_allow_html=True)
-
-        with col_g2:
-            st.markdown("#### `ia_autonomia_percent_gauge`")
-            cor = "#4CAF50" if autonomia_gauge_val >= 70 else "#FF9800" if autonomia_gauge_val >= 50 else "#f44336"
-            st.markdown(_gauge_card("Autonomia IA", f"{autonomia_gauge_val:.1f}%", "Gauge — % autonomia da IA", cor), unsafe_allow_html=True)
-
-        with col_g3:
-            st.markdown("#### `escalacoes_pendentes_gauge`")
-            cor = "#f44336" if escalacoes > 0 else "#4CAF50"
-            st.markdown(_gauge_card("Escalações", str(escalacoes), "Gauge — escalações pendentes", cor), unsafe_allow_html=True)
-
-        st.divider()
-        with st.expander("Ver formato raw (como aparece em /metrics)"):
-            st.code(
-                f"# HELP nps_score_gauge NPS médio atual por escritório\n"
-                f"# TYPE nps_score_gauge gauge\n"
-                f'nps_score_gauge{{escritorio_id="1"}} {nps_gauge_val:.1f}\n\n'
-                f"# HELP ia_autonomia_percent_gauge Percentual de autonomia da IA\n"
-                f"# TYPE ia_autonomia_percent_gauge gauge\n"
-                f'ia_autonomia_percent_gauge{{escritorio_id="1"}} {autonomia_gauge_val:.1f}\n\n'
-                f"# HELP escalacoes_pendentes_gauge Interações com escalacao pendente\n"
-                f"# TYPE escalacoes_pendentes_gauge gauge\n"
-                f'escalacoes_pendentes_gauge{{escritorio_id="1"}} {escalacoes}',
-                language="text",
-            )
-
-        st.markdown("""
-        **Segurança do endpoint `/metrics`:**
-        - `METRICS_TOKEN` env var → `Authorization: Bearer <token>` (comparação HMAC segura)
-        - Segunda camada: restrição de IP a nível de infra (nginx / load balancer)
-        - Sem token configurado → modo dev (warning no log, sem bloqueio)
-
-        **Integração Grafana:**
-        ```yaml
-        scrape_configs:
-          - job_name: hub-juridico
-            static_configs:
-              - targets: [api:8000]
-            metrics_path: /metrics
-            bearer_token: ${METRICS_TOKEN}
-        ```
-        """)
-        st.info(
-            "`_atualizar_metricas_prometheus()` é chamada apenas em cache miss do dashboard "
-            "(não a cada request), evitando writes desnecessários ao Prometheus.",
-            icon="ℹ️",
-        )
 
 
 # =============================================================================
@@ -2712,11 +2780,11 @@ def _buscar_e_pontuar_leads(
 
 
 def page_prospeccao() -> None:
-    """Feature 3 — Prospecção Inteligente (B2B + B2C)."""
-    st.title("🔍 Prospecção Inteligente")
+    """Captação de Novos Clientes."""
+    st.title("🔍 Captação de Novos Clientes")
     st.caption(
-        "Motor de captação de leads qualificados: DataJud CNJ → Receita Federal → LinkedIn → "
-        "Score heurístico + Claude Sonnet."
+        "Descubra empresas e pessoas com processos judiciais que combinam com a sua área de atuação. "
+        "A IA analisa o perfil de cada candidato e indica quem tem mais chance de virar cliente."
     )
 
     ob = st.session_state.get("onboarding", {})
@@ -2732,18 +2800,17 @@ def page_prospeccao() -> None:
     leads_total = len(st.session_state["leads_prospeccao"])
 
     tab_dna, tab_descobrir, tab_pipeline = st.tabs([
-        "🧬 DNA do Escritório",
-        "🔎 Descobrir Leads",
-        f"📋 Pipeline  ({leads_total} lead{'s' if leads_total != 1 else ''})",
+        "🧬 Perfil do Escritório",
+        "🔎 Buscar Candidatos",
+        f"📋 Minha Lista  ({leads_total} candidato{'s' if leads_total != 1 else ''})",
     ])
 
     # ── TAB 1 — DNA do Escritório ──────────────────────────────────────────────
     with tab_dna:
-        st.markdown("### Perfil Estratégico do Escritório")
+        st.markdown("### Qual é o perfil do seu escritório?")
         st.caption(
-            "O DNA é inferido a partir do tipo de ação pesquisado e determina quais leads "
-            "recebem score mais alto. Em produção é gerado pelo `DNAAdvogadoService` a partir "
-            "do histórico real de processos (`POST /prospeccao/dna/atualizar`)."
+            "Com base no tipo de ação que você busca, identificamos as áreas de maior força do seu escritório. "
+            "Esse perfil é usado para pontuar quais candidatos têm mais chances de virar clientes."
         )
 
         col_a, col_b = st.columns(2)
@@ -2791,24 +2858,24 @@ def page_prospeccao() -> None:
             st.success("DNA atualizado.")
             st.rerun()
 
-        with st.expander("ℹ️ Como o DNA funciona em produção"):
+        with st.expander("ℹ️ De onde vem este perfil?"):
             st.markdown("""
-**`GET /prospeccao/dna`** → retorna o DNA salvo (cache Redis 6h).
+O perfil é calculado automaticamente com base nos tipos de ação que você pesquisa aqui.
+Em produção, ele é gerado a partir do histórico real dos últimos 90 dias de processos do seu escritório.
 
-**`POST /prospeccao/dna/atualizar`** → regenera via `DNAAdvogadoService`:
-1. Agrega os tipos de ação dos últimos 90 dias do escritório
-2. Classifica se o perfil é B2B ou B2C pelo polo predominante
-3. Chama **Claude Haiku** para nomear as especialidades e sugerir setores-alvo
-4. Persiste em `escritorio.dna_prospeccao` (JSONB) + cache Redis (TTL 6h)
-5. Fallback: `dados_insuficientes=True` quando há menos de 5 processos
+A IA analisa:
+- Quais tipos de ação você trabalha mais
+- Se o seu perfil é mais voltado para empresas ou para pessoas físicas
+- Quais setores têm mais a ver com o seu histórico
+- Qual é o perfil ideal de cliente para o seu escritório
 """)
 
     # ── TAB 2 — Descobrir Leads ────────────────────────────────────────────────
     with tab_descobrir:
-        st.markdown("### Buscar Novos Leads")
+        st.markdown("### Encontrar novos clientes em potencial")
         st.caption(
-            "Selecione um tipo de ação. O motor busca litigantes no DataJud CNJ, "
-            "enriquece com Receita Federal + LinkedIn e pontua com Claude Sonnet."
+            "Escolha o tipo de ação. A IA busca empresas e pessoas com processos parecidos nos tribunais, "
+            "analisa o perfil de cada uma e indica quem tem mais chance de precisar do seu escritório."
         )
 
         with st.form("form_descobrir_leads"):
@@ -2836,7 +2903,7 @@ def page_prospeccao() -> None:
                 dna = _gerar_dna_demo(tipo_acao_ref=tipo_acao, nome_escritorio=ob.get("nome_escritorio", ""))
                 st.session_state["dna_escritorio"] = dna
 
-                with st.spinner(f"Consultando DataJud → enriquecendo → Claude Sonnet... (~{limite * 4}s)"):
+                with st.spinner(f"Buscando e analisando candidatos com a IA... (~{limite * 4}s)"):
                     try:
                         novos = _buscar_e_pontuar_leads(
                             tipo_acao=tipo_acao,
@@ -2856,25 +2923,25 @@ def page_prospeccao() -> None:
                         st.session_state["leads_prospeccao"] = existentes
 
                         if inseridos:
-                            st.success(f"✅ {inseridos} novo(s) lead(s) adicionado(s) ao pipeline (score ≥ {score_minimo})")
+                            st.success(f"✅ {inseridos} novo(s) candidato(s) adicionado(s) à sua lista")
                         elif novos:
-                            st.info("Todos os leads encontrados já estavam no pipeline.")
+                            st.info("Todos os candidatos encontrados já estavam na sua lista.")
                         else:
                             st.warning(
-                                f"Nenhum candidato atingiu score ≥ {score_minimo}. "
-                                "Reduza o score mínimo ou mude o tipo de ação."
+                                f"Nenhum candidato atingiu a pontuação mínima de {score_minimo}. "
+                                "Reduza o mínimo ou mude o tipo de ação."
                             )
 
                         if novos:
                             st.divider()
-                            st.markdown(f"**{len(novos)} lead(s) qualificado(s) nesta busca:**")
+                            st.markdown(f"**{len(novos)} candidato(s) encontrado(s) nesta busca:**")
                             for lead in novos:
                                 _render_lead_card_prospeccao(lead)
                                 if lead.get("componentes"):
-                                    with st.expander(f"🔬 Componentes do score — {lead['nome']}"):
+                                    with st.expander(f"Por que esta pontuação? — {lead['nome']}"):
                                         for comp, pts in lead["componentes"].items():
                                             label = comp.replace("_", " ").title()
-                                            st.markdown(f"- **{label}:** +{pts} pts")
+                                            st.markdown(f"- **{label}:** +{pts} pontos")
 
                         st.rerun()
 
@@ -2895,24 +2962,25 @@ def page_prospeccao() -> None:
             )
 
         st.divider()
-        with st.expander("ℹ️ Fluxo completo em produção"):
+        with st.expander("ℹ️ Como a pontuação é calculada?"):
             st.markdown("""
-**`POST /prospeccao/descobrir`** executa o motor completo:
+A IA analisa cada candidato em até 6 critérios e atribui uma pontuação de 0 a 100:
 
-| Etapa | Serviço | Detalhe |
-|-------|---------|---------|
-| 1 | `DataJudProspeccaoClient` | ElasticSearch CNJ — busca litigantes por `tipo_acao` |
-| 2 | `EmpresaIntelligenceService` | Receita Federal (CNPJ, porte, sócios) + LinkedIn (cargos) |
-| 3 | `PessoaIntelligenceService` | Dados do processo público — sem CPF/telefone/email (LGPD art. 11) |
-| 4 | `MatchingService._score_heuristico_*` | Heurística B2B (6 componentes) ou B2C (4 componentes) |
-| 5 | `MatchingService._refinar_com_claude` | Claude Sonnet refina score + gera motivo e abordagem (só se score ≥ 30) |
-| 6 | `_salvar_lead` | Persiste no banco com deduplicação por CNPJ (empresa) ou número CNJ (pessoa) |
+**Para empresas:**
+- Área jurídica da empresa bate com a sua especialidade (+30 pts)
+- Setor da empresa é compatível com o seu histórico (+20 pts)
+- A empresa tem vários processos ativos — alta demanda (+15 pts)
+- Contato identificado no LinkedIn (+15 pts)
+- Porte da empresa (médio/grande = mais potencial) (+10 pts)
+- Empresa regularmente ativa na Receita Federal (+10 pts)
 
-**Heurística B2B:**
-+30 especialidade match · +20 setor CNAE · +15 demanda ativa (≥3 proc.) · +15 LinkedIn · +10 porte · +10 ATIVA
+**Para pessoas físicas:**
+- Tipo de ação bate com sua especialidade (+35 pts)
+- A pessoa está no polo que você costuma atender (+25 pts)
+- Processo ainda em fase inicial — oportunidade de entrada (+20 pts)
+- Alta recorrência de processos similares (+20 pts)
 
-**Heurística B2C:**
-+35 especialidade match · +25 polo compatível · +20 fase inicial · +20 alta recorrência (>30%)
+Candidatos com 75+ são os mais quentes. Entre 40 e 74, valem uma abordagem cuidadosa.
 """)
 
     # ── TAB 3 — Pipeline ───────────────────────────────────────────────────────
@@ -3034,26 +3102,30 @@ def _render_sidebar() -> None:
     clientes = st.session_state.get("clientes_hub", [])
 
     with st.sidebar:
-        st.title("⚖️ Hub Jurídico v2.0")
-        st.caption("IA Completa para Escritórios de Advocacia")
+        st.title("⚖️ Assistente Jurídico")
+        st.caption("IA para o seu escritório de advocacia")
         st.divider()
 
         # Navegação
-        paginas_disponiveis = ["🚀 Onboarding"]
+        paginas_disponiveis = ["🚀 Configuração Inicial"]
         if onboarding_ok or clientes:
             paginas_disponiveis += [
-                "👥 Hub do Advogado", "🤝 CRM", "📚 Base RAG",
-                "🔍 Prospecção", "📊 Analytics", "⚙️ Configurações",
+                "👥 Meus Clientes",
+                "🤝 Relacionamento",
+                "📚 Documentos do Escritório",
+                "🔍 Captar Novos Clientes",
+                "📊 Painel de Resultados",
+                "⚙️ Configurações",
             ]
 
         pagina_selecionada = st.radio("Navegação", paginas_disponiveis, label_visibility="collapsed")
         mapa = {
-            "🚀 Onboarding": "onboarding",
-            "👥 Hub do Advogado": "hub",
-            "🤝 CRM": "crm",
-            "📚 Base RAG": "rag",
-            "🔍 Prospecção": "prospeccao",
-            "📊 Analytics": "analytics",
+            "🚀 Configuração Inicial": "onboarding",
+            "👥 Meus Clientes": "hub",
+            "🤝 Relacionamento": "crm",
+            "📚 Documentos do Escritório": "rag",
+            "🔍 Captar Novos Clientes": "prospeccao",
+            "📊 Painel de Resultados": "analytics",
             "⚙️ Configurações": "config",
         }
         st.session_state["pagina"] = mapa.get(pagina_selecionada, "onboarding")

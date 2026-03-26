@@ -96,6 +96,51 @@ _TIMEOUT_CLAUDE_SEGUNDOS = 25.0   # timeout por chamada ao Claude
 _TIMEOUT_JUSBRASIL_SEGUNDOS = 20.0  # timeout por chamada ao Jusbrasil/cache
 
 # ---------------------------------------------------------------------------
+# Humanização — fragmentação de mensagens para WhatsApp
+# ---------------------------------------------------------------------------
+
+def _fragmentar_resposta(texto: str) -> list[str]:
+    """
+    Divide a resposta em partes menores para envio em múltiplas mensagens WhatsApp.
+
+    Simula o comportamento humano de enviar várias mensagens em sequência:
+    divide por parágrafos (\\n\\n), agrupa partes muito curtas com a seguinte
+    e limita a no máximo 4 bolhas para não fragmentar demais.
+    """
+    partes_raw = [p.strip() for p in texto.split("\n\n") if p.strip()]
+    if len(partes_raw) <= 1:
+        return [texto.strip()] if texto.strip() else [texto]
+
+    resultado: list[str] = []
+    acumulado = ""
+    for parte in partes_raw:
+        if not acumulado:
+            acumulado = parte
+        elif len(acumulado) < 80:
+            acumulado = acumulado + "\n\n" + parte
+        else:
+            resultado.append(acumulado)
+            acumulado = parte
+    if acumulado:
+        resultado.append(acumulado)
+
+    if len(resultado) > 4:
+        meio = "\n\n".join(resultado[1:-1])
+        resultado = [resultado[0], meio, resultado[-1]]
+
+    return resultado
+
+
+def _delay_digitacao_whatsapp(texto: str) -> float:
+    """
+    Calcula delay realista entre mensagens WhatsApp.
+    Simula ~45 palavras/min (velocidade de digitação humana).
+    Limitado entre 1.5s e 4.0s para ser perceptível mas não lento demais.
+    """
+    palavras = len(texto.split())
+    return max(1.5, min(4.0, palavras * 0.10))
+
+# ---------------------------------------------------------------------------
 # Métricas Prometheus
 # ---------------------------------------------------------------------------
 
@@ -1158,10 +1203,18 @@ class ConversationOrchestrator:
 
                 if instance and numero:
                     try:
-                        await self._evolution.enviar_texto(instance, numero, resposta_final)
+                        # Fragmenta a resposta em partes menores para simular
+                        # digitação humana no WhatsApp (múltiplas mensagens em sequência).
+                        partes = _fragmentar_resposta(resposta_final)
+                        for i, parte in enumerate(partes):
+                            await self._evolution.enviar_texto(instance, numero, parte)
+                            # Delay de digitação entre partes (exceto após a última)
+                            if i < len(partes) - 1:
+                                await asyncio.sleep(_delay_digitacao_whatsapp(partes[i + 1]))
                         log.info(
                             "mensagem_enviada_whatsapp",
                             numero_parcial=numero[:4] + "***",
+                            partes=len(partes),
                         )
                     except Exception as exc_wa:
                         log.warning("falha_envio_whatsapp", erro=str(exc_wa))
