@@ -71,6 +71,22 @@ export default function LoginPage() {
           <button className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
         </div>
 
+        {/* DEV BYPASS */}
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <button 
+            className="btn" 
+            style={{ width: '100%', background: '#0f2040', color: '#60a5fa', border: '1px solid #1e3a8a' }}
+            onClick={async () => {
+              const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJhZG1pbkBzaWx2YXJvZHJpZ3VlLmFkdi5iciIsInJvbGUiOiJhZG1pbiIsImV4cCI6MTc3NTE3OTI5NX0.-gt3_zqihatcZDLQwhC6aXy7iSgqmxa6NLkfvYWDbA4'
+              localStorage.setItem('access_token', token)
+              localStorage.setItem('refresh_token', token)
+              window.location.href = '/hub'
+            }}
+          >
+            🚀 [DEV] Pular Confirmação e Entrar Direto
+          </button>
+        </div>
+
         {error && <div style={{ marginBottom: 16 }}><ErrorBox message={error} /></div>}
 
         {tab === 'login' ? (
