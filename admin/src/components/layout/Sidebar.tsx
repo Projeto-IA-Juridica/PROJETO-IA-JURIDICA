@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
@@ -12,6 +13,15 @@ const NAV = [
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
+  
+  useEffect(() => {
+    document.documentElement.className = theme === 'light' ? 'light-theme' : ''
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
 
   return (
     <aside style={{
@@ -69,11 +79,23 @@ export default function Sidebar() {
       <div style={{ padding: '12px 8px', borderTop: '1px solid var(--surface-border)' }}>
         <button
           className="sidebar-link btn-ghost"
+          onClick={toggleTheme}
+          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none', marginBottom: 4 }}
+        >
+          <div style={{ fontSize: 16, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <span className={`theme-icon ${theme === 'light' ? 'active' : ''}`}>☀️</span>
+            <span className={`theme-icon ${theme === 'dark' ? 'active' : ''}`}>🌙</span>
+          </div>
+          <span style={{ fontSize: 13, marginLeft: 4 }}>Modo {theme === 'light' ? 'Claro' : 'Escuro'}</span>
+        </button>
+
+        <button
+          className="sidebar-link btn-ghost"
           onClick={logout}
           style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none' }}
         >
-          <span style={{ fontSize: 15 }}>🚪</span>
-          <span style={{ fontSize: 13 }}>Sair</span>
+          <div style={{ fontSize: 15, width: 20, display: 'flex', justifyContent: 'center' }}>🚪</div>
+          <span style={{ fontSize: 13, marginLeft: 4 }}>Sair</span>
         </button>
       </div>
     </aside>
