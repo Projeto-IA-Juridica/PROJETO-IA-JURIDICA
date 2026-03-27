@@ -111,7 +111,12 @@
   .badge-muted   { background: var(--surface-overlay); color: var(--text-secondary); border: 1px solid var(--surface-border); }
   .badge-purple  { background: #3b0764; color: #d8b4fe; }
 
-  .metric-card { @apply surface p-4; }
+  .metric-card {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    padding: 16px;
+  }
   .metric-value { font-size: 24px; font-weight: 700; color: var(--text-primary); line-height: 1; }
   .metric-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
   .metric-delta { font-size: 11px; margin-top: 2px; }

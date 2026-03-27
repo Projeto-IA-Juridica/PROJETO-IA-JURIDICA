@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../../context/AuthContext'
 
 const NAV = [
   { to: '/hub', icon: '⚖️', label: 'Hub do Advogado' },

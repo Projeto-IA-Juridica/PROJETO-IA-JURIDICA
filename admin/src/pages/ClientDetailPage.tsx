@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { clientesApi, processosApi } from '../api'
 import { chatApi, type Mensagem } from '../api/chat'
 import { BadgeCRM, BadgeRisco, ProgressBar, Spinner, ErrorBox } from '../components/ui'
@@ -11,7 +11,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--surface-border-muted)', fontSize: 12 }}>
       <span style={{ color: 'var(--text-muted)', flexShrink: 0, marginRight: 8 }}>{label}</span>
-      <span style={{ color: 'var(--text-secondary)', textAlign: 'right' }}>{value ?? '—'}</span>
+      <span style={{ color: 'var(--text-secondary)', textAlign: 'right' }}>{value ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}</span>
     </div>
   )
 }
@@ -78,10 +78,10 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
                 <div className="chat-bubble-ai" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
                 {m.meta && (
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, marginLeft: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {m.meta.intencao && <span>intent: <code>{String(m.meta.intencao)}</code></span>}
-                    {m.meta.tokens && <span>tokens: {(m.meta.tokens as { input: number; output: number }).input}↑ {(m.meta.tokens as { input: number; output: number }).output}↓</span>}
-                    {ESCALACAO.has(String(m.meta.intencao)) && <span style={{ color: '#fca5a5' }}>🚨 escalado</span>}
-                    {m.meta.fallback && <span style={{ color: 'var(--warning)' }}>⚠️ fallback</span>}
+                    {m.meta.intencao != null && <span>intent: <code>{String(m.meta.intencao)}</code></span>}
+                    {m.meta.tokens != null && <span>tokens: {String((m.meta.tokens as Record<string, number>).input)}↑ {String((m.meta.tokens as Record<string, number>).output)}↓</span>}
+                    {m.meta.intencao != null && ESCALACAO.has(String(m.meta.intencao)) && <span style={{ color: '#fca5a5' }}>🚨 escalado</span>}
+                    {m.meta.fallback != null && String(m.meta.fallback) === 'true' && <span style={{ color: 'var(--warning)' }}>⚠️ fallback</span>}
                   </div>
                 )}
               </div>

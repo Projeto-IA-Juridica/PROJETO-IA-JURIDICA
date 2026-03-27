@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ragApi, type RAGDoc, type RAGChunk } from '../api'
+import { ragApi, type RAGChunk } from '../api'
 import { Spinner, EmptyState, ErrorBox } from '../components/ui'
 
 const TIPOS = ['peticao', 'sentenca', 'jurisprudencia', 'tese', 'parecer']
