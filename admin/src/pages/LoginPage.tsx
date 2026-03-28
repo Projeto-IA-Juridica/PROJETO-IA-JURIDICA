@@ -46,9 +46,18 @@ export default function LoginPage() {
       })
       navigate('/onboarding')
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string | Array<{msg:string}> } } })?.response?.data?.detail
-      if (Array.isArray(detail)) setError(detail.map(d => d.msg).join('; '))
-      else setError(detail ?? 'Falha no cadastro')
+      console.error('Erro no cadastro:', err)
+      const axiosErr = err as { response?: { data?: { detail?: string | Array<{msg:string; loc?: string[]}> }, status?: number }, message?: string }
+      const detail = axiosErr?.response?.data?.detail
+      if (Array.isArray(detail)) {
+        setError(detail.map(d => d.loc ? `${d.loc.slice(-1)[0]}: ${d.msg}` : d.msg).join('; '))
+      } else if (detail) {
+        setError(detail)
+      } else if (axiosErr?.response?.status) {
+        setError(`Erro ${axiosErr.response.status}: Falha na comunicação com o servidor`)
+      } else {
+        setError(axiosErr?.message ?? 'Falha no cadastro - verifique sua conexão')
+      }
     } finally { setLoading(false) }
   }
 
@@ -112,7 +121,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <label className="label">CNPJ *</label>
-                <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" />
+                <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" title="Use um CNPJ válido (ex: 11.444.777/0001-61)" />
               </div>
               <div>
                 <label className="label">Nome do Responsável *</label>

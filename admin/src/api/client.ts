@@ -46,12 +46,22 @@ api.interceptors.response.use(
 import * as MOCK from './mockData'
 
 // --- ADAPTER MOCK PARA VISUALIZAÇÃO DE UI SEM DEPENDENCIA DO BACKEND ---
-const originAdapter = axios.defaults.adapter;
+// URLs que devem ir direto pro backend real (não mockar)
+const REAL_URLS = ['/auth/login', '/auth/logout', '/onboarding/register']
+
+const xhrAdapter = axios.getAdapter('xhr')
+
 api.defaults.adapter = async (config) => {
+  const url = config.url || ''
+
+  // Chamadas reais vão direto pro backend
+  if (REAL_URLS.some(u => url.startsWith(u))) {
+    return xhrAdapter(config)
+  }
+
   // Simula um delay de rede leve pra parecer real
   await new Promise(r => setTimeout(r, 600))
 
-  const url = config.url || ''
   let data: any = null
 
   try {
@@ -81,9 +91,8 @@ api.defaults.adapter = async (config) => {
     return { data, status: 200, statusText: 'OK', headers: new axios.AxiosHeaders(), config, request: {} as any }
   }
 
-  // Falha em chamadas como login, onboarding register, e fallback real
-  if (typeof originAdapter === 'function') return (originAdapter as Function)(config)
-  return Promise.reject(new Error("No adapter found for " + url))
+  // Fallback para o backend real
+  return xhrAdapter(config)
 }
 // ------------------------------------------------------------------------
 
