@@ -1,7 +1,7 @@
 """add analytics indexes
 
 Revision ID: 008_add_analytics_indexes
-Revises: e4bcb5d405fa
+Revises: 004
 Create Date: 2026-03-19 15:30:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '008_add_analytics_indexes'
-down_revision: Union[str, None] = 'e4bcb5d405fa'
+down_revision: Union[str, None] = '004'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

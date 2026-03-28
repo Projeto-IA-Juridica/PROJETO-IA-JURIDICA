@@ -1,7 +1,7 @@
 """add_onboarding_fields
 
 Revision ID: 008_add_onboarding_fields
-Revises: e4bcb5d405fa
+Revises: 008_add_analytics_indexes
 Create Date: 2026-03-19
 
 Feature 4 — Módulo de Onboarding Automatizado do Escritório.
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "008_add_onboarding_fields"
-down_revision = "e4bcb5d405fa"
+down_revision = "008_add_analytics_indexes"
 branch_labels = None
 depends_on = None
 

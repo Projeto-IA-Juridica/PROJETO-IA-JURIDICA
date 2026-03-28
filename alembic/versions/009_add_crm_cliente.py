@@ -1,7 +1,7 @@
 """add_crm_cliente
 
 Revision ID: 009_add_crm_cliente
-Revises: e4bcb5d405fa
+Revises: 008_add_onboarding_fields
 Create Date: 2026-03-21
 
 Adiciona colunas CRM à tabela clientes:
@@ -19,7 +19,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "009_add_crm_cliente"
-down_revision: Union[str, None] = "e4bcb5d405fa"
+down_revision: Union[str, None] = "008_add_onboarding_fields"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
