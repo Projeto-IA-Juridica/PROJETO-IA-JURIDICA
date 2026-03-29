@@ -70,11 +70,23 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
             }
 
     try:
-        return asyncio.run(_run())
+        resultado = asyncio.run(_run())
     except Exception as exc:
         # Graceful degradation: log e re-raise para o retry/DLQ
         log.error("crm_worker.analisar_cliente.falhou", erro=str(exc))
         raise
+
+    # Emite contador por nível — permite ver distribuição de risco da carteira no Prometheus
+    try:
+        from feature_1_ia_personalizada.api.routes.metrics import clientes_crm_analisados_total
+        clientes_crm_analisados_total.labels(
+            escritorio_id=str(escritorio_id),
+            nivel=resultado.get("nivel", "desconhecido"),
+        ).inc()
+    except Exception:
+        pass  # métricas nunca bloqueiam a task
+
+    return resultado
 
 
 # ---------------------------------------------------------------------------
