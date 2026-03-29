@@ -273,7 +273,13 @@ def enviar_pesquisa_satisfacao(self):
     max_retries=3,
 )
 def processar_mensagem_recebida(
-    self, id_escritorio: int, id_cliente: int, mensagem: str, tipo: str
+    self,
+    id_escritorio: int,
+    id_cliente: int,
+    mensagem: str,
+    tipo: str,
+    instance_nome: str | None = None,
+    audio_message_id: str | None = None,
 ):
     # Import lazy: evita importar asyncpg e SQLAlchemy no boot do módulo.
     # O orchestrator já envia a resposta via EvolutionClient em _node_enviar_resposta,
@@ -281,6 +287,55 @@ def processar_mensagem_recebida(
     from feature_1_ia_personalizada.services.ai.orchestrator import (
         executar_fluxo_orquestrador,
     )
+
+    # --- Transcrição de áudio (Whisper) ---
+    # Quando o webhook identifica um audioMessage, passa tipo="audio" e audio_message_id.
+    # Aqui baixamos o OGG da Evolution API, convertemos para MP3 e transcrevemos.
+    # Se a transcrição falhar, substituímos por mensagem de fallback amigável para
+    # que o orchestrador informe o cliente do problema sem crashar o fluxo.
+    if tipo == "audio" and audio_message_id and instance_nome:
+        async def _transcrever() -> str:
+            from feature_1_ia_personalizada.services.messaging.evolution_client import (
+                EvolutionClient,
+            )
+            from shared.utils.audio_handler import (
+                converter_ogg_para_mp3,
+                transcrever_audio,
+                validar_duracao_audio,
+            )
+
+            evo = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
+            try:
+                ogg_bytes = await evo.baixar_media(instance_nome, audio_message_id)
+                validar_duracao_audio(ogg_bytes)
+                mp3_bytes = converter_ogg_para_mp3(ogg_bytes)
+                return await transcrever_audio(mp3_bytes)
+            finally:
+                await evo.close()
+
+        try:
+            mensagem = asyncio.run(_transcrever())
+            tipo = "texto"  # orchestrador trata como texto após transcrição
+            logger.info(
+                "audio.transcricao_ok",
+                id_cliente=id_cliente,
+                chars=len(mensagem),
+            )
+        except ValueError as exc:
+            # Duração excedida, áudio corrompido ou timeout Whisper
+            logger.warning("audio.transcricao_falhou", id_cliente=id_cliente, erro=str(exc))
+            mensagem = (
+                "[Recebi um áudio, mas não consegui processá-lo. "
+                f"Motivo: {exc}. Por favor, tente enviar uma mensagem de texto.]"
+            )
+            tipo = "texto"
+        except Exception as exc:
+            logger.error("audio.transcricao_erro_inesperado", id_cliente=id_cliente, erro=str(exc))
+            mensagem = (
+                "[Recebi um áudio, mas ocorreu um erro interno ao processá-lo. "
+                "Por favor, envie uma mensagem de texto.]"
+            )
+            tipo = "texto"
 
     try:
         resultado = executar_fluxo_orquestrador(

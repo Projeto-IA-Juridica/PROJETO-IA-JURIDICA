@@ -129,7 +129,10 @@ async def receive_message(
         if isinstance(ext_text, dict):
             texto = str(ext_text.get("text", ""))
     elif "audioMessage" in msg_content:
-        texto = "[ÁUDIO NÃO PROCESSADO PELA ROTA AINDA]"  # Futuro: processamento de áudio Whisper
+        # Áudio: a transcrição (Whisper) é feita no worker de forma assíncrona.
+        # O message_id extraído do key é passado ao Celery para que o worker
+        # baixe o OGG via Evolution API e transcreva antes de chamar o orchestrador.
+        texto = "__AUDIO__"
     elif "imageMessage" in msg_content:
         img_msg = msg_content["imageMessage"]
         if isinstance(img_msg, dict):
@@ -194,10 +197,15 @@ async def receive_message(
 
     # 4. Disparar o Worker (Processamento via Celery assíncrono)
     # A IA fará todo o trabalho pesado longe da Main Thread do FastAPI
+    _msg_content_dict = msg_content if isinstance(msg_content, dict) else {}
     tipo_mensagem = "texto"
-    if "audioMessage" in (msg_content if isinstance(msg_content, dict) else {}):
+    audio_message_id: str | None = None
+
+    if "audioMessage" in _msg_content_dict:
         tipo_mensagem = "audio"
-    elif "imageMessage" in (msg_content if isinstance(msg_content, dict) else {}):
+        # message_id necessário para o worker baixar o OGG via Evolution API
+        audio_message_id = key.get("id") or None
+    elif "imageMessage" in _msg_content_dict:
         tipo_mensagem = "imagem"
 
     processar_mensagem_recebida.delay(
@@ -205,6 +213,8 @@ async def receive_message(
         id_cliente=cliente.id,
         mensagem=texto,
         tipo=tipo_mensagem,
+        instance_nome=instance_name,
+        audio_message_id=audio_message_id,
     )
 
     # 7.10 — CRM: dispara análise com debounce (1h) após cada interação
