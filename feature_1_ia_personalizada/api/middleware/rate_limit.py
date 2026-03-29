@@ -50,7 +50,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         prefix = "rate_limit:api:"
 
         if path == "/auth/login":
-            # Proteção anti-brute-force: sempre usa IP, nunca user_id
+            # Proteção anti-brute-force: sempre usa IP, nunca user_id.
+            # request.client pode ser None atrás de certos proxies — fallback para "unknown".
             identifier = request.client.host if request.client else "unknown"
             limit = LIMIT_LOGIN
             prefix = "rate_limit:login:"
