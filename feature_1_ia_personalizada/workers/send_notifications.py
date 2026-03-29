@@ -314,6 +314,11 @@ def processar_mensagem_recebida(
                 await evo.close()
 
         try:
+            from feature_1_ia_personalizada.api.routes.metrics import audio_transcritos_total as _ctr_audio
+        except Exception:
+            _ctr_audio = None  # métricas opcionais
+
+        try:
             mensagem = asyncio.run(_transcrever())
             tipo = "texto"  # orchestrador trata como texto após transcrição
             logger.info(
@@ -321,6 +326,8 @@ def processar_mensagem_recebida(
                 id_cliente=id_cliente,
                 chars=len(mensagem),
             )
+            if _ctr_audio:
+                _ctr_audio.labels(resultado="sucesso").inc()
         except ValueError as exc:
             # Duração excedida, áudio corrompido ou timeout Whisper
             logger.warning("audio.transcricao_falhou", id_cliente=id_cliente, erro=str(exc))
@@ -329,6 +336,9 @@ def processar_mensagem_recebida(
                 f"Motivo: {exc}. Por favor, tente enviar uma mensagem de texto.]"
             )
             tipo = "texto"
+            _resultado_audio = "erro_duracao" if "longo" in str(exc).lower() or "máximo" in str(exc).lower() else "erro_whisper"
+            if _ctr_audio:
+                _ctr_audio.labels(resultado=_resultado_audio).inc()
         except Exception as exc:
             logger.error("audio.transcricao_erro_inesperado", id_cliente=id_cliente, erro=str(exc))
             mensagem = (
@@ -336,6 +346,8 @@ def processar_mensagem_recebida(
                 "Por favor, envie uma mensagem de texto.]"
             )
             tipo = "texto"
+            if _ctr_audio:
+                _ctr_audio.labels(resultado="erro_inesperado").inc()
 
     try:
         resultado = executar_fluxo_orquestrador(

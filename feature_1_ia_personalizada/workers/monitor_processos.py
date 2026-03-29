@@ -268,6 +268,21 @@ def monitorar_processos() -> dict[str, Any]:
 
     _processos_monitorados_total.set(len(processos))
 
+    # Gauge por nível de risco e escritório — conta antes do ciclo de atualização
+    # para refletir o estado persistido no banco (scores calculados no ciclo anterior).
+    try:
+        from feature_1_ia_personalizada.api.routes.metrics import processos_por_risco_gauge
+        from collections import defaultdict
+        _dist: dict[tuple[str, str], int] = defaultdict(int)
+        for _p in processos:
+            _esc = str(_p.get("escritorio_id", "desconhecido"))
+            _nivel = str(_p.get("score_nivel") or "sem_score")
+            _dist[(_esc, _nivel)] += 1
+        for (_esc, _nivel), _total in _dist.items():
+            processos_por_risco_gauge.labels(escritorio_id=_esc, nivel=_nivel).set(_total)
+    except Exception:
+        pass  # métricas nunca bloqueiam o worker
+
     for indice in range(0, len(processos), TAMANHO_LOTE):
         lote = processos[indice : indice + TAMANHO_LOTE]
 
