@@ -43,6 +43,9 @@ _ROTAS_ISENTAS = (
     "/health",          # leitura
     "/metrics",         # leitura
     "/auth/csrf-token", # emissão do token
+    "/auth/login",      # login inicial (sem sessão prévia para proteger)
+    "/auth/refresh",    # refresh usa JWT, não sessão
+    "/onboarding/register",  # registro inicial (sem sessão prévia)
     "/docs",
     "/redoc",
     "/openapi.json",
