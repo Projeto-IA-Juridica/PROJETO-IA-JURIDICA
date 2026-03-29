@@ -54,10 +54,12 @@ jobs:
       - name: Formatação — Black
         run: black --check .
 
-      # mypy faz análise estática de tipos
+      # mypy faz análise estática de tipos — BLOQUEANTE: erros de tipo impedem merge
       # ignore_missing_imports = true está em pyproject.toml — não falha por stubs ausentes
+      # continue-on-error: false (padrão) garante que o job falha se mypy reportar erros
       - name: Tipos — Mypy
         run: mypy feature_1_ia_personalizada shared
+        continue-on-error: false
 
       # conftest.py (scope=session) já injeta todas as env vars via os.environ.setdefault
       # antes do primeiro import de módulo — nenhuma variável de ambiente extra necessária aqui

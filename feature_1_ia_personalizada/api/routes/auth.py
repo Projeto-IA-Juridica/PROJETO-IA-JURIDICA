@@ -36,8 +36,12 @@ async def login(credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(query)
     usuario = result.scalars().first()
 
-    # 2. Verifica se o usuário existe e se a senha bate com o hash bcrypt
-    if not usuario or not verificar_senha(credentials.senha, usuario.senha_hash):
+    # 2. Sempre executa o bcrypt (mesmo quando o usuário não existe) para que o tempo
+    #    de resposta seja constante — impede enumeração de e-mails via timing attack.
+    hash_ref = usuario.senha_hash if usuario else _DUMMY_HASH
+    senha_ok = verificar_senha(credentials.senha, hash_ref)
+
+    if not usuario or not senha_ok:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
