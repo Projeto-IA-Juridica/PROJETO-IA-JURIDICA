@@ -30,6 +30,7 @@ ROTAS_PUBLICAS = [
     "/health/ready",  # O detailed também, para pods k8s conseguirem ler
     "/auth/login",  # Obviamente, pra gerar o token
     "/auth/refresh",  # Pra renovar
+    "/auth/csrf-token",  # Pra buscar o token CSRF antes do login
     "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
     "/metrics",  # Prometheus scraper não usa JWT
 ]
