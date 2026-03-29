@@ -116,6 +116,7 @@ if settings.SENTRY_DSN:
 from feature_1_ia_personalizada.api.middleware.auth import (  # noqa: E402
     JWTAuthMiddleware,
 )
+from feature_1_ia_personalizada.api.middleware.csrf import CSRFMiddleware  # noqa: E402
 from feature_1_ia_personalizada.api.middleware.rate_limit import (  # noqa: E402
     RateLimitMiddleware,
 )
@@ -237,8 +238,9 @@ app.add_middleware(
 
 
 # Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
-# Fluxo ideal ao receber requisição: 1. Rate Limit -> 2. Autenticação JWT -> 3. Rotas
+# Fluxo ao receber requisição: 1. Rate Limit -> 2. CSRF -> 3. Autenticação JWT -> 4. Rotas
 app.add_middleware(JWTAuthMiddleware)
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(RateLimitMiddleware)
 # RequestLoggingMiddleware adicionado por último = executa PRIMEIRO (outermost)
 # Garante que request_id está disponível para todos os middlewares internos e rotas

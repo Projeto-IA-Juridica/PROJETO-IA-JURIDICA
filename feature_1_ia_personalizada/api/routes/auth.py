@@ -1,8 +1,15 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from feature_1_ia_personalizada.api.middleware.csrf import (
+    _COOKIE_MAX_AGE,
+    _COOKIE_NAME,
+    gerar_csrf_token,
+)
 
 from shared.config.settings import settings
 from shared.database.session import get_db
@@ -126,6 +133,32 @@ async def logout(request: Request):
         token = auth_header.split(" ")[1]
         revogar_token(token)
     return None
+
+
+@router.get("/csrf-token", include_in_schema=True)
+async def csrf_token():
+    """
+    Emite um novo token CSRF.
+
+    O token é devolvido tanto no corpo JSON quanto definido como cookie
+    `csrf_token` (HttpOnly=False para que o JavaScript possa lê-lo).
+
+    O frontend deve:
+    1. Chamar este endpoint uma vez ao iniciar a sessão.
+    2. Armazenar o valor retornado.
+    3. Incluí-lo no header `X-CSRF-Token` em todas as requisições POST/PUT/PATCH/DELETE.
+    """
+    token = gerar_csrf_token()
+    response = JSONResponse(content={"csrf_token": token})
+    response.set_cookie(
+        key=_COOKIE_NAME,
+        value=token,
+        httponly=False,   # precisa ser lido pelo JS (Double Submit Cookie)
+        samesite="strict",
+        secure=True,
+        max_age=_COOKIE_MAX_AGE,
+    )
+    return response
 
 
 @router.get("/me", response_model=UsuarioResponse)
