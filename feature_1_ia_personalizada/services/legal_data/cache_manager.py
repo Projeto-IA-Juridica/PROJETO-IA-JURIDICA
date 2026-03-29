@@ -198,3 +198,54 @@ def set_capa_sync(cnj: str, capa: dict[str, Any]) -> None:
         logger.debug("cache_capa_salva_sync", cnj=cnj)
     except Exception as e:
         logger.error("cache_write_sync_error", error=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Helpers async de invalidação — para rotas FastAPI (contexto assíncrono)
+# ---------------------------------------------------------------------------
+# Mesmas chaves dos helpers sync e da classe LegalDataCacheManager para garantir
+# que invalidações de qualquer contexto (rota ou worker) afetem o mesmo cache.
+# Graceful degradation: qualquer erro Redis é logado mas nunca propaga exceção.
+# ---------------------------------------------------------------------------
+
+_KEY_DNA = "dna:{escritorio_id}"
+
+
+async def invalidar_caches_processo_async(redis_client: Redis, cnj: str) -> None:
+    """
+    Apaga capa e andamentos de um processo do Redis (async).
+
+    Deve ser chamado após qualquer escrita em Processo (PUT, DELETE/archive)
+    para que a próxima leitura busque dados frescos do Jusbrasil/DataJud.
+
+    Parâmetros:
+        redis_client — instância redis.asyncio.Redis (geralmente request.app.state.redis_client)
+        cnj          — número CNJ do processo (ex: "0001234-56.2023.8.26.0001")
+    """
+    try:
+        pipe = redis_client.pipeline()
+        pipe.delete(LegalDataCacheManager._key_capa(cnj))
+        pipe.delete(LegalDataCacheManager._key_andamentos(cnj))
+        await pipe.execute()
+        logger.info("cache_processo_invalidado_async", cnj=cnj)
+    except Exception as exc:
+        logger.warning("cache_invalidate_async_error", cnj=cnj, error=str(exc))
+
+
+async def invalidar_cache_dna_async(redis_client: Redis, escritorio_id: int) -> None:
+    """
+    Apaga o cache do DNA de especialização de um escritório (async).
+
+    Deve ser chamado quando o conjunto de processos do escritório muda
+    (novo processo criado ou processo arquivado), pois a distribuição de
+    tipos_acao usada para calcular o DNA fica desatualizada.
+
+    Parâmetros:
+        redis_client  — instância redis.asyncio.Redis
+        escritorio_id — ID do escritório cujo DNA deve ser invalidado
+    """
+    try:
+        await redis_client.delete(f"dna:{escritorio_id}")
+        logger.info("cache_dna_invalidado_async", escritorio_id=escritorio_id)
+    except Exception as exc:
+        logger.warning("cache_dna_invalidate_async_error", escritorio_id=escritorio_id, error=str(exc))

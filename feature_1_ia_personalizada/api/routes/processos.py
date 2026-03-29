@@ -2,6 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.services.legal_data.cache_manager import (
+    invalidar_cache_dna_async,
+    invalidar_caches_processo_async,
+)
 from shared.database.session import get_db
 from shared.models.processo import Processo
 from shared.schemas.processo import (
@@ -26,6 +30,11 @@ def _get_escritorio_id(request: Request) -> int:
 def _get_user_id(request: Request) -> int:
     payload = getattr(request.state, "user_payload", {})
     return int(payload.get("sub", 0))
+
+
+def _get_redis(request: Request):
+    """Retorna o redis_client do app.state, ou None se indisponível."""
+    return getattr(request.app.state, "redis_client", None)
 
 
 def _get_ip(request: Request) -> str:
@@ -142,6 +151,11 @@ async def create_processo(
     db.add(novo_processo)
     await db.flush()
 
+    # Novo processo altera a distribuição de tipos_acao — invalida DNA do escritório
+    redis = _get_redis(request)
+    if redis:
+        await invalidar_cache_dna_async(redis, escritorio_id)
+
     return novo_processo
 
 
@@ -186,6 +200,15 @@ async def update_processo(
 
     await db.flush()
     await db.refresh(processo)
+
+    # Dados do processo mudaram — invalida cache de capa e andamentos para este CNJ
+    redis = _get_redis(request)
+    if redis:
+        await invalidar_caches_processo_async(redis, processo.numero_cnj)
+        # tipo_acao alterado muda a distribuição usada pelo DNA do escritório
+        if "tipo_acao" in update_data:
+            await invalidar_cache_dna_async(redis, escritorio_id)
+
     return processo
 
 
@@ -202,8 +225,16 @@ async def delete_processo(processo_id: int, request: Request, db: AsyncSession =
 
     registrar_acesso(_get_user_id(request), f"processo:{processo_id}", "exclusao", _get_ip(request))
 
+    cnj = processo.numero_cnj
     processo.status = "arquivado"
     processo.monitoramento_ativo = False
 
     await db.flush()
+
+    # Processo arquivado: invalida cache de dados judiciais e DNA do escritório
+    redis = _get_redis(request)
+    if redis:
+        await invalidar_caches_processo_async(redis, cnj)
+        await invalidar_cache_dna_async(redis, escritorio_id)
+
     return None
