@@ -39,6 +39,8 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
+import time
+
 from prometheus_client import Counter
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -333,6 +335,7 @@ class ConversationOrchestrator:
                 "processo_id":    int | None,
             }
         """
+        t_inicio = time.perf_counter()
         historico = await self._memory.buscar_historico(escritorio_id, cliente_id)
 
         initial_state: ConversationState = {
@@ -394,6 +397,38 @@ class ConversationOrchestrator:
         ).inc()
         if _usando_fallback:
             _ia_fallback_used_total.inc()
+
+        # --- Métricas de negócio ---
+        _elapsed_ms = (time.perf_counter() - t_inicio) * 1000
+        _tokens_finais = final_state.get("tokens_usados") or {}
+        _label_esc = str(escritorio_id)
+        try:
+            from feature_1_ia_personalizada.api.routes.metrics import (
+                ia_custo_por_interacao_usd,
+                ia_latencia_ms,
+                ia_tokens_input_total,
+                ia_tokens_output_total,
+            )
+            ia_latencia_ms.labels(
+                escritorio_id=_label_esc, intencao=_intencao_final
+            ).observe(_elapsed_ms)
+            _tok_in = int(_tokens_finais.get("input", 0))
+            _tok_out = int(_tokens_finais.get("output", 0))
+            if _tok_in:
+                ia_tokens_input_total.labels(
+                    escritorio_id=_label_esc, intencao=_intencao_final
+                ).inc(_tok_in)
+            if _tok_out:
+                ia_tokens_output_total.labels(
+                    escritorio_id=_label_esc, intencao=_intencao_final
+                ).inc(_tok_out)
+            _custo = float(_tokens_finais.get("custo_str", "0") or "0")
+            if _custo > 0:
+                ia_custo_por_interacao_usd.labels(
+                    escritorio_id=_label_esc, intencao=_intencao_final
+                ).observe(_custo)
+        except Exception:
+            pass  # métricas nunca bloqueiam o fluxo principal
 
         return {
             "resposta": resposta_final,
