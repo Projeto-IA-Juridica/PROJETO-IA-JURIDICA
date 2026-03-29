@@ -24,7 +24,7 @@ import hmac
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
-from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 from shared.config.settings import settings
 
@@ -52,6 +52,66 @@ escalacoes_pendentes_gauge = Gauge(
     "escalacoes_pendentes",
     "Número de escalações com status pendente no escritório",
     labelnames=["escritorio_id"],
+)
+
+# ---------------------------------------------------------------------------
+# Métricas de negócio — custo, tokens e latência da IA (por interação)
+# ---------------------------------------------------------------------------
+
+ia_custo_por_interacao_usd = Histogram(
+    "ia_custo_por_interacao_usd",
+    "Custo USD por interação processada pelo orchestrador (baseado em tokens Claude)",
+    labelnames=["escritorio_id", "intencao"],
+    buckets=(0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0),
+)
+
+ia_tokens_input_total = Counter(
+    "ia_tokens_input_total",
+    "Total de tokens de entrada consumidos pela IA",
+    labelnames=["escritorio_id", "intencao"],
+)
+
+ia_tokens_output_total = Counter(
+    "ia_tokens_output_total",
+    "Total de tokens de saída gerados pela IA",
+    labelnames=["escritorio_id", "intencao"],
+)
+
+ia_latencia_ms = Histogram(
+    "ia_latencia_ms",
+    "Latência ponta-a-ponta do orchestrador em milissegundos (recebimento → envio WhatsApp)",
+    labelnames=["escritorio_id", "intencao"],
+    buckets=(500, 1000, 2000, 3000, 5000, 8000, 12000, 20000, 30000),
+)
+
+# ---------------------------------------------------------------------------
+# Métricas de negócio — CRM (saúde da carteira de clientes)
+# ---------------------------------------------------------------------------
+
+clientes_crm_analisados_total = Counter(
+    "clientes_crm_analisados_total",
+    "Total de análises CRM concluídas — agrupe por nivel para ver distribuição de risco",
+    labelnames=["escritorio_id", "nivel"],
+)
+
+# ---------------------------------------------------------------------------
+# Métricas de negócio — processos judiciais (distribuição de risco)
+# ---------------------------------------------------------------------------
+
+processos_por_risco_gauge = Gauge(
+    "processos_por_risco_total",
+    "Número atual de processos por nível de score de risco",
+    labelnames=["escritorio_id", "nivel"],
+)
+
+# ---------------------------------------------------------------------------
+# Métricas de negócio — canal WhatsApp (áudio)
+# ---------------------------------------------------------------------------
+
+audio_transcritos_total = Counter(
+    "audio_transcritos_total",
+    "Total de mensagens de áudio processadas via Whisper",
+    labelnames=["resultado"],  # sucesso | erro_duracao | erro_whisper | erro_inesperado
 )
 
 
