@@ -8,7 +8,13 @@ from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.usuario import Usuario
 from shared.schemas.usuario import TokenResponse, UsuarioLogin, UsuarioResponse
-from shared.security.encryption import verificar_senha
+from shared.security.encryption import hash_senha, verificar_senha
+
+# Hash computado uma vez ao importar o módulo.
+# Usado no login quando o e-mail não existe, para que o tempo de resposta
+# seja indistinguível do caso em que a senha está errada — evita enumeração
+# de e-mails via timing attack (always run bcrypt, even for unknown users).
+_DUMMY_HASH: str = hash_senha("__sentinel_dummy_para_timing_attack__")
 from shared.security.jwt import (
     criar_refresh_token,
     criar_token,
