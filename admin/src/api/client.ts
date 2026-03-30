@@ -10,11 +10,6 @@ export const api = axios.create({
 // Armazena o token CSRF em memória
 let csrfToken: string | null = null
 
-function persistCsrfCookie(token: string) {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : ''
-  document.cookie = `csrf_token=${token}; Path=/; SameSite=Strict${secure}`
-}
-
 // Busca o token CSRF do backend
 export async function fetchCsrfToken(): Promise<string | null> {
   if (csrfToken) return csrfToken
@@ -22,7 +17,8 @@ export async function fetchCsrfToken(): Promise<string | null> {
     const { data } = await axios.get('/api/auth/csrf-token', { withCredentials: true })
     csrfToken = data.csrf_token
     if (csrfToken) {
-      persistCsrfCookie(csrfToken)
+      const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+      document.cookie = `csrf_token=${csrfToken}; Path=/; SameSite=Strict${secure}`
     }
     return csrfToken
   } catch (err) {
@@ -51,8 +47,6 @@ api.interceptors.request.use(async (config) => {
       await fetchCsrfToken()
     }
     if (csrfToken) {
-      // Middleware CSRF exige o padrão double-submit: cookie + header iguais.
-      persistCsrfCookie(csrfToken)
       config.headers['X-CSRF-Token'] = csrfToken
     }
   }

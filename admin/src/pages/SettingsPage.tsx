@@ -1,36 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { adminImportApi, onboardingApi, type ConnectWhatsappResponse, type EvolutionQrPayload } from '../api'
+import { adminImportApi, onboardingApi } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { Spinner, ErrorBox } from '../components/ui'
 
 type Tab = 'profile' | 'persona' | 'templates' | 'onboarding' | 'status'
-
-function extractQrString(input: unknown): string | null {
-  if (typeof input === 'string') {
-    const clean = input.trim()
-    return clean || null
-  }
-
-  if (!input || typeof input !== 'object') return null
-
-  const obj = input as Record<string, unknown>
-  const preferredKeys = ['base64', 'qrcode', 'code', 'qr', 'image', 'src']
-
-  for (const key of preferredKeys) {
-    if (key in obj) {
-      const found = extractQrString(obj[key])
-      if (found) return found
-    }
-  }
-
-  for (const value of Object.values(obj)) {
-    const found = extractQrString(value)
-    if (found) return found
-  }
-
-  return null
-}
 
 export default function SettingsPage() {
   const qc = useQueryClient()
@@ -47,19 +21,6 @@ export default function SettingsPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [saved, setSaved] = useState('')
   const [importResult, setImportResult] = useState<string>('')
-  const [waConnectData, setWaConnectData] = useState<ConnectWhatsappResponse | null>(null)
-  const [waInfo, setWaInfo] = useState('')
-
-  const qrImageSrc = useMemo(() => {
-    const qr = waConnectData?.qr_code
-    if (!qr) return null
-
-    const payload = qr as EvolutionQrPayload | string
-    const candidate = extractQrString(payload)
-    if (!candidate) return null
-    if (candidate.startsWith('data:image')) return candidate
-    return `data:image/png;base64,${candidate}`
-  }, [waConnectData])
 
   useEffect(() => {
     const esc = status?.escritorio
@@ -120,27 +81,16 @@ export default function SettingsPage() {
 
   const { mutate: connectWhatsapp, isPending: connectingWhatsapp } = useMutation({
     mutationFn: onboardingApi.connectWhatsapp,
-    onSuccess: (res) => {
-      setWaConnectData(res)
-      setWaInfo(`Instancia ${res.instance_name} criada/reconectada. Estado atual: ${res.status}.`)
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['onboarding-status'] })
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
     },
-    onError: (err: unknown) => {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setWaInfo(detail ?? 'Falha ao conectar na Evolution API.')
-    },
   })
 
-  const { data: whatsappStatus, refetch: refetchWhatsappStatus } = useQuery({
+  const { data: whatsappStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: onboardingApi.whatsappStatus,
-    refetchInterval: (query) => {
-      const data = query.state.data
-      if (activeTab !== 'onboarding') return 30_000
-      if (!data?.connected) return 5_000
-      return 20_000
-    },
+    refetchInterval: 15_000,
   })
 
   const { mutate: goLive, isPending: goingLive } = useMutation({
@@ -189,9 +139,8 @@ export default function SettingsPage() {
               <div>ID do usuário: <strong style={{ color: 'var(--text-primary)' }}>{user?.id ?? '—'}</strong></div>
               <div>ID do escritório: <strong style={{ color: 'var(--text-primary)' }}>{user?.escritorio_id ?? esc?.id ?? '—'}</strong></div>
             </div>
-
             <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)' }}>
-              Essas informações são carregadas de auth/me e status do onboarding.
+              Informações de conta e contexto atual do escritório.
             </div>
           </div>
 
@@ -305,71 +254,13 @@ export default function SettingsPage() {
               <button className="btn btn-secondary" onClick={() => connectWhatsapp()} disabled={connectingWhatsapp}>
                 {connectingWhatsapp ? <Spinner size={12} /> : null} Conectar WhatsApp
               </button>
-              <button className="btn btn-secondary" onClick={() => refetchWhatsappStatus()}>
-                Atualizar status WhatsApp
-              </button>
               <button className="btn btn-primary" onClick={() => goLive()} disabled={goingLive}>
                 {goingLive ? <Spinner size={12} /> : null} Executar go-live
               </button>
             </div>
 
-            <div className="surface-overlay" style={{ padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Evolution API</div>
-                <span className={`badge ${whatsappStatus?.connected ? 'badge-success' : 'badge-warning'}`}>
-                  {whatsappStatus?.connected ? 'Conectado' : `Aguardando (${whatsappStatus?.state ?? 'indefinido'})`}
-                </span>
-              </div>
-
-              {waConnectData?.instance_name ? (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
-                  Instancia: <strong style={{ color: 'var(--text-primary)' }}>{waConnectData.instance_name}</strong>
-                </div>
-              ) : null}
-
-              {qrImageSrc && !whatsappStatus?.connected ? (
-                <div style={{ display: 'grid', placeItems: 'center', gap: 8 }}>
-                  <img
-                    src={qrImageSrc}
-                    alt="QR Code WhatsApp"
-                    style={{ width: 220, height: 220, background: '#fff', padding: 8, borderRadius: 10, border: '1px solid var(--surface-border)' }}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Abra o WhatsApp no celular e escaneie o QR Code.
-                  </div>
-                </div>
-              ) : null}
-
-              {!qrImageSrc && !whatsappStatus?.connected ? (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                  Clique em "Conectar WhatsApp" para gerar um novo QR Code pela Evolution API.
-                </div>
-              ) : null}
-
-              {whatsappStatus?.connected ? (
-                <div style={{ fontSize: 12, color: 'var(--success)' }}>
-                  WhatsApp conectado com sucesso. Pode seguir para o go-live.
-                </div>
-              ) : null}
-            </div>
-
-            {waInfo && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {waInfo}
-              </div>
-            )}
-
-            {waConnectData && (
-              <details style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                <summary style={{ cursor: 'pointer' }}>Ver retorno bruto da Evolution API</summary>
-                <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--surface-base)', padding: 10, borderRadius: 8, border: '1px solid var(--surface-border)' }}>
-{JSON.stringify(waConnectData, null, 2)}
-                </pre>
-              </details>
-            )}
-
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              Estado atual: {whatsappStatus?.state ?? 'indefinido'}
+              WhatsApp: {whatsappStatus?.connected ? 'conectado' : `desconectado (${whatsappStatus?.state ?? 'indefinido'})`}
             </div>
             {importResult && <div style={{ fontSize: 12, color: 'var(--success)' }}>{importResult}</div>}
           </div>

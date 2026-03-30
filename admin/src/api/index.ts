@@ -1,4 +1,4 @@
-import api, { fetchCsrfToken } from './client'
+import api from './client'
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -22,46 +22,6 @@ export interface OnboardingStatus {
   }
 }
 
-export interface EvolutionQrPayload {
-  base64?: string
-  qrcode?: string
-  code?: string
-  pairingCode?: string
-  [key: string]: unknown
-}
-
-export interface ConnectWhatsappResponse {
-  etapa: number
-  instance_name: string
-  qr_code: EvolutionQrPayload | string | null
-  status: string
-}
-
-export interface WhatsappStatusResponse {
-  connected: boolean
-  state: string
-}
-
-function authHeaderOrThrow() {
-  const token = localStorage.getItem('access_token')
-  if (!token) {
-    throw new Error('Sessao expirada: token de acesso ausente. Faca login novamente.')
-  }
-  return { Authorization: `Bearer ${token}` }
-}
-
-async function authAndCsrfHeadersOrThrow() {
-  const auth = authHeaderOrThrow()
-  const csrf = await fetchCsrfToken()
-  if (!csrf) {
-    throw new Error('Falha ao obter token CSRF. Atualize a pagina e tente novamente.')
-  }
-  return {
-    ...auth,
-    'X-CSRF-Token': csrf,
-  }
-}
-
 export const onboardingApi = {
   status: () => api.get<OnboardingStatus>('/onboarding/status').then((r) => r.data),
 
@@ -77,15 +37,9 @@ export const onboardingApi = {
     }).then((r) => r.data)
   },
 
-  connectWhatsapp: async () => {
-    const headers = await authAndCsrfHeadersOrThrow()
-    return api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp', null, { headers }).then((r) => r.data)
-  },
+  connectWhatsapp: () => api.post('/onboarding/connect-whatsapp').then((r) => r.data),
 
-  whatsappStatus: () =>
-    api.get<WhatsappStatusResponse>('/onboarding/whatsapp-status', {
-      headers: authHeaderOrThrow(),
-    }).then((r) => r.data),
+  whatsappStatus: () => api.get<{ connected: boolean; state: string }>('/onboarding/whatsapp-status').then((r) => r.data),
 
   configurarTemplates: (data: { template_boas_vindas?: string; template_atualizacao?: string; template_sem_novidade?: string }) =>
     api.post('/onboarding/configure-templates', data).then((r) => r.data),
