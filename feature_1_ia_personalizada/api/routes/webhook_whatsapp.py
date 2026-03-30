@@ -115,6 +115,19 @@ async def receive_message(
     if not telefone_digitos:
         return {"status": "ignored", "reason": "Invalid phone format"}
 
+    # Idempotência: impede reprocessamento de duplicatas enviadas pela Evolution em alta carga.
+    # A Evolution pode reenviar o mesmo webhook se não receber 200 dentro do timeout.
+    # Usamos o message_id (único por mensagem WhatsApp) como chave com TTL de 5 min.
+    msg_id = key.get("id")
+    if msg_id:
+        redis_client = getattr(request.app.state, "redis_client", None)
+        if redis_client is not None:
+            idempotency_key = f"wh:msg:{msg_id}"
+            already_seen = not await redis_client.set(idempotency_key, "1", nx=True, ex=300)
+            if already_seen:
+                logger.debug("webhook_mensagem_duplicada_ignorada", msg_id=msg_id)
+                return {"status": "duplicate"}
+
     # Extrair conteúdo da mensagem
     msg_content: dict[str, Any] = (
         msg_obj.get("message", msg_obj) if isinstance(msg_obj.get("message", msg_obj), dict) else {}

@@ -176,6 +176,7 @@ def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dad
     base=DLQTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
+    retry_backoff_max=600,
     max_retries=5,
 )
 def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: str):
