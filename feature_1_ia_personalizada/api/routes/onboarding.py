@@ -42,6 +42,18 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 
 
+def _safe_error_payload(resp: httpx.Response) -> str:
+    """Extrai um resumo seguro do erro retornado pela Evolution API."""
+    try:
+        data = resp.json()
+        detail = data.get("message") or data.get("error") or data.get("detail")
+        if detail:
+            return str(detail)
+        return str(data)[:500]
+    except Exception:
+        return (resp.text or "")[:500]
+
+
 # ---------------------------------------------------------------------------
 # Schemas de entrada
 # ---------------------------------------------------------------------------
@@ -425,18 +437,33 @@ async def connect_whatsapp(
                     )
                 data = resp_connect.json()
             else:
+                erro_externo = _safe_error_payload(resp)
                 raise HTTPException(
                     status_code=502,
-                    detail=f"Evolution API retornou erro inesperado (HTTP {resp.status_code}).",
+                    detail=(
+                        f"Evolution API retornou erro inesperado (HTTP {resp.status_code}). "
+                        f"Resposta: {erro_externo or 'sem corpo de resposta'}"
+                    ),
                 )
 
     except httpx.TimeoutException as exc:
         raise HTTPException(
             status_code=504, detail="Evolution API não respondeu a tempo."
         ) from exc
+    except HTTPException:
+        raise
+    except httpx.HTTPError as exc:
+        logger.error("evolution_http_error", erro=str(exc))
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha HTTP ao conectar com a Evolution API: {exc}",
+        ) from exc
     except Exception as exc:
         logger.error("evolution_connect_error", erro=str(exc))
-        raise HTTPException(status_code=502, detail="Erro ao conectar com a Evolution API.")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Erro ao conectar com a Evolution API: {exc}",
+        )
 
     # Persiste o nome da instância no escritório
     escritorio.webhook_whatsapp_instance = instance_name

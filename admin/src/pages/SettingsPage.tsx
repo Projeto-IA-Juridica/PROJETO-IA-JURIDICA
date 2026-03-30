@@ -5,6 +5,32 @@ import { Spinner, ErrorBox } from '../components/ui'
 
 type Tab = 'persona' | 'templates' | 'onboarding' | 'status'
 
+function extractQrString(input: unknown): string | null {
+  if (typeof input === 'string') {
+    const clean = input.trim()
+    return clean || null
+  }
+
+  if (!input || typeof input !== 'object') return null
+
+  const obj = input as Record<string, unknown>
+  const preferredKeys = ['base64', 'qrcode', 'code', 'qr', 'image', 'src']
+
+  for (const key of preferredKeys) {
+    if (key in obj) {
+      const found = extractQrString(obj[key])
+      if (found) return found
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    const found = extractQrString(value)
+    if (found) return found
+  }
+
+  return null
+}
+
 export default function SettingsPage() {
   const qc = useQueryClient()
   const [activeTab, setActiveTab] = useState<Tab>('persona')
@@ -26,17 +52,8 @@ export default function SettingsPage() {
     const qr = waConnectData?.qr_code
     if (!qr) return null
 
-    if (typeof qr === 'string') {
-      const clean = qr.trim()
-      if (!clean) return null
-      if (clean.startsWith('data:image')) return clean
-      return `data:image/png;base64,${clean}`
-    }
-
-    const payload = qr as EvolutionQrPayload
-    const candidate = [payload.base64, payload.qrcode, payload.code]
-      .find((value) => typeof value === 'string' && value.trim().length > 0)
-
+    const payload = qr as EvolutionQrPayload | string
+    const candidate = extractQrString(payload)
     if (!candidate) return null
     if (candidate.startsWith('data:image')) return candidate
     return `data:image/png;base64,${candidate}`
@@ -107,8 +124,9 @@ export default function SettingsPage() {
       qc.invalidateQueries({ queryKey: ['onboarding-status'] })
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
     },
-    onError: () => {
-      setWaInfo('Falha ao conectar na Evolution API.')
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setWaInfo(detail ?? 'Falha ao conectar na Evolution API.')
     },
   })
 
@@ -292,6 +310,15 @@ export default function SettingsPage() {
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 {waInfo}
               </div>
+            )}
+
+            {waConnectData && (
+              <details style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                <summary style={{ cursor: 'pointer' }}>Ver retorno bruto da Evolution API</summary>
+                <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'var(--surface-base)', padding: 10, borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+{JSON.stringify(waConnectData, null, 2)}
+                </pre>
+              </details>
             )}
 
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
