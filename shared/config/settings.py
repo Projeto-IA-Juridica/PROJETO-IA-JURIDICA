@@ -50,6 +50,10 @@ class Settings(BaseSettings):
 
     # Segurança / LGPD
     ENCRYPTION_KEY: str  # Fernet key (base64 urlsafe) — validado abaixo
+    # Chave anterior — usada APENAS para descriptografar dados cifrados antes de uma rotação de chave.
+    # Durante rotação: defina ENCRYPTION_KEY com a nova chave e ENCRYPTION_KEY_PREVIOUS com a antiga.
+    # Após re-criptografar todos os registros com a nova chave, remova esta variável.
+    ENCRYPTION_KEY_PREVIOUS: str | None = None
 
     # Observabilidade
     SENTRY_DSN: str | None = None
@@ -101,6 +105,21 @@ class Settings(BaseSettings):
                 "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe, 32 bytes). "
                 'Gere uma com: python -c "from cryptography.fernet import Fernet; '
                 'print(Fernet.generate_key().decode())"'
+            ) from exc
+        return v
+
+    @field_validator("ENCRYPTION_KEY_PREVIOUS")
+    @classmethod
+    def validar_fernet_key_anterior(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            from cryptography.fernet import Fernet
+
+            Fernet(v.encode())
+        except Exception as exc:
+            raise ValueError(
+                "ENCRYPTION_KEY_PREVIOUS deve ser uma chave Fernet válida."
             ) from exc
         return v
 

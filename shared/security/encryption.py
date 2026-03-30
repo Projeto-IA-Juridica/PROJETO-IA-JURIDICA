@@ -9,18 +9,27 @@ Módulo de criptografia e hashing de senhas.
 """
 
 import bcrypt
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 
 from shared.config.settings import settings
 
-# A chave Fernet deve ser uma string url-safe base64 de 32 bytes
-# Gerada tipicamente com: Fernet.generate_key().decode()
-_fernet = Fernet(settings.ENCRYPTION_KEY.encode("utf-8"))
+# Suporte a rotação de chave:
+# - ENCRYPTION_KEY: chave ativa — usada para criptografar novos dados.
+# - ENCRYPTION_KEY_PREVIOUS: chave anterior — usada SOMENTE para descriptografar
+#   registros cifrados antes da rotação. Remover após re-criptografar todos os registros.
+#
+# MultiFernet.encrypt() usa sempre a primeira chave (ativa).
+# MultiFernet.decrypt() tenta cada chave em ordem até uma funcionar.
+_chaves = [Fernet(settings.ENCRYPTION_KEY.encode("utf-8"))]
+if settings.ENCRYPTION_KEY_PREVIOUS:
+    _chaves.append(Fernet(settings.ENCRYPTION_KEY_PREVIOUS.encode("utf-8")))
+
+_fernet = MultiFernet(_chaves)
 
 
 def criptografar(texto: str) -> str:
     """
-    Criptografa um texto (ex: CPF) de forma reversível.
+    Criptografa um texto (ex: CPF) de forma reversível usando a chave ativa.
     Útil para salvar dados sensíveis em repouso no banco.
     """
     if not texto:
@@ -31,6 +40,8 @@ def criptografar(texto: str) -> str:
 def descriptografar(texto_cifrado: str) -> str:
     """
     Descriptografa um texto cifrado gerado por `criptografar()`.
+    Tenta a chave ativa primeiro; se falhar e ENCRYPTION_KEY_PREVIOUS estiver
+    configurada, tenta a chave anterior (suporte à rotação gradual).
     """
     if not texto_cifrado:
         return texto_cifrado

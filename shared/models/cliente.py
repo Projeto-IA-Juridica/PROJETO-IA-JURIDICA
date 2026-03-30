@@ -57,6 +57,17 @@ class Cliente(Base, TimestampMixin, TenantMixin):
         nullable=False,
         comment="CPF armazenado criptografado (AES-256 Fernet)",
     )
+    cpf_version: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=1,
+        server_default="1",
+        comment=(
+            "Versão da chave Fernet usada para criptografar o CPF. "
+            "Incrementar ao rotar ENCRYPTION_KEY para rastrear registros que "
+            "precisam ser re-criptografados com a nova chave."
+        ),
+    )
 
     # --- Contato ---
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)
