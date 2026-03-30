@@ -41,7 +41,7 @@ function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => vo
           {cliente.telefone_whatsapp}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <BadgeCRM nivel={cliente.crm_nivel as never} />
+          <BadgeCRM nivel={cliente.crm_nivel} />
           {cliente.crm_score != null && (
             <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>score {cliente.crm_score}/100</span>
           )}

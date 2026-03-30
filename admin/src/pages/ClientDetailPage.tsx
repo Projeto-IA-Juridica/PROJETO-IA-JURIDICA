@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { clientesApi, processosApi } from '../api'
 import { chatApi, type Mensagem } from '../api/chat'
-import { BadgeCRM, BadgeRisco, ProgressBar, Spinner, ErrorBox } from '../components/ui'
+import { BadgeCRM, BadgeRisco, ProgressBar, Spinner, ErrorBox, EmptyState } from '../components/ui'
 
 const ESCALACAO = new Set(['parecer_juridico', 'estrategia_processual', 'negociacao', 'decisao_judicial_impacto_alto'])
 
@@ -114,6 +114,7 @@ export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const clienteId = Number(id)
+  const [selectedProcessoId, setSelectedProcessoId] = useState<number | null>(null)
 
   const { data: cliente, isLoading: lcli, error: ecli } = useQuery({
     queryKey: ['cliente', clienteId],
@@ -124,10 +125,17 @@ export default function ClientDetailPage() {
     queryFn: () => processosApi.porCliente(clienteId),
   })
 
+  // Auto-select first process when data loads
+  useEffect(() => {
+    if (processos && processos.length > 0 && !selectedProcessoId) {
+      setSelectedProcessoId(processos[0].id)
+    }
+  }, [processos, selectedProcessoId])
+
   if (lcli) return <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}><Spinner size={28} /></div>
   if (ecli || !cliente) return <ErrorBox message="Cliente não encontrado." />
 
-  const processo = processos?.[0]
+  const processo = processos?.find(p => p.id === selectedProcessoId)
 
   return (
     <>
@@ -139,7 +147,7 @@ export default function ClientDetailPage() {
             <h1 className="page-title">{cliente.nome}</h1>
             <p className="page-subtitle">{cliente.telefone_whatsapp}</p>
           </div>
-          <BadgeCRM nivel={cliente.crm_nivel as never} />
+          <BadgeCRM nivel={cliente.crm_nivel} />
         </div>
       </div>
 
@@ -161,19 +169,40 @@ export default function ClientDetailPage() {
           {/* Processo */}
           <div className="surface" style={{ padding: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Processo Judicial</div>
-            {lproc ? <Spinner /> : !processo ? (
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nenhum processo vinculado.</div>
-            ) : (
+
+            {/* Tabs para múltiplos processos */}
+            {processos && processos.length > 1 && (
+              <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+                {processos.map(p => (
+                  <button
+                    key={p.id}
+                    className={`btn btn-sm ${processo?.id === p.id ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setSelectedProcessoId(p.id)}
+                    title={p.numero_cnj}
+                  >
+                    {p.numero_cnj.slice(-8)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {lproc ? <Spinner /> : !processos || processos.length === 0 ? (
+              <EmptyState
+                icon="📋"
+                title="Nenhum processo vinculado"
+                desc="Este cliente ainda não possui processos cadastrados."
+              />
+            ) : processo ? (
               <>
                 <InfoRow label="CNJ" value={<code style={{ fontSize: 10 }}>{processo.numero_cnj}</code>} />
                 <InfoRow label="Tribunal" value={processo.tribunal} />
                 <InfoRow label="Tipo de Ação" value={processo.tipo_acao} />
                 <InfoRow label="Polo" value={processo.polo_cliente?.toUpperCase()} />
                 <InfoRow label="Último Andamento" value={processo.ultimo_andamento} />
-                <InfoRow label="Data" value={processo.data_ultimo_andamento} />
+                <InfoRow label="Data" value={processo.data_ultimo_andamento ? new Date(processo.data_ultimo_andamento).toLocaleDateString('pt-BR') : '—'} />
                 <InfoRow label="Monitoramento" value={<span style={{ color: processo.monitoramento_ativo ? 'var(--success)' : 'var(--text-muted)' }}>{processo.monitoramento_ativo ? '✅ Ativo' : 'Inativo'}</span>} />
               </>
-            )}
+            ) : null}
           </div>
 
           {/* Score de Risco */}

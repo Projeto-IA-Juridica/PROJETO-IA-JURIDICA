@@ -22,7 +22,7 @@ function CRMClienteRow({ card, onAnalyze }: { card: CRMCard; onAnalyze: (id: num
           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{card.telefone_whatsapp}</div>
         </div>
 
-        <BadgeCRM nivel={card.crm_nivel as never} />
+        <BadgeCRM nivel={card.crm_nivel} />
 
         <div style={{ textAlign: 'center', minWidth: 70 }}>
           <div style={{ fontWeight: 700, fontSize: 16 }}>{card.crm_score ?? '—'}</div>

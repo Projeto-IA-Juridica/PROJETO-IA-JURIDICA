@@ -1,5 +1,13 @@
 import api from './client'
 
+// ─── Paginação ───────────────────────────────────────────────────────────────
+export interface PaginatedResponse<T> {
+  items: T[]
+  page: number
+  per_page: number
+  total: number
+}
+
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 export interface OnboardingStatus {
   onboarding_completo: boolean
@@ -58,7 +66,7 @@ export interface Cliente {
 
 export const clientesApi = {
   listar: (params?: { page?: number; page_size?: number; search?: string }) =>
-    api.get<Cliente[]>('/clientes', { params }).then((r) => r.data),
+    api.get<PaginatedResponse<Cliente>>('/clientes', { params }).then((r) => r.data.items || r.data),
 
   detalhe: (id: number) => api.get<Cliente>(`/clientes/${id}`).then((r) => r.data),
 }
@@ -83,7 +91,7 @@ export interface Processo {
 
 export const processosApi = {
   porCliente: (clienteId: number) =>
-    api.get<Processo[]>('/processos', { params: { cliente_id: clienteId } }).then((r) => r.data),
+    api.get<PaginatedResponse<Processo>>('/processos', { params: { cliente_id: clienteId } }).then((r) => r.data.items || r.data),
 
   detalhe: (id: number) => api.get<Processo>(`/processos/${id}`).then((r) => r.data),
 }

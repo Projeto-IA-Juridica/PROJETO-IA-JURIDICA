@@ -112,3 +112,6 @@ export function ErrorBox({ message }: { message: string }) {
     </div>
   )
 }
+
+// Pagination
+export { Pagination } from './Pagination'
