@@ -48,6 +48,7 @@ def _redis_client() -> redis.Redis:
     max_retries=2,
     autoretry_for=(Exception,),
     retry_backoff=True,
+    retry_backoff_max=600,
     queue="ia",
 )
 def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:

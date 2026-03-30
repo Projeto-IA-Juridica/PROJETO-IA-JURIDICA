@@ -271,6 +271,7 @@ def enviar_pesquisa_satisfacao(self):
     base=DLQTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
+    retry_backoff_max=600,
     max_retries=3,
 )
 def processar_mensagem_recebida(
@@ -441,6 +442,7 @@ def enviar_boas_vindas_escritorio(self, escritorio_id: int):
     base=DLQTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
+    retry_backoff_max=600,
     max_retries=3,
 )
 def processar_resposta_advogado(
