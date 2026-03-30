@@ -84,9 +84,12 @@ export interface ClienteExport {
     nome: string
     telefone_whatsapp?: string
     cpf?: string | null
+    cpf_presente?: boolean
     data_nascimento?: string | null
     profissao?: string | null
     empresa?: string | null
+    empresa_atual?: string | null
+    cargo?: string | null
     ativo?: boolean
   }
   processos?: Array<Record<string, unknown>>
@@ -130,21 +133,26 @@ export const clientesApi = {
   },
 
   detalhe: async (id: number): Promise<Cliente> => {
-    const [crmCard, exportData] = await Promise.all([
-      api.get<CRMCliente>(`/crm/clientes/${id}`).then((r) => r.data),
-      api.get<ClienteExport>(`/clientes/${id}/exportar`).then((r) => r.data),
-    ])
+    const crmCard = await api.get<CRMCliente>(`/crm/clientes/${id}`).then((r) => r.data)
 
-    const base = exportData.cliente
+    // Em alguns ambientes /clientes/{id}/exportar pode estar indisponível.
+    // Mantemos o detalhe funcional com os dados de CRM e completamos campos extras quando possível.
+    let base: ClienteExport['cliente'] | undefined
+    try {
+      const exportData = await api.get<ClienteExport>(`/clientes/${id}/exportar`).then((r) => r.data)
+      base = exportData.cliente
+    } catch (error) {
+      console.warn('Falha ao obter dados LGPD exportáveis do cliente; usando fallback CRM.', error)
+    }
 
     return {
       id: crmCard.id,
-      nome: base?.nome ?? crmCard.nome,
-      telefone_whatsapp: base?.telefone_whatsapp ?? crmCard.telefone_whatsapp,
-      cpf: base?.cpf ?? undefined,
+      nome: base?.nome || crmCard.nome,
+      telefone_whatsapp: base?.telefone_whatsapp || crmCard.telefone_whatsapp,
+      cpf: base?.cpf ?? (base?.cpf_presente ? 'Protegido (LGPD)' : undefined),
       data_nascimento: base?.data_nascimento ?? undefined,
       profissao: base?.profissao ?? undefined,
-      empresa: base?.empresa ?? undefined,
+      empresa: base?.empresa ?? base?.empresa_atual ?? undefined,
       status: base?.ativo === false ? 'inativo' : 'ativo',
       ativo: base?.ativo !== false,
       crm_nivel: crmCard.crm_nivel,

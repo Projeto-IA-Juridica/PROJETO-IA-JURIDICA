@@ -17,10 +17,11 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 function ChatWindow({ clienteId }: { clienteId: number }) {
   const qc = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
-  const { data: msgs, isLoading } = useQuery({
+  const { data: msgs, isLoading, error } = useQuery({
     queryKey: ['chat', clienteId],
     queryFn: () => chatApi.historico(clienteId),
     staleTime: 0,
+    retry: 0,
   })
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -53,6 +54,9 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
       {/* Histórico */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0 12px' }}>
         {isLoading && <div style={{ textAlign: 'center', paddingTop: 20 }}><Spinner /></div>}
+        {error && (
+          <ErrorBox message="Não foi possível carregar o histórico deste cliente agora." />
+        )}
 
         {/* Mensagens da API (históricas) */}
         {apiMsgs.map(m => (
