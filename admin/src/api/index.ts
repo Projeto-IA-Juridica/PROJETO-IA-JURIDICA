@@ -22,6 +22,26 @@ export interface OnboardingStatus {
   }
 }
 
+export interface EvolutionQrPayload {
+  base64?: string
+  qrcode?: string
+  code?: string
+  pairingCode?: string
+  [key: string]: unknown
+}
+
+export interface ConnectWhatsappResponse {
+  etapa: number
+  instance_name: string
+  qr_code: EvolutionQrPayload | string | null
+  status: string
+}
+
+export interface WhatsappStatusResponse {
+  connected: boolean
+  state: string
+}
+
 export const onboardingApi = {
   status: () => api.get<OnboardingStatus>('/onboarding/status').then((r) => r.data),
 
@@ -37,9 +57,9 @@ export const onboardingApi = {
     }).then((r) => r.data)
   },
 
-  connectWhatsapp: () => api.post('/onboarding/connect-whatsapp').then((r) => r.data),
+  connectWhatsapp: () => api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp').then((r) => r.data),
 
-  whatsappStatus: () => api.get<{ connected: boolean; state: string }>('/onboarding/whatsapp-status').then((r) => r.data),
+  whatsappStatus: () => api.get<WhatsappStatusResponse>('/onboarding/whatsapp-status').then((r) => r.data),
 
   configurarTemplates: (data: { template_boas_vindas?: string; template_atualizacao?: string; template_sem_novidade?: string }) =>
     api.post('/onboarding/configure-templates', data).then((r) => r.data),
@@ -162,6 +182,7 @@ export const clientesApi = {
 
 export interface Processo {
   id: number
+  cliente_id: number
   numero_cnj: string
   tipo_acao: string | null
   polo_cliente: string
@@ -174,13 +195,45 @@ export interface Processo {
   score_risco?: number | null
   score_nivel?: string | null
   score_interpretacao?: string | null
+  frequencia_monitoramento?: 'diario' | 'semanal' | null
+  advogado_responsavel_id?: number | null
+}
+
+export interface ProcessoCreatePayload {
+  numero_cnj: string
+  cliente_id: number
+  polo_cliente: 'autor' | 'reu' | 'terceiro'
+  tipo_acao?: string | null
+}
+
+export interface ProcessoUpdatePayload {
+  polo_cliente?: 'autor' | 'reu' | 'terceiro'
+  tipo_acao?: string | null
+  advogado_responsavel_id?: number | null
+  monitoramento_ativo?: boolean
+  frequencia_monitoramento?: 'diario' | 'semanal'
 }
 
 export const processosApi = {
+  listar: (params?: {
+    page?: number
+    per_page?: number
+    status?: string
+    cliente_id?: number
+    search?: string
+    score_nivel?: string
+  }) => api.get<PaginatedResponse<Processo>>('/processos', { params }).then((r) => r.data),
+
   porCliente: (clienteId: number) =>
     api.get<PaginatedResponse<Processo>>('/processos', { params: { cliente_id: clienteId, per_page: 100 } }).then((r) => r.data.items),
 
+  criar: (payload: ProcessoCreatePayload) => api.post<Processo>('/processos', payload).then((r) => r.data),
+
   detalhe: (id: number) => api.get<Processo>(`/processos/${id}`).then((r) => r.data),
+
+  atualizar: (id: number, payload: ProcessoUpdatePayload) => api.put<Processo>(`/processos/${id}`, payload).then((r) => r.data),
+
+  arquivar: (id: number) => api.delete(`/processos/${id}`).then((r) => r.data),
 }
 
 export interface RAGDoc {

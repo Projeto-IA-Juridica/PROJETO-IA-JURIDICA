@@ -8,6 +8,7 @@ import ClientDetailPage from './pages/ClientDetailPage'
 import CRMPage from './pages/CRMPage'
 import RAGPage from './pages/RAGPage'
 import AnalyticsPage from './pages/AnalyticsPage'
+import ProcessosPage from './pages/ProcessosPage'
 import SettingsPage from './pages/SettingsPage'
 import OperationsPage from './pages/OperationsPage'
 import { Spinner } from './components/ui'
@@ -37,6 +38,7 @@ function ProtectedRoutes() {
         <Route path="/hub" element={<HubPage />} />
         <Route path="/hub/clientes/:id" element={<ClientDetailPage />} />
         <Route path="/crm" element={<CRMPage />} />
+        <Route path="/processos" element={<ProcessosPage />} />
         <Route path="/rag" element={<RAGPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/operations" element={<OperationsPage />} />
