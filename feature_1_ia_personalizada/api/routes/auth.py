@@ -32,37 +32,65 @@ from shared.security.jwt import (
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
+_LOGIN_MAX_FALHAS = 10          # tentativas antes do bloqueio
+_LOGIN_FALHA_JANELA_S = 3600    # 1 hora — janela de contagem de falhas
+_LOGIN_LOCKOUT_S = 900          # 15 min — duração do bloqueio
+
+
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
     """
     Autentica um usuário (advogado, assistente, admin) com e-mail e senha.
     Retorna o Access Token (curta duração) e o Refresh Token (longa duração).
     """
-    # 1. Busca o usuário pelo e-mail
+    redis = getattr(request.app.state, "redis_client", None)
+    email_key = credentials.email.lower().strip()
+    lockout_key = f"login:lockout:{email_key}"
+    falhas_key = f"login:fail:{email_key}"
+
+    # 1. Verifica lockout por conta (complementa o rate limit por IP do middleware)
+    if redis is not None and await redis.exists(lockout_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Conta temporariamente bloqueada por excesso de tentativas. Tente em 15 minutos.",
+        )
+
+    # 2. Busca o usuário pelo e-mail
     query = select(Usuario).where(Usuario.email == credentials.email)
     result = await db.execute(query)
     usuario = result.scalars().first()
 
-    # 2. Sempre executa o bcrypt (mesmo quando o usuário não existe) para que o tempo
+    # 3. Sempre executa o bcrypt (mesmo quando o usuário não existe) para que o tempo
     #    de resposta seja constante — impede enumeração de e-mails via timing attack.
     hash_ref = usuario.senha_hash if usuario else _DUMMY_HASH
     senha_ok = verificar_senha(credentials.senha, hash_ref)
 
     if not usuario or not senha_ok:
+        # Incrementa contador de falhas por conta
+        if redis is not None:
+            falhas = await redis.incr(falhas_key)
+            if falhas == 1:
+                await redis.expire(falhas_key, _LOGIN_FALHA_JANELA_S)
+            if falhas >= _LOGIN_MAX_FALHAS:
+                await redis.setex(lockout_key, _LOGIN_LOCKOUT_S, "1")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 3. Verifica se a conta está ativa (se tivermos essa flag, por enquanto só vamos em frente)
+    # 4. Login bem-sucedido — limpa contadores de falha
+    if redis is not None:
+        await redis.delete(falhas_key, lockout_key)
+
+    # 5. Verifica se a conta está ativa (se tivermos essa flag, por enquanto só vamos em frente)
     # se hasattr(usuario, "ativo") and not usuario.ativo: ...
 
-    # 4. Atualiza a data do último login
+    # 6. Atualiza a data do último login
     usuario.ultimo_login = datetime.utcnow()
     # O get_db vai dar db.commit() ao final da requisição se não houver erro no FastApi
 
-    # 5. Gera os Tokens
+    # 7. Gera os Tokens
     access_token = criar_token(
         user_id=usuario.id, escritorio_id=usuario.escritorio_id, role=usuario.role
     )
