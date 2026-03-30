@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminImportApi, onboardingApi, type ConnectWhatsappResponse, type EvolutionQrPayload } from '../api'
+import { useAuth } from '../context/AuthContext'
 import { Spinner, ErrorBox } from '../components/ui'
 
-type Tab = 'persona' | 'templates' | 'onboarding' | 'status'
+type Tab = 'profile' | 'persona' | 'templates' | 'onboarding' | 'status'
 
 function extractQrString(input: unknown): string | null {
   if (typeof input === 'string') {
@@ -33,7 +34,8 @@ function extractQrString(input: unknown): string | null {
 
 export default function SettingsPage() {
   const qc = useQueryClient()
-  const [activeTab, setActiveTab] = useState<Tab>('persona')
+  const { user, logout } = useAuth()
+  const [activeTab, setActiveTab] = useState<Tab>('profile')
 
   const { data: status, isLoading, error } = useQuery({
     queryKey: ['onboarding-status'],
@@ -168,11 +170,56 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ borderBottom: '1px solid var(--surface-border)', marginBottom: 24, display: 'flex' }}>
+        <button className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>Perfil</button>
         <button className={`tab ${activeTab === 'persona' ? 'active' : ''}`} onClick={() => setActiveTab('persona')}>Persona IA</button>
         <button className={`tab ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>Templates</button>
         <button className={`tab ${activeTab === 'onboarding' ? 'active' : ''}`} onClick={() => setActiveTab('onboarding')}>Onboarding</button>
         <button className={`tab ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>Status</button>
       </div>
+
+      {activeTab === 'profile' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12, maxWidth: 900 }}>
+          <div className="surface" style={{ padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Dados da conta</div>
+            <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+              <div>Nome: <strong style={{ color: 'var(--text-primary)' }}>{user?.nome ?? '—'}</strong></div>
+              <div>E-mail: <strong style={{ color: 'var(--text-primary)' }}>{user?.email ?? '—'}</strong></div>
+              <div>Perfil: <strong style={{ color: 'var(--text-primary)' }}>{user?.role ?? '—'}</strong></div>
+              <div>OAB: <strong style={{ color: 'var(--text-primary)' }}>{user?.oab ?? 'não informado'}</strong></div>
+              <div>ID do usuário: <strong style={{ color: 'var(--text-primary)' }}>{user?.id ?? '—'}</strong></div>
+              <div>ID do escritório: <strong style={{ color: 'var(--text-primary)' }}>{user?.escritorio_id ?? esc?.id ?? '—'}</strong></div>
+            </div>
+
+            <div style={{ marginTop: 14, fontSize: 12, color: 'var(--text-muted)' }}>
+              Essas informações são carregadas de auth/me e status do onboarding.
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 12 }}>
+            <div className="surface" style={{ padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Resumo operacional</div>
+              <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                <div>Escritório: <strong style={{ color: 'var(--text-primary)' }}>{esc?.nome ?? '—'}</strong></div>
+                <div>Onboarding: <strong style={{ color: status?.onboarding_completo ? 'var(--success)' : 'var(--warning)' }}>{status?.onboarding_completo ? 'concluído' : 'em andamento'}</strong></div>
+                <div>Progresso: <strong style={{ color: 'var(--text-primary)' }}>{status?.percentual_completo ?? 0}%</strong></div>
+                <div>WhatsApp: <strong style={{ color: esc?.whatsapp_conectado ? 'var(--success)' : 'var(--warning)' }}>{esc?.whatsapp_conectado ? 'conectado' : 'desconectado'}</strong></div>
+              </div>
+            </div>
+
+            <div className="surface" style={{ padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Segurança</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-secondary" onClick={() => window.location.reload()}>
+                  Recarregar sessão
+                </button>
+                <button className="btn btn-danger" onClick={logout}>
+                  Sair da conta
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'persona' && (
         <div className="surface" style={{ padding: 24, maxWidth: 620 }}>

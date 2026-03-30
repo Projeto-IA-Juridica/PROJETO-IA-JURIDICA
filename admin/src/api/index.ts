@@ -1,4 +1,4 @@
-import api from './client'
+import api, { fetchCsrfToken } from './client'
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -50,6 +50,18 @@ function authHeaderOrThrow() {
   return { Authorization: `Bearer ${token}` }
 }
 
+async function authAndCsrfHeadersOrThrow() {
+  const auth = authHeaderOrThrow()
+  const csrf = await fetchCsrfToken()
+  if (!csrf) {
+    throw new Error('Falha ao obter token CSRF. Atualize a pagina e tente novamente.')
+  }
+  return {
+    ...auth,
+    'X-CSRF-Token': csrf,
+  }
+}
+
 export const onboardingApi = {
   status: () => api.get<OnboardingStatus>('/onboarding/status').then((r) => r.data),
 
@@ -65,10 +77,10 @@ export const onboardingApi = {
     }).then((r) => r.data)
   },
 
-  connectWhatsapp: () =>
-    api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp', null, {
-      headers: authHeaderOrThrow(),
-    }).then((r) => r.data),
+  connectWhatsapp: async () => {
+    const headers = await authAndCsrfHeadersOrThrow()
+    return api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp', null, { headers }).then((r) => r.data)
+  },
 
   whatsappStatus: () =>
     api.get<WhatsappStatusResponse>('/onboarding/whatsapp-status', {
