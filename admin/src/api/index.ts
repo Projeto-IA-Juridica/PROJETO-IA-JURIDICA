@@ -42,6 +42,14 @@ export interface WhatsappStatusResponse {
   state: string
 }
 
+function authHeaderOrThrow() {
+  const token = localStorage.getItem('access_token')
+  if (!token) {
+    throw new Error('Sessao expirada: token de acesso ausente. Faca login novamente.')
+  }
+  return { Authorization: `Bearer ${token}` }
+}
+
 export const onboardingApi = {
   status: () => api.get<OnboardingStatus>('/onboarding/status').then((r) => r.data),
 
@@ -57,9 +65,15 @@ export const onboardingApi = {
     }).then((r) => r.data)
   },
 
-  connectWhatsapp: () => api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp').then((r) => r.data),
+  connectWhatsapp: () =>
+    api.post<ConnectWhatsappResponse>('/onboarding/connect-whatsapp', null, {
+      headers: authHeaderOrThrow(),
+    }).then((r) => r.data),
 
-  whatsappStatus: () => api.get<WhatsappStatusResponse>('/onboarding/whatsapp-status').then((r) => r.data),
+  whatsappStatus: () =>
+    api.get<WhatsappStatusResponse>('/onboarding/whatsapp-status', {
+      headers: authHeaderOrThrow(),
+    }).then((r) => r.data),
 
   configurarTemplates: (data: { template_boas_vindas?: string; template_atualizacao?: string; template_sem_novidade?: string }) =>
     api.post('/onboarding/configure-templates', data).then((r) => r.data),
