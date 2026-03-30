@@ -5,6 +5,52 @@ import { Spinner, ErrorBox } from '../components/ui'
 
 type Tab = 'login' | 'register'
 
+type ApiValidationError = {
+  msg?: string
+  loc?: Array<string | number>
+}
+
+type ApiErrorShape = {
+  response?: {
+    data?: {
+      detail?: string | ApiValidationError[] | ApiValidationError
+    }
+    status?: number
+  }
+  message?: string
+}
+
+function toErrorMessage(err: unknown, fallback: string): string {
+  const axiosErr = err as ApiErrorShape
+  const detail = axiosErr?.response?.data?.detail
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        const field = d?.loc?.length ? String(d.loc[d.loc.length - 1]) : ''
+        const msg = d?.msg ?? 'Erro de validação'
+        return field ? `${field}: ${msg}` : msg
+      })
+      .join('; ')
+  }
+
+  if (detail && typeof detail === 'object') {
+    const msg = detail.msg ?? 'Erro de validação'
+    const field = detail.loc?.length ? String(detail.loc[detail.loc.length - 1]) : ''
+    return field ? `${field}: ${msg}` : msg
+  }
+
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail
+  }
+
+  if (axiosErr?.response?.status) {
+    return `Erro ${axiosErr.response.status}: Falha na comunicação com o servidor`
+  }
+
+  return axiosErr?.message ?? fallback
+}
+
 export default function LoginPage() {
   const { login, register } = useAuth()
   const navigate = useNavigate()
@@ -27,11 +73,10 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(email, senha)
+      await login(email.trim(), senha)
       navigate('/hub')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(msg ?? 'E-mail ou senha incorretos')
+      setError(toErrorMessage(err, 'E-mail ou senha incorretos'))
     } finally { setLoading(false) }
   }
 
@@ -42,22 +87,12 @@ export default function LoginPage() {
     try {
       await register({
         ...reg,
-        email_admin: reg.email_admin,
+        email_admin: reg.email_admin.trim(),
       })
       navigate('/settings')
     } catch (err: unknown) {
       console.error('Erro no cadastro:', err)
-      const axiosErr = err as { response?: { data?: { detail?: string | Array<{msg:string; loc?: string[]}> }, status?: number }, message?: string }
-      const detail = axiosErr?.response?.data?.detail
-      if (Array.isArray(detail)) {
-        setError(detail.map(d => d.loc ? `${d.loc.slice(-1)[0]}: ${d.msg}` : d.msg).join('; '))
-      } else if (detail) {
-        setError(detail)
-      } else if (axiosErr?.response?.status) {
-        setError(`Erro ${axiosErr.response.status}: Falha na comunicação com o servidor`)
-      } else {
-        setError(axiosErr?.message ?? 'Falha no cadastro - verifique sua conexão')
-      }
+      setError(toErrorMessage(err, 'Falha no cadastro - verifique sua conexão'))
     } finally { setLoading(false) }
   }
 
