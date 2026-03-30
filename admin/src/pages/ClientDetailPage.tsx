@@ -5,8 +5,6 @@ import { clientesApi, processosApi } from '../api'
 import { chatApi, type Mensagem } from '../api/chat'
 import { BadgeCRM, BadgeRisco, ProgressBar, Spinner, ErrorBox, EmptyState } from '../components/ui'
 
-const ESCALACAO = new Set(['parecer_juridico', 'estrategia_processual', 'negociacao', 'decisao_judicial_impacto_alto'])
-
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--surface-border-muted)', fontSize: 12 }}>
@@ -26,7 +24,7 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
   })
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [localMsgs, setLocalMsgs] = useState<Array<{ role: 'user' | 'ai'; content: string; meta?: Record<string, unknown> }>>([])
+  const [localMsgs, setLocalMsgs] = useState<Array<{ role: 'user' | 'ai'; content: string }>>([])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -40,7 +38,7 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
     setLocalMsgs(p => [...p, { role: 'user', content: msg }])
     try {
       const res = await chatApi.enviar(clienteId, msg)
-      setLocalMsgs(p => [...p, { role: 'ai', content: res.resposta, meta: { intencao: res.intencao, tokens: res.tokens_usados, fallback: res.usando_fallback } }])
+      setLocalMsgs(p => [...p, { role: 'ai', content: res.message }])
       qc.invalidateQueries({ queryKey: ['chat', clienteId] })
     } catch {
       setLocalMsgs(p => [...p, { role: 'ai', content: '⚠️ Erro ao processar. Tente novamente.' }])
@@ -48,7 +46,7 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
   }
 
   // Merge: histórico da API + mensagens locais da sessão (evitar duplicatas)
-  const apiMsgs: Mensagem[] = msgs ?? []
+  const apiMsgs: Mensagem[] = (msgs ?? []).slice().reverse()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
@@ -74,17 +72,7 @@ function ChatWindow({ clienteId }: { clienteId: number }) {
             {m.role === 'user' ? (
               <div className="chat-bubble-user">{m.content}</div>
             ) : (
-              <div>
-                <div className="chat-bubble-ai" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                {m.meta && (
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, marginLeft: 4, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {m.meta.intencao != null && <span>intent: <code>{String(m.meta.intencao)}</code></span>}
-                    {m.meta.tokens != null && <span>tokens: {String((m.meta.tokens as Record<string, number>).input)}↑ {String((m.meta.tokens as Record<string, number>).output)}↓</span>}
-                    {m.meta.intencao != null && ESCALACAO.has(String(m.meta.intencao)) && <span style={{ color: '#fca5a5' }}>🚨 escalado</span>}
-                    {m.meta.fallback != null && String(m.meta.fallback) === 'true' && <span style={{ color: 'var(--warning)' }}>⚠️ fallback</span>}
-                  </div>
-                )}
-              </div>
+              <div className="chat-bubble-ai" style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
             )}
           </div>
         ))}

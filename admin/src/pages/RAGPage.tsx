@@ -15,9 +15,9 @@ export default function RAGPage() {
   const [tipo, setTipo] = useState('jurisprudencia')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [query, setQuery] = useState('')
-  const [topK, setTopK] = useState(3)
   const [resultados, setResultados] = useState<RAGChunk[]>([])
   const [buscando, setBuscando] = useState(false)
+  const [jobInfo, setJobInfo] = useState('')
 
   const { data: docs, isLoading, error } = useQuery({
     queryKey: ['rag-docs'],
@@ -26,8 +26,9 @@ export default function RAGPage() {
 
   const { mutate: upload, isPending: uploading, error: uploadError } = useMutation({
     mutationFn: () => ragApi.upload(selectedFile!, titulo || selectedFile!.name, tipo),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['rag-docs'] })
+      setJobInfo(`Ingestão iniciada. Job: ${res.job_id}`)
       setSelectedFile(null)
       setTitulo('')
       if (fileRef.current) fileRef.current.value = ''
@@ -43,7 +44,7 @@ export default function RAGPage() {
     if (!query.trim()) return
     setBuscando(true)
     try {
-      const r = await ragApi.buscar(query, topK)
+      const r = await ragApi.buscar(query, tipo)
       setResultados(r)
     } finally { setBuscando(false) }
   }
@@ -67,7 +68,7 @@ export default function RAGPage() {
         <div className="surface" style={{ padding: '12px 20px', display: 'flex', gap: 20 }}>
           <div><span style={{ fontSize: 20, fontWeight: 700 }}>{docs?.length ?? 0}</span><div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Documentos</div></div>
           <div style={{ width: 1, background: 'var(--surface-border)' }} />
-          <div><span style={{ fontSize: 20, fontWeight: 700 }}>{docs?.reduce((s, d) => s + d.total_chunks, 0) ?? 0}</span><div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Chunks</div></div>
+          <div><span style={{ fontSize: 20, fontWeight: 700 }}>{docs?.reduce((s, d) => s + d.chunks, 0) ?? 0}</span><div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Chunks</div></div>
         </div>
       </div>
 
@@ -108,6 +109,7 @@ export default function RAGPage() {
                   </select>
                 </div>
                 {uploadError && <ErrorBox message="Falha no upload." />}
+                {jobInfo && <div style={{ fontSize: 11, color: 'var(--success)' }}>{jobInfo}</div>}
                 <button className="btn btn-primary" onClick={() => upload()} disabled={uploading}>
                   {uploading ? <><Spinner size={12} /> Ingerindo...</> : '📥 Ingerir documento'}
                 </button>
@@ -123,7 +125,7 @@ export default function RAGPage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {docs.map(d => (
-                  <div key={d.id} style={{
+                  <div key={d.doc_hash} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
                     background: 'var(--surface-overlay)', borderRadius: 6,
                     border: '1px solid var(--surface-border)'
@@ -131,9 +133,9 @@ export default function RAGPage() {
                     <span style={{ fontSize: 16 }}>{TIPO_ICON[d.tipo] ?? '⚪'}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.titulo}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.tipo} · {d.total_chunks} chunks</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.tipo} · {d.chunks} chunks</div>
                     </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => deletar(d.id)}>🗑️</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => deletar(d.doc_hash)}>🗑️</button>
                   </div>
                 ))}
               </div>
@@ -154,10 +156,6 @@ export default function RAGPage() {
                 onKeyDown={e => e.key === 'Enter' && buscar()}
                 placeholder="ex: prescrição trabalhista, rescisão indireta..." />
             </div>
-            <div>
-              <label className="label">Top K resultados</label>
-              <input className="input" type="number" min={1} max={5} value={topK} onChange={e => setTopK(Number(e.target.value))} />
-            </div>
             <button className="btn btn-primary" onClick={buscar} disabled={buscando || !query.trim()}>
               {buscando ? <Spinner size={12} /> : '🔎 Buscar'}
             </button>
@@ -169,7 +167,7 @@ export default function RAGPage() {
               {resultados.map((r, i) => (
                 <details key={i} style={{ marginBottom: 8 }}>
                   <summary style={{ fontSize: 12, cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                    {TIPO_ICON[r.tipo] ?? '⚪'} Chunk {i + 1} — {r.titulo} (score: {r.score.toFixed(3)})
+                    {TIPO_ICON[tipo] ?? '⚪'} Trecho {i + 1}
                   </summary>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, padding: '8px', background: 'var(--surface-base)', borderRadius: 4, lineHeight: 1.6 }}>
                     {r.texto.slice(0, 400)}{r.texto.length > 400 ? '...' : ''}

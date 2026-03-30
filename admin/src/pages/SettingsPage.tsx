@@ -1,142 +1,252 @@
-import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { onboardingApi } from '../api'
+import { useEffect, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { adminImportApi, onboardingApi } from '../api'
 import { Spinner, ErrorBox } from '../components/ui'
 
-export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'persona' | 'templates' | 'status'>('persona')
+type Tab = 'persona' | 'templates' | 'onboarding' | 'status'
 
-  const { data: status, isLoading } = useQuery({
+export default function SettingsPage() {
+  const qc = useQueryClient()
+  const [activeTab, setActiveTab] = useState<Tab>('persona')
+
+  const { data: status, isLoading, error } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.status,
   })
 
   const [persona, setPersona] = useState({ persona_nome: '', persona_tom: 'formal', horario_inicio: '08:00', horario_fim: '18:00' })
   const [templates, setTemplates] = useState({ template_boas_vindas: '', template_atualizacao: '', template_sem_novidade: '' })
+  const [csvFile, setCsvFile] = useState<File | null>(null)
   const [saved, setSaved] = useState('')
+  const [importResult, setImportResult] = useState<string>('')
+
+  useEffect(() => {
+    const esc = status?.escritorio
+    if (!esc) return
+    setPersona((prev) => {
+      if (prev.persona_nome) return prev
+      return {
+        ...prev,
+        persona_nome: esc.persona_nome ?? '',
+        persona_tom: esc.persona_tom ?? 'formal',
+      }
+    })
+  }, [status])
 
   const { mutate: savePersona, isPending: savingPersona, error: personaError } = useMutation({
     mutationFn: () => onboardingApi.configurarIA(persona),
-    onSuccess: () => { setSaved('persona'); setTimeout(() => setSaved(''), 2000) },
+    onSuccess: () => {
+      setSaved('persona')
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+      window.setTimeout(() => setSaved(''), 2000)
+    },
   })
+
   const { mutate: saveTemplates, isPending: savingTemplates, error: templatesError } = useMutation({
     mutationFn: () => onboardingApi.configurarTemplates(templates),
-    onSuccess: () => { setSaved('templates'); setTimeout(() => setSaved(''), 2000) },
+    onSuccess: () => {
+      setSaved('templates')
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+      window.setTimeout(() => setSaved(''), 2000)
+    },
   })
 
+  const { mutate: importPreview, isPending: previewing } = useMutation({
+    mutationFn: () => onboardingApi.importProcessos(csvFile!, true),
+    onSuccess: (res: Record<string, unknown>) => {
+      const total = Number(res.importados ?? 0) + Number(res.atualizados ?? 0)
+      setImportResult(`Preview concluido: ${total} linha(s) validada(s).`)
+    },
+  })
+
+  const { mutate: importReal, isPending: importing } = useMutation({
+    mutationFn: () => onboardingApi.importProcessos(csvFile!, false),
+    onSuccess: (res: Record<string, unknown>) => {
+      const importados = Number(res.importados ?? 0)
+      const atualizados = Number(res.atualizados ?? 0)
+      setImportResult(`Importacao concluida: ${importados} novo(s), ${atualizados} atualizado(s).`)
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+    },
+  })
+
+  const { mutate: importClientesAdmin, isPending: importingClientes } = useMutation({
+    mutationFn: () => adminImportApi.importarClientes(csvFile!, false),
+    onSuccess: (res) => {
+      setImportResult(`Clientes importados: ${res.importados}. Processos novos: ${res.processos_novos}.`)
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+    },
+  })
+
+  const { mutate: connectWhatsapp, isPending: connectingWhatsapp } = useMutation({
+    mutationFn: onboardingApi.connectWhatsapp,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+      qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
+    },
+  })
+
+  const { data: whatsappStatus } = useQuery({
+    queryKey: ['whatsapp-status'],
+    queryFn: onboardingApi.whatsappStatus,
+    refetchInterval: 15_000,
+  })
+
+  const { mutate: goLive, isPending: goingLive } = useMutation({
+    mutationFn: onboardingApi.goLive,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['onboarding-status'] })
+      setImportResult('Go-live executado com sucesso.')
+    },
+  })
+
+  const statusResumo = useMemo(() => {
+    if (!status) return 'Carregando status...'
+    if (status.onboarding_completo) return 'Escritorio operacional'
+    return `${status.percentual_completo}% concluido`
+  }, [status])
+
   if (isLoading) return <Spinner />
+  if (error) return <ErrorBox message="Falha ao carregar configuracoes do escritorio." />
 
   const esc = status?.escritorio
-
-  // Pre-fill com dados do backend
-  if (esc && !persona.persona_nome && esc.persona_nome) {
-    setPersona(p => ({ ...p, persona_nome: esc.persona_nome ?? '', persona_tom: esc.persona_tom ?? 'formal' }))
-  }
 
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Configurações</h1>
-        <p className="page-subtitle">Persona da IA, templates e status do sistema</p>
+        <h1 className="page-title">Configuracoes</h1>
+        <p className="page-subtitle">Onboarding, persona da IA e operacao do escritorio</p>
       </div>
 
       <div style={{ borderBottom: '1px solid var(--surface-border)', marginBottom: 24, display: 'flex' }}>
-        <button className={`tab ${activeTab === 'persona' ? 'active' : ''}`} onClick={() => setActiveTab('persona')}>🤖 Persona IA</button>
-        <button className={`tab ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>📝 Templates</button>
-        <button className={`tab ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>📊 Status</button>
+        <button className={`tab ${activeTab === 'persona' ? 'active' : ''}`} onClick={() => setActiveTab('persona')}>Persona IA</button>
+        <button className={`tab ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>Templates</button>
+        <button className={`tab ${activeTab === 'onboarding' ? 'active' : ''}`} onClick={() => setActiveTab('onboarding')}>Onboarding</button>
+        <button className={`tab ${activeTab === 'status' ? 'active' : ''}`} onClick={() => setActiveTab('status')}>Status</button>
       </div>
 
       {activeTab === 'persona' && (
-        <div className="surface" style={{ padding: 24, maxWidth: 560 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Configurar Persona da IA</div>
+        <div className="surface" style={{ padding: 24, maxWidth: 620 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Configurar persona da IA</div>
           {personaError && <div style={{ marginBottom: 12 }}><ErrorBox message="Falha ao salvar persona." /></div>}
-          {saved === 'persona' && <div style={{ marginBottom: 12, color: 'var(--success)', fontSize: 13 }}>✅ Persona salva com sucesso!</div>}
+          {saved === 'persona' && <div style={{ marginBottom: 12, color: 'var(--success)', fontSize: 13 }}>Persona salva com sucesso.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label className="label">Nome da IA</label>
-              <input className="input" value={persona.persona_nome} onChange={e => setPersona(p => ({ ...p, persona_nome: e.target.value }))} placeholder="Assistente Jurídico" />
+              <input className="input" value={persona.persona_nome} onChange={(e) => setPersona((p) => ({ ...p, persona_nome: e.target.value }))} />
             </div>
             <div>
-              <label className="label">Tom de Voz</label>
-              <select className="input" value={persona.persona_tom} onChange={e => setPersona(p => ({ ...p, persona_tom: e.target.value }))}>
+              <label className="label">Tom de voz</label>
+              <select className="input" value={persona.persona_tom} onChange={(e) => setPersona((p) => ({ ...p, persona_tom: e.target.value }))}>
                 <option value="formal">Formal</option>
-                <option value="amigavel">Amigável</option>
+                <option value="amigavel">Amigavel</option>
                 <option value="neutro">Neutro</option>
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="label">Horário de Início</label>
-                <input className="input" type="time" value={persona.horario_inicio} onChange={e => setPersona(p => ({ ...p, horario_inicio: e.target.value }))} />
+                <label className="label">Horario inicio</label>
+                <input className="input" type="time" value={persona.horario_inicio} onChange={(e) => setPersona((p) => ({ ...p, horario_inicio: e.target.value }))} />
               </div>
               <div>
-                <label className="label">Horário de Fim</label>
-                <input className="input" type="time" value={persona.horario_fim} onChange={e => setPersona(p => ({ ...p, horario_fim: e.target.value }))} />
+                <label className="label">Horario fim</label>
+                <input className="input" type="time" value={persona.horario_fim} onChange={(e) => setPersona((p) => ({ ...p, horario_fim: e.target.value }))} />
               </div>
             </div>
-            <button className="btn btn-primary" onClick={() => savePersona()} disabled={savingPersona || !persona.persona_nome}>
-              {savingPersona ? <><Spinner size={12} /> Salvando...</> : 'Salvar Persona'}
+            <button className="btn btn-primary" onClick={() => savePersona()} disabled={savingPersona || !persona.persona_nome.trim()}>
+              {savingPersona ? <Spinner size={12} /> : null} Salvar persona
             </button>
           </div>
         </div>
       )}
 
       {activeTab === 'templates' && (
-        <div className="surface" style={{ padding: 24, maxWidth: 560 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Templates de Mensagem WhatsApp</div>
+        <div className="surface" style={{ padding: 24, maxWidth: 620 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Templates de mensagem</div>
           {templatesError && <div style={{ marginBottom: 12 }}><ErrorBox message="Falha ao salvar templates." /></div>}
-          {saved === 'templates' && <div style={{ marginBottom: 12, color: 'var(--success)', fontSize: 13 }}>✅ Templates salvos com sucesso!</div>}
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
-            Use <code>{'{{nome_cliente}}'}</code> e <code>{'{{resumo_andamento}}'}</code> como placeholders.
-            Deixe vazio para manter o template atual.
-          </p>
+          {saved === 'templates' && <div style={{ marginBottom: 12, color: 'var(--success)', fontSize: 13 }}>Templates salvos com sucesso.</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label className="label">Boas-Vindas (requer {'{nome_cliente}'})</label>
-              <textarea className="input" rows={3} value={templates.template_boas_vindas} onChange={e => setTemplates(t => ({ ...t, template_boas_vindas: e.target.value }))} placeholder="Olá {nome_cliente}! Bem-vindo ao escritório..." />
+              <label className="label">Boas-vindas</label>
+              <textarea className="input" rows={3} value={templates.template_boas_vindas} onChange={(e) => setTemplates((t) => ({ ...t, template_boas_vindas: e.target.value }))} />
             </div>
             <div>
-              <label className="label">Atualização de Processo</label>
-              <textarea className="input" rows={3} value={templates.template_atualizacao} onChange={e => setTemplates(t => ({ ...t, template_atualizacao: e.target.value }))} placeholder="Olá {nome_cliente}! Novidades no seu processo: {resumo_andamento}" />
+              <label className="label">Atualizacao</label>
+              <textarea className="input" rows={3} value={templates.template_atualizacao} onChange={(e) => setTemplates((t) => ({ ...t, template_atualizacao: e.target.value }))} />
             </div>
             <div>
-              <label className="label">Sem Novidade</label>
-              <textarea className="input" rows={3} value={templates.template_sem_novidade} onChange={e => setTemplates(t => ({ ...t, template_sem_novidade: e.target.value }))} placeholder="Olá {nome_cliente}, consultamos seu processo e não há novidades." />
+              <label className="label">Sem novidade</label>
+              <textarea className="input" rows={3} value={templates.template_sem_novidade} onChange={(e) => setTemplates((t) => ({ ...t, template_sem_novidade: e.target.value }))} />
             </div>
             <button className="btn btn-primary" onClick={() => saveTemplates()} disabled={savingTemplates}>
-              {savingTemplates ? <><Spinner size={12} /> Salvando...</> : 'Salvar Templates'}
+              {savingTemplates ? <Spinner size={12} /> : null} Salvar templates
             </button>
           </div>
         </div>
       )}
 
+      {activeTab === 'onboarding' && (
+        <div className="surface" style={{ padding: 24, maxWidth: 780 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Executar etapas reais do onboarding</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label className="label">CSV para importacao</label>
+              <input className="input" type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary" onClick={() => importPreview()} disabled={!csvFile || previewing}>
+                {previewing ? <Spinner size={12} /> : null} Preview onboarding
+              </button>
+              <button className="btn btn-primary" onClick={() => importReal()} disabled={!csvFile || importing}>
+                {importing ? <Spinner size={12} /> : null} Importar onboarding
+              </button>
+              <button className="btn btn-secondary" onClick={() => importClientesAdmin()} disabled={!csvFile || importingClientes}>
+                {importingClientes ? <Spinner size={12} /> : null} Importacao admin/clientes
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary" onClick={() => connectWhatsapp()} disabled={connectingWhatsapp}>
+                {connectingWhatsapp ? <Spinner size={12} /> : null} Conectar WhatsApp
+              </button>
+              <button className="btn btn-primary" onClick={() => goLive()} disabled={goingLive}>
+                {goingLive ? <Spinner size={12} /> : null} Executar go-live
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              WhatsApp: {whatsappStatus?.connected ? 'conectado' : `desconectado (${whatsappStatus?.state ?? 'indefinido'})`}
+            </div>
+            {importResult && <div style={{ fontSize: 12, color: 'var(--success)' }}>{importResult}</div>}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'status' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 560 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 620 }}>
           <div className="surface" style={{ padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Status do Onboarding</div>
-            {status?.etapas.map(e => (
-              <div key={e.numero} style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 16 }}>{e.concluida ? '✅' : '⭕'}</span>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Status geral</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>{statusResumo}</div>
+            {status?.etapas.map((etapa) => (
+              <div key={etapa.numero} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                <span>{etapa.concluida ? 'OK' : '...'}</span>
                 <div>
-                  <div style={{ fontSize: 13, color: e.concluida ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: 500 }}>{e.nome}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{e.descricao}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>{etapa.nome}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{etapa.descricao}</div>
                 </div>
               </div>
             ))}
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-              {status?.onboarding_completo ? '🟢 Escritório operacional' : `⚠️ ${status?.percentual_completo}% concluído`}
-            </div>
           </div>
 
           <div className="surface" style={{ padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Dados do Escritório</div>
-            {esc && (
-              <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ color: 'var(--text-muted)' }}>Nome: <span style={{ color: 'var(--text-primary)' }}>{esc.nome}</span></div>
-                <div style={{ color: 'var(--text-muted)' }}>Persona: <span style={{ color: 'var(--text-primary)' }}>{esc.persona_nome ?? '—'}</span> · Tom: {esc.persona_tom ?? '—'}</div>
-                <div style={{ color: 'var(--text-muted)' }}>WhatsApp: <span style={{ color: esc.whatsapp_conectado ? 'var(--success)' : 'var(--danger)' }}>{esc.whatsapp_conectado ? '✅ Conectado' : '❌ Desconectado'}</span></div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Dados do escritorio</div>
+            {esc ? (
+              <div style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+                <div>Nome: <strong style={{ color: 'var(--text-primary)' }}>{esc.nome}</strong></div>
+                <div>Persona: <strong style={{ color: 'var(--text-primary)' }}>{esc.persona_nome ?? 'nao definida'}</strong></div>
+                <div>Tom: <strong style={{ color: 'var(--text-primary)' }}>{esc.persona_tom ?? 'nao definido'}</strong></div>
+                <div>WhatsApp: <strong style={{ color: esc.whatsapp_conectado ? 'var(--success)' : 'var(--warning)' }}>{esc.whatsapp_conectado ? 'conectado' : 'desconectado'}</strong></div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

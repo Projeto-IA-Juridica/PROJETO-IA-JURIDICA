@@ -16,6 +16,10 @@ export async function fetchCsrfToken(): Promise<string | null> {
   try {
     const { data } = await axios.get('/api/auth/csrf-token', { withCredentials: true })
     csrfToken = data.csrf_token
+    if (csrfToken) {
+      const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+      document.cookie = `csrf_token=${csrfToken}; Path=/; SameSite=Strict${secure}`
+    }
     return csrfToken
   } catch (err) {
     console.error('Falha ao buscar CSRF token:', err)

@@ -7,6 +7,7 @@ const NAV = [
   { to: '/crm', icon: '🤝', label: 'CRM' },
   { to: '/rag', icon: '📚', label: 'Base RAG' },
   { to: '/analytics', icon: '📊', label: 'Analytics' },
+  { to: '/operations', icon: '🧭', label: 'Operações API' },
   { to: '/settings', icon: '⚙️', label: 'Configurações' },
 ]
 

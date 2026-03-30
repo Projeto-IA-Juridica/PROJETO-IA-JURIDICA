@@ -85,29 +85,29 @@ export default function AnalyticsPage() {
             <>
               {/* KPIs resumo */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 24 }}>
-                <MetricCard value={data.total_interacoes} label="Total Interações" />
-                <MetricCard value={data.clientes_ativos} label="Clientes Ativos" />
-                <MetricCard value={data.nps_medio != null ? `${data.nps_medio.toFixed(1)} ⭐` : '—'} label="NPS Médio" />
-                <MetricCard value={`${data.percentual_autonomia?.toFixed(1) ?? 0}%`} label="Autonomia IA" />
-                <MetricCard value={`US$ ${data.custo_total_usd?.toFixed(4) ?? '0.0000'}`} label="Custo Claude" />
+                <MetricCard value={data.resumo.total_interacoes} label="Total Interações" />
+                <MetricCard value={data.resumo.clientes_ativos} label="Clientes Ativos" />
+                <MetricCard value={`${data.resumo.nps_medio.toFixed(1)} ⭐`} label="NPS Médio" delta={data.resumo.variacao_nps} deltaSign="auto" />
+                <MetricCard value={`${data.eficiencia.percentual_autonomia.toFixed(1)}%`} label="Autonomia IA" />
+                <MetricCard value={`US$ ${data.eficiencia.custo_total_usd.toFixed(4)}`} label="Custo Claude" />
               </div>
 
               {/* Eficiência */}
               <div className="surface" style={{ padding: 20, marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>Eficiência da IA</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 16 }}>
-                  <MetricCard value={`${data.tempo_resposta_medio_ms ?? '—'} ms`} label="Tempo Médio Resposta" />
-                  <MetricCard value={data.interacoes_sem_humano ?? 0} label="Sem Intervenção Humana" />
-                  <MetricCard value={`${data.horas_economizadas?.toFixed(1) ?? 0}h`} label="Horas Economizadas" />
+                  <MetricCard value={`${data.eficiencia.tempo_resposta_medio_ms ?? '—'} ms`} label="Tempo Médio Resposta" />
+                  <MetricCard value={data.eficiencia.interacoes_sem_humano ?? 0} label="Sem Intervenção Humana" />
+                  <MetricCard value={`${data.eficiencia.horas_economizadas_estimadas?.toFixed(1) ?? 0}h`} label="Horas Economizadas" />
                 </div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Taxa de Autonomia</span>
-                    <span style={{ fontWeight: 600 }}>{data.percentual_autonomia?.toFixed(1) ?? 0}%</span>
+                    <span style={{ fontWeight: 600 }}>{data.eficiencia.percentual_autonomia?.toFixed(1) ?? 0}%</span>
                   </div>
-                  <ProgressBar value={data.percentual_autonomia ?? 0} max={100} height={8} />
+                  <ProgressBar value={data.eficiencia.percentual_autonomia ?? 0} max={100} height={8} />
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                    {data.interacoes_sem_humano ?? 0} de {data.total_interacoes} interações resolvidas sem intervenção humana
+                    {data.eficiencia.interacoes_sem_humano ?? 0} de {data.resumo.total_interacoes} interações resolvidas sem intervenção humana
                   </div>
                 </div>
               </div>
@@ -144,7 +144,7 @@ export default function AnalyticsPage() {
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 16 }}>
                           <span>NPS: <strong style={{ color: 'var(--text-secondary)' }}>{r.nps_medio != null ? r.nps_medio.toFixed(1) : '—'}</strong></span>
                           <span>{r.total_interacoes} msgs</span>
-                          <span>há {r.ultimo_contato_dias}d</span>
+                          <span>{r.ultimo_contato ? new Date(r.ultimo_contato).toLocaleDateString('pt-BR') : 'sem contato'}</span>
                         </div>
                       </div>
                     ))}

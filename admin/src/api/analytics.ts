@@ -1,30 +1,40 @@
 import api from './client'
 
-export interface DashboardStats {
+export interface DashboardResumo {
   total_interacoes: number
   clientes_ativos: number
-  nps_medio: number | null
+  nps_medio: number
+  nps_anterior: number
+  variacao_nps: string
+}
+
+export interface DashboardEficiencia {
   percentual_autonomia: number
   tempo_resposta_medio_ms: number
   interacoes_sem_humano: number
-  horas_economizadas: number
+  horas_economizadas_estimadas: number
   custo_total_usd: number
-  escalacoes_pendentes: number
-  tendencia_semanal?: Array<{
+}
+
+export interface DashboardStats {
+  resumo: DashboardResumo
+  eficiencia: DashboardEficiencia
+  tendencia_semanal: Array<{
     semana: string
     total_interacoes: number
-    nps_medio: number | null
+    nps_medio: number
     autonomia_pct: number
   }>
-  por_cliente?: Array<{
+  por_cliente: Array<{
     cliente_id: number
     nome: string
     nps_medio: number | null
     total_interacoes: number
-    ultimo_contato_dias: number
+    ultimo_contato: string | null
     em_risco: boolean
     sem_avaliacao: boolean
   }>
+  score_risco_distribuicao: Record<string, number>
 }
 
 export const analyticsApi = {

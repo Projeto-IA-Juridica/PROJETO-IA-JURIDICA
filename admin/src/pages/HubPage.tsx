@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientesApi, type Cliente } from '../api'
-import { BadgeCRM, Spinner, EmptyState, ErrorBox } from '../components/ui'
+import { BadgeCRM, Spinner, EmptyState, ErrorBox, Pagination } from '../components/ui'
 
 function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => void }) {
   const iniciais = cliente.nome.split(' ').slice(0, 2).map(n => n[0]).join('')
@@ -53,10 +54,16 @@ function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => vo
 
 export default function HubPage() {
   const navigate = useNavigate()
-  const { data: clientes, isLoading, error } = useQuery({
-    queryKey: ['clientes'],
-    queryFn: () => clientesApi.listar({ page_size: 100 }),
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['clientes', page],
+    queryFn: () => clientesApi.listar({ page, page_size: pageSize }),
   })
+
+  const clientes = data?.items || []
+  const totalPages = data ? Math.ceil(data.total / data.per_page) : 1
 
   if (isLoading) return (
     <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
@@ -72,28 +79,39 @@ export default function HubPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 className="page-title">Hub do Advogado</h1>
-            <p className="page-subtitle">{clientes?.length ?? 0} clientes carregados</p>
+            <p className="page-subtitle">{data?.total ?? 0} clientes no total</p>
           </div>
         </div>
       </div>
 
-      {!clientes?.length ? (
+      {!clientes.length ? (
         <EmptyState
           icon="👥"
           title="Nenhum cliente encontrado"
           desc="Complete o onboarding e importe clientes via CSV para começar."
-          action={<button className="btn btn-primary" onClick={() => navigate('/onboarding')}>Ir para Onboarding</button>}
+          action={<button className="btn btn-primary" onClick={() => navigate('/settings')}>Ir para Configurações</button>}
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-          {clientes.map(c => (
-            <ClienteCard
-              key={c.id}
-              cliente={c}
-              onClick={() => navigate(`/hub/clientes/${c.id}`)}
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+            {clientes.map(c => (
+              <ClienteCard
+                key={c.id}
+                cliente={c}
+                onClick={() => navigate(`/hub/clientes/${c.id}`)}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              totalItems={data?.total}
             />
-          ))}
-        </div>
+          )}
+        </>
       )}
     </>
   )

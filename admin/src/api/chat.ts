@@ -14,13 +14,15 @@ export interface Mensagem {
   rag_ativo?: boolean
 }
 
+export interface SendMessageResponse {
+  status: string
+  message: string
+}
+
 export const chatApi = {
-  historico: (clienteId: number, page = 1) =>
-    api.get<Mensagem[]>('/chat/historico', { params: { cliente_id: clienteId, page } }).then((r) => r.data),
+  historico: (clienteId: number, limit = 50) =>
+    api.get<Mensagem[]>(`/chat/history/${clienteId}`, { params: { limit } }).then((r) => r.data),
 
   enviar: (clienteId: number, mensagem: string) =>
-    api.post<{ resposta: string; intencao: string; tokens_usados: { input: number; output: number }; usando_fallback: boolean }>(
-      '/chat/send',
-      { mensagem, tipo: 'texto', cliente_id: clienteId }
-    ).then((r) => r.data),
+    api.post<SendMessageResponse>(`/chat/send/${clienteId}`, { mensagem, tipo: 'texto' }).then((r) => r.data),
 }

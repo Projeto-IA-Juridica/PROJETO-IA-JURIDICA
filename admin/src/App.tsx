@@ -9,6 +9,7 @@ import CRMPage from './pages/CRMPage'
 import RAGPage from './pages/RAGPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SettingsPage from './pages/SettingsPage'
+import OperationsPage from './pages/OperationsPage'
 import { Spinner } from './components/ui'
 
 const qc = new QueryClient({
@@ -38,6 +39,7 @@ function ProtectedRoutes() {
         <Route path="/crm" element={<CRMPage />} />
         <Route path="/rag" element={<RAGPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/operations" element={<OperationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/hub" replace />} />
       </Routes>
