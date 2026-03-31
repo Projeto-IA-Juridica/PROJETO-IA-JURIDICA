@@ -1,7 +1,7 @@
 .PHONY: setup install-base dev worker beat flower \
        migrate migrate-create migrate-down migrate-history seed create-admin init-db \
        lint format lint-check type-check \
-       test test-unit test-integration test-fast test-file \
+       test test-unit test-integration test-integration-postgres test-fast test-file mutation \
        docker-up docker-up-prod docker-down docker-logs docker-build docker-restart \
        health clean verify-install help
 
@@ -14,6 +14,7 @@ BLACK := $(VENV)/bin/black
 ALEMBIC := $(VENV)/bin/alembic
 UVICORN := $(VENV)/bin/uvicorn
 CELERY := $(VENV)/bin/celery
+MUTMUT := $(VENV)/bin/mutmut
 
 # ==============================================================================
 # SETUP
@@ -119,6 +120,23 @@ test-fast: ## Roda testes sem coverage (mais rápido)
 
 test-file: ## Roda um arquivo de teste específico (use: make test-file FILE=tests/unit/test_foo.py)
 	$(PYTEST) $(FILE) -v
+
+test-integration-postgres: ## Roda testes de integração com PostgreSQL+pgvector real (requer Docker)
+	@echo "Subindo PostgreSQL+pgvector via Docker..."
+	docker run -d --name test-pg-vector \
+		-e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=test_concierge \
+		-p 5433:5432 pgvector/pgvector:pg16 2>/dev/null || true
+	@echo "Aguardando PostgreSQL ficar pronto..."
+	@sleep 3
+	TEST_DATABASE_URL="postgresql+asyncpg://test:test@localhost:5433/test_concierge" \
+		$(PYTEST) feature_1_ia_personalizada/tests/integration/ shared/tests/ --tb=short -v
+	docker rm -f test-pg-vector 2>/dev/null || true
+
+mutation: ## Roda mutation testing com mutmut (lento — use em branches antes de merge)
+	@echo "Iniciando mutation testing em services/ e shared/..."
+	@echo "Dica: cada mutante leva ~2-5s. Para cancelar: Ctrl+C e rode 'mutmut results'"
+	$(MUTMUT) run
+	$(MUTMUT) results
 
 # ==============================================================================
 # DOCKER
