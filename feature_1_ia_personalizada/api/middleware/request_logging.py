@@ -58,10 +58,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             client_ip=client_ip,
         )
 
-        # 3. Processa o request
+        # 4. Processa o request
         response = await call_next(request)
 
-        # 4. Loga fim com status e latência
+        # 5. Loga fim com status e latência
         duracao_ms = round((time.perf_counter() - inicio) * 1000, 2)
         nivel = "warning" if response.status_code >= 400 else "info"
         getattr(logger, nivel)(
@@ -71,6 +71,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             client_ip=client_ip,
         )
 
-        # 5. Devolve request_id ao cliente (útil para correlacionar logs com suporte)
+        # 6. Devolve request_id ao cliente (útil para correlacionar logs com suporte)
         response.headers["X-Request-ID"] = request_id
         return response
