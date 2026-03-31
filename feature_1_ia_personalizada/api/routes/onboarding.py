@@ -396,6 +396,18 @@ async def connect_whatsapp(
     escritorio = await _obter_escritorio_do_token(request, db)
 
     instance_name = f"escritorio_{escritorio.id}"
+    configured_base = settings.EVOLUTION_API_URL.rstrip("/")
+    current_api_base = str(request.base_url).rstrip("/")
+
+    # Falha comum em produção: EVOLUTION_API_URL apontando para a própria API.
+    if configured_base == current_api_base:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Configuração inválida: EVOLUTION_API_URL aponta para esta própria API. "
+                "Defina EVOLUTION_API_URL com a URL do servidor Evolution API (ex: http://evolution-api:8080)."
+            ),
+        )
 
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -437,6 +449,11 @@ async def connect_whatsapp(
                     raw = resp.text
                     if raw:
                         detail = f"{detail} Resposta: {raw[:400]}"
+                        if "CSRF token ausente" in raw:
+                            detail = (
+                                "A URL configurada em EVOLUTION_API_URL parece apontar para esta API/backend "
+                                "(retorno de CSRF interno). Configure EVOLUTION_API_URL para o host correto da Evolution API."
+                            )
                 except Exception:
                     pass
                 raise HTTPException(

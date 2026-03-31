@@ -81,7 +81,7 @@ services:
       DATABASE_PROVIDER: redis
       DATABASE_CONNECTION_URI: redis://redis:6379/3
       REDIS_URI: redis://redis:6379/4
-      DEL_INSTANCE: false
+      DEL_INSTANCE: "false"
     volumes:
       - evolution_data:/evolution/instances
     networks:
