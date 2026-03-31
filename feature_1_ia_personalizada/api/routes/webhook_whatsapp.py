@@ -127,6 +127,14 @@ async def receive_message(
             if already_seen:
                 logger.debug("webhook_mensagem_duplicada_ignorada", msg_id=msg_id)
                 return {"status": "duplicate"}
+        else:
+            # Redis indisponível: idempotência desativada — duplicatas da Evolution
+            # serão processadas. Verifique /health/detailed para status do Redis.
+            logger.warning(
+                "webhook_idempotencia_desabilitada",
+                msg_id=msg_id,
+                reason="redis_unavailable",
+            )
 
     # Extrair conteúdo da mensagem
     msg_content: dict[str, Any] = (
