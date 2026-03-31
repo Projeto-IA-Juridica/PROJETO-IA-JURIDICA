@@ -6,8 +6,14 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from prometheus_client import Counter, Histogram
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from feature_1_ia_personalizada.api.schemas.webhook import (
+    WebhookEvolutionPayload,
+    WebhookMessageContent,
+)
 
 from feature_1_ia_personalizada.workers.crm_worker import disparar_analise_com_debounce
 from feature_1_ia_personalizada.workers.send_notifications import (
