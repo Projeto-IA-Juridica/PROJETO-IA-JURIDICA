@@ -150,13 +150,28 @@ def fake_redis() -> FakeRedis:
 # Database e API Mocks
 # ---------------------------------------------------------------------------
 
+import os as _os
+
 from faker import Faker
-from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-# SQLite não conhece JSONB (tipo PostgreSQL). Faz JSONB se comportar como JSON no SQLite.
-if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
-    SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
+# ---------------------------------------------------------------------------
+# Banco de dados para testes
+# ---------------------------------------------------------------------------
+# Padrão: SQLite in-memory (rápido, sem dependências externas).
+# Com TEST_DATABASE_URL no ambiente (ex: CI com PostgreSQL+pgvector), usa banco real.
+# Isso permite testar comportamentos específicos do PostgreSQL:
+#   - JSONB nativo (sem mock)
+#   - pgvector (embeddings realistas)
+#   - UNIQUE constraints e transações concorrentes
+TEST_DATABASE_URL = _os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+_is_sqlite = TEST_DATABASE_URL.startswith("sqlite")
+
+# JSONB → JSON apenas no SQLite. PostgreSQL suporta JSONB nativamente.
+if _is_sqlite:
+    from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+    if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
+        SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
 
 # Dependências reais/modelos
 from shared.database.session import get_db
@@ -169,24 +184,21 @@ from shared.security.jwt import criar_token
 
 fake = Faker("pt_BR")
 
-# Engine in-memory para SQLite Async
-# Como o Postgres exigiria um banco de dados real rodando e limpar as tabelas,
-# o SQLite:memory: é o padrao de ouro pra rodar pytest super rapido,
-# porém precisamos do driver aiosqlite (que vamos instalar agora).
-# Aqui vamos usar o esquema do sqlite
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-from sqlalchemy.pool import StaticPool
-
 
 @pytest.fixture(scope="session")
 def engine():
-    _engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
+    if _is_sqlite:
+        from sqlalchemy.pool import StaticPool
+        _engine = create_async_engine(
+            TEST_DATABASE_URL,
+            echo=False,
+            poolclass=StaticPool,
+            connect_args={"check_same_thread": False},
+        )
+    else:
+        # PostgreSQL: NullPool evita conflito de event loop no pytest-asyncio
+        from sqlalchemy.pool import NullPool
+        _engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
     yield _engine
     _engine.sync_engine.dispose()
 
@@ -194,6 +206,10 @@ def engine():
 @pytest.fixture(scope="function")
 async def init_db(engine):
     async with engine.begin() as conn:
+        if not _is_sqlite:
+            # Ativa pgvector para testes com PostgreSQL real
+            from sqlalchemy import text
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
     yield
     async with engine.begin() as conn:

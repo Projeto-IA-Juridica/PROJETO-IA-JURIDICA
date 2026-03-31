@@ -45,6 +45,8 @@ jobs:
 
     outputs:
       pre_status: ${{ steps.capture.outputs.status }}
+      # ID do último deployment bem-sucedido — usado pelo rollback-on-failure
+      stable_deployment_id: ${{ steps.get-stable-deployment.outputs.id }}
 
     steps:
       - name: Capturar estado atual de produção
@@ -63,6 +65,39 @@ jobs:
             .checks // {} | to_entries[] |
             "  \(.key): \(.value.status)"
           ' 2>/dev/null || true
+
+      - name: Capturar ID do deployment estável (pré-deploy)
+        id: get-stable-deployment
+        # Falha silenciosa: se RAILWAY_TOKEN/SERVICE_ID não estiverem configurados,
+        # rollback automático é desabilitado mas o pipeline continua normalmente.
+        continue-on-error: true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_SERVICE_ID" ]; then
+            echo "id=" >> $GITHUB_OUTPUT
+            echo "RAILWAY_TOKEN ou RAILWAY_SERVICE_ID nao configurados — rollback automatico desabilitado."
+            exit 0
+          fi
+
+          # Busca os últimos deployments via Railway GraphQL API e retorna o ID do mais recente com status SUCCESS
+          RESP=$(curl -sf -X POST "https://backboard.railway.app/graphql/v2" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "{\"query\":\"{ deployments(input: {serviceId: \\\"$RAILWAY_SERVICE_ID\\\", first: 20}) { edges { node { id status } } } }\"}" \
+            2>/dev/null || echo '{}')
+
+          DEPLOYMENT_ID=$(echo "$RESP" | jq -r \
+            '[.data.deployments.edges[]? | select(.node.status == "SUCCESS")] | first | .node.id // ""' \
+            2>/dev/null || echo "")
+
+          echo "id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+          if [ -n "$DEPLOYMENT_ID" ]; then
+            echo "Deployment estavel capturado para rollback: $DEPLOYMENT_ID"
+          else
+            echo "Nenhum deployment SUCCESS encontrado — rollback automatico nao sera possivel."
+          fi
 
   # ----------------------------------------------------------------------------
   # Job 2: Aguardar Railway concluir o deploy e a API responder.
@@ -182,12 +217,61 @@ jobs:
             "${{ secrets.RAILWAY_APP_URL }}/metrics"
 
   # ----------------------------------------------------------------------------
-  # Job 4: Resumo final — mostra saúde pré e pós-deploy lado a lado
+  # Job 4: Rollback automático — acionado quando smoke-test falha.
+  #
+  # Pré-requisitos (GitHub → Settings → Secrets → Actions):
+  #   RAILWAY_TOKEN      → API token do Railway (railway.app → Account Settings → Tokens)
+  #   RAILWAY_SERVICE_ID → ID do serviço (railway.app → projeto → serviço → Settings → Service ID)
+  #
+  # Sem esses secrets: rollback é desabilitado silenciosamente (o deploy falha
+  # mas nada é revertido — exige intervenção manual no dashboard do Railway).
+  # ----------------------------------------------------------------------------
+  rollback-on-failure:
+    name: Rollback Automático
+    runs-on: ubuntu-latest
+    needs: [pre-deploy-health, smoke-test]
+    if: always() && needs.smoke-test.result == 'failure'
+
+    steps:
+      - name: Reverter para deployment estável via Railway API
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          STABLE_ID: ${{ needs.pre-deploy-health.outputs.stable_deployment_id }}
+        run: |
+          if [ -z "$STABLE_ID" ]; then
+            echo "::warning::Nenhum deployment estável capturado — rollback automatico impossivel."
+            echo "Acao necessaria: reverta manualmente em https://railway.app"
+            exit 1
+          fi
+
+          echo "Smoke test falhou. Revertendo para deployment: $STABLE_ID"
+
+          # Reinicia o deployment estável anterior via Railway GraphQL API.
+          # deploymentRestart aciona um redeploy da mesma imagem/configuração,
+          # efetivamente revertendo o ambiente para o estado pré-deploy.
+          RESULT=$(curl -sf -X POST "https://backboard.railway.app/graphql/v2" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "{\"query\":\"mutation { deploymentRestart(id: \\\"$STABLE_ID\\\") }\"}" \
+            2>/dev/null || echo '{"errors":[{"message":"curl falhou"}]}')
+
+          ERRORS=$(echo "$RESULT" | jq -r '.errors // [] | length')
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::Rollback via API falhou:"
+            echo "$RESULT" | jq -r '.errors[].message'
+            echo "Reverta manualmente em https://railway.app"
+            exit 1
+          fi
+
+          echo "Rollback iniciado com sucesso. Aguarde o Railway completar o redeploy."
+
+  # ----------------------------------------------------------------------------
+  # Job 5: Resumo final — mostra saúde pré e pós-deploy lado a lado
   # ----------------------------------------------------------------------------
   notify:
     name: Resumo do Deploy
     runs-on: ubuntu-latest
-    needs: [pre-deploy-health, wait-for-deploy, smoke-test]
+    needs: [pre-deploy-health, wait-for-deploy, smoke-test, rollback-on-failure]
     if: always()
 
     steps:
@@ -206,6 +290,7 @@ jobs:
           echo "| Health Pré-Deploy | ${{ needs.pre-deploy-health.outputs.pre_status }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Aguardar Railway | ${{ needs.wait-for-deploy.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rollback Automático | ${{ needs.rollback-on-failure.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**URL:** ${{ secrets.RAILWAY_APP_URL }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.event.workflow_run.head_sha || github.sha }}\`" >> $GITHUB_STEP_SUMMARY

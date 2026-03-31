@@ -10,3 +10,8 @@ streamlit==1.54.0
 
 # Load Testing
 locust==2.32.7
+
+# Mutation Testing
+# Executa via: make mutation (ou mutmut run + mutmut results)
+# Detecta testes que passam mesmo quando lógica é alterada (operadores, constantes, etc.)
+mutmut==2.4.4
