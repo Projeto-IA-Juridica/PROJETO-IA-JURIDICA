@@ -419,20 +419,43 @@ async def connect_whatsapp(
                     headers={"apikey": settings.EVOLUTION_API_KEY},
                 )
                 if resp_connect.status_code not in (200, 201):
+                    detail = f"Instância já existe mas falhou ao reconectar (HTTP {resp_connect.status_code})."
+                    try:
+                        raw = resp_connect.text
+                        if raw:
+                            detail = f"{detail} Resposta: {raw[:400]}"
+                    except Exception:
+                        pass
                     raise HTTPException(
                         status_code=502,
-                        detail=f"Instância já existe mas falhou ao reconectar (HTTP {resp_connect.status_code}).",
+                        detail=detail,
                     )
                 data = resp_connect.json()
             else:
+                detail = f"Evolution API retornou erro inesperado (HTTP {resp.status_code})."
+                try:
+                    raw = resp.text
+                    if raw:
+                        detail = f"{detail} Resposta: {raw[:400]}"
+                except Exception:
+                    pass
                 raise HTTPException(
                     status_code=502,
-                    detail=f"Evolution API retornou erro inesperado (HTTP {resp.status_code}).",
+                    detail=detail,
                 )
 
+    except HTTPException:
+        # Preserva detalhes de erro já preparados acima.
+        raise
     except httpx.TimeoutException as exc:
         raise HTTPException(
             status_code=504, detail="Evolution API não respondeu a tempo."
+        ) from exc
+    except httpx.HTTPError as exc:
+        logger.error("evolution_connect_http_error", erro=str(exc))
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha de comunicação com Evolution API: {str(exc)[:300]}",
         ) from exc
     except Exception as exc:
         logger.error("evolution_connect_error", erro=str(exc))

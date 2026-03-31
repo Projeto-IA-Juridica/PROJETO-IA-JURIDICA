@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [saved, setSaved] = useState('')
   const [importResult, setImportResult] = useState<string>('')
+  const [whatsappFeedback, setWhatsappFeedback] = useState<string>('')
+  const [whatsappError, setWhatsappError] = useState<string>('')
 
   useEffect(() => {
     const esc = status?.escritorio
@@ -82,8 +84,15 @@ export default function SettingsPage() {
   const { mutate: connectWhatsapp, isPending: connectingWhatsapp } = useMutation({
     mutationFn: onboardingApi.connectWhatsapp,
     onSuccess: () => {
+      setWhatsappError('')
+      setWhatsappFeedback('Solicitação enviada. Se necessário, aguarde alguns segundos e acompanhe o status abaixo.')
       qc.invalidateQueries({ queryKey: ['onboarding-status'] })
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setWhatsappFeedback('')
+      setWhatsappError(detail ?? 'Falha ao conectar WhatsApp. Verifique Evolution API URL/API key no backend.')
     },
   })
 
@@ -258,6 +267,9 @@ export default function SettingsPage() {
                 {goingLive ? <Spinner size={12} /> : null} Executar go-live
               </button>
             </div>
+
+            {whatsappError && <ErrorBox message={whatsappError} />}
+            {whatsappFeedback && <div style={{ fontSize: 12, color: 'var(--success)' }}>{whatsappFeedback}</div>}
 
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               WhatsApp: {whatsappStatus?.connected ? 'conectado' : `desconectado (${whatsappStatus?.state ?? 'indefinido'})`}
