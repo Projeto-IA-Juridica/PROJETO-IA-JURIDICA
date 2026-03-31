@@ -121,4 +121,24 @@ line-length = 100
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
-ignore_missing_imports = true
+ignore_missing_imports = true  # libs externas sem stubs (LangChain, pgvector, etc.)
+
+# Módulos internos: checagem estrita mesmo com ignore_missing_imports global.
+# Any implícito proveniente de libs externas não "contamina" o código interno.
+[[tool.mypy.overrides]]
+module = [
+    "feature_1_ia_personalizada.services.*",
+    "feature_1_ia_personalizada.workers.*",
+    "feature_1_ia_personalizada.api.*",
+    "shared.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+
+[tool.mutmut]
+paths_to_mutate = "feature_1_ia_personalizada/services/,shared/"
+tests_dir = "feature_1_ia_personalizada/tests/,shared/tests/"
+# -x para no primeiro teste falho (rápido); --no-cov para não medir cobertura durante mutação
+runner = "python -m pytest feature_1_ia_personalizada/tests/ shared/tests/ -x -q --no-header --no-cov"
