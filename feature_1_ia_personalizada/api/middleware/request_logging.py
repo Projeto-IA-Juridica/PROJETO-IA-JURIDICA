@@ -25,6 +25,8 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
+from shared.telemetry import get_trace_id
+
 logger = structlog.get_logger(__name__)
 
 
@@ -40,6 +42,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             http_method=request.method,
             http_path=request.url.path,
         )
+
+        # 3. Injeta trace_id do span OTel ativo (gerado pelo FastAPIInstrumentor).
+        #    Correlaciona logs estruturados com spans no Grafana Tempo / Jaeger.
+        #    Se OTel não estiver ativo, get_trace_id() retorna None e nada é adicionado.
+        trace_id = get_trace_id()
+        if trace_id:
+            bind_contextvars(trace_id=trace_id)
 
         client_ip = request.client.host if request.client else "unknown"
         inicio = time.perf_counter()
