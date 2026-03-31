@@ -104,30 +104,35 @@ async def _update_state(processo_id: int, novo_andamento: str) -> dict[str, Any]
     fase = _classificar_fase(novo_andamento)
 
     async with async_session_factory() as session:
-        # Lê estado atual para manter histórico de andamentos
-        result = await session.execute(
-            select(ProcessoModel.estado_atual).where(ProcessoModel.id == processo_id)
-        )
-        row = result.scalar_one_or_none()
-        estado = row if isinstance(row, dict) else _estado_inicial()
+        async with session.begin():
+            # SELECT FOR UPDATE garante que dois workers Celery não atualizem
+            # o mesmo processo simultaneamente. O segundo worker bloqueia até
+            # o primeiro commitar, evitando perda de andamentos por race condition.
+            result = await session.execute(
+                select(ProcessoModel.estado_atual)
+                .where(ProcessoModel.id == processo_id)
+                .with_for_update()
+            )
+            row = result.scalar_one_or_none()
+            estado = row if isinstance(row, dict) else _estado_inicial()
 
-        # Mantém os últimos 5 andamentos
-        ultimos: list[str] = estado.get("ultimos_andamentos", [])
-        ultimos.append(novo_andamento)
-        ultimos = ultimos[-5:]
+            # Mantém os últimos 5 andamentos
+            ultimos: list[str] = estado.get("ultimos_andamentos", [])
+            ultimos.append(novo_andamento)
+            ultimos = ultimos[-5:]
 
-        novo_estado: dict[str, Any] = {
-            "fase": fase,
-            "ultimos_andamentos": ultimos,
-            "proximo_passo_esperado": _PROXIMO_PASSO.get(fase, ""),
-        }
+            novo_estado: dict[str, Any] = {
+                "fase": fase,
+                "ultimos_andamentos": ultimos,
+                "proximo_passo_esperado": _PROXIMO_PASSO.get(fase, ""),
+            }
 
-        await session.execute(
-            update(ProcessoModel)
-            .where(ProcessoModel.id == processo_id)
-            .values(estado_atual=novo_estado, fase_processual=fase)
-        )
-        await session.commit()
+            await session.execute(
+                update(ProcessoModel)
+                .where(ProcessoModel.id == processo_id)
+                .values(estado_atual=novo_estado, fase_processual=fase)
+            )
+        # session.begin() commita automaticamente ao sair do bloco
 
     logger.info(
         "processo_state_atualizado",

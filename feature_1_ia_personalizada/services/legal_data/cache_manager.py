@@ -15,6 +15,7 @@ Dois contextos de uso:
 """
 
 import json
+import random
 from datetime import timedelta
 from typing import Any
 
@@ -38,6 +39,17 @@ _sync_redis: _redis_sync_mod.Redis = _redis_sync_mod.from_url(
     socket_connect_timeout=2,
     socket_timeout=2,
 )
+
+
+def _com_jitter(ttl: int, jitter_max: int = 60) -> int:
+    """Adiciona jitter aleatório ao TTL para evitar thundering herd.
+
+    Quando múltiplos workers fazem cache de muitos processos ao mesmo tempo
+    (ex: sync em lote), todos os keys expirariam simultaneamente sem jitter,
+    causando rajada de chamadas ao Jusbrasil/DataJud. O jitter dispersa as
+    expirações ao longo de um intervalo, distribuindo a carga.
+    """
+    return ttl + random.randint(0, jitter_max)
 
 
 class LegalDataCacheManager:
@@ -83,7 +95,7 @@ class LegalDataCacheManager:
         """Salva a Capa no Redis pelo TTL designado."""
         try:
             payload = json.dumps(capa_data, ensure_ascii=False)
-            await self._redis.setex(self._key_capa(cnj), self.TTL_CAPA_PROCESSO, payload)
+            await self._redis.setex(self._key_capa(cnj), _com_jitter(self.TTL_CAPA_PROCESSO), payload)
             logger.debug("cache_capa_salva", cnj=cnj)
         except Exception as e:
             logger.error("cache_write_error", error=str(e), key=self._key_capa(cnj))
@@ -106,7 +118,7 @@ class LegalDataCacheManager:
         """Salva os andamentos judiciais no Redis."""
         try:
             payload = json.dumps(andamentos_list, ensure_ascii=False)
-            await self._redis.setex(self._key_andamentos(cnj), self.TTL_ANDAMENTOS, payload)
+            await self._redis.setex(self._key_andamentos(cnj), _com_jitter(self.TTL_ANDAMENTOS), payload)
             logger.debug("cache_andamentos_salvo", cnj=cnj, qtd=len(andamentos_list))
         except Exception as e:
             logger.error("cache_write_error", error=str(e), key=self._key_andamentos(cnj))
@@ -158,7 +170,7 @@ def set_andamentos_sync(cnj: str, andamentos: list[dict[str, Any]]) -> None:
     try:
         _sync_redis.setex(
             LegalDataCacheManager._key_andamentos(cnj),
-            LegalDataCacheManager.TTL_ANDAMENTOS,
+            _com_jitter(LegalDataCacheManager.TTL_ANDAMENTOS),
             json.dumps(andamentos, ensure_ascii=False),
         )
         logger.debug("cache_andamentos_salvo_sync", cnj=cnj, qtd=len(andamentos))
@@ -192,7 +204,7 @@ def set_capa_sync(cnj: str, capa: dict[str, Any]) -> None:
     try:
         _sync_redis.setex(
             LegalDataCacheManager._key_capa(cnj),
-            LegalDataCacheManager.TTL_CAPA_PROCESSO,
+            _com_jitter(LegalDataCacheManager.TTL_CAPA_PROCESSO),
             json.dumps(capa, ensure_ascii=False),
         )
         logger.debug("cache_capa_salva_sync", cnj=cnj)
