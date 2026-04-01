@@ -8,6 +8,7 @@ from celery import Celery, Task
 from celery.schedules import crontab
 from celery.signals import worker_process_init
 from kombu import Queue
+from redbeat import RedBeatScheduler  # noqa: F401 — importação necessária para registro do scheduler
 
 _dlq_logger = structlog.get_logger("workers.dlq")
 
@@ -39,6 +40,17 @@ celery_app.conf.update(
     task_time_limit=60 * 20,
     task_soft_time_limit=60 * 18,
     broker_connection_retry_on_startup=True,
+    # RedBeat — scheduler dinâmico armazenado no Redis.
+    # Permite ajustar crons via CLI ou endpoint sem redeploy:
+    #   redbeat -A workers.celery_app beat -l info
+    # Para inspecionar/editar schedules:
+    #   from redbeat import RedBeatSchedulerEntry
+    #   RedBeatSchedulerEntry.from_key('redbeat:nome-da-task', app=celery_app)
+    beat_scheduler="redbeat.RedBeatScheduler",
+    redbeat_redis_url=BROKER_URL,
+    # Intervalo máximo de loop do beat (segundos). Padrão RedBeat é 5 min;
+    # reduzimos para 30s para que alterações de schedule se propaguem rapidamente.
+    beat_max_loop_interval=30,
     # DLQ — garantia de entrega
     # task_acks_late=True: a mensagem só é removida da fila APÓS a task concluir
     # (sucesso ou falha definitiva). Se o worker cair durante a execução, a task
