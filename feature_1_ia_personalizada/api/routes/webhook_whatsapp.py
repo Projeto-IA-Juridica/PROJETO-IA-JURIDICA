@@ -6,8 +6,14 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from prometheus_client import Counter, Histogram
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from feature_1_ia_personalizada.api.schemas.webhook import (
+    WebhookEvolutionPayload,
+    WebhookMessageContent,
+)
 
 from feature_1_ia_personalizada.workers.crm_worker import disparar_analise_com_debounce
 from feature_1_ia_personalizada.workers.send_notifications import (
@@ -55,11 +61,19 @@ async def receive_message(
     try:
         body = await request.json()
     except Exception:
-        # Pydantic/FastAPI request parsing fallbacks
         raise HTTPException(status_code=400, detail="Payload inválido ou não é JSON") from None
 
-    event = body.get("event")
-    instance_name = body.get("instance")
+    # Valida os campos raiz com Pydantic. extra='ignore' garante que novos campos
+    # da Evolution não quebram o parse; type mismatch em campos conhecidos levanta
+    # ValidationError de forma explícita (falha ruidosa > comportamento silencioso errado).
+    try:
+        payload = WebhookEvolutionPayload.model_validate(body)
+    except ValidationError as exc:
+        logger.warning("webhook_payload_invalido", erros=exc.error_count())
+        raise HTTPException(status_code=422, detail="Payload Evolution inválido") from exc
+
+    event = payload.event
+    instance_name = payload.instance
 
     # ----------------------------------------------------------------
     # connection.update — WhatsApp conectou → envia boas-vindas em lote
@@ -127,29 +141,29 @@ async def receive_message(
             if already_seen:
                 logger.debug("webhook_mensagem_duplicada_ignorada", msg_id=msg_id)
                 return {"status": "duplicate"}
+        else:
+            # Redis indisponível: idempotência desativada — duplicatas da Evolution
+            # serão processadas. Verifique /health/detailed para status do Redis.
+            logger.warning(
+                "webhook_idempotencia_desabilitada",
+                msg_id=msg_id,
+                reason="redis_unavailable",
+            )
 
-    # Extrair conteúdo da mensagem
-    msg_content: dict[str, Any] = (
-        msg_obj.get("message", msg_obj) if isinstance(msg_obj.get("message", msg_obj), dict) else {}
+    # Extrai e valida o conteúdo da mensagem via schema Pydantic.
+    # extract_text() encapsula a lógica de extração de texto por tipo de mídia.
+    _raw_msg_content = msg_obj.get("message", msg_obj)
+    _raw_msg_content_dict: dict[str, Any] = (
+        _raw_msg_content if isinstance(_raw_msg_content, dict) else {}
     )
+    msg_content_parsed = WebhookMessageContent.model_validate(_raw_msg_content_dict)
+    # mantido como dict para compatibilidade com o .delay() que serializa para Celery
+    msg_content: dict[str, Any] = _raw_msg_content_dict
 
-    # Pega texto simples ou caption de mídia
-    texto = ""
-    if "conversation" in msg_content:
-        texto = str(msg_content["conversation"])
-    elif "extendedTextMessage" in msg_content:
-        ext_text = msg_content["extendedTextMessage"]
-        if isinstance(ext_text, dict):
-            texto = str(ext_text.get("text", ""))
-    elif "audioMessage" in msg_content:
-        # Áudio: a transcrição (Whisper) é feita no worker de forma assíncrona.
-        # O message_id extraído do key é passado ao Celery para que o worker
-        # baixe o OGG via Evolution API e transcreva antes de chamar o orchestrador.
-        texto = "__AUDIO__"
-    elif "imageMessage" in msg_content:
-        img_msg = msg_content["imageMessage"]
-        if isinstance(img_msg, dict):
-            texto = str(img_msg.get("caption", "[IMAGEM]"))
+    # Áudio: a transcrição (Whisper) é feita no worker de forma assíncrona.
+    # O message_id extraído do key é passado ao Celery para que o worker
+    # baixe o OGG via Evolution API e transcreva antes de chamar o orchestrador.
+    texto = msg_content_parsed.extract_text()
 
     if not texto.strip():
         # Ignora mensagens vazias ou de sistema sem texto aparente

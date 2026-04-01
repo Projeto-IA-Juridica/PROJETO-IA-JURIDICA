@@ -19,9 +19,20 @@ import re
 from typing import Any
 
 import httpx
+import pybreaker
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+# Circuit breaker para a API DataJud (CNJ).
+# Após 5 falhas consecutivas, o circuito abre e calls subsequentes retornam
+# fallback imediatamente (sem aguardar timeout de rede) por 120 segundos.
+# Evita que um DataJud instável paralise todos os workers de monitoramento.
+_datajud_cb = pybreaker.CircuitBreaker(
+    fail_max=5,           # abre após 5 falhas consecutivas
+    reset_timeout=120,    # tenta novamente após 2 minutos (half-open)
+    name="datajud",
+)
 
 _BASE_URL = "https://api-publica.datajud.cnj.jus.br"
 
@@ -199,10 +210,22 @@ class DataJudClient:
 
         Filtra movimentos anteriores a `data_referencia_iso` quando fornecida.
         Chamado pelo worker Celery (contexto síncrono — sem event loop ativo).
+
+        Retorna lista vazia (fallback) quando o circuit breaker está aberto,
+        evitando que um DataJud instável paralise os workers de monitoramento.
         """
         import asyncio
 
-        data = asyncio.run(self.consultar_processo(numero_cnj))
+        try:
+            data = _datajud_cb.call(asyncio.run, self.consultar_processo(numero_cnj))
+        except pybreaker.CircuitBreakerError:
+            logger.warning(
+                "datajud_circuit_aberto",
+                cnj=numero_cnj,
+                msg="DataJud indisponível — retornando lista vazia como fallback",
+            )
+            return []
+
         hits = data.get("hits", {}).get("hits", [])
 
         if not hits:

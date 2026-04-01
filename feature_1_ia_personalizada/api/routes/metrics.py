@@ -58,13 +58,18 @@ escalacoes_pendentes_gauge = Gauge(
 # Métricas de negócio — custo, tokens e latência da IA (por interação)
 # ---------------------------------------------------------------------------
 
+# Histograms NÃO têm escritorio_id: cada bucket cria N séries temporais,
+# e (N_escritorios × N_intencoes × N_buckets) ultrapassa rapidamente o limite seguro
+# do Prometheus (~100K séries). Use os Gauges por escritório abaixo para granularidade.
 ia_custo_por_interacao_usd = Histogram(
     "ia_custo_por_interacao_usd",
     "Custo USD por interação processada pelo orchestrador (baseado em tokens Claude)",
-    labelnames=["escritorio_id", "intencao"],
+    labelnames=["intencao"],
     buckets=(0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0),
 )
 
+# Counters com escritorio_id: cardinality = N_escritorios × N_intencoes.
+# Aceitável enquanto N_escritorios < 500 (cada combo = 1 série, sem multiplicador de bucket).
 ia_tokens_input_total = Counter(
     "ia_tokens_input_total",
     "Total de tokens de entrada consumidos pela IA",
@@ -80,7 +85,7 @@ ia_tokens_output_total = Counter(
 ia_latencia_ms = Histogram(
     "ia_latencia_ms",
     "Latência ponta-a-ponta do orchestrador em milissegundos (recebimento → envio WhatsApp)",
-    labelnames=["escritorio_id", "intencao"],
+    labelnames=["intencao"],
     buckets=(500, 1000, 2000, 3000, 5000, 8000, 12000, 20000, 30000),
 )
 

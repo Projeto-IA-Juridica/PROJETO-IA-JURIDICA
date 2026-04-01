@@ -409,9 +409,8 @@ class ConversationOrchestrator:
                 ia_tokens_input_total,
                 ia_tokens_output_total,
             )
-            ia_latencia_ms.labels(
-                escritorio_id=_label_esc, intencao=_intencao_final
-            ).observe(_elapsed_ms)
+            # Histograms sem escritorio_id (evita alta cardinality de séries temporais)
+            ia_latencia_ms.labels(intencao=_intencao_final).observe(_elapsed_ms)
             _tok_in = int(_tokens_finais.get("input", 0))
             _tok_out = int(_tokens_finais.get("output", 0))
             if _tok_in:
@@ -424,9 +423,7 @@ class ConversationOrchestrator:
                 ).inc(_tok_out)
             _custo = float(_tokens_finais.get("custo_str", "0") or "0")
             if _custo > 0:
-                ia_custo_por_interacao_usd.labels(
-                    escritorio_id=_label_esc, intencao=_intencao_final
-                ).observe(_custo)
+                ia_custo_por_interacao_usd.labels(intencao=_intencao_final).observe(_custo)
         except Exception:
             pass  # métricas nunca bloqueiam o fluxo principal
 
