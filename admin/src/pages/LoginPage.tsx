@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Spinner, ErrorBox } from '../components/ui'
+import { Scale } from 'lucide-react'
 
 type Tab = 'login' | 'register'
 
@@ -40,13 +41,9 @@ function toErrorMessage(err: unknown, fallback: string): string {
     return field ? `${field}: ${msg}` : msg
   }
 
-  if (typeof detail === 'string' && detail.trim()) {
-    return detail
-  }
+  if (typeof detail === 'string' && detail.trim()) return detail
 
-  if (axiosErr?.response?.status) {
-    return `Erro ${axiosErr.response.status}: Falha na comunicação com o servidor`
-  }
+  if (axiosErr?.response?.status) return `Erro ${axiosErr.response.status}: Falha na comunicação`
 
   return axiosErr?.message ?? fallback
 }
@@ -58,11 +55,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Login form
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
 
-  // Register form
   const [reg, setReg] = useState({
     nome_escritorio: '', cnpj: '', email_admin: '', senha: '',
     nome_responsavel: '', oab_responsavel: '',
@@ -85,14 +80,10 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await register({
-        ...reg,
-        email_admin: reg.email_admin.trim(),
-      })
+      await register({ ...reg, email_admin: reg.email_admin.trim() })
       navigate('/settings')
     } catch (err: unknown) {
-      console.error('Erro no cadastro:', err)
-      setError(toErrorMessage(err, 'Falha no cadastro - verifique sua conexão'))
+      setError(toErrorMessage(err, 'Falha no cadastro'))
     } finally { setLoading(false) }
   }
 
@@ -101,24 +92,26 @@ export default function LoginPage() {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--surface-base)',
     }}>
-      <div style={{ width: '100%', maxWidth: 420, padding: 24 }}>
+      <div style={{ width: '100%', maxWidth: 380, padding: 20 }}>
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>⚖️</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Hub Jurídico</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Painel Interno de Administração</div>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 12, background: 'var(--accent-glow)', marginBottom: 12 }}>
+            <Scale size={24} style={{ color: 'var(--accent)' }} />
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Hub Jurídico</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Painel de Administração</div>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-border)', marginBottom: 24 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-border)', marginBottom: 20 }}>
           <button className={`tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</button>
           <button className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
         </div>
 
-        {error && <div style={{ marginBottom: 16 }}><ErrorBox message={error} /></div>}
+        {error && <div style={{ marginBottom: 14 }}><ErrorBox message={error} /></div>}
 
         {tab === 'login' ? (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
               <label className="label">E-mail</label>
               <input className="input" type="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@escritorio.com" />
@@ -127,40 +120,40 @@ export default function LoginPage() {
               <label className="label">Senha</label>
               <input className="input" type="password" required value={senha} onChange={e => setSenha(e.target.value)} placeholder="••••••••" />
             </div>
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 4 }}>
+            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 2, justifyContent: 'center' }}>
               {loading ? <Spinner size={14} /> : null} Entrar
             </button>
           </form>
         ) : (
-          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
-                <label className="label">Nome do Escritório *</label>
+                <label className="label">Escritório</label>
                 <input className="input" required value={reg.nome_escritorio} onChange={e => setReg(r => ({ ...r, nome_escritorio: e.target.value }))} placeholder="Souza Advogados" />
               </div>
               <div>
-                <label className="label">CNPJ *</label>
-                <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" title="Use um CNPJ válido (ex: 11.444.777/0001-61)" />
+                <label className="label">CNPJ</label>
+                <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" />
               </div>
               <div>
-                <label className="label">Nome do Responsável *</label>
+                <label className="label">Responsável</label>
                 <input className="input" required value={reg.nome_responsavel} onChange={e => setReg(r => ({ ...r, nome_responsavel: e.target.value }))} placeholder="Dr. João Silva" />
               </div>
               <div>
-                <label className="label">OAB *</label>
+                <label className="label">OAB</label>
                 <input className="input" required value={reg.oab_responsavel} onChange={e => setReg(r => ({ ...r, oab_responsavel: e.target.value }))} placeholder="SP123456" />
               </div>
               <div style={{ gridColumn: '1/-1' }}>
-                <label className="label">E-mail Admin *</label>
+                <label className="label">E-mail</label>
                 <input className="input" type="email" required value={reg.email_admin} onChange={e => setReg(r => ({ ...r, email_admin: e.target.value }))} placeholder="admin@escritorio.com" />
               </div>
               <div style={{ gridColumn: '1/-1' }}>
-                <label className="label">Senha * (mín. 8 caracteres)</label>
+                <label className="label">Senha (mín. 8)</label>
                 <input className="input" type="password" required minLength={8} value={reg.senha} onChange={e => setReg(r => ({ ...r, senha: e.target.value }))} placeholder="••••••••" />
               </div>
             </div>
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 4 }}>
-              {loading ? <Spinner size={14} /> : null} Criar conta e Onboarding
+            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 2, justifyContent: 'center' }}>
+              {loading ? <Spinner size={14} /> : null} Criar conta
             </button>
           </form>
         )}

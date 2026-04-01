@@ -15,7 +15,12 @@ import { Spinner } from './components/ui'
 
 const qc = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 2 * 60_000 },
+    queries: {
+      retry: 0,
+      staleTime: 5 * 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+    },
   },
 })
 
@@ -25,7 +30,7 @@ function ProtectedRoutes() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Spinner size={28} />
+        <Spinner size={24} />
       </div>
     )
   }

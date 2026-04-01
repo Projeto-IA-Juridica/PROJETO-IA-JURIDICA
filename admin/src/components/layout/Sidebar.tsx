@@ -1,23 +1,27 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import {
+  Scale, FolderOpen, Handshake, BookOpen, BarChart3,
+  Compass, Settings, LogOut, Sun, Moon,
+} from 'lucide-react'
 
 const NAV = [
-  { to: '/hub', icon: '⚖️', label: 'Hub do Advogado' },
-  { to: '/processos', icon: '📂', label: 'Processos' },
-  { to: '/crm', icon: '🤝', label: 'CRM' },
-  { to: '/rag', icon: '📚', label: 'Base RAG' },
-  { to: '/analytics', icon: '📊', label: 'Analytics' },
-  { to: '/operations', icon: '🧭', label: 'Operações API' },
-  { to: '/settings', icon: '⚙️', label: 'Configurações' },
+  { to: '/hub', icon: Scale, label: 'Hub' },
+  { to: '/processos', icon: FolderOpen, label: 'Processos' },
+  { to: '/crm', icon: Handshake, label: 'CRM' },
+  { to: '/rag', icon: BookOpen, label: 'Base RAG' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/operations', icon: Compass, label: 'Operações' },
+  { to: '/settings', icon: Settings, label: 'Configurações' },
 ]
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const location = useLocation()
-  
+
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
-  
+
   useEffect(() => {
     document.documentElement.className = theme === 'light' ? 'light-theme' : ''
     localStorage.setItem('theme', theme)
@@ -27,42 +31,38 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      width: 220,
-      minWidth: 220,
+      width: 200,
+      minWidth: 200,
       background: 'var(--surface-raised)',
       borderRight: '1px solid var(--surface-border)',
       display: 'flex',
       flexDirection: 'column',
-      padding: '0',
       height: '100vh',
       position: 'sticky',
       top: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid var(--surface-border)' }}>
+      <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid var(--surface-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>⚖️</span>
+          <Scale size={18} style={{ color: 'var(--accent)' }} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Hub Jurídico</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Painel Interno</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Hub Jurídico</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.03em' }}>PAINEL</div>
           </div>
         </div>
       </div>
 
-      {/* Escritório */}
+      {/* User info */}
       {user && (
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--surface-border-muted)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Escritório</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, wordBreak: 'break-all' }}>
-            {user.nome}
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{user.role}</div>
+        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{user.nome}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{user.role}</div>
         </div>
       )}
 
-      {/* Nav links */}
-      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
-        {NAV.map(({ to, icon, label }) => {
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '6px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {NAV.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname.startsWith(to)
           return (
             <NavLink
@@ -70,7 +70,7 @@ export default function Sidebar() {
               to={to}
               className={`sidebar-link ${isActive ? 'active' : ''}`}
             >
-              <span style={{ fontSize: 15 }}>{icon}</span>
+              <Icon size={16} className="icon" />
               <span>{label}</span>
             </NavLink>
           )
@@ -78,26 +78,26 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div style={{ padding: '12px 8px', borderTop: '1px solid var(--surface-border)' }}>
+      <div style={{ padding: '8px 6px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <button
-          className="sidebar-link btn-ghost"
+          className="sidebar-link"
           onClick={toggleTheme}
-          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none', marginBottom: 4 }}
+          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit' }}
         >
-          <div style={{ fontSize: 16, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <span className={`theme-icon ${theme === 'light' ? 'active' : ''}`}>☀️</span>
-            <span className={`theme-icon ${theme === 'dark' ? 'active' : ''}`}>🌙</span>
+          <div className="theme-toggle">
+            <Sun size={16} className={`icon ${theme === 'light' ? 'active' : ''}`} />
+            <Moon size={16} className={`icon ${theme === 'dark' ? 'active' : ''}`} />
           </div>
-          <span style={{ fontSize: 13, marginLeft: 4 }}>Modo {theme === 'light' ? 'Claro' : 'Escuro'}</span>
+          <span style={{ fontSize: 13 }}>{theme === 'light' ? 'Claro' : 'Escuro'}</span>
         </button>
 
         <button
-          className="sidebar-link btn-ghost"
+          className="sidebar-link"
           onClick={logout}
-          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none' }}
+          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit' }}
         >
-          <div style={{ fontSize: 15, width: 20, display: 'flex', justifyContent: 'center' }}>🚪</div>
-          <span style={{ fontSize: 13, marginLeft: 4 }}>Sair</span>
+          <LogOut size={16} className="icon" />
+          <span style={{ fontSize: 13 }}>Sair</span>
         </button>
       </div>
     </aside>

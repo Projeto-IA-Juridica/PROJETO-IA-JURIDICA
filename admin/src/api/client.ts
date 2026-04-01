@@ -2,7 +2,7 @@ import axios from 'axios'
 
 export const api = axios.create({
   baseURL: '/api',
-  timeout: 30_000,
+  timeout: 12_000,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // Necessário para enviar cookies CSRF
 })

@@ -3,50 +3,45 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientesApi, type Cliente } from '../api'
 import { BadgeCRM, Spinner, EmptyState, ErrorBox, Pagination } from '../components/ui'
+import { Users, Search } from 'lucide-react'
 
 function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => void }) {
   const iniciais = cliente.nome.split(' ').slice(0, 2).map(n => n[0]).join('')
   return (
     <div
       onClick={onClick}
+      className="surface"
       style={{
-        background: 'var(--surface-raised)',
-        border: '1px solid var(--surface-border)',
-        borderRadius: 8,
-        padding: '16px',
+        padding: '14px 16px',
         cursor: 'pointer',
-        transition: 'border-color 0.15s, background 0.15s',
         display: 'flex',
-        gap: 14,
-        alignItems: 'flex-start',
+        gap: 12,
+        alignItems: 'center',
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--surface-border)' }}
     >
-      {/* Avatar */}
       <div style={{
-        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
         background: 'var(--surface-overlay)',
-        border: '1px solid var(--surface-border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)',
+        fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
       }}>
         {iniciais}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--text-primary)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {cliente.nome}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontFamily: 'monospace' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
           {cliente.telefone_whatsapp}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <BadgeCRM nivel={cliente.crm_nivel} />
-          {cliente.crm_score != null && (
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>score {cliente.crm_score}/100</span>
-          )}
-        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <BadgeCRM nivel={cliente.crm_nivel} />
+        {cliente.crm_score != null && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cliente.crm_score}</span>
+        )}
       </div>
     </div>
   )
@@ -55,6 +50,7 @@ function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => vo
 export default function HubPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
   const pageSize = 20
 
   const { data, isLoading, error } = useQuery({
@@ -63,15 +59,12 @@ export default function HubPage() {
   })
 
   const clientes = data?.items || []
+  const filtered = search.trim()
+    ? clientes.filter(c => c.nome.toLowerCase().includes(search.toLowerCase()))
+    : clientes
   const totalPages = data ? Math.ceil(data.total / data.per_page) : 1
 
-  if (isLoading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
-      <Spinner size={28} />
-    </div>
-  )
-
-  if (error) return <ErrorBox message="Falha ao carregar clientes. Verifique sua conexão com a API." />
+  if (error) return <ErrorBox message="Falha ao carregar clientes." />
 
   return (
     <>
@@ -79,37 +72,41 @@ export default function HubPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h1 className="page-title">Hub do Advogado</h1>
-            <p className="page-subtitle">{data?.total ?? 0} clientes no total</p>
+            <p className="page-subtitle">{data?.total ?? 0} clientes</p>
           </div>
         </div>
       </div>
 
-      {!clientes.length ? (
+      {/* Search */}
+      <div style={{ position: 'relative', maxWidth: 320, marginBottom: 16 }}>
+        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <input
+          className="input"
+          style={{ paddingLeft: 30 }}
+          placeholder="Buscar cliente..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}><Spinner size={20} /></div>
+      ) : !filtered.length ? (
         <EmptyState
-          icon="👥"
+          icon={<Users size={32} style={{ color: 'var(--text-muted)' }} />}
           title="Nenhum cliente encontrado"
-          desc="Complete o onboarding e importe clientes via CSV para começar."
+          desc="Complete o onboarding e importe clientes via CSV."
           action={<button className="btn btn-primary" onClick={() => navigate('/settings')}>Ir para Configurações</button>}
         />
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-            {clientes.map(c => (
-              <ClienteCard
-                key={c.id}
-                cliente={c}
-                onClick={() => navigate(`/hub/clientes/${c.id}`)}
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filtered.map(c => (
+              <ClienteCard key={c.id} cliente={c} onClick={() => navigate(`/hub/clientes/${c.id}`)} />
             ))}
           </div>
-
           {totalPages > 1 && (
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              totalItems={data?.total}
-            />
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={data?.total} />
           )}
         </>
       )}
