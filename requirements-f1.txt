@@ -26,6 +26,9 @@ aiohttp==3.9.3
 # Resiliência
 pybreaker==1.2.0
 
+# Beat scheduler dinâmico (sem redeploy para ajustar crons)
+redbeat==2.2.0
+
 
 # Audio
 pydub==0.25.1             # Conversão ogg→mp3 (requer ffmpeg instalado no SO)

@@ -128,7 +128,51 @@ jobs:
             --tb=short -v --no-cov
 
   # ----------------------------------------------------------------------------
-  # Job 3: Build Docker — valida que a imagem compila sem erros
+  # Job 3: Segurança — bandit (SAST) + safety (dependências vulneráveis)
+  # Roda em paralelo com os outros jobs.
+  # bandit: analisa o código Python em busca de padrões inseguros (SQLi, shell injection, etc.)
+  # safety: cruza requirements com o banco de CVEs do PyPI Safety DB
+  # ----------------------------------------------------------------------------
+  security:
+    name: Segurança (bandit + safety)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar ferramentas de segurança
+        run: pip install bandit[toml]==1.7.8 safety==3.2.0
+
+      # -r: recursivo nos módulos internos; -ll: reporta apenas MEDIUM e HIGH
+      # --skip B101: assert é usado em testes — falso-positivo garantido
+      - name: SAST — Bandit
+        run: |
+          bandit -r feature_1_ia_personalizada shared \
+            -ll --skip B101 \
+            --format json --output bandit-report.json || true
+          bandit -r feature_1_ia_personalizada shared \
+            -ll --skip B101
+
+      # Verifica vulnerabilidades conhecidas nas dependências instaladas
+      - name: Dependências — Safety
+        run: safety check -r requirements-f1.txt --full-report
+
+      - name: Upload relatório Bandit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ----------------------------------------------------------------------------
+  # Job 4: Build Docker — valida que a imagem compila sem erros
   # Roda em paralelo com o job de testes
   # ----------------------------------------------------------------------------
   docker-build:

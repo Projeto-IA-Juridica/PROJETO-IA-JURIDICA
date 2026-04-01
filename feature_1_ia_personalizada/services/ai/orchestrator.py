@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -43,7 +44,7 @@ import time
 
 from prometheus_client import Counter
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typing_extensions import TypedDict
 
@@ -92,6 +93,30 @@ from shared.models.interacao import Interacao
 from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Quota de tokens
+# ---------------------------------------------------------------------------
+
+
+class QuotaExcedidaError(Exception):
+    """Lançado quando o escritório atingiu o limite mensal de tokens Claude."""
+
+    def __init__(self, escritorio_id: int, usados: int, limite: int) -> None:
+        self.escritorio_id = escritorio_id
+        self.usados = usados
+        self.limite = limite
+        super().__init__(
+            f"Escritório {escritorio_id} atingiu quota mensal: {usados}/{limite} tokens"
+        )
+
+
+# Fallback genérico exibido ao CLIENTE quando a quota está esgotada.
+# Não expõe informações de billing — aviso real vai para o escritório via log/alerta.
+_MSG_QUOTA_CLIENTE = (
+    "No momento não consigo processar sua mensagem. "
+    "Por favor, entre em contato diretamente com o escritório."
+)
 
 _TIMEOUT_FLUXO_SEGUNDOS = 120.0   # guard absoluto de último recurso (não deve ser atingido)
 _TIMEOUT_CLAUDE_SEGUNDOS = 25.0   # timeout por chamada ao Claude
@@ -336,6 +361,19 @@ class ConversationOrchestrator:
             }
         """
         t_inicio = time.perf_counter()
+
+        # Verifica quota ANTES de invocar o LangGraph (e portanto antes de chamar Claude)
+        try:
+            await self._verificar_quota_tokens(escritorio_id)
+        except QuotaExcedidaError:
+            return {
+                "resposta": _MSG_QUOTA_CLIENTE,
+                "intencao": "outro",
+                "usando_fallback": True,
+                "tokens_usados": {},
+                "processo_id": None,
+            }
+
         historico = await self._memory.buscar_historico(escritorio_id, cliente_id)
 
         initial_state: ConversationState = {
@@ -427,6 +465,14 @@ class ConversationOrchestrator:
         except Exception:
             pass  # métricas nunca bloqueiam o fluxo principal
 
+        # Registra consumo de tokens para controle de quota (fire-and-forget)
+        _tok_in_final = int(_tokens_finais.get("input", 0))
+        _tok_out_final = int(_tokens_finais.get("output", 0))
+        if _tok_in_final + _tok_out_final > 0:
+            asyncio.create_task(
+                self._atualizar_uso_tokens(escritorio_id, _tok_in_final + _tok_out_final)
+            )
+
         return {
             "resposta": resposta_final,
             "intencao": final_state.get("intencao", "outro"),
@@ -503,6 +549,78 @@ class ConversationOrchestrator:
         escritorio = await session.get(Escritorio, escritorio_id)
         cliente = await session.get(Cliente, cliente_id)
         return escritorio, cliente
+
+    async def _verificar_quota_tokens(self, escritorio_id: int) -> None:
+        """
+        Verifica se o escritório ainda tem quota mensal disponível.
+
+        - Se tokens_reset_em é de um mês anterior, reseta o contador.
+        - Se quota_tokens_mes é None (enterprise), sempre passa.
+        - Lança QuotaExcedidaError se o limite foi atingido.
+          O aviso ao escritório fica no log estruturado; o cliente vê apenas
+          a mensagem genérica _MSG_QUOTA_CLIENTE.
+        """
+        now = datetime.now(tz=timezone.utc)
+        async with self._session_factory() as session:
+            escritorio = await session.get(Escritorio, escritorio_id)
+            if escritorio is None:
+                return  # escritório não encontrado — deixa o fluxo principal lidar
+
+            # Sem limite configurado (enterprise ou plano não mapeado)
+            if escritorio.quota_tokens_mes is None:
+                return
+
+            # Reset mensal: se o último reset foi em mês/ano diferente do atual
+            reset_em = escritorio.tokens_reset_em
+            precisa_reset = reset_em is None or (
+                reset_em.year != now.year or reset_em.month != now.month
+            )
+            if precisa_reset:
+                await session.execute(
+                    update(Escritorio)
+                    .where(Escritorio.id == escritorio_id)
+                    .values(tokens_usados_mes=0, tokens_reset_em=now)
+                )
+                await session.commit()
+                return  # acabou de resetar — quota disponível
+
+            # Verifica se já atingiu o limite
+            if escritorio.tokens_usados_mes >= escritorio.quota_tokens_mes:
+                logger.warning(
+                    "quota_tokens_excedida",
+                    escritorio_id=escritorio_id,
+                    tokens_usados=escritorio.tokens_usados_mes,
+                    quota_tokens_mes=escritorio.quota_tokens_mes,
+                    plano=escritorio.plano,
+                )
+                raise QuotaExcedidaError(
+                    escritorio_id=escritorio_id,
+                    usados=escritorio.tokens_usados_mes,
+                    limite=escritorio.quota_tokens_mes,
+                )
+
+    async def _atualizar_uso_tokens(self, escritorio_id: int, tokens_total: int) -> None:
+        """
+        Incrementa tokens_usados_mes de forma atômica (UPDATE ... SET x = x + delta).
+        Falhas são silenciosas — não devem bloquear a resposta ao cliente.
+        """
+        if tokens_total <= 0:
+            return
+        try:
+            async with self._session_factory() as session:
+                await session.execute(
+                    update(Escritorio)
+                    .where(Escritorio.id == escritorio_id)
+                    .values(tokens_usados_mes=Escritorio.tokens_usados_mes + tokens_total)
+                )
+                await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "quota_update_falhou",
+                escritorio_id=escritorio_id,
+                tokens=tokens_total,
+                erro=str(exc),
+            )
 
     async def _obter_persona(
         self,
