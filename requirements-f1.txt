@@ -27,7 +27,7 @@ aiohttp==3.9.3
 pybreaker==1.2.0
 
 # Beat scheduler dinâmico (sem redeploy para ajustar crons)
-redbeat==2.2.0
+celery-redbeat==2.2.0
 
 
 # Audio
