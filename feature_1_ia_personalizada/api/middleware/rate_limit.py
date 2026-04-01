@@ -24,6 +24,39 @@ LIMIT_CHAT = 30
 LIMIT_LOGIN = 5  # anti-brute-force
 
 
+def _get_client_ip(request: Request) -> str:
+    """
+    Extrai o IP real do cliente respeitando proxies reversos (Railway, Nginx, Cloudflare).
+
+    Ordem de prioridade:
+      1. X-Forwarded-For — cabeçalho padrão de proxies (primeiro IP = cliente original)
+      2. X-Real-IP       — cabeçalho alternativo (Nginx)
+      3. request.client  — conexão direta (sem proxy)
+      4. "unknown"       — fallback (nunca agrupa todos num único bucket)
+
+    Segurança: X-Forwarded-For pode ser forjado pelo cliente se o proxy não o sanitizar.
+    Em produção, configure o proxy para sobrescrever (não apenas adicionar) o header.
+    Railway faz isso por padrão — o primeiro IP da lista é confiável.
+    """
+    # X-Forwarded-For: client, proxy1, proxy2 — pega sempre o primeiro (cliente original)
+    x_forwarded = request.headers.get("x-forwarded-for", "").strip()
+    if x_forwarded:
+        first_ip = x_forwarded.split(",")[0].strip()
+        if first_ip:
+            return first_ip
+
+    # X-Real-IP: cabeçalho alternativo usado pelo Nginx
+    x_real_ip = request.headers.get("x-real-ip", "").strip()
+    if x_real_ip:
+        return x_real_ip
+
+    # Conexão direta (sem proxy) — pode ser None em alguns ambientes ASGI
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "unknown"
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     Controla o limite de requisições por IP ou por Usuário.
@@ -41,7 +74,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         # Estratégia de chave: IP para rotas públicas, User_ID para autenticados
-        identifier = request.client.host if request.client else "unknown"
+        identifier = _get_client_ip(request)
         if hasattr(request.state, "user_payload"):
             identifier = request.state.user_payload.get("sub", identifier)
 
@@ -51,8 +84,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if path == "/auth/login":
             # Proteção anti-brute-force: sempre usa IP, nunca user_id.
-            # request.client pode ser None atrás de certos proxies — fallback para "unknown".
-            identifier = request.client.host if request.client else "unknown"
+            identifier = _get_client_ip(request)
             limit = LIMIT_LOGIN
             prefix = "rate_limit:login:"
         elif path.startswith("/webhook/whatsapp"):
