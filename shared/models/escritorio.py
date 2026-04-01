@@ -13,7 +13,7 @@ from datetime import time
 from datetime import datetime
 
 from sqlalchemy import Boolean, Integer, SmallInteger, String, Text, Time, UniqueConstraint
-from sqlalchemy import TIMESTAMP
+from sqlalchemy import TIMESTAMP, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -128,6 +128,27 @@ class Escritorio(Base, TimestampMixin):
         Text(),
         nullable=True,
         comment="Template personalizado para quando não há novidades",
+    )
+
+    # --- Quota de Tokens Claude ---
+    # Limite mensal por plano. None = sem limite (enterprise).
+    # Defaults aplicados automaticamente na migration.
+    # Planos: basico=500K | profissional=2M | enterprise=None
+    quota_tokens_mes: Mapped[int | None] = mapped_column(
+        BigInteger(),
+        nullable=True,
+        comment="Limite mensal de tokens Claude (input+output). None = ilimitado.",
+    )
+    tokens_usados_mes: Mapped[int] = mapped_column(
+        BigInteger(),
+        nullable=False,
+        server_default="0",
+        comment="Total de tokens consumidos no mês corrente.",
+    )
+    tokens_reset_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        comment="Timestamp do último reset mensal do contador de tokens.",
     )
 
     # --- Feature 3: Prospecção Inteligente ---
