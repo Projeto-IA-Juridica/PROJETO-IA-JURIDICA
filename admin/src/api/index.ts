@@ -98,12 +98,7 @@ export interface ClienteExport {
 
 export const clientesApi = {
   listar: async (params?: { page?: number; page_size?: number; search?: string }) => {
-    const data = await api.get<CRMCliente[]>('/crm/clientes', {
-      params: {
-        page: params?.page ?? 1,
-        page_size: params?.page_size ?? 20,
-      },
-    }).then((r) => r.data)
+    const data = await api.get<CRMCliente[]>('/crm/clientes').then((r) => r.data)
 
     const search = params?.search?.trim().toLowerCase()
     const filtered = search ? data.filter((item) => item.nome.toLowerCase().includes(search)) : data
@@ -238,7 +233,10 @@ export interface RAGChunk {
 
 export const ragApi = {
   listar: () =>
-    api.get<{ items: RAGDoc[] }>('/rag/documentos', { params: { page: 1, per_page: 200 } }).then((r) => r.data.items),
+    api.get<RAGDoc[] | { items: RAGDoc[] }>('/rag/documentos').then((r) => {
+      const d = r.data
+      return Array.isArray(d) ? d : d.items ?? []
+    }),
 
   upload: (file: File, titulo: string, tipo: string) => {
     const form = new FormData()

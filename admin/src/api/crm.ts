@@ -26,7 +26,12 @@ export interface CRMResumo {
 
 export const crmApi = {
   listar: (params?: { nivel?: string; sem_analise?: boolean; page?: number; page_size?: number }) =>
-    api.get<CRMCard[]>('/crm/clientes', { params }).then((r) => r.data),
+    api.get<CRMCard[]>('/crm/clientes', {
+      params: {
+        nivel: params?.nivel,
+        sem_analise: params?.sem_analise,
+      },
+    }).then((r) => r.data),
 
   resumo: () => api.get<CRMResumo>('/crm/resumo').then((r) => r.data),
 
