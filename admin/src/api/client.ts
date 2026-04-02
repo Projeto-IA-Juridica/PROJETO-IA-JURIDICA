@@ -59,6 +59,11 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
+    // Permitir lidar com erros no login/register para renderizar mensagens
+    if (original.url?.includes('/auth/login') || original.url?.includes('/onboarding/register')) {
+      return Promise.reject(error)
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       const refresh = localStorage.getItem('refresh_token')

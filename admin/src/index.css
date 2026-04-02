@@ -1,47 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --surface-base: #09090b;
-    --surface-raised: #18181b;
-    --surface-overlay: #1e1e22;
-    --surface-border: rgba(255, 255, 255, 0.06);
-    --surface-border-muted: rgba(255, 255, 255, 0.03);
-    --text-primary: #fafafa;
-    --text-secondary: #a1a1aa;
-    --text-muted: #52525b;
-    --accent: #3b82f6;
-    --accent-glow: rgba(59, 130, 246, 0.12);
+    --surface-base: #020617;
+    --surface-raised: rgba(15, 23, 42, 0.5);
+    --surface-overlay: rgba(30, 41, 59, 0.6);
+    --surface-border: rgba(255, 255, 255, 0.08);
+    --surface-border-muted: rgba(255, 255, 255, 0.04);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6; 
+    --accent-glow: rgba(59, 130, 246, 0.35);
     --accent-dim: #2563eb;
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
     --danger-dim: rgba(239, 68, 68, 0.1);
-    --danger-surface: rgba(239, 68, 68, 0.08);
-    --danger-border: rgba(239, 68, 68, 0.2);
+    --danger-surface: rgba(239, 68, 68, 0.12);
+    --danger-border: rgba(239, 68, 68, 0.25);
     --danger-text: #fca5a5;
-    --input-bg: rgba(255, 255, 255, 0.04);
-    --input-focus-bg: rgba(255, 255, 255, 0.06);
-    --hover-bg: rgba(255, 255, 255, 0.04);
-    --icon-color: #71717a;
+    --input-bg: rgba(255, 255, 255, 0.03);
+    --input-focus-bg: rgba(255, 255, 255, 0.08);
+    --hover-bg: rgba(255, 255, 255, 0.05);
+    --icon-color: #94a3b8;
   }
 
   html.light-theme {
-    --surface-base: #fafafa;
-    --surface-raised: #ffffff;
-    --surface-overlay: #f4f4f5;
-    --surface-border: rgba(0, 0, 0, 0.06);
-    --surface-border-muted: rgba(0, 0, 0, 0.03);
-    --text-primary: #09090b;
-    --text-secondary: #52525b;
-    --text-muted: #a1a1aa;
-    --accent-glow: rgba(59, 130, 246, 0.1);
-    --input-bg: rgba(0, 0, 0, 0.02);
+    --surface-base: #f8fafc;
+    --surface-raised: rgba(255, 255, 255, 0.8);
+    --surface-overlay: rgba(241, 245, 249, 0.9);
+    --surface-border: rgba(0, 0, 0, 0.08);
+    --surface-border-muted: rgba(0, 0, 0, 0.04);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent-glow: rgba(59, 130, 246, 0.2);
+    --input-bg: #ffffff;
     --input-focus-bg: #ffffff;
-    --hover-bg: rgba(0, 0, 0, 0.03);
-    --icon-color: #71717a;
-    --danger-surface: rgba(239, 68, 68, 0.06);
-    --danger-border: rgba(239, 68, 68, 0.15);
+    --hover-bg: rgba(0, 0, 0, 0.04);
+    --icon-color: #64748b;
+    --danger-surface: rgba(239, 68, 68, 0.08);
+    --danger-border: rgba(239, 68, 68, 0.2);
     --danger-text: #dc2626;
   }
 
@@ -51,12 +51,12 @@
   body {
     background: var(--surface-base);
     color: var(--text-primary);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -70,11 +70,14 @@
   .surface {
     background: var(--surface-raised);
     border: 1px solid var(--surface-border);
-    border-radius: 10px;
-    transition: border-color 0.15s ease;
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
-  .surface:hover { border-color: rgba(255, 255, 255, 0.1); }
-  html.light-theme .surface:hover { border-color: rgba(0, 0, 0, 0.1); }
+  .surface:hover { border-color: rgba(255, 255, 255, 0.12); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15); }
+  html.light-theme .surface:hover { border-color: rgba(0, 0, 0, 0.12); }
 
   /* ---- Buttons ---- */
   .btn {
@@ -221,15 +224,22 @@
 
   /* ---- Error Box ---- */
   .error-box {
-    background: var(--danger-surface);
-    border: 1px solid var(--danger-border);
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
     border-radius: 8px;
-    padding: 10px 14px;
-    color: var(--danger-text);
+    padding: 12px 16px;
+    color: #fca5a5;
     font-size: 13px;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    animation: fadeIn 0.3s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   /* ---- Chat Bubbles ---- */
@@ -283,14 +293,45 @@
     align-items: center;
     justify-content: center;
     padding: 36px 16px;
-    background: var(--surface-base);
+    background: linear-gradient(135deg, var(--surface-base) 0%, rgba(15, 23, 42, 1) 50%, #030712 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
+    position: relative;
+    overflow: hidden;
+  }
+  .login-viewport::before {
+    content: '';
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+    top: -200px;
+    left: -100px;
+    filter: blur(80px);
+    opacity: 0.5;
+    animation: pulseGlow 8s ease-in-out infinite alternate;
+  }
+  @keyframes pulseGlow {
+    0% { transform: scale(1) translate(0, 0); opacity: 0.5; }
+    100% { transform: scale(1.1) translate(20px, 30px); opacity: 0.8; }
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
   }
   .login-card {
+    position: relative;
+    z-index: 10;
     width: 100%;
     max-width: 420px;
-    padding: 26px;
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
   .login-brand { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
   .login-logo { width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-glow); color: var(--accent); }
