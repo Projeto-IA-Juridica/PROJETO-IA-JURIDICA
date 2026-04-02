@@ -104,11 +104,9 @@ export function EmptyState({ icon = '📭', title, desc, action }: EmptyStatePro
 // ErrorBox
 export function ErrorBox({ message }: { message: string }) {
   return (
-    <div style={{
-      background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8,
-      padding: '12px 16px', color: '#fca5a5', fontSize: 13,
-    }}>
-      ⚠️ {message}
+    <div className="error-box" role="alert">
+      <span style={{ fontSize: 14 }}>⚠️</span>
+      <div style={{ marginLeft: 8 }}>{message}</div>
     </div>
   )
 }

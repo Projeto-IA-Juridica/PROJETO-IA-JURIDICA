@@ -88,75 +88,76 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--surface-base)',
-    }}>
-      <div style={{ width: '100%', maxWidth: 380, padding: 20 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 48, height: 48, borderRadius: 12, background: 'var(--accent-glow)', marginBottom: 12 }}>
-            <Scale size={24} style={{ color: 'var(--accent)' }} />
+    <div className="login-viewport">
+      <div className="login-card surface">
+        <div className="login-brand">
+          <div className="login-logo" aria-hidden>
+            <Scale size={22} />
           </div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Hub Jurídico</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Painel de Administração</div>
+          <div>
+            <div className="login-title">Hub Jurídico</div>
+            <div className="login-subtitle">Painel de administração</div>
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--surface-border)', marginBottom: 20 }}>
-          <button className={`tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</button>
-          <button className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
-        </div>
+        <div style={{ marginTop: 18 }}>
+          <div className="tab-row" role="tablist">
+            <button className={`tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</button>
+            <button className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
+          </div>
 
-        {error && <div style={{ marginBottom: 14 }}><ErrorBox message={error} /></div>}
+          {error && <div style={{ marginTop: 14 }}><ErrorBox message={error} /></div>}
 
-        {tab === 'login' ? (
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
+          {tab === 'login' ? (
+            <form onSubmit={handleLogin} className="login-form">
               <label className="label">E-mail</label>
               <input className="input" type="email" required autoFocus value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@escritorio.com" />
-            </div>
-            <div>
-              <label className="label">Senha</label>
+
+              <label className="label" style={{ marginTop: 8 }}>Senha</label>
               <input className="input" type="password" required value={senha} onChange={e => setSenha(e.target.value)} placeholder="••••••••" />
-            </div>
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 2, justifyContent: 'center' }}>
-              {loading ? <Spinner size={14} /> : null} Entrar
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <label className="label">Escritório</label>
-                <input className="input" required value={reg.nome_escritorio} onChange={e => setReg(r => ({ ...r, nome_escritorio: e.target.value }))} placeholder="Souza Advogados" />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                <a href="#" style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }}>Esqueceu a senha?</a>
               </div>
-              <div>
-                <label className="label">CNPJ</label>
-                <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" />
+
+              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 12 }}>
+                {loading ? <Spinner size={14} /> : null} Entrar
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister} className="login-form register-form">
+              <div className="register-grid">
+                <div>
+                  <label className="label">Escritório</label>
+                  <input className="input" required value={reg.nome_escritorio} onChange={e => setReg(r => ({ ...r, nome_escritorio: e.target.value }))} placeholder="Souza Advogados" />
+                </div>
+                <div>
+                  <label className="label">CNPJ</label>
+                  <input className="input" required value={reg.cnpj} onChange={e => setReg(r => ({ ...r, cnpj: e.target.value }))} placeholder="11.222.333/0001-81" />
+                </div>
+                <div>
+                  <label className="label">Responsável</label>
+                  <input className="input" required value={reg.nome_responsavel} onChange={e => setReg(r => ({ ...r, nome_responsavel: e.target.value }))} placeholder="Dr. João Silva" />
+                </div>
+                <div>
+                  <label className="label">OAB</label>
+                  <input className="input" required value={reg.oab_responsavel} onChange={e => setReg(r => ({ ...r, oab_responsavel: e.target.value }))} placeholder="SP123456" />
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label className="label">E-mail</label>
+                  <input className="input" type="email" required value={reg.email_admin} onChange={e => setReg(r => ({ ...r, email_admin: e.target.value }))} placeholder="admin@escritorio.com" />
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label className="label">Senha (mín. 8)</label>
+                  <input className="input" type="password" required minLength={8} value={reg.senha} onChange={e => setReg(r => ({ ...r, senha: e.target.value }))} placeholder="••••••••" />
+                </div>
               </div>
-              <div>
-                <label className="label">Responsável</label>
-                <input className="input" required value={reg.nome_responsavel} onChange={e => setReg(r => ({ ...r, nome_responsavel: e.target.value }))} placeholder="Dr. João Silva" />
-              </div>
-              <div>
-                <label className="label">OAB</label>
-                <input className="input" required value={reg.oab_responsavel} onChange={e => setReg(r => ({ ...r, oab_responsavel: e.target.value }))} placeholder="SP123456" />
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label className="label">E-mail</label>
-                <input className="input" type="email" required value={reg.email_admin} onChange={e => setReg(r => ({ ...r, email_admin: e.target.value }))} placeholder="admin@escritorio.com" />
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label className="label">Senha (mín. 8)</label>
-                <input className="input" type="password" required minLength={8} value={reg.senha} onChange={e => setReg(r => ({ ...r, senha: e.target.value }))} placeholder="••••••••" />
-              </div>
-            </div>
-            <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 2, justifyContent: 'center' }}>
-              {loading ? <Spinner size={14} /> : null} Criar conta
-            </button>
-          </form>
-        )}
+              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 12 }}>
+                {loading ? <Spinner size={14} /> : null} Criar conta
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )

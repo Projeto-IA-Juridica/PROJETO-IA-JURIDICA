@@ -275,4 +275,34 @@
 
   /* ---- Spinner ---- */
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- Login / Auth ---- */
+  .login-viewport {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 16px;
+    background: var(--surface-base);
+  }
+  .login-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 26px;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  }
+  .login-brand { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+  .login-logo { width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-glow); color: var(--accent); }
+  .login-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+  .login-subtitle { font-size: 12px; color: var(--text-muted); }
+
+  .tab-row { display: flex; gap: 8px; border-bottom: 1px solid var(--surface-border); padding-bottom: 10px; }
+  .login-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .register-form .register-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .login-form .btn { width: 100%; justify-content: center; }
+
+  @media (max-width: 420px) {
+    .register-form .register-grid { grid-template-columns: 1fr; }
+  }
 }
