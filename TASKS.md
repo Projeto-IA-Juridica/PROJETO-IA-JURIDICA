@@ -579,6 +579,43 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ---
 
+## Auditoria de Viabilidade (02/04/2026)
+
+> Resultado de auditoria contra o código real do projeto. Referência para evitar surpresas durante a implementação.
+
+### O que JÁ EXISTE e pode ser reutilizado
+
+| Componente | Arquivo real | Como reutilizar |
+|---|---|---|
+| `baixar_media(instance, message_id)` | `services/messaging/evolution_client.py:240` | Download de PDFs do WhatsApp (Fase 4) — **método é `baixar_media`, não `download_media`** |
+| `_extrair_texto_pdf()` | `services/rag/ingestion.py` | Extração de texto de petições (Fase 4) |
+| `CRMDataAggregator.coletar_contexto_cliente()` | `services/crm/aggregator.py:96` | Contexto CRM para insights (Fase 5) |
+| `CRMAnalyzer.analisar_cliente()` | `services/crm/analyzer.py:88` | Score e recomendação CRM (Fase 5) |
+| `FactChecker` — retorna `dict` | `services/ai/fact_checker.py` | Convertido para float em `ConfidenceRouter` (Fase 2) |
+| `whatsapp_numero` em `Usuario` | `shared/models/usuario.py:65` | **Já existe** — migration `20260317_*` já aplicada |
+| Routing de escalação no webhook | `api/routes/webhook_whatsapp.py:191` | Base para adicionar ramo do Hub (Fase 3) |
+| LangGraph com 8 nós | `services/ai/orchestrator.py:695` | +2 nós Harvey sem refatorar grafo existente |
+| `ConversationState` TypedDict | `orchestrator.py:199` | +2 campos: `confidence_score`, `modelo_ia_usado` |
+| Filas Celery (4 existentes) | `workers/celery_app.py:67` | +1 fila `hub_advogado` |
+| Circuit breaker `pybreaker` | já importado no projeto | `HarveyClient` usa o mesmo padrão do DataJud |
+
+### Divergências corrigidas neste TASKS vs. doc original
+
+| Seção | Problema na doc original | Correção aplicada |
+|---|---|---|
+| 3.1 | Pseudocódigo de webhook ignorava a lógica de escalação existente | Correto: Hub é terceiro ramo, após escalação |
+| 3.2 | Dizia "verificar se whatsapp_numero existe" | Campo já existe; seção marcada como ✅ JÁ FEITO |
+| 4.1 | `evolution_client.download_media()` | Método real: `baixar_media(instance, message_id)` |
+| 1.4/2.3/3.4 | Migrations com formato `016_*`, `017_*`, `019_*` | Projeto usa formato date-based (`20260402_HHMM_HASH_*`) |
+| 2.1 | "reutilizar resultado do fact_checker diretamente" (como se fosse float) | `fact_checker` retorna `dict`; conversão para float documentada |
+| 2.4 | ConversationState não mencionava novos campos | Adicionados: `confidence_score` e `modelo_ia_usado` |
+
+### Nenhum bloqueador técnico identificado
+
+Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API pronta, Celery com padrão de filas, CRM reutilizável, multi-tenant isolado. A feature é **100% aditiva** — nenhum código existente precisa ser refatorado.
+
+---
+
 ## Pré-requisito: Confirmar com equipe Harvey antes de iniciar
 
 - [ ] Confirmar formato do endpoint de chat (`POST /v1/chat/completions` ou formato próprio)
@@ -691,7 +728,9 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ### 1.4 — Migration Alembic: campos Harvey em `escritorios` — arquivo NOVO
 
-- [ ] Criar `alembic/versions/016_add_harvey_fields_to_escritorios.py`
+> **Atenção:** As migrations recentes do projeto usam formato date-based (`20260402_HHMM_HASH_descricao.py`), não numeração sequencial. Seguir o mesmo padrão.
+
+- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_harvey_fields_to_escritorios.py` (substituir HHMM e HASH gerados pelo `alembic revision`)
 - [ ] `upgrade()`:
   ```sql
   ALTER TABLE escritorios ADD COLUMN harvey_habilitado BOOLEAN DEFAULT FALSE;
@@ -737,7 +776,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 - [ ] Criar classe `ConfidenceRouter` com constante `THRESHOLD = 0.70`
 - [ ] Implementar método `async avaliar(mensagem, resposta_claude, tipo_intencao, rag_docs, fact_check_result, historico_cliente, escritorio_id) -> ConfidenceScore`
   - **score_cobertura_rag** (peso 35%): `max(similaridade_coseno)` dos docs recuperados; se RAG retornou 0 docs → score = 0.0
-  - **score_fact_checker** (peso 25%): reutilizar resultado de `fact_checker.py` diretamente (já existe, sem chamada extra)
+  - **score_fact_checker** (peso 25%): o `fact_checker.py` retorna um dict `{"verificado": bool, "correcoes": list[str], "dados_reais_resumo": str}` — **NÃO retorna um float**. Converter para float no `ConfidenceRouter`: `score = 1.0 if result["verificado"] else max(0.0, 1.0 - 0.3 * len(result["correcoes"]))`. Reaproveitar o resultado já disponível no state sem chamar fact-checker novamente.
   - **score_intencao** (peso 25%): mapeamento determinístico por `tipo_intencao`:
     - `saudacao` → 1.0
     - `status_processo` → 0.90
@@ -771,7 +810,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ### 2.3 — Migration Alembic: `modelo_ia` em `interacoes` — arquivo NOVO
 
-- [ ] Criar `alembic/versions/017_add_modelo_ia_to_interacoes.py`
+- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_modelo_ia_to_interacoes.py` (formato date-based — ver nota em 1.4)
 - [ ] `upgrade()`:
   ```sql
   ALTER TABLE interacoes ADD COLUMN modelo_ia VARCHAR(50) DEFAULT 'claude';
@@ -783,10 +822,15 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ### 2.4 — Dois novos nós no LangGraph Orchestrator (`services/ai/orchestrator.py`) — arquivo EXISTENTE
 
+- [ ] Adicionar 2 campos em `ConversationState` (TypedDict em `orchestrator.py`):
+  ```python
+  confidence_score: float | None          # score calculado pelo ConfidenceRouter
+  modelo_ia_usado: str                    # 'claude' | 'harvey' | 'claude_harvey_fallback'
+  ```
 - [ ] Adicionar nó `avaliar_confianca` no grafo LangGraph entre `gerar_resposta` e `verificar_resposta`:
   - Instanciar `ConfidenceRouter`
   - Chamar `confidence_router.avaliar(...)` com dados já presentes no `state`
-  - Guardar `ConfidenceScore` no `ConversationState`
+  - Guardar `ConfidenceScore` no `ConversationState` (campo `confidence_score`)
   - Retornar edge condicional: `score.valor >= threshold` → `"verificar_resposta"`, senão → `"gerar_resposta_harvey"`
 - [ ] Adicionar nó `gerar_resposta_harvey`:
   - Chamar `HarveyClient.gerar_resposta()` com o mesmo contexto RAG + system prompt
@@ -857,35 +901,55 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ---
 
-### 3.1 — Roteamento por role no Webhook (`api/routes/webhook_whatsapp.py`) — arquivo EXISTENTE
+### 3.1 — Roteamento no Webhook (`api/routes/webhook_whatsapp.py`) — arquivo EXISTENTE
 
-- [ ] Dentro do handler de `messages.upsert`, antes do fluxo existente do cliente, adicionar lógica:
+> **AUDITORIA:** O webhook atual já roteia advogados, mas **somente quando `escalacao_ativa == True`** (resposta de escalação). O Hub precisa de um terceiro ramo: advogados que mandam mensagem **sem escalação ativa** → Hub do Advogado.
+>
+> O fluxo atual é: `cliente encontrado?` → sim: fluxo cliente | não: `advogado com escalacao_ativa?` → sim: `processar_resposta_advogado` | não: "ignored"
+>
+> Após a modificação: `cliente encontrado?` → sim: fluxo cliente | não: `advogado com escalacao_ativa?` → sim: `processar_resposta_advogado` (existente, inalterado) | não: `advogado com role advogado/admin e ativo?` → sim: Hub | não: "ignored"
+
+- [ ] Adicionar terceiro ramo logo após o bloco de escalação existente (linhas ~191–217 do arquivo):
   ```python
-  usuario = await db.query(Usuario).filter(
-      Usuario.whatsapp_numero == telefone_remetente,
-      Usuario.escritorio_id == escritorio_id,
-      Usuario.role.in_(["advogado", "admin"]),
+  # Ramo existente (INALTERADO): escalação ativa
+  stmt_adv_esc = select(Usuario).where(
+      Usuario.whatsapp_numero == telefone_digitos,
+      Usuario.escritorio_id == escritorio.id,
       Usuario.ativo == True,
-  ).first()
+      Usuario.escalacao_ativa == True,
+  )
+  advogado_esc = (await db.execute(stmt_adv_esc)).scalars().first()
+  if advogado_esc:
+      processar_resposta_advogado.delay(...)  # inalterado
+      return {"status": "queued_escalation_reply"}
 
-  if usuario:
-      processar_mensagem_advogado.apply_async(
-          args=[payload_dict, usuario.id],
-          queue="hub_advogado"
+  # [NOVO] Ramo Hub do Advogado: advogado sem escalação ativa
+  if escritorio.harvey_habilitado:
+      stmt_adv_hub = select(Usuario).where(
+          Usuario.whatsapp_numero == telefone_digitos,
+          Usuario.escritorio_id == escritorio.id,
+          Usuario.role.in_(["advogado", "admin"]),
+          Usuario.ativo == True,
       )
-  else:
-      processar_mensagem_recebida.apply_async(...)  # fluxo existente inalterado
+      advogado_hub = (await db.execute(stmt_adv_hub)).scalars().first()
+      if advogado_hub:
+          processar_mensagem_advogado.apply_async(
+              args=[payload_dict, advogado_hub.id],
+              queue="hub_advogado",
+          )
+          return {"status": "queued_hub_advogado"}
   ```
-- [ ] Verificar que o fluxo existente do cliente **não é alterado** — apenas adiciona `if/else`
-- [ ] Verificar que `Usuario.whatsapp_numero` existe no modelo (adicionar campo se não existir — ver 3.2)
+- [ ] `Usuario.whatsapp_numero` **já existe** no modelo (adicionado na migration `20260317_1537_e4bcb5d405fa_add_usuario_whatsapp.py`) — nenhuma alteração de modelo necessária
+- [ ] Verificar que o fluxo existente do cliente e da escalação são completamente inalterados
+- [ ] Verificar que quando `harvey_habilitado=False` o bloco Hub é ignorado (sem overhead)
 
 ---
 
-### 3.2 — Campo `whatsapp_numero` em `Usuario` (se não existir) — arquivo EXISTENTE
+### 3.2 — ~~Campo `whatsapp_numero` em `Usuario`~~ — JÁ EXISTE ✅
 
-- [ ] Verificar se `shared/models/usuario.py` já tem `whatsapp_numero`
-- [ ] Se não existir: adicionar `whatsapp_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)`
-- [ ] Se campo não existir: criar migration `018_add_whatsapp_numero_to_usuarios.py`
+> **AUDITORIA:** `shared/models/usuario.py` linha 65 já tem `whatsapp_numero: Mapped[str | None]`.
+> Migration `20260317_1537_e4bcb5d405fa_add_usuario_whatsapp.py` já aplicada em produção.
+> **Nenhuma ação necessária. Nenhuma migration adicional para este campo.**
 
 ---
 
@@ -915,7 +979,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ### 3.4 — Migration Alembic: `sessoes_advogado` — arquivo NOVO
 
-- [ ] Criar `alembic/versions/019_add_sessoes_advogado.py`
+- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_sessoes_advogado.py` (formato date-based — ver nota em 1.4)
 - [ ] `upgrade()`: `CREATE TABLE sessoes_advogado` com todos os campos + FKs + índices:
   ```sql
   CREATE INDEX ix_sessoes_advogado_usuario ON sessoes_advogado (usuario_id, escritorio_id);
@@ -1057,7 +1121,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 ### 4.1 — Handler de análise de petição na task Celery (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
 
 - [ ] Implementar `_handler_analise_peticao(payload, usuario, escritorio, db)`:
-  1. Baixar PDF via `evolution_client.download_media()` (já existe para áudios — reutilizar)
+  1. Baixar PDF via `evolution_client.baixar_media(instance, message_id)` — **método real é `baixar_media`, não `download_media`** (linha 240 do `evolution_client.py`; já usado para áudios)
   2. Extrair texto via `DocumentoIngester._extrair_texto_pdf()` (já em `ingestion.py`)
   3. Limpar artefatos OCR via `data_cleaner.py` (já existe)
   4. Se PDF muito grande: chunking antes de enviar (reutilizar lógica de `ingestion.py`)
@@ -1224,10 +1288,10 @@ shared/
     └── hub_advogado.py                   # Fase 5 — Schemas Pydantic
 
 alembic/versions/
-├── 016_add_harvey_fields_to_escritorios.py    # Fase 1
-├── 017_add_modelo_ia_to_interacoes.py         # Fase 2
-├── 018_add_whatsapp_numero_to_usuarios.py     # Fase 3 (se necessário)
-└── 019_add_sessoes_advogado.py                # Fase 3
+├── 20260402_*_add_harvey_fields_to_escritorios.py    # Fase 1
+├── 20260402_*_add_modelo_ia_to_interacoes.py         # Fase 2
+└── 20260402_*_add_sessoes_advogado.py                # Fase 3
+# NOTA: whatsapp_numero em usuarios JÁ EXISTE (migration 20260317_*_add_usuario_whatsapp)
 
 tests/
 ├── unit/
@@ -1246,8 +1310,8 @@ tests/
 shared/config/settings.py             → +5 vars Harvey (Fase 1)
 shared/models/escritorio.py           → +5 campos Harvey (Fase 1)
 shared/models/interacao.py            → +campo modelo_ia (Fase 2)
-shared/models/usuario.py              → +whatsapp_numero se ausente (Fase 3)
 shared/models/__init__.py             → +export SessaoAdvogado (Fase 3)
+# shared/models/usuario.py — NÃO precisa de alteração; whatsapp_numero JÁ EXISTE
 shared/schemas/__init__.py            → +exports hub_advogado.py (Fase 5)
 .env.example                          → +HARVEY_* vars (Fase 1)
 
@@ -1281,9 +1345,10 @@ FASE 2: Roteador de Confiança
   → 2.4 (orchestrator — 2 nós) → 2.7 (testes integração)
   ↓
 FASE 3: Hub do Advogado via WhatsApp
-  3.3 (modelo SessaoAdvogado) → 3.4 (migration) → 3.2 (usuario.whatsapp_numero)
+  3.3 (modelo SessaoAdvogado) → 3.4 (migration)
     → paralelo: 3.5 (classificador) + 3.8 (prompts) + 3.7 (celery fila)
   → 3.6 (task hub_advogado) → 3.1 (webhook roteamento) → 3.9 (testes)
+  # 3.2 ignorado — whatsapp_numero já existe
   ↓
 FASE 4: Análise de Petições
   4.1 (handler PDF na task) → 4.2 (endpoints REST) → 4.3 (testes)
