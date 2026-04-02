@@ -1,5 +1,3 @@
-import { AlertTriangle } from 'lucide-react'
-
 // Badge de nível CRM/risco
 export type NivelCRM = 'excelente' | 'satisfeito' | 'neutro' | 'em_risco' | 'critico'
 export type NivelRisco = 'baixo' | 'moderado' | 'alto' | 'critico'
@@ -43,7 +41,7 @@ export function BadgeStatus({ ativo }: { ativo: boolean }) {
 
 // ProgressBar
 interface ProgressBarProps { value: number; max?: number; color?: string; height?: number }
-export function ProgressBar({ value, max = 100, color, height = 4 }: ProgressBarProps) {
+export function ProgressBar({ value, max = 100, color, height = 5 }: ProgressBarProps) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100))
   const barColor = color ?? (pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)')
   return (
@@ -70,37 +68,47 @@ export function MetricCard({ value, label, delta, deltaSign, sub }: MetricCardPr
 }
 
 // Spinner
-export function Spinner({ size = 16 }: { size?: number }) {
+export function Spinner({ size = 18 }: { size?: number }) {
   return (
     <span style={{
       display: 'inline-block', width: size, height: size,
       border: `2px solid var(--surface-border)`,
       borderTopColor: 'var(--accent)',
       borderRadius: '50%',
-      animation: 'spin 0.6s linear infinite',
+      animation: 'spin 0.7s linear infinite',
     }} />
   )
 }
 
+// Inject spin keyframe once
+if (typeof document !== 'undefined' && !document.getElementById('spin-style')) {
+  const s = document.createElement('style')
+  s.id = 'spin-style'
+  s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }'
+  document.head.appendChild(s)
+}
+
 // EmptyState
-interface EmptyStateProps { icon?: React.ReactNode; title: string; desc?: string; action?: React.ReactNode }
-export function EmptyState({ icon, title, desc, action }: EmptyStateProps) {
+interface EmptyStateProps { icon?: string; title: string; desc?: string; action?: React.ReactNode }
+export function EmptyState({ icon = '📭', title, desc, action }: EmptyStateProps) {
   return (
     <div className="empty-state">
-      {icon && <div className="empty-state-icon">{icon}</div>}
+      <div className="empty-state-icon">{icon}</div>
       <div className="empty-state-title">{title}</div>
       {desc && <div className="empty-state-desc">{desc}</div>}
-      {action && <div style={{ marginTop: 14 }}>{action}</div>}
+      {action && <div style={{ marginTop: 16 }}>{action}</div>}
     </div>
   )
 }
 
-// ErrorBox — uses CSS class, respects theme
+// ErrorBox
 export function ErrorBox({ message }: { message: string }) {
   return (
-    <div className="error-box">
-      <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-      <span>{message}</span>
+    <div style={{
+      background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8,
+      padding: '12px 16px', color: '#fca5a5', fontSize: 13,
+    }}>
+      ⚠️ {message}
     </div>
   )
 }

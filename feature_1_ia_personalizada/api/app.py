@@ -22,7 +22,6 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from shared.config.settings import settings
-from shared.telemetry import setup_telemetry
 
 # Validar formato das chaves no startup
 
@@ -213,14 +212,6 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
-
-# ==========================================
-# OPENTELEMETRY — distributed tracing
-# ==========================================
-# Propaga W3C traceparent: FastAPI → Celery → httpx (DataJud, Evolution, Voyage).
-# trace_id fica disponível em todos os logs structlog via RequestLoggingMiddleware.
-# Exportação de spans habilitada apenas quando OTLP_ENDPOINT estiver no .env.
-setup_telemetry(app)
 
 # ==========================================
 # MIDDLEWARES GLOBAIS
