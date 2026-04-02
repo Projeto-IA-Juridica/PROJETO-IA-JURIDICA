@@ -1372,3 +1372,507 @@ FASE 5: Resumos e Insights CRM
 | Global | `harvey_habilitado=False` → zero impacto no desempenho ou comportamento do cliente |
 | Global | Harvey indisponível → fallback para Claude sem erro visível ao usuário |
 | Global | Cobertura de testes ≥ 70% nos arquivos novos (CI não quebra) |
+
+---
+
+---
+
+# ESTRATÉGIA — Três Motores de IA Jurídica
+
+> **Contexto:** As fases anteriores assumem Harvey como único motor avançado. Esta seção define a arquitetura plugável com três motores — Harvey AI, Claude Opus e OpenAI o1/GPT-4o — cada um com suas forças e estratégias de performance específicas para este projeto.
+>
+> **Descoberta crítica do código:** O `orchestrator.py` já classifica intenções como `parecer_juridico`, `estrategia_processual`, `negociacao`, `decisao_judicial_impacto_alto` — e hoje as roteia para escalação humana. Esses são exatamente os casos que o motor avançado deve interceptar **antes** de escalar.
+
+---
+
+## Arquitetura Plugável — `MotorIAJuridico`
+
+### Por que plugável
+
+Harvey pode não estar disponível (API Key pendente, latência do Brasil, custo). Em vez de hardcodar Harvey em todo lugar, definir um protocolo único que todos os motores implementam. O escritório escolhe o motor no plano de assinatura. O `ConfidenceRouter` não precisa saber qual motor está por baixo.
+
+### M.0 — Protocolo Base (`services/ai/motor_juridico_base.py`) — arquivo NOVO
+
+- [ ] Criar `feature_1_ia_personalizada/services/ai/motor_juridico_base.py`
+- [ ] Criar dataclass compartilhado `RespostaMotorIA`:
+  ```python
+  conteudo: str
+  motor_usado: str          # 'harvey' | 'claude_opus' | 'openai_o1' | 'openai_gpt4o'
+  tokens_input: int
+  tokens_output: int
+  custo_estimado: Decimal
+  latencia_ms: int
+  cached: bool              # True se veio do cache Redis
+  ```
+- [ ] Criar dataclass compartilhado `AnaliseDocumento`:
+  ```python
+  tipo_peca: str
+  pontos_fortes: list[str]
+  vulnerabilidades: list[str]
+  argumentos_ausentes: list[str]
+  precedentes_relevantes: list[str]
+  sugestoes: list[str]
+  score_qualidade: int       # 0–100
+  recomendacao_final: str
+  motor_usado: str
+  custo_estimado: Decimal
+  ```
+- [ ] Criar `Protocol` `MotorIAJuridico`:
+  ```python
+  class MotorIAJuridico(Protocol):
+      async def gerar_resposta(
+          self,
+          system_prompt: str,
+          mensagem: str,
+          contexto_rag: list[str] | None,
+          escritorio_id: int,
+      ) -> RespostaMotorIA: ...
+
+      async def analisar_documento(
+          self,
+          conteudo: str,
+          tipo_analise: str,
+          contexto_processo: dict | None,
+      ) -> AnaliseDocumento: ...
+
+      async def pesquisar_jurisprudencia(
+          self,
+          query: str,
+          tribunal: str | None,
+          periodo: str | None,
+      ) -> list[dict]: ...
+
+      def esta_disponivel(self) -> bool: ...
+      # True se circuit breaker fechado e API key configurada
+  ```
+- [ ] Criar `MotorRouter` — seleciona o motor correto na hora da chamada:
+  ```python
+  class MotorRouter:
+      def selecionar(
+          self,
+          escritorio: Escritorio,
+          intencao: str,
+          fallback_chain: list[str],   # ['harvey', 'claude_opus', 'openai_o1']
+      ) -> MotorIAJuridico:
+          """
+          Percorre fallback_chain em ordem.
+          Retorna o primeiro motor disponível (circuit breaker fechado + API key set).
+          """
+  ```
+
+### M.0b — Campo `motor_juridico_avancado` em `Escritorio` — arquivo EXISTENTE
+
+- [ ] Adicionar campo em `shared/models/escritorio.py`:
+  ```python
+  motor_juridico_avancado: Mapped[str] = mapped_column(
+      String(20), server_default="claude_opus"
+  )
+  # Valores: 'harvey' | 'claude_opus' | 'openai_o1' | 'desativado'
+  ```
+- [ ] Adicionar migration `20260402_HHMM_HASH_add_motor_juridico_to_escritorios.py`
+- [ ] `upgrade()`: `ALTER TABLE escritorios ADD COLUMN motor_juridico_avancado VARCHAR(20) DEFAULT 'claude_opus';`
+- [ ] `downgrade()`: `DROP COLUMN motor_juridico_avancado`
+
+### M.0c — Mapeamento de intenções por motor (lógica no `MotorRouter`)
+
+> Baseado nas intenções reais do `orchestrator.py` (linha 811–824):
+
+```
+Claude Sonnet (atual, inalterado):
+  status | duvida_termo | duvida_geral | saudacao | reclamacao | desabafo | outro
+
+Motor Avançado (Harvey | Claude Opus | OpenAI o1):
+  parecer_juridico              → motor avançado ANTES de escalar
+  estrategia_processual         → motor avançado ANTES de escalar
+  negociacao                    → motor avançado ANTES de escalar
+  decisao_judicial_impacto_alto → motor avançado ANTES de escalar
+  perspectivas                  → motor avançado (alto risco de alucinação no Sonnet)
+```
+
+**Impacto arquitetural:** O nó `avaliar_escalacao` no LangGraph hoje encaminha `parecer_juridico` etc. direto para escalação. Com o motor avançado, o fluxo muda:
+
+```
+classificar_intencao
+  → avaliar_escalacao
+    → intencao em {parecer_juridico, estrategia_processual...}:
+        → [NOVO] gerar_resposta_motor_avancado   ← motor tenta responder
+            → se confiança OK: verificar_resposta → enviar_resposta
+            → se confiança baixa: preparar_escalacao (mantém comportamento atual)
+```
+
+---
+
+## Motor 1 — Harvey AI
+
+> **Perfil:** Especializado em raciocínio jurídico denso, potencialmente com base de jurisprudência própria. Motor premium — mais lento e mais caro, mas mais preciso para análise de documentos.
+
+### Quando usar Harvey
+
+| Caso de uso | Justificativa |
+|---|---|
+| Análise de petições (PDF) | Harvey pode ter endpoint dedicado para documentos |
+| Pesquisa de jurisprudência | Base própria STJ/STF (a confirmar) — RAG complementar |
+| `parecer_juridico` no Hub do Advogado | Raciocínio denso especializado |
+| `estrategia_processual` no Hub do Advogado | Requer integração de múltiplos precedentes |
+| Fallback do ConfidenceRouter < 0.50 | Score muito baixo = Claude Opus falhou também |
+
+### Estratégias de performance — Harvey
+
+#### H.1 — Cache agressivo em Redis (impacto alto, custo Harvey é alto)
+
+- [ ] Implementar cache em `HarveyClient.gerar_resposta()`:
+  - Chave: `harvey_resp:{escritorio_id}:{hash(system_prompt[:200] + mensagem)}`
+  - TTL: 30 minutos (respostas jurídicas têm validade curta)
+  - Hash via `hashlib.sha256` — rápido, colisões aceitáveis nessa escala
+  - Hit rate esperado: 15–30% no Hub (advogados perguntam variações similares)
+- [ ] Cache separado para análise de processo (mais estável):
+  - Chave: `harvey_proc:{processo_id}:{data_ultima_movimentacao}`
+  - TTL: 6 horas (invalida se processo tiver nova movimentação)
+  - Usar `data_ultima_movimentacao` na chave = cache naturalmente invalidado quando processo atualiza
+
+#### H.2 — Pre-warming de contexto antes de chamar Harvey
+
+- [ ] Na task `processar_mensagem_advogado`, antes de chamar Harvey, disparar em paralelo via `asyncio.gather`:
+  1. Buscar histórico das últimas 5 sessões do advogado (Redis)
+  2. Buscar top-5 documentos RAG mais relevantes (já em pgvector)
+  3. Buscar dados do escritório (nome, especialidades do DNA)
+- [ ] Injetar todo o contexto pré-carregado no `system_prompt` do Harvey de uma vez
+- [ ] **Nunca** fazer essas buscas dentro da chamada Harvey (latência seria somada)
+
+#### H.3 — Chunking inteligente para PDFs grandes
+
+- [ ] No `_handler_analise_peticao`, antes de chamar Harvey:
+  - Se `len(texto) > 8000 tokens`: dividir em chunks de 4000 tokens com 200 de overlap
+  - Enviar chunk por chunk e agregar `AnaliseDocumento` (merge de pontos fortes/fracos/sugestões)
+  - Usar `asyncio.gather` para chunks do mesmo documento em paralelo (se Harvey suportar concorrência)
+- [ ] Reutilizar `_chunk_texto()` de `ingestion.py` — já existe no projeto
+
+#### H.4 — Mensagem imediata de "pensando" no WhatsApp
+
+- [ ] Ao detectar intenção pesada (`ANALISE_PETICAO`, `PESQUISA_JURISPRUDENCIA`):
+  - Enviar imediatamente via `WhatsAppService.enviar()`: "🔍 Analisando... respondo em até 60 segundos."
+  - Só então chamar Harvey
+- [ ] Para `DUVIDA_JURIDICA` simples: não enviar mensagem prévia (Harvey responde em < 15s)
+
+#### H.5 — Circuit breaker com fallback em cascata
+
+- [ ] Configurar `pybreaker.CircuitBreaker` no `HarveyClient.__init__`:
+  - `fail_max=3` (abre após 3 falhas consecutivas)
+  - `reset_timeout=60` (tenta reabrir após 1 minuto)
+- [ ] Fallback em cascata automático via `MotorRouter`:
+  - Harvey indisponível → Claude Opus
+  - Claude Opus indisponível → OpenAI GPT-4o
+  - Todos indisponíveis → Claude Sonnet (motor padrão existente) com aviso
+
+#### H.6 — Prompt engineering específico para Harvey
+
+- [ ] Prompt em **inglês** para Harvey (a confirmar com equipe Harvey se suporte BR é nativo)
+  - Se Harvey suporta PT-BR nativamente → prompts em português
+  - Se não: prompt base em inglês + instrução `"Always respond in Brazilian Portuguese"`
+- [ ] Prompts Harvey devem ser mais concisos que Claude (Harvey raciocina internamente — menos chain-of-thought no prompt)
+- [ ] Para análise de petição: estruturar como checklist jurídico, não como conversa
+
+---
+
+## Motor 2 — Claude Opus 4.6
+
+> **Perfil:** Zero nova dependência. Mesmo SDK, mesma API key, mesma `ClaudeClient`. A diferença é o modelo passado para `chamar_direto()`. Claude Opus é ~4x mais capaz que Sonnet em raciocínio mas ~6x mais caro.
+
+### Quando usar Claude Opus
+
+| Caso de uso | Justificativa |
+|---|---|
+| Fallback do Harvey (circuit breaker aberto) | Mesma API, ativa imediatamente |
+| `perspectivas` no canal do cliente | Alto risco de alucinação no Sonnet |
+| `parecer_juridico` quando Harvey desativado | Opus é forte o suficiente para 80% dos casos |
+| Escritórios sem acesso Harvey/OpenAI | Motor avançado padrão (zero onboarding) |
+| Extended thinking em análise complexa | Claude 3.7+ suporta — raciocínio passo a passo |
+
+### Estratégias de performance — Claude Opus
+
+#### O.1 — Reutilizar `ClaudeClient.chamar_direto()` — zero novo código de client
+
+- [ ] `ClaudeClient.chamar_direto()` já aceita `modelo: str` como parâmetro (linha 198–230 do arquivo)
+- [ ] Implementar `ClaudeOpusMotor(MotorIAJuridico)` como thin wrapper:
+  ```python
+  class ClaudeOpusMotor:
+      MODELO = "claude-opus-4-6"
+      TEMPERATURA = 0.2    # mais determinístico que Sonnet (0.3) para raciocínio jurídico
+      MAX_TOKENS = 4096    # Opus pode responder mais longo
+
+      async def gerar_resposta(self, system_prompt, mensagem, contexto_rag, escritorio_id):
+          resultado = await self._claude_client.chamar_direto(
+              system_prompt=system_prompt,
+              mensagem=mensagem,
+              modelo=self.MODELO,
+              max_tokens=self.MAX_TOKENS,
+              temperature=self.TEMPERATURA,
+          )
+          return RespostaMotorIA(
+              conteudo=resultado["resposta"],
+              motor_usado="claude_opus",
+              tokens_input=resultado["tokens_input"],
+              tokens_output=resultado["tokens_output"],
+              custo_estimado=resultado["custo"],
+              ...
+          )
+  ```
+- [ ] **Não criar novo client HTTP** — toda a infra de retry, backoff, circuit breaker e métricas Prometheus do `ClaudeClient` é herdada automaticamente
+
+#### O.2 — Temperatura 0.2 para jurídico (vs. 0.3 padrão do Sonnet)
+
+- [ ] Opus com temperature 0.2 produz respostas mais consistentes e citações mais precisas
+- [ ] Para classificação de intenção no Hub: temperature 0.0 (determinístico)
+- [ ] Para rascunho de mensagem ao cliente: temperature 0.5 (mais variado, mais humano)
+
+#### O.3 — Extended Thinking para análise de petição
+
+- [ ] Claude Opus 4.6 suporta `extended_thinking` (chain-of-thought explícito):
+  ```python
+  # Na análise de petição com Opus
+  response = await client.messages.create(
+      model="claude-opus-4-6",
+      max_tokens=16000,
+      thinking={"type": "enabled", "budget_tokens": 8000},
+      messages=[{"role": "user", "content": conteudo_peticao}],
+  )
+  ```
+- [ ] O `thinking` block NÃO é enviado ao advogado — apenas o bloco `text` final
+- [ ] Custo: tokens de thinking são cobrados como input — incluir no `custo_estimado`
+- [ ] Quando usar: somente para `ANALISE_PETICAO` e `PESQUISA_JURISPRUDENCIA` (alto valor, tolera custo extra)
+
+#### O.4 — Cache Redis com TTL diferenciado por intenção
+
+- [ ] Cache mais curto para intenções que mudam (status de processo): 5 minutos
+- [ ] Cache mais longo para análise de documentos (petição não muda): 2 horas
+- [ ] Chave: `opus_resp:{escritorio_id}:{intencao}:{hash(mensagem[:300])}`
+- [ ] Invalidar cache de processo quando `monitor_processos` worker detectar nova movimentação (já acontece — usar evento Celery existente)
+
+#### O.5 — Preços Opus vs. Sonnet — controle de custo
+
+- [ ] Opus 4.6: ~$15/M input, ~$75/M output (estimativa — verificar pricing atual Anthropic)
+- [ ] Sonnet 4.6: $3/M input, $15/M output (valores atuais no `claude_client.py`)
+- [ ] Adicionar constantes em `shared/config/constants.py`:
+  ```python
+  CUSTO_OPUS_INPUT_POR_MILHAO = Decimal("15.00")
+  CUSTO_OPUS_OUTPUT_POR_MILHAO = Decimal("75.00")
+  ```
+- [ ] `ClaudeOpusMotor._calcular_custo()` usa as constantes corretas
+- [ ] Quota Opus por escritório: usar mesmo campo `harvey_quota_tokens_mes` — é a quota do motor avançado, não específico do Harvey
+
+#### O.6 — Prompts Opus: aproveitar capacidade de raciocínio longo
+
+- [ ] Opus lida bem com prompts longos e estruturados — injetar **mais contexto** que no Sonnet:
+  - RAG: top-10 documentos (vs. top-5 do Sonnet)
+  - Histórico: últimas 10 interações (vs. 5 do Sonnet)
+  - DNA do escritório: completo (especialidades, setores, diferenciais)
+- [ ] Pedir ao Opus que estruture a resposta antes de responder (sem extended thinking):
+  ```
+  Antes de responder, identifique internamente:
+  1. O que o advogado realmente quer saber
+  2. Quais dados do contexto são relevantes
+  3. Quais riscos jurídicos existem na resposta
+  Então responda com precisão técnica.
+  ```
+
+---
+
+## Motor 3 — OpenAI o1 / GPT-4o
+
+> **Perfil:** SDK `openai==1.50.2` e `OPENAI_API_KEY` já estão no projeto (usados para Whisper). `langchain-openai==0.1.25` também já está instalado. Zero nova dependência — apenas novo uso do client existente.
+
+### Quando usar OpenAI
+
+| Modelo | Caso de uso | Justificativa |
+|---|---|---|
+| `o1-mini` | Análise de petição, pesquisa de jurisprudência | Chain-of-thought nativo, raciocínio denso |
+| `gpt-4o` | Respostas rápidas no Hub, estruturação de dados | Rápido + JSON mode nativo |
+| `gpt-4o-mini` | Classificação de intenção no Hub (alternativa ao Haiku) | Barato, rápido, confiável em JSON |
+
+### Regras de seleção dentro do motor OpenAI
+
+```
+intencao in {DUVIDA_JURIDICA, RASCUNHO_MENSAGEM}  → gpt-4o    (velocidade)
+intencao in {ANALISE_PETICAO, PESQUISA_JURISPRUDENCIA}  → o1-mini  (raciocínio)
+classificacao de intencao                          → gpt-4o-mini (custo)
+STATUS_ESCRITORIO (dashboard)                      → sem IA (dados estruturados, não precisa de LLM)
+```
+
+### Estratégias de performance — OpenAI
+
+#### GPT.1 — `OpenAIMotor` com `AsyncOpenAI` — arquivo NOVO
+
+- [ ] Criar `feature_1_ia_personalizada/services/ai/openai_motor.py`
+- [ ] Importar `openai.AsyncOpenAI` — SDK já instalado, zero nova dependência
+- [ ] Criar classe `OpenAIMotor(MotorIAJuridico)`:
+  ```python
+  class OpenAIMotor:
+      MODELO_RAPIDO = "gpt-4o"
+      MODELO_RACIOCINIO = "o1-mini"
+      MODELO_CLASSIFICACAO = "gpt-4o-mini"
+      TIMEOUT = 60          # o1 é mais lento que gpt-4o
+      MAX_RETRIES = 3
+
+      def __init__(self, api_key: str):
+          self._client = openai.AsyncOpenAI(api_key=api_key, timeout=self.TIMEOUT)
+          self._breaker = pybreaker.CircuitBreaker(fail_max=3, reset_timeout=60)
+  ```
+- [ ] Implementar `async gerar_resposta()` usando `gpt-4o`:
+  - `response_format={"type": "json_object"}` quando resposta precisar ser estruturada
+  - Retry com backoff igual ao `claude_client.py` (mesma lógica `_com_retry`)
+  - Log estruturado com `structlog` (mesmo padrão do projeto)
+- [ ] Implementar `async analisar_documento()` usando `o1-mini`:
+  - **Atenção:** `o1` não suporta `temperature` — omitir o parâmetro
+  - **Atenção:** `o1` não suporta `system` role separado — mesclar system + user em mensagem `user`
+  - Resposta do `o1` já contém chain-of-thought interno — não pedir explicitamente
+
+#### GPT.2 — Structured Outputs (JSON mode) — vantagem sobre Harvey e Opus
+
+- [ ] GPT-4o tem JSON mode nativo confiável: `response_format={"type": "json_object"}`
+- [ ] Usar para:
+  - Classificação de intenção do Hub (`HubAdvogadoClassificador`) — substituir Claude Haiku se necessário
+  - `AnaliseDocumento` (estrutura definida, fácil parsear)
+  - `DNAEscritorio` (campos bem definidos)
+- [ ] Schema Pydantic → JSON schema → OpenAI structured output (garante parse sem `try/except`)
+
+#### GPT.3 — Preços OpenAI — controle explícito
+
+- [ ] Adicionar constantes em `shared/config/constants.py`:
+  ```python
+  # gpt-4o (verificar pricing atual em platform.openai.com)
+  CUSTO_GPT4O_INPUT_POR_MILHAO = Decimal("2.50")
+  CUSTO_GPT4O_OUTPUT_POR_MILHAO = Decimal("10.00")
+  # o1-mini
+  CUSTO_O1_MINI_INPUT_POR_MILHAO = Decimal("3.00")
+  CUSTO_O1_MINI_OUTPUT_POR_MILHAO = Decimal("12.00")
+  # gpt-4o-mini
+  CUSTO_GPT4O_MINI_INPUT_POR_MILHAO = Decimal("0.15")
+  CUSTO_GPT4O_MINI_OUTPUT_POR_MILHAO = Decimal("0.60")
+  ```
+- [ ] Atualizar constantes ao renovar contrato (preços mudam com frequência)
+
+#### GPT.4 — Reutilizar OPENAI_API_KEY já existente no settings
+
+- [ ] `settings.OPENAI_API_KEY` **já existe** em `shared/config/settings.py` (linha 23)
+- [ ] Não adicionar nova variável — `OpenAIMotor.__init__(api_key=settings.OPENAI_API_KEY)`
+- [ ] Adicionar em `settings.py` apenas:
+  ```python
+  OPENAI_MOTOR_HABILITADO: bool = True   # False desativa motor sem remover credencial
+  OPENAI_MODELO_RAPIDO: str = "gpt-4o"
+  OPENAI_MODELO_RACIOCINIO: str = "o1-mini"
+  ```
+
+#### GPT.5 — Limite de contexto do o1-mini e chunking
+
+- [ ] `o1-mini` suporta 128K tokens de contexto — mas raciocínio em contextos grandes é lento
+- [ ] Estratégia: para PDFs > 20 páginas, extrair apenas partes relevantes antes de enviar:
+  1. Extrair texto completo via PyMuPDF (já existe)
+  2. Usar RAG (pgvector) para selecionar as seções mais relevantes para a query
+  3. Enviar apenas as seções selecionadas ao o1-mini (não o PDF completo)
+- [ ] Resultado: análise mais focada + menor custo + menor latência
+
+#### GPT.6 — Cache específico por modelo OpenAI
+
+- [ ] Chave Redis: `openai_resp:{modelo}:{escritorio_id}:{hash(mensagem[:300])}`
+- [ ] TTL por modelo:
+  - `gpt-4o`: 15 minutos (respostas rápidas — menos valor em cache longo)
+  - `o1-mini`: 2 horas (raciocínio denso — mais caro, vale guardar mais tempo)
+- [ ] **Atenção:** o1 tem "reasoning tokens" que NÃO aparecem no usage — custo real é maior que `usage.total_tokens` indica. Monitorar via `usage.completion_tokens_details.reasoning_tokens` se disponível.
+
+#### GPT.7 — Prompts OpenAI: diferenças críticas vs. Claude
+
+- [ ] **GPT-4o:** suporta `system` + `user` normalmente — mesmo padrão do Claude
+- [ ] **o1-mini/o1:** NÃO suporta `system` role nem `temperature`
+  ```python
+  # ERRADO para o1:
+  messages=[{"role": "system", "content": prompt}, {"role": "user", "content": msg}]
+
+  # CORRETO para o1:
+  messages=[{"role": "user", "content": f"{prompt}\n\n{msg}"}]
+  ```
+- [ ] Criar método `_preparar_mensagens(system, user, modelo)` no `OpenAIMotor` que aplica a regra correta automaticamente
+
+---
+
+## Comparativo Final — Qual Motor para Cada Situação
+
+| Situação | Motor 1 | Motor 2 | Motor 3 |
+|---|---|---|---|
+| **Custo de setup** | Alto (API pendente, confirmações) | Zero (já no stack) | Zero (SDK + key já existem) |
+| **Análise de petição** | ⭐⭐⭐ (especializado) | ⭐⭐ (extended thinking) | ⭐⭐ (o1-mini chain-of-thought) |
+| **Jurisprudência** | ⭐⭐⭐ (base própria?) | ⭐⭐ (via RAG) | ⭐⭐ (via RAG) |
+| **Dúvida jurídica Hub** | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ |
+| **Respostas rápidas** | ⭐ (lento) | ⭐⭐ | ⭐⭐⭐ (gpt-4o) |
+| **Structured output** | ⭐⭐ | ⭐⭐ | ⭐⭐⭐ (JSON mode nativo) |
+| **Latência Brasil** | ❓ (US-based, incógnita) | ✅ (mesma infra atual) | ✅ (datacenters SA) |
+| **Custo por análise** | ❓ (desconhecido) | Alto (Opus ~6x Sonnet) | Médio (o1-mini previsível) |
+| **Fallback se indisponível** | Claude Opus → OpenAI | OpenAI → Sonnet | Sonnet |
+
+### Ordem de fallback recomendada por tipo de tarefa
+
+```
+Análise de Petição:
+  Harvey → o1-mini → Claude Opus (extended thinking) → Claude Sonnet (sem análise profunda)
+
+Dúvida Jurídica Hub:
+  Harvey → Claude Opus → gpt-4o → Claude Sonnet
+
+Classificação de Intenção (Hub):
+  Claude Haiku (atual) → gpt-4o-mini → heurística por keywords (já existe)
+
+Canal do Cliente (ConfidenceRouter):
+  Claude Sonnet (score ≥ 0.70) → motor_juridico_avancado do escritório (score < 0.70)
+```
+
+---
+
+## Implementação — Arquivos da Camada Plugável
+
+### Novos arquivos (adicionais às Fases 1–5)
+
+```
+feature_1_ia_personalizada/services/ai/
+├── motor_juridico_base.py     # Protocol + dataclasses compartilhados
+├── claude_opus_motor.py       # Thin wrapper sobre ClaudeClient.chamar_direto()
+└── openai_motor.py            # AsyncOpenAI — usa SDK já instalado
+```
+
+### Modificações adicionais
+
+```
+shared/models/escritorio.py
+  → +campo motor_juridico_avancado: str (default 'claude_opus')
+
+shared/config/settings.py
+  → +OPENAI_MOTOR_HABILITADO: bool
+  → +OPENAI_MODELO_RAPIDO: str
+  → +OPENAI_MODELO_RACIOCINIO: str
+
+shared/config/constants.py
+  → +constantes de preço para Opus, gpt-4o, o1-mini
+
+alembic/versions/
+  → +20260402_*_add_motor_juridico_to_escritorios.py
+```
+
+### Testes adicionais
+
+```
+tests/unit/
+├── test_claude_opus_motor.py   # Verifica que chamar_direto é chamado com modelo correto
+├── test_openai_motor.py        # Mock AsyncOpenAI; verifica chunking, JSON mode, o1 sem temperature
+└── test_motor_router.py        # Fallback em cascata; circuit breaker abre → próximo motor
+
+tests/integration/
+└── test_motor_completo.py      # End-to-end: intent → MotorRouter → motor → RespostaMotorIA
+```
+
+### Critérios de aceite da camada plugável
+
+- [ ] `motor_juridico_avancado = "claude_opus"` → análise de petição usa `claude-opus-4-6` com extended thinking
+- [ ] `motor_juridico_avancado = "openai_o1"` → análise usa `o1-mini` com prompt sem `system` role
+- [ ] `motor_juridico_avancado = "harvey"` → comportamento das Fases 1–5
+- [ ] Harvey com circuit breaker aberto → `MotorRouter` seleciona Claude Opus automaticamente
+- [ ] Todos os motores gravam `motor_usado` em `SessaoAdvogado` e `modelo_ia` em `Interacao`
+- [ ] Custo calculado corretamente para cada motor (constantes diferentes por modelo)
+- [ ] `motor_juridico_avancado = "desativado"` → comportamento atual (Claude Sonnet para tudo)
