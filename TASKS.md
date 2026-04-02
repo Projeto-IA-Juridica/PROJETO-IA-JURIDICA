@@ -554,3 +554,756 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
             → 3.13 (Testes unit)
               → 3.14 (Testes integração)
 ```
+
+---
+
+---
+
+# TASKS — Feature Harvey: Hub do Advogado
+
+> **Conceito:** Ecossistema de IA dual — cliente usa Claude (fluido), advogado usa Harvey AI (raciocínio jurídico pesado) via WhatsApp dedicado. Um Roteador de Confiança decide quando Claude delega para Harvey no fluxo do cliente.
+> **Acesso:** Hub do Advogado restrito a `advogado` e `admin`. Roteador opera transparentemente no fluxo do cliente.
+> **Referência:** [docs/FEATURE_HARVEY_HUB_ADVOGADO.md](docs/FEATURE_HARVEY_HUB_ADVOGADO.md)
+
+---
+
+## Status Geral
+
+| Fase | Descrição | Status |
+|------|-----------|--------|
+| Fase 1 | Fundação Harvey (client + settings + feature flag) | ❌ Não iniciada |
+| Fase 2 | Roteador de Confiança Claude → Harvey | ❌ Não iniciada |
+| Fase 3 | Hub do Advogado via WhatsApp | ❌ Não iniciada |
+| Fase 4 | Análise de Petições (PDF → Harvey) | ❌ Não iniciada |
+| Fase 5 | Resumo de Processos e Insights CRM | ❌ Não iniciada |
+
+---
+
+## Pré-requisito: Confirmar com equipe Harvey antes de iniciar
+
+- [ ] Confirmar formato do endpoint de chat (`POST /v1/chat/completions` ou formato próprio)
+- [ ] Confirmar existência de endpoint dedicado para análise de PDFs
+- [ ] Confirmar latência aceitável do Brasil (Harvey é US-based)
+- [ ] Confirmar modelo de pricing (por token? por request? por documento?)
+- [ ] Confirmar rate limits (requests/minuto por API key)
+- [ ] Confirmar suporte nativo ao português brasileiro (ou necessita prompt em inglês)
+- [ ] Confirmar acesso à base de jurisprudência brasileira (STJ/STF/TJs)
+- [ ] Obter `HARVEY_API_KEY` de produção e staging
+
+---
+
+## FASE 1 — Fundação Harvey (2–3 dias)
+
+> Objetivo: Harvey funcionando isoladamente, sem impacto algum no fluxo existente do cliente.
+> Critério de aceite: `HarveyClient.gerar_resposta()` retorna resposta válida num teste de integração.
+
+---
+
+### 1.1 — `HarveyClient` (`services/ai/harvey_client.py`) — arquivo NOVO
+
+- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/harvey_client.py`
+- [ ] Criar enum `TipoAnaliseHarvey` com valores:
+  - `ANALISE_COMPLETA = "analise_completa"`
+  - `PONTOS_FRACOS = "pontos_fracos"`
+  - `JURISPRUDENCIA_RELACIONADA = "jurisprudencia_relacionada"`
+  - `RESUMO_EXECUTIVO = "resumo_executivo"`
+  - `CONTRA_ARGUMENTOS = "contra_argumentos"`
+- [ ] Criar dataclass `HarveyResponse` com campos:
+  - `conteudo: str`
+  - `tokens_input: int`
+  - `tokens_output: int`
+  - `custo_estimado: Decimal`
+  - `modelo: str`
+  - `latencia_ms: int`
+- [ ] Criar dataclass `AnaliseHarveyResponse` com campos:
+  - `tipo_peca: str`
+  - `pontos_fortes: list[str]`
+  - `vulnerabilidades: list[str]`
+  - `argumentos_ausentes: list[str]`
+  - `precedentes_relevantes: list[str]`
+  - `sugestoes: list[str]`
+  - `score_qualidade: int` (0–100)
+  - `recomendacao_final: str`
+  - `tokens_input: int`
+  - `tokens_output: int`
+  - `custo_estimado: Decimal`
+- [ ] Criar dataclass `Jurisprudencia` com campos:
+  - `ementa: str`
+  - `tribunal: str`
+  - `numero_processo: str`
+  - `data_julgamento: str`
+  - `aplicabilidade: str` — `"FAVORAVEL" | "DESFAVORAVEL" | "NEUTRO"`
+  - `relevancia_score: float`
+- [ ] Criar classe `HarveyClient` com constantes:
+  - `MODELO_HARVEY = "harvey-v3"` (confirmar com documentação Harvey)
+  - `MAX_TOKENS = 2048`
+  - `TIMEOUT = 45` (Harvey mais lento — raciocínio denso)
+  - `MAX_RETRIES = 3`
+- [ ] Implementar `__init__` com:
+  - Leitura de `settings.HARVEY_API_KEY` e `settings.HARVEY_API_URL`
+  - Circuit breaker via `pybreaker` (padrão já usado no DataJud)
+  - Client HTTP async (`httpx.AsyncClient` com timeout configurável)
+- [ ] Implementar método `async gerar_resposta(system_prompt, mensagem_usuario, contexto_rag, escritorio_id) -> HarveyResponse`:
+  - Retry com backoff exponencial (3 tentativas)
+  - Circuit breaker abre após 3 falhas consecutivas
+  - Log estruturado com `structlog` (latência, tokens, custo)
+  - Retornar `HarveyResponse` tipado com tokens consumidos + custo
+- [ ] Implementar método `async analisar_peticao(conteudo_peticao, tipo_analise, contexto_processo) -> AnaliseHarveyResponse`:
+  - Usar endpoint dedicado Harvey para documentos jurídicos (se disponível)
+  - Chunking do conteúdo se PDF muito grande (reusar lógica de `ingestion.py`)
+  - Parsear resposta para `AnaliseHarveyResponse` estruturado
+- [ ] Implementar método `async pesquisar_jurisprudencia(query, tribunal, periodo) -> list[Jurisprudencia]`:
+  - Usar base de dados jurídica Harvey
+  - Ordenar do mais recente para o mais antigo
+  - Parsear para lista de `Jurisprudencia`
+- [ ] Implementar fallback: se Harvey indisponível (circuit breaker aberto), levantar `HarveyUnavailableError` para o chamador tratar com Claude
+
+---
+
+### 1.2 — Variáveis de ambiente (`shared/config/settings.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar em `shared/config/settings.py`:
+  ```python
+  HARVEY_API_KEY: str = ""
+  HARVEY_API_URL: str = "https://api.harvey.ai/v1"
+  HARVEY_MODELO: str = "harvey-v3"
+  HARVEY_TIMEOUT: int = 45
+  HARVEY_HABILITADO: bool = False
+  ```
+- [ ] Adicionar `HARVEY_API_KEY` no `.env.example` com comentário explicativo
+- [ ] Documentar no `.env.example` que `HARVEY_HABILITADO=False` por padrão (feature flag global; controle por escritório é via banco)
+
+---
+
+### 1.3 — Feature flag por escritório (`shared/models/escritorio.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar campos ao modelo `Escritorio`:
+  ```python
+  harvey_habilitado: Mapped[bool] = mapped_column(default=False)
+  harvey_canal_advogado_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
+  harvey_quota_tokens_mes: Mapped[int] = mapped_column(default=500_000)
+  harvey_tokens_usados_mes: Mapped[int] = mapped_column(default=0)
+  harvey_confidence_threshold: Mapped[float] = mapped_column(default=0.70)
+  ```
+- [ ] `harvey_canal_advogado_numero`: se `None`, usa o mesmo número do cliente distinguindo por role do remetente
+
+---
+
+### 1.4 — Migration Alembic: campos Harvey em `escritorios` — arquivo NOVO
+
+- [ ] Criar `alembic/versions/016_add_harvey_fields_to_escritorios.py`
+- [ ] `upgrade()`:
+  ```sql
+  ALTER TABLE escritorios ADD COLUMN harvey_habilitado BOOLEAN DEFAULT FALSE;
+  ALTER TABLE escritorios ADD COLUMN harvey_canal_advogado_numero VARCHAR(20);
+  ALTER TABLE escritorios ADD COLUMN harvey_quota_tokens_mes INTEGER DEFAULT 500000;
+  ALTER TABLE escritorios ADD COLUMN harvey_tokens_usados_mes INTEGER DEFAULT 0;
+  ALTER TABLE escritorios ADD COLUMN harvey_confidence_threshold FLOAT DEFAULT 0.70;
+  ```
+- [ ] `downgrade()`: `DROP COLUMN` em todos os 5 campos
+- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1` passam sem erro
+
+---
+
+### 1.5 — Testes unitários `HarveyClient` — arquivo NOVO
+
+- [ ] Criar `tests/unit/test_harvey_client.py`
+- [ ] Teste: `gerar_resposta()` com mock HTTP retorna `HarveyResponse` tipado corretamente
+- [ ] Teste: retry dispara em falha HTTP 500 (3 tentativas, depois levanta exceção)
+- [ ] Teste: circuit breaker abre após 3 falhas e não tenta nova chamada
+- [ ] Teste: `analisar_peticao()` parseia resposta estruturada de análise
+- [ ] Teste: `pesquisar_jurisprudencia()` retorna lista de `Jurisprudencia` ordenada por data
+- [ ] Teste: `HarveyUnavailableError` é levantado quando circuit breaker está aberto
+
+---
+
+## FASE 2 — Roteador de Confiança (2–3 dias)
+
+> Objetivo: Claude delega automaticamente para Harvey quando confiança na resposta está abaixo do threshold.
+> Critério de aceite: pergunta jurídica complexa → score < 0.70 → Harvey responde. Pergunta de status → Claude responde.
+
+---
+
+### 2.1 — `ConfidenceRouter` (`services/ai/confidence_router.py`) — arquivo NOVO
+
+- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/confidence_router.py`
+- [ ] Criar dataclass `ConfidenceScore`:
+  ```python
+  valor: float                    # 0.0 → 1.0
+  componentes: dict               # breakdown por dimensão
+  deve_escalar_harvey: bool       # True se valor < threshold
+  motivo: str                     # log interno
+  ```
+- [ ] Criar classe `ConfidenceRouter` com constante `THRESHOLD = 0.70`
+- [ ] Implementar método `async avaliar(mensagem, resposta_claude, tipo_intencao, rag_docs, fact_check_result, historico_cliente, escritorio_id) -> ConfidenceScore`
+  - **score_cobertura_rag** (peso 35%): `max(similaridade_coseno)` dos docs recuperados; se RAG retornou 0 docs → score = 0.0
+  - **score_fact_checker** (peso 25%): reutilizar resultado de `fact_checker.py` diretamente (já existe, sem chamada extra)
+  - **score_intencao** (peso 25%): mapeamento determinístico por `tipo_intencao`:
+    - `saudacao` → 1.0
+    - `status_processo` → 0.90
+    - `reclamacao` → 0.75
+    - `pergunta_juridica` → 0.45
+    - `perspectiva_caso` → 0.30
+  - **score_historico_cliente** (peso 15%): razão entre respostas com NPS ≥ 4 nas últimas 20 interações do cliente
+  - Fórmula: `0.35 × rag + 0.25 × fact + 0.25 × intencao + 0.15 × historico`
+  - Condições de roteamento forçado para Harvey (score ignorado):
+    - `tipo_intencao == "jurídica_complexa"` → sempre Harvey
+    - `fact_check_result["hallucination_score"] > 0.30` → Harvey
+    - Número de tentativas de geração > 1 → Harvey
+    - Mensagem contém termos: "CPC art", "STJ", "STF", "Súmula", "CLT art" → Harvey
+- [ ] Implementar método `async rotear(state, score) -> str`:
+  - Retorna `"claude"` ou `"harvey"`
+  - Verificar `escritorio.harvey_habilitado` antes de rotear para Harvey
+  - Verificar quota: se `harvey_tokens_usados_mes >= harvey_quota_tokens_mes` → forçar `"claude"` com log de aviso
+  - Usar `escritorio.harvey_confidence_threshold` em vez do `THRESHOLD` fixo (ajustável por escritório)
+
+---
+
+### 2.2 — Campo `modelo_ia` em `Interacao` (`shared/models/interacao.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar campo ao modelo `Interacao`:
+  ```python
+  modelo_ia: Mapped[str] = mapped_column(String(50), server_default="claude")
+  # Valores: 'claude', 'harvey', 'claude_harvey_fallback'
+  ```
+
+---
+
+### 2.3 — Migration Alembic: `modelo_ia` em `interacoes` — arquivo NOVO
+
+- [ ] Criar `alembic/versions/017_add_modelo_ia_to_interacoes.py`
+- [ ] `upgrade()`:
+  ```sql
+  ALTER TABLE interacoes ADD COLUMN modelo_ia VARCHAR(50) DEFAULT 'claude';
+  ```
+- [ ] `downgrade()`: `DROP COLUMN modelo_ia`
+- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1` passam
+
+---
+
+### 2.4 — Dois novos nós no LangGraph Orchestrator (`services/ai/orchestrator.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar nó `avaliar_confianca` no grafo LangGraph entre `gerar_resposta` e `verificar_resposta`:
+  - Instanciar `ConfidenceRouter`
+  - Chamar `confidence_router.avaliar(...)` com dados já presentes no `state`
+  - Guardar `ConfidenceScore` no `ConversationState`
+  - Retornar edge condicional: `score.valor >= threshold` → `"verificar_resposta"`, senão → `"gerar_resposta_harvey"`
+- [ ] Adicionar nó `gerar_resposta_harvey`:
+  - Chamar `HarveyClient.gerar_resposta()` com o mesmo contexto RAG + system prompt
+  - Em caso de `HarveyUnavailableError` (circuit breaker): fallback para resposta Claude existente no state, setar `modelo_ia = "claude_harvey_fallback"`, logar aviso
+  - Setar `modelo_ia = "harvey"` no state
+  - Atualizar `harvey_tokens_usados_mes` no escritório (incrementar atomicamente)
+  - Continuar para `verificar_resposta` → `enviar_resposta` (caminho normal)
+- [ ] Adicionar verificações de feature flag no orchestrator:
+  ```python
+  if not escritorio.harvey_habilitado:
+      # Pular nó avaliar_confianca, ir direto para verificar_resposta
+  if escritorio.harvey_tokens_usados_mes >= escritorio.harvey_quota_tokens_mes:
+      # Logar harvey_quota_esgotada e forçar Claude
+  ```
+- [ ] Grafo final resultante:
+  ```
+  classificar_intencao → buscar_dados → gerar_resposta(Claude)
+    → [NOVO] avaliar_confianca
+      → score≥threshold: verificar_resposta → enviar_resposta
+      → score<threshold: [NOVO] gerar_resposta_harvey → verificar_resposta → enviar_resposta
+  ```
+
+---
+
+### 2.5 — Prompts Harvey para canal do cliente (`services/ai/prompts.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar seção `# === PROMPTS HARVEY — CANAL DO CLIENTE ===`
+- [ ] Criar `SYSTEM_PROMPT_HARVEY_CLIENTE_BASE`:
+  - Tom técnico-jurídico mas ainda acessível ao cliente leigo
+  - Escritório: `{nome_escritorio}`, Persona IA: `{nome_ia}`
+  - Restrições: nunca prever resultado, nunca dar conselho jurídico, nunca citar OAB como barreira
+  - Contexto RAG injetado: `{contexto_documentos}`
+- [ ] Criar `SYSTEM_PROMPT_HARVEY_PERGUNTA_JURIDICA`:
+  - Responde com precisão técnica mas linguagem acessível
+  - Citar artigos de lei e súmulas apenas quando tiver alta certeza
+  - Redirecionar para o advogado responsável ao final da resposta
+
+---
+
+### 2.6 — Métricas Harvey em `api/routes/metrics.py` — arquivo EXISTENTE
+
+- [ ] Adicionar contadores Prometheus:
+  - `harvey_requests_total` — counter com labels `escritorio_id`, `resultado` (`"sucesso"`, `"fallback_claude"`, `"circuit_breaker"`)
+  - `harvey_roteamentos_total` — counter de quantas msgs de cliente foram roteadas para Harvey
+  - `harvey_tokens_total` — counter de tokens Harvey consumidos por escritório
+  - `harvey_latencia_segundos` — histogram de latência das chamadas Harvey
+- [ ] Expor métricas no endpoint `/metrics` (Prometheus scrape)
+
+---
+
+### 2.7 — Testes de integração do Roteador — arquivo NOVO
+
+- [ ] Criar `tests/integration/test_confidence_router.py`
+- [ ] Teste: `tipo_intencao="status_processo"` → score ≥ 0.90 → Claude responde
+- [ ] Teste: `tipo_intencao="perspectiva_caso"` → score ≤ 0.30 → Harvey roteado
+- [ ] Teste: mensagem com "STJ" explícito → forçar Harvey independente de score
+- [ ] Teste: `fact_check_result["hallucination_score"] = 0.40` → forçar Harvey
+- [ ] Teste: `harvey_habilitado=False` → score ignorado, Claude sempre responde
+- [ ] Teste: quota Harvey esgotada → fallback Claude com log de aviso
+- [ ] Teste end-to-end (mock Harvey): mensagem jurídica complexa entra no orchestrator → Harvey responde → `modelo_ia="harvey"` gravado na `Interacao`
+
+---
+
+## FASE 3 — Hub do Advogado via WhatsApp (3–4 dias)
+
+> Objetivo: Advogado consegue fazer perguntas jurídicas via WhatsApp e receber respostas Harvey em < 30s.
+> Critério de aceite: Advogado envia "Dúvida sobre CPC art. 485" → Harvey responde via WhatsApp em < 30 segundos.
+
+---
+
+### 3.1 — Roteamento por role no Webhook (`api/routes/webhook_whatsapp.py`) — arquivo EXISTENTE
+
+- [ ] Dentro do handler de `messages.upsert`, antes do fluxo existente do cliente, adicionar lógica:
+  ```python
+  usuario = await db.query(Usuario).filter(
+      Usuario.whatsapp_numero == telefone_remetente,
+      Usuario.escritorio_id == escritorio_id,
+      Usuario.role.in_(["advogado", "admin"]),
+      Usuario.ativo == True,
+  ).first()
+
+  if usuario:
+      processar_mensagem_advogado.apply_async(
+          args=[payload_dict, usuario.id],
+          queue="hub_advogado"
+      )
+  else:
+      processar_mensagem_recebida.apply_async(...)  # fluxo existente inalterado
+  ```
+- [ ] Verificar que o fluxo existente do cliente **não é alterado** — apenas adiciona `if/else`
+- [ ] Verificar que `Usuario.whatsapp_numero` existe no modelo (adicionar campo se não existir — ver 3.2)
+
+---
+
+### 3.2 — Campo `whatsapp_numero` em `Usuario` (se não existir) — arquivo EXISTENTE
+
+- [ ] Verificar se `shared/models/usuario.py` já tem `whatsapp_numero`
+- [ ] Se não existir: adicionar `whatsapp_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)`
+- [ ] Se campo não existir: criar migration `018_add_whatsapp_numero_to_usuarios.py`
+
+---
+
+### 3.3 — Modelo `SessaoAdvogado` (`shared/models/sessao_advogado.py`) — arquivo NOVO
+
+- [ ] Criar arquivo `shared/models/sessao_advogado.py`
+- [ ] Criar modelo `SessaoAdvogado(Base, TimestampMixin, TenantMixin)`:
+  ```python
+  __tablename__ = "sessoes_advogado"
+
+  id: Mapped[int] = mapped_column(primary_key=True)
+  usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+  mensagem_advogado: Mapped[str] = mapped_column(Text)
+  resposta_hub: Mapped[str] = mapped_column(Text)
+  intencao: Mapped[str] = mapped_column(String(50))
+  modelo_ia: Mapped[str] = mapped_column(String(50))  # 'harvey', 'claude', 'harvey_claude'
+  tokens_input: Mapped[int] = mapped_column(default=0)
+  tokens_output: Mapped[int] = mapped_column(default=0)
+  custo_estimado: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=0)
+  cliente_referenciado_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), nullable=True)
+  processo_referenciado_id: Mapped[int | None] = mapped_column(ForeignKey("processos.id"), nullable=True)
+  metadata_json: Mapped[dict] = mapped_column(JSONB, default={})
+  ```
+- [ ] Exportar `SessaoAdvogado` em `shared/models/__init__.py`
+
+---
+
+### 3.4 — Migration Alembic: `sessoes_advogado` — arquivo NOVO
+
+- [ ] Criar `alembic/versions/019_add_sessoes_advogado.py`
+- [ ] `upgrade()`: `CREATE TABLE sessoes_advogado` com todos os campos + FKs + índices:
+  ```sql
+  CREATE INDEX ix_sessoes_advogado_usuario ON sessoes_advogado (usuario_id, escritorio_id);
+  CREATE INDEX ix_sessoes_advogado_created ON sessoes_advogado (created_at DESC);
+  ```
+- [ ] `downgrade()`: `DROP TABLE sessoes_advogado`
+- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1`
+
+---
+
+### 3.5 — Classificador de intenção do advogado (`services/ai/hub_advogado_classifier.py`) — arquivo NOVO
+
+- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/hub_advogado_classifier.py`
+- [ ] Criar enum `IntencaoAdvogado`:
+  - `RESUMO_PROCESSO = "resumo_processo"`
+  - `ANALISE_PETICAO = "analise_peticao"` (detectado por presença de documento PDF)
+  - `PESQUISA_JURISPRUDENCIA = "pesquisa_jurisprudencia"`
+  - `INSIGHT_CLIENTE = "insight_cliente"`
+  - `DUVIDA_JURIDICA = "duvida_juridica"`
+  - `STATUS_ESCRITORIO = "status_escritorio"`
+  - `RASCUNHO_MENSAGEM = "rascunho_mensagem"`
+- [ ] Criar classe `HubAdvogadoClassificador`
+- [ ] Implementar `async classificar(mensagem, tipo_media) -> IntencaoAdvogado`:
+  - Se `tipo_media == "document"` → retornar `ANALISE_PETICAO` diretamente (sem Claude)
+  - Se mensagem contiver "status", "dashboard" → `STATUS_ESCRITORIO` (heurística rápida, sem Claude)
+  - Caso contrário: chamar Claude Haiku com prompt de classificação (rápido, barato)
+  - Timeout 5s — se exceder: fallback para `DUVIDA_JURIDICA`
+- [ ] Criar `SYSTEM_PROMPT_CLASSIFICADOR_ADVOGADO` em `prompts.py`:
+  - Input: mensagem do advogado
+  - Output JSON: `{"intencao": "<valor>", "entidades": {"cliente_nome": ..., "processo_cnj": ..., "query_juris": ...}}`
+  - Classificar nas 7 intenções suportadas
+
+---
+
+### 3.6 — Task Celery do Hub (`workers/hub_advogado.py`) — arquivo NOVO
+
+- [ ] Criar arquivo `feature_1_ia_personalizada/workers/hub_advogado.py`
+- [ ] Criar task `processar_mensagem_advogado`:
+  ```python
+  @celery_app.task(
+      name="processar_mensagem_advogado",
+      queue="hub_advogado",
+      max_retries=3,
+      default_retry_delay=5,
+      soft_time_limit=120,
+      time_limit=150,
+  )
+  ```
+- [ ] Fluxo da task:
+  1. Buscar `Usuario` pelo `usuario_id` (validar que ainda é ativo e tem role advogado/admin)
+  2. Verificar que `escritorio.harvey_habilitado` é True (se False: responder "Hub não ativo para este escritório")
+  3. Extrair texto/tipo de mídia do payload Evolution API
+  4. Chamar `HubAdvogadoClassificador.classificar()` → `IntencaoAdvogado`
+  5. Despachar para handler correto:
+     - `ANALISE_PETICAO` → `_handler_analise_peticao()`
+     - `RESUMO_PROCESSO` → `_handler_resumo_processo()`
+     - `INSIGHT_CLIENTE` → `_handler_insight_cliente()`
+     - `PESQUISA_JURISPRUDENCIA` → `_handler_pesquisa_jurisprudencia()`
+     - `STATUS_ESCRITORIO` → `_handler_status_escritorio()`
+     - `RASCUNHO_MENSAGEM` → `_handler_rascunho_mensagem()`
+     - `DUVIDA_JURIDICA` (default) → `_handler_duvida_juridica()`
+  6. Formatar resposta para WhatsApp (markdown: `*negrito*`, `_itálico_`)
+  7. Enviar resposta via `WhatsAppService.enviar()` para o número do advogado
+  8. Salvar `SessaoAdvogado` no banco com tokens + custo + intenção + modelo_ia
+  9. Incrementar `harvey_tokens_usados_mes` no `Escritorio`
+- [ ] Implementar `_handler_duvida_juridica(mensagem, usuario, escritorio, db)`:
+  - Montar contexto: últimas 5 sessões do advogado (memória conversacional)
+  - Buscar RAG docs relevantes do escritório
+  - Chamar `HarveyClient.gerar_resposta()` com `SYSTEM_PROMPT_HUB_ADVOGADO_BASE`
+  - Fallback: se Harvey indisponível → Claude com aviso explícito na resposta
+- [ ] Implementar `_handler_status_escritorio(usuario, escritorio, db)`:
+  - Agregar: total de atendimentos hoje, processos com prazo próximo (próximos 7 dias), leads novos, NPS médio do mês
+  - Formatar como dashboard WhatsApp sem chamar Harvey (dados estruturados)
+- [ ] Implementar `_handler_rascunho_mensagem(mensagem, usuario, escritorio, db)`:
+  - Identificar cliente alvo na mensagem (nome ou ID)
+  - Buscar dados CRM do cliente
+  - Chamar Harvey para gerar rascunho de mensagem empática e profissional
+  - Retornar rascunho para o advogado revisar e enviar manualmente
+
+---
+
+### 3.7 — Fila Celery `hub_advogado` (`workers/celery_app.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar ao `CELERY_TASK_ROUTES`:
+  ```python
+  "feature_1_ia_personalizada.workers.hub_advogado.*": {"queue": "hub_advogado"},
+  ```
+- [ ] Adicionar `hub_advogado` à lista de queues no comando de inicialização do worker:
+  ```
+  celery -A ... worker -Q monitoramento,notificacoes,ia,relacionamento,hub_advogado
+  ```
+- [ ] Atualizar `infrastructure/docker/docker-compose.yml` para incluir `hub_advogado` nas queues do container worker
+- [ ] Atualizar `railway.worker.json` para incluir a nova fila na configuração de produção
+
+---
+
+### 3.8 — Prompts do Hub do Advogado (`services/ai/prompts.py`) — arquivo EXISTENTE
+
+- [ ] Adicionar seção `# === PROMPTS DO HUB DO ADVOGADO ===` ao final do arquivo
+- [ ] Criar `SYSTEM_PROMPT_HUB_ADVOGADO_BASE`:
+  - Input: `{nome_escritorio}`, `{nome_usuario}`, `{oab}`
+  - Tom técnico-jurídico (interlocutor é profissional jurídico)
+  - Citar artigos de lei, súmulas e jurisprudências com precisão
+  - Não usar linguagem simplificada; ser objetivo e denso
+- [ ] Criar `SYSTEM_PROMPT_ANALISE_PETICAO`:
+  - Estrutura obrigatória da análise: IDENTIFICAÇÃO → PONTOS FORTES → VULNERABILIDADES → JURISPRUDÊNCIA RELEVANTE → SUGESTÕES → AVALIAÇÃO GERAL (score 0-100)
+  - Input: `{data_hoje}` para referência de direito vigente
+- [ ] Criar `SYSTEM_PROMPT_PESQUISA_JURISPRUDENCIA`:
+  - Input: `{query}`, `{tribunais}`, `{periodo}`
+  - Output obrigatório: ementa (2-3 linhas), data + tribunal + número, aplicabilidade (FAVORÁVEL/DESFAVORÁVEL/NEUTRO), tendência atual
+  - Ordenar do mais recente para o mais antigo
+- [ ] Criar `SYSTEM_PROMPT_INSIGHT_CLIENTE`:
+  - Input: `{nome_cliente}`, `{crm_score}`, `{resumo_interacoes}`, `{resumo_processos}`, `{ultima_acao_crm}`
+  - Output obrigatório: situação atual (3-4 linhas), pontos de atenção imediata, próxima ação recomendada (específica e acionável), risco de abandono (BAIXO/MÉDIO/ALTO)
+- [ ] Criar `SYSTEM_PROMPT_CLASSIFICADOR_ADVOGADO` (para `HubAdvogadoClassificador`)
+
+---
+
+### 3.9 — Testes unitários do Hub do Advogado — arquivo NOVO
+
+- [ ] Criar `tests/unit/test_hub_advogado.py`
+- [ ] Teste: `HubAdvogadoClassificador` classifica "Resumo do processo 123" → `RESUMO_PROCESSO`
+- [ ] Teste: payload com `type="document"` → `ANALISE_PETICAO` sem chamar Claude
+- [ ] Teste: "Status" ou "Dashboard" → `STATUS_ESCRITORIO` (heurística, sem Claude)
+- [ ] Teste: remetente não é advogado → task retorna sem processar (não envia mensagem)
+- [ ] Teste: `harvey_habilitado=False` → resposta de hub não ativo enviada
+- [ ] Teste: Harvey indisponível → fallback Claude com aviso na resposta
+- [ ] Teste: `SessaoAdvogado` é salva com campos corretos após processamento
+
+---
+
+## FASE 4 — Análise de Petições PDF (2–3 dias)
+
+> Objetivo: Advogado envia PDF no WhatsApp → Harvey analisa e responde com insights estruturados.
+> Critério de aceite: Advogado envia PDF de petição → recebe análise estruturada em < 60 segundos.
+
+---
+
+### 4.1 — Handler de análise de petição na task Celery (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+
+- [ ] Implementar `_handler_analise_peticao(payload, usuario, escritorio, db)`:
+  1. Baixar PDF via `evolution_client.download_media()` (já existe para áudios — reutilizar)
+  2. Extrair texto via `DocumentoIngester._extrair_texto_pdf()` (já em `ingestion.py`)
+  3. Limpar artefatos OCR via `data_cleaner.py` (já existe)
+  4. Se PDF muito grande: chunking antes de enviar (reutilizar lógica de `ingestion.py`)
+  5. Enviar mensagem imediata de confirmação "Analisando petição... aguarde até 60 segundos" ao advogado
+  6. Chamar `HarveyClient.analisar_peticao(conteudo, TipoAnaliseHarvey.ANALISE_COMPLETA, contexto_processo)`
+  7. Formatar `AnaliseHarveyResponse` em markdown WhatsApp estruturado:
+     - `*IDENTIFICAÇÃO*`, `*PONTOS FORTES*`, `*VULNERABILIDADES*`, `*JURISPRUDÊNCIA*`, `*SUGESTÕES*`, `*AVALIAÇÃO: X/100*`
+  8. Enviar resposta formatada
+  9. Salvar `SessaoAdvogado` com `intencao="analise_peticao"`, `modelo_ia="harvey"`
+
+---
+
+### 4.2 — Endpoint REST de análise de petição (`api/routes/hub_advogado.py`) — arquivo NOVO (parcial)
+
+- [ ] Criar arquivo `feature_1_ia_personalizada/api/routes/hub_advogado.py`
+- [ ] Criar `POST /api/v1/hub/analisar-peticao`:
+  - Body: `FormData` com campo `arquivo` (PDF)
+  - Validação: tipo MIME deve ser `application/pdf`
+  - Tamanho máximo: 10MB (configurável)
+  - Role: `advogado`, `admin`
+  - Chamar `HarveyClient.analisar_peticao()` diretamente (sem WhatsApp)
+  - Retornar `AnaliseHarveyResponse` como JSON
+  - Salvar `SessaoAdvogado`
+- [ ] Criar `POST /api/v1/hub/consultar`:
+  - Body: `{ pergunta: str, cliente_id?: int, processo_id?: int }`
+  - Role: `advogado`, `admin`
+  - Montar contexto com dados do cliente/processo se fornecidos
+  - Chamar `HarveyClient.gerar_resposta()` diretamente (sem WhatsApp)
+  - Retornar resposta Harvey como JSON
+  - Salvar `SessaoAdvogado`
+- [ ] Registrar router em `feature_1_ia_personalizada/api/app.py`:
+  ```python
+  app.include_router(hub_advogado_router, prefix="/api/v1/hub", tags=["Hub do Advogado"])
+  ```
+
+---
+
+### 4.3 — Testes de integração de análise de petição — arquivo NOVO
+
+- [ ] Criar `tests/integration/test_analise_peticao.py`
+- [ ] Teste: upload PDF → `HarveyClient.analisar_peticao()` chamado com texto extraído (mock Harvey)
+- [ ] Teste: PDF inválido (não-PDF) → HTTP 422
+- [ ] Teste: PDF muito grande → chunking aplicado antes de chamar Harvey
+- [ ] Teste: `POST /hub/analisar-peticao` com role `cliente` → HTTP 403
+- [ ] Teste: `POST /hub/consultar` retorna resposta Harvey + salva `SessaoAdvogado`
+
+---
+
+## FASE 5 — Resumos de Processos e Insights CRM (2 dias)
+
+> Objetivo: Harvey cruza dados jurídicos + CRM para insights acionáveis ao advogado.
+> Critério de aceite: "Me dá um resumo do João Silva" → Harvey retorna resumo com dados reais + recomendação CRM.
+
+---
+
+### 5.1 — Handler de resumo de processo (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+
+- [ ] Implementar `_handler_resumo_processo(mensagem, usuario, escritorio, db)`:
+  1. Extrair identificador: nome do cliente OU número CNJ do processo (via entidades do classificador)
+  2. Buscar processo no banco via `worker_queries.py` (já existe — reutilizar)
+  3. Buscar últimas movimentações via Jusbrasil (`jusbrasil_client.py`) + DataJud (`datajud_client.py`)
+  4. Buscar documentos RAG do processo (petições, contestações já ingeridas)
+  5. Buscar dados CRM do cliente (score, histórico de NPS)
+  6. Montar contexto completo para Harvey
+  7. Chamar `HarveyClient.gerar_resposta()` com `SYSTEM_PROMPT_HUB_ADVOGADO_BASE` + dados estruturados
+  8. Formatar resposta no padrão definido na seção 7 da doc (📋 com processo, cliente, movimentações, análise Harvey, score de risco, próxima audiência)
+  9. Salvar `SessaoAdvogado` com `processo_referenciado_id`
+
+---
+
+### 5.2 — Handler de insight de cliente (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+
+- [ ] Implementar `_handler_insight_cliente(mensagem, usuario, escritorio, db)`:
+  1. Extrair nome do cliente da mensagem (via entidades do classificador)
+  2. Buscar cliente no banco (fuzzy match por nome se necessário)
+  3. Buscar CRM score via `crm/aggregator.py` (já existe — reutilizar)
+  4. Buscar histórico de interações relevantes via `crm/analyzer.py` (já existe — reutilizar)
+  5. Buscar processos ativos do cliente
+  6. Montar contexto com `SYSTEM_PROMPT_INSIGHT_CLIENTE`
+  7. Chamar `HarveyClient.gerar_resposta()`
+  8. Formatar resposta: situação atual + pontos de atenção + próxima ação + risco de abandono
+  9. Salvar `SessaoAdvogado` com `cliente_referenciado_id`
+
+---
+
+### 5.3 — Endpoints REST de histórico (`api/routes/hub_advogado.py`) — arquivo EXISTENTE (Fase 4)
+
+- [ ] Criar `GET /api/v1/hub/historico?page=1&limit=25`:
+  - Query `SessaoAdvogado` filtrado por `usuario_id` do JWT autenticado
+  - Paginação com `page` e `limit`
+  - Role: `advogado`, `admin`
+  - Retornar lista com `id`, `intencao`, `modelo_ia`, `created_at`, preview da mensagem (100 chars)
+- [ ] Criar `GET /api/v1/hub/historico/{sessao_id}`:
+  - Buscar `SessaoAdvogado` por ID
+  - Validar que `escritorio_id` bate com o do usuário autenticado (isolamento multi-tenant)
+  - Retornar sessão completa
+- [ ] Criar `GET /api/v1/hub/metricas`:
+  - Role: `admin`
+  - Agregar `SessaoAdvogado` por `escritorio_id`: tokens consumidos total, custo total, intenções mais usadas (TOP 5), advogados mais ativos
+  - Retornar JSON com período `mes_atual`
+
+---
+
+### 5.4 — Schemas Pydantic para Hub (`shared/schemas/`) — arquivo NOVO
+
+- [ ] Criar `shared/schemas/hub_advogado.py`
+- [ ] Criar `ConsultaHubRequest`:
+  ```python
+  pergunta: str
+  cliente_id: int | None = None
+  processo_id: int | None = None
+  ```
+- [ ] Criar `SessaoAdvogadoResponse`:
+  ```python
+  id: int
+  intencao: str
+  mensagem_advogado: str
+  resposta_hub: str
+  modelo_ia: str
+  tokens_input: int
+  tokens_output: int
+  custo_estimado: Decimal
+  cliente_referenciado_id: int | None
+  processo_referenciado_id: int | None
+  created_at: datetime
+  ```
+- [ ] Criar `SessaoAdvogadoListItem` (versão reduzida para listagem)
+- [ ] Criar `MetricasHubResponse`
+- [ ] Exportar em `shared/schemas/__init__.py`
+
+---
+
+### 5.5 — Testes de integração de resumos e insights — arquivo NOVO
+
+- [ ] Criar `tests/integration/test_hub_resumos_insights.py`
+- [ ] Teste: "Resumo do processo 0001234-55.2023.8.26.0001" → Harvey recebe dados reais do banco (mock Harvey)
+- [ ] Teste: "Insight da cliente Maria" → CRM `aggregator.py` chamado + Harvey gera recomendação
+- [ ] Teste: `GET /hub/historico` retorna apenas sessões do usuário autenticado (isolamento)
+- [ ] Teste: `GET /hub/historico/{id}` de outro escritório → HTTP 403
+- [ ] Teste: `GET /hub/metricas` com role `advogado` → HTTP 403; com role `admin` → HTTP 200
+
+---
+
+## Arquivos a Criar (Resumo Completo)
+
+```
+NOVOS ARQUIVOS:
+feature_1_ia_personalizada/
+├── services/
+│   └── ai/
+│       ├── harvey_client.py              # Fase 1 — Cliente Harvey AI
+│       ├── confidence_router.py          # Fase 2 — Roteador de Confiança
+│       └── hub_advogado_classifier.py    # Fase 3 — Classificador de Intenção
+├── workers/
+│   └── hub_advogado.py                   # Fase 3 — Task Celery do Hub
+└── api/
+    └── routes/
+        └── hub_advogado.py               # Fase 4 — Endpoints REST
+
+shared/
+├── models/
+│   └── sessao_advogado.py                # Fase 3 — Histórico de Sessões
+└── schemas/
+    └── hub_advogado.py                   # Fase 5 — Schemas Pydantic
+
+alembic/versions/
+├── 016_add_harvey_fields_to_escritorios.py    # Fase 1
+├── 017_add_modelo_ia_to_interacoes.py         # Fase 2
+├── 018_add_whatsapp_numero_to_usuarios.py     # Fase 3 (se necessário)
+└── 019_add_sessoes_advogado.py                # Fase 3
+
+tests/
+├── unit/
+│   ├── test_harvey_client.py             # Fase 1
+│   ├── test_confidence_router.py         # Fase 2 (unit)
+│   └── test_hub_advogado.py              # Fase 3
+└── integration/
+    ├── test_confidence_router.py         # Fase 2
+    ├── test_analise_peticao.py           # Fase 4
+    └── test_hub_resumos_insights.py      # Fase 5
+```
+
+## Arquivos Existentes a Modificar (Resumo Completo)
+
+```
+shared/config/settings.py             → +5 vars Harvey (Fase 1)
+shared/models/escritorio.py           → +5 campos Harvey (Fase 1)
+shared/models/interacao.py            → +campo modelo_ia (Fase 2)
+shared/models/usuario.py              → +whatsapp_numero se ausente (Fase 3)
+shared/models/__init__.py             → +export SessaoAdvogado (Fase 3)
+shared/schemas/__init__.py            → +exports hub_advogado.py (Fase 5)
+.env.example                          → +HARVEY_* vars (Fase 1)
+
+feature_1_ia_personalizada/
+├── services/ai/
+│   ├── orchestrator.py               → +2 nós LangGraph + verificações quota (Fase 2)
+│   └── prompts.py                    → +6 prompts Harvey/Hub (Fases 2, 3)
+├── workers/celery_app.py             → +fila hub_advogado (Fase 3)
+└── api/
+    ├── app.py                        → +include_router hub_advogado (Fase 4)
+    ├── routes/webhook_whatsapp.py    → +roteamento por role (Fase 3)
+    └── routes/metrics.py             → +métricas Harvey Prometheus (Fase 2)
+
+infrastructure/docker/docker-compose.yml  → +hub_advogado na fila do worker (Fase 3)
+railway.worker.json                        → +hub_advogado na fila de produção (Fase 3)
+```
+
+---
+
+## Ordem de Implementação
+
+```
+PRÉ-REQUISITO: Confirmar API Harvey (seção acima)
+  ↓
+FASE 1: Fundação Harvey (sem impacto no código existente)
+  1.2 (settings) → 1.3 (modelo) → 1.4 (migration) → 1.1 (HarveyClient) → 1.5 (testes)
+  ↓
+FASE 2: Roteador de Confiança
+  2.3 (migration interacao) → 2.2 (modelo interacao) → 2.1 (ConfidenceRouter)
+    → paralelo: 2.5 (prompts) + 2.6 (métricas)
+  → 2.4 (orchestrator — 2 nós) → 2.7 (testes integração)
+  ↓
+FASE 3: Hub do Advogado via WhatsApp
+  3.3 (modelo SessaoAdvogado) → 3.4 (migration) → 3.2 (usuario.whatsapp_numero)
+    → paralelo: 3.5 (classificador) + 3.8 (prompts) + 3.7 (celery fila)
+  → 3.6 (task hub_advogado) → 3.1 (webhook roteamento) → 3.9 (testes)
+  ↓
+FASE 4: Análise de Petições
+  4.1 (handler PDF na task) → 4.2 (endpoints REST) → 4.3 (testes)
+  ↓
+FASE 5: Resumos e Insights CRM
+  5.4 (schemas) → 5.1 (handler resumo) → 5.2 (handler insight) → 5.3 (endpoints histórico) → 5.5 (testes)
+```
+
+---
+
+## Critérios de Aceite Globais
+
+| Fase | Critério |
+|------|----------|
+| Fase 1 | `HarveyClient.gerar_resposta()` retorna resposta válida em teste de integração |
+| Fase 2 | Pergunta jurídica complexa → score < 0.70 → Harvey responde; pergunta de status → Claude responde |
+| Fase 3 | Advogado envia "CPC art. 485" → Harvey responde via WhatsApp em < 30s |
+| Fase 4 | Advogado envia PDF → análise estruturada em < 60s |
+| Fase 5 | "Resumo do João Silva" → Harvey retorna com dados reais do banco + recomendação CRM |
+| Global | Todos os fluxos do cliente existentes continuam 100% inalterados (sem regressão) |
+| Global | `harvey_habilitado=False` → zero impacto no desempenho ou comportamento do cliente |
+| Global | Harvey indisponível → fallback para Claude sem erro visível ao usuário |
+| Global | Cobertura de testes ≥ 70% nos arquivos novos (CI não quebra) |
