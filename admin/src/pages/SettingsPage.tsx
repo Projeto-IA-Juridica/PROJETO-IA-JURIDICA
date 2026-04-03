@@ -96,9 +96,9 @@ export default function SettingsPage() {
   const { data: whatsappStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: onboardingApi.whatsappStatus,
-    refetchInterval: 30_000, // Reduzido polling de 15s para 30s para melhorar performance
+    refetchInterval: 60_000, // Aumentado para 60s (era 30s) para reduzir carga na API
     retry: 1, // Retry apenas 1 vez em caso de falha
-    staleTime: 25_000, // Considera dados frescos por 25s
+    staleTime: 50_000, // Considera dados frescos por 50s
   })
 
   const { mutate: goLive, isPending: goingLive } = useMutation({

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientesApi, type Cliente } from '../api'
-import { BadgeCRM, Spinner, EmptyState, ErrorBox, Pagination } from '../components/ui'
+import { BadgeCRM, Spinner, EmptyState, ErrorBox, Pagination, SkeletonGrid } from '../components/ui'
 
 function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => void }) {
   const iniciais = cliente.nome.split(' ').slice(0, 2).map(n => n[0]).join('')
@@ -60,14 +60,16 @@ export default function HubPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['clientes', page],
     queryFn: () => clientesApi.listar({ page, page_size: pageSize }),
+    staleTime: 60 * 1000, // 60s cache
+    placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega novos
   })
 
   const clientes = data?.items || []
   const totalPages = data ? Math.ceil(data.total / data.per_page) : 1
 
-  if (isLoading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
-      <Spinner size={28} />
+  if (isLoading && !data) return (
+    <div style={{ paddingTop: 20 }}>
+      <SkeletonGrid count={9} />
     </div>
   )
 

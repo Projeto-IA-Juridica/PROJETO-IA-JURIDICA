@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { crmApi, type CRMCard } from '../api/crm'
-import { BadgeCRM, MetricCard, ProgressBar, Spinner, EmptyState, ErrorBox } from '../components/ui'
+import { BadgeCRM, MetricCard, ProgressBar, Spinner, EmptyState, ErrorBox, SkeletonGrid } from '../components/ui'
 
 type NivelFilter = 'todos' | 'critico' | 'em_risco' | 'neutro' | 'satisfeito' | 'excelente'
 
@@ -75,10 +75,16 @@ export default function CRMPage() {
   const [filtro, setFiltro] = useState<NivelFilter>('todos')
   const [busca, setBusca] = useState('')
 
-  const { data: resumo, isLoading: lr } = useQuery({ queryKey: ['crm-resumo'], queryFn: () => crmApi.resumo() })
+  const { data: resumo, isLoading: lr } = useQuery({
+    queryKey: ['crm-resumo'],
+    queryFn: () => crmApi.resumo(),
+    staleTime: 60 * 1000, // 60s
+  })
   const { data: clientes, isLoading: lc, error } = useQuery({
     queryKey: ['crm-clientes', filtro],
     queryFn: () => crmApi.listar({ nivel: filtro === 'todos' ? undefined : filtro, page_size: 100 }),
+    staleTime: 60 * 1000, // 60s
+    placeholderData: (prev) => prev, // Mantém dados antigos
   })
 
   const { mutate: analisarTudo, isPending: analisando } = useMutation({
@@ -142,7 +148,7 @@ export default function CRMPage() {
       </div>
 
       {/* Lista */}
-      {lc ? <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}><Spinner /></div> : (
+      {lc && !clientes ? <div style={{ paddingTop: 20 }}><SkeletonGrid count={5} /></div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtrados.length === 0 ? (
             <EmptyState icon="🤝" title="Nenhum cliente encontrado" desc="Ajuste os filtros ou analise o escritório." />

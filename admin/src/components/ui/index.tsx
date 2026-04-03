@@ -113,3 +113,34 @@ export function ErrorBox({ message }: { message: string }) {
 
 // Pagination
 export { Pagination } from './Pagination'
+
+// SkeletonCard — placeholder enquanto carrega dados
+export function SkeletonCard() {
+  return (
+    <div className="surface" style={{
+      padding: '16px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      backgroundColor: 'var(--surface-base)', userSelect: 'none',
+    }}>
+      <div style={{ height: 16, background: 'var(--surface-border)', borderRadius: 4, marginBottom: 8 }} />
+      <div style={{ height: 12, background: 'var(--surface-border)', borderRadius: 4, width: '70%' }} />
+    </div>
+  )
+}
+
+export function SkeletonGrid({ count = 3 }: { count?: number }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  )
+}
+
+// Inject pulse keyframe once
+if (typeof document !== 'undefined' && !document.getElementById('pulse-style')) {
+  const s = document.createElement('style')
+  s.id = 'pulse-style'
+  s.textContent = '@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }'
+  document.head.appendChild(s)
+}

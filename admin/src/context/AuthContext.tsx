@@ -47,7 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await authApi.logout()
+    try {
+      await authApi.logout()
+    } catch (err) {
+      // Não bloqueia o logout se a API falhar
+      console.warn('Logout API falhou, limpando local storage mesmo assim:', err)
+    }
     localStorage.clear()
     setUser(null)
     window.location.href = '/login'

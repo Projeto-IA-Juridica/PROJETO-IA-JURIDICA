@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { analyticsApi } from '../api/analytics'
-import { MetricCard, ProgressBar, Spinner, ErrorBox } from '../components/ui'
+import { MetricCard, ProgressBar, Spinner, ErrorBox, SkeletonGrid } from '../components/ui'
 
 type Dias = 7 | 30 | 90
 
@@ -39,6 +39,8 @@ export default function AnalyticsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard', dias],
     queryFn: () => analyticsApi.dashboard(dias),
+    staleTime: 5 * 60 * 1000, // 5 min cache
+    placeholderData: (prev) => prev,
   })
 
   const handleExport = async () => {
@@ -78,7 +80,7 @@ export default function AnalyticsPage() {
 
       {activeTab === 'dashboard' && (
         <>
-          {isLoading ? <Spinner /> : data && (
+          {isLoading && !data ? <SkeletonGrid count={6} /> : data && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
                 <MetricCard value={data.resumo.total_interacoes} label="Interações" />
