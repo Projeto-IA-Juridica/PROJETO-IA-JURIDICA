@@ -17,11 +17,11 @@ const qc = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1, // Retry 1 vez em caso de falha de rede
-      staleTime: 30 * 1000, // 30s — dados frescos são mantidos por pouco tempo
-      gcTime: 5 * 60_000, // 5 min — cache mantido por 5 min antes de descartar
+      staleTime: 2 * 60_000, // 2 min — dados frescos mantidos por mais tempo (menos requisições)
+      gcTime: 10 * 60_000, // 10 min — cache mantido por 10 min antes de descartar
       refetchOnWindowFocus: false, // Não refetch ao voltar para a aba
-      refetchOnMount: false, // Não refetch ao montar componente se tem cache
-      refetchOnReconnect: 'stale', // Refetch ao reconectar à rede apenas se stale
+      refetchOnMount: false, // Não refetch ao montar componente se tem cache (CRITICAL)
+      refetchOnReconnect: false, // Não refetch ao reconectar (evita travamentos)
     },
   },
 })

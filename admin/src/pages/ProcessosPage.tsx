@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clientesApi, processosApi, type Processo } from '../api'
-import { BadgeRisco, EmptyState, ErrorBox, Pagination, Spinner } from '../components/ui'
+import { BadgeRisco, EmptyState, ErrorBox, Pagination, Spinner, SkeletonGrid } from '../components/ui'
 import { FolderOpen, Plus, RefreshCw } from 'lucide-react'
 
 function ProcessoForm({
@@ -115,12 +115,16 @@ export default function ProcessosPage() {
 
   const { data: clientesData } = useQuery({
     queryKey: ['clientes-processos-form'],
-    queryFn: () => clientesApi.listar({ page: 1, page_size: 200 }),
+    queryFn: () => clientesApi.listar({ page: 1, page_size: 100 }),
+    staleTime: 5 * 60_000, // 5 min cache — essa lista muda pouco
+    placeholderData: (prev) => prev,
   })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['processos', page, status, search],
     queryFn: () => processosApi.listar({ page, per_page: 20, status: status || undefined, search: search.trim() || undefined }),
+    staleTime: 60 * 1000, // 60s cache
+    placeholderData: (prev) => prev,
   })
 
   const { mutate: criarProcesso, isPending: creating } = useMutation({
@@ -174,8 +178,8 @@ export default function ProcessosPage() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Spinner size={20} /></div>
+      {isLoading && !data ? (
+        <div style={{ paddingTop: 20 }}><SkeletonGrid count={5} /></div>
       ) : items.length === 0 ? (
         <EmptyState icon={<FolderOpen size={24} style={{ color: 'var(--text-muted)' }} />} title="Nenhum processo encontrado" desc="Cadastre um processo para iniciar o monitoramento." />
       ) : (
