@@ -98,18 +98,28 @@ export interface ClienteExport {
 
 export const clientesApi = {
   listar: async (params?: { page?: number; page_size?: number; search?: string }) => {
-    const data = await api.get<CRMCliente[]>('/crm/clientes').then((r) => r.data)
+    const page = params?.page ?? 1
+    const pageSize = params?.page_size ?? 20
 
+    // Usa paginação no BACKEND diretamente
+    const data = await api.get<CRMCliente[]>('/crm/clientes', {
+      params: {
+        page,
+        page_size: pageSize,
+      }
+    }).then((r) => r.data)
+
+    // Filtra busca no frontend (idealmente seria no backend também)
     const search = params?.search?.trim().toLowerCase()
     const filtered = search ? data.filter((item) => item.nome.toLowerCase().includes(search)) : data
 
-    const page = params?.page ?? 1
-    const pageSize = params?.page_size ?? 20
-    const offset = (page - 1) * pageSize
-    const items = filtered.slice(offset, offset + pageSize)
+    // IMPORTANTE: Backend não retorna total, então estimamos baseado no tamanho da resposta
+    // Se retornou menos que page_size, assumimos que é a última página
+    const isLastPage = filtered.length < pageSize
+    const estimatedTotal = isLastPage ? (page - 1) * pageSize + filtered.length : page * pageSize + 1
 
     return {
-      items: items.map((item) => ({
+      items: filtered.map((item) => ({
         id: item.id,
         nome: item.nome,
         telefone_whatsapp: item.telefone_whatsapp,
@@ -123,7 +133,7 @@ export const clientesApi = {
       })),
       page,
       per_page: pageSize,
-      total: filtered.length,
+      total: estimatedTotal,
     } satisfies PaginatedResponse<Cliente>
   },
 

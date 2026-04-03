@@ -25,6 +25,7 @@ export default function SettingsPage() {
   const [importResult, setImportResult] = useState<string>('')
   const [whatsappFeedback, setWhatsappFeedback] = useState<string>('')
   const [whatsappError, setWhatsappError] = useState<string>('')
+  const [whatsappQr, setWhatsappQr] = useState<string | null>(null)
 
   useEffect(() => {
     const esc = status?.escritorio
@@ -68,24 +69,36 @@ export default function SettingsPage() {
 
   const { mutate: connectWhatsapp, isPending: connectingWhatsapp } = useMutation({
     mutationFn: onboardingApi.connectWhatsapp,
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       setWhatsappError('')
       setWhatsappFeedback('Solicitação enviada. Aguarde e acompanhe o status.')
+      // Try to extract QR code if provided
+      const q = res?.qr_code ?? res?.qrcode ?? null
+      let src = null
+      if (q) {
+        if (typeof q === 'string') src = q
+        else if (q.data) src = q.data
+        else if (q.base64) src = `data:image/png;base64,${q.base64}`
+        else if (q.png) src = `data:image/png;base64,${q.png}`
+      }
+      setWhatsappQr(src)
       qc.invalidateQueries({ queryKey: ['onboarding-status'] })
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
     },
     onError: (err: unknown) => {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       setWhatsappFeedback('')
-      setWhatsappError(detail ?? 'Falha ao conectar WhatsApp.')
+      setWhatsappError(detail ?? 'Falha ao conectar WhatsApp. Verifique EVOLUTION_API_URL e EVOLUTION_API_KEY no backend.')
+      setWhatsappQr(null)
     },
   })
 
   const { data: whatsappStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: onboardingApi.whatsappStatus,
-    refetchInterval: 15_000,
-    retry: 0,
+    refetchInterval: 30_000, // Reduzido polling de 15s para 30s para melhorar performance
+    retry: 1, // Retry apenas 1 vez em caso de falha
+    staleTime: 25_000, // Considera dados frescos por 25s
   })
 
   const { mutate: goLive, isPending: goingLive } = useMutation({
@@ -252,6 +265,18 @@ export default function SettingsPage() {
             </div>
             {whatsappError && <ErrorBox message={whatsappError} />}
             {whatsappFeedback && <div style={{ fontSize: 12, color: 'var(--success)' }}>{whatsappFeedback}</div>}
+            {whatsappQr && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>QR Code — escaneie com o WhatsApp</div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <img src={whatsappQr} alt="WhatsApp QR" style={{ width: 220, height: 'auto', borderRadius: 8, border: '1px solid var(--surface-border)' }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div>Abra o WhatsApp no seu celular → Configurações → Dispositivos conectados → Escanear código.</div>
+                    <button className="btn btn-ghost" onClick={() => setWhatsappQr(null)} style={{ marginTop: 8 }}>Fechar QR</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
               WhatsApp: {whatsappStatus?.connected ? 'conectado' : `desconectado (${whatsappStatus?.state ?? '—'})`}
             </div>

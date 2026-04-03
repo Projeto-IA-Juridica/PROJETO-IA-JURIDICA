@@ -1,10 +1,23 @@
-import axios from 'axios'
+import axios from 'axios'import axiosRetry from 'axios-retry'
 
 export const api = axios.create({
   baseURL: '/api',
-  timeout: 12_000,
+  timeout: 45_000, // Aumentado para 45s para operações pesadas (CRM, RAG, IA)
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // Necessário para enviar cookies CSRF
+})
+
+// Configurar retry automático para requests que falharam
+axiosRetry(api, {
+  retries: 3, // Tentar até 3 vezes
+  retryDelay: axiosRetry.exponentialDelay, // Delay exponencial entre tentativas
+  retryCondition: (error) => {
+    // Retry em erros de rede ou timeout, mas não em erros 4xx (client errors)
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.code === 'ECONNABORTED'
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.log(`Retry ${retryCount} para ${requestConfig.url}: ${error.message}`)
+  },
 })
 
 // Armazena o token CSRF em memória
