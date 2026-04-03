@@ -15,7 +15,10 @@ export default function SettingsPage() {
   const { data: status, isLoading, error: statusError } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.status,
-    retry: 0,
+    retry: 1, // Retry 1 vez em caso de erro
+    staleTime: 2 * 60_000, // 2 min cache — dados frescos por pouco tempo
+    refetchInterval: false, // Não refetch automático
+    placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega
   })
 
   const [persona, setPersona] = useState({ persona_nome: '', persona_tom: 'formal', horario_inicio: '08:00', horario_fim: '18:00' })

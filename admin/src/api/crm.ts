@@ -30,6 +30,8 @@ export const crmApi = {
       params: {
         nivel: params?.nivel,
         sem_analise: params?.sem_analise,
+        page: params?.page ?? 1,
+        page_size: Math.min(params?.page_size ?? 20, 100), // API limita a máximo 100
       },
     }).then((r) => r.data),
 
