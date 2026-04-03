@@ -16,8 +16,8 @@ export default function SettingsPage() {
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.status,
     retry: 1, // Retry 1 vez em caso de erro
-    staleTime: 2 * 60_000, // 2 min cache — dados frescos por pouco tempo
-    refetchInterval: false, // Não refetch automático
+    staleTime: 5 * 60_000, // 5 min cache
+    refetchInterval: false, // ❌ Disable polling - backend returning errors
     placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega
   })
 

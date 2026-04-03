@@ -29,7 +29,11 @@ def _get_escritorio_id(request: Request) -> int:
 
 def _get_user_id(request: Request) -> int:
     payload = getattr(request.state, "user_payload", {})
-    return int(payload.get("sub", 0))
+    user_id = payload.get("sub", 0)
+    try:
+        return int(user_id) if user_id else 0
+    except (TypeError, ValueError):
+        return 0
 
 
 def _get_redis(request: Request):
@@ -63,50 +67,61 @@ async def list_processos(
     - Exclusivo: Oculta dados de outros escritórios (Multi-tenant).
     - Suporta filtros opcionais por status, cliente_id, busca de CNJ e score_nivel.
     """
-    escritorio_id = _get_escritorio_id(request)
+    try:
+        escritorio_id = _get_escritorio_id(request)
 
-    # Valida score_nivel antes de qualquer I/O
-    if score_nivel is not None and score_nivel not in _NIVEIS_SCORE_VALIDOS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"score_nivel inválido. Opções: {sorted(_NIVEIS_SCORE_VALIDOS)}",
+        # Valida score_nivel antes de qualquer I/O
+        if score_nivel is not None and score_nivel not in _NIVEIS_SCORE_VALIDOS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"score_nivel inválido. Opções: {sorted(_NIVEIS_SCORE_VALIDOS)}",
+            )
+
+        registrar_acesso(
+            _get_user_id(request),
+            f"processos:escritorio:{escritorio_id}",
+            "leitura",
+            _get_ip(request),
         )
 
-    registrar_acesso(
-        _get_user_id(request),
-        f"processos:escritorio:{escritorio_id}",
-        "leitura",
-        _get_ip(request),
-    )
+        stmt = select(Processo).where(Processo.escritorio_id == escritorio_id)
 
-    stmt = select(Processo).where(Processo.escritorio_id == escritorio_id)
+        if status_processo:
+            stmt = stmt.where(Processo.status == status_processo)
+        if cliente_id:
+            stmt = stmt.where(Processo.cliente_id == cliente_id)
+        if search:
+            stmt = stmt.where(Processo.numero_cnj.ilike(f"%{search}%"))
+        if score_nivel:
+            stmt = stmt.where(Processo.score_nivel == score_nivel)
 
-    if status_processo:
-        stmt = stmt.where(Processo.status == status_processo)
-    if cliente_id:
-        stmt = stmt.where(Processo.cliente_id == cliente_id)
-    if search:
-        stmt = stmt.where(Processo.numero_cnj.ilike(f"%{search}%"))
-    if score_nivel:
-        stmt = stmt.where(Processo.score_nivel == score_nivel)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await db.scalar(count_stmt)
 
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = await db.scalar(count_stmt)
+        stmt = stmt.order_by(Processo.created_at.desc())
+        stmt = stmt.offset((page - 1) * per_page).limit(per_page)
 
-    stmt = stmt.order_by(Processo.created_at.desc())
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+        result = await db.execute(stmt)
+        processos = result.scalars().all()
 
-    result = await db.execute(stmt)
-    processos = result.scalars().all()
+        total_valid = total or 0
 
-    total_valid = total or 0
-
-    return ProcessoList(
-        items=list(processos),  # type: ignore[arg-type]
-        page=page,
-        per_page=per_page,
-        total=total_valid,
-    )
+        return ProcessoList(
+            items=list(processos),  # type: ignore[arg-type]
+            page=page,
+            per_page=per_page,
+            total=total_valid,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import structlog
+        logger = structlog.get_logger(__name__)
+        logger.error("list_processos_erro", erro=str(exc), exc_info=True, page=page)
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao listar processos. Tente novamente em alguns instantes.",
+        ) from exc
 
 
 @router.post("", response_model=ProcessoResponse, status_code=status.HTTP_201_CREATED)
