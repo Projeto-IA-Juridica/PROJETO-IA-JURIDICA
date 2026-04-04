@@ -559,9 +559,10 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 ---
 
-# TASKS — Feature Harvey: Hub do Advogado
+# TASKS — Feature Hub do Advogado (Claude Opus — ex-Harvey)
 
-> **Conceito:** Ecossistema de IA dual — cliente usa Claude (fluido), advogado usa Harvey AI (raciocínio jurídico pesado) via WhatsApp dedicado. Um Roteador de Confiança decide quando Claude delega para Harvey no fluxo do cliente.
+> **Conceito:** Ecossistema de IA dual — cliente usa Claude (fluido), advogado usa Claude Opus (raciocínio jurídico pesado) via WhatsApp dedicado. Um Roteador de Confiança decide quando Claude delega para Claude Opus no fluxo do cliente.
+> **Nota:** Harvey AI foi substituído por Claude Opus (`claude-opus-4-6`) como modelo de escalação. Todos os campos e configs renomeados de `harvey_*` para `escalacao_*`.
 > **Acesso:** Hub do Advogado restrito a `advogado` e `admin`. Roteador opera transparentemente no fluxo do cliente.
 > **Referência:** [docs/FEATURE_HARVEY_HUB_ADVOGADO.md](docs/FEATURE_HARVEY_HUB_ADVOGADO.md)
 
@@ -571,10 +572,10 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 
 | Fase | Descrição | Status |
 |------|-----------|--------|
-| Fase 1 | Fundação Harvey (client + settings + feature flag) | ❌ Não iniciada |
-| Fase 2 | Roteador de Confiança Claude → Harvey | ❌ Não iniciada |
+| Fase 1 | Fundação (client + settings + feature flag) | ✅ Concluída |
+| Fase 2 | Roteador de Confiança Claude → Claude Opus | ✅ Concluída |
 | Fase 3 | Hub do Advogado via WhatsApp | ❌ Não iniciada |
-| Fase 4 | Análise de Petições (PDF → Harvey) | ❌ Não iniciada |
+| Fase 4 | Análise de Petições (PDF → Claude Opus) | ❌ Não iniciada |
 | Fase 5 | Resumo de Processos e Insights CRM | ❌ Não iniciada |
 
 ---
@@ -629,172 +630,66 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-## FASE 1 — Fundação Harvey (2–3 dias)
+## FASE 1 — Fundação (Claude Opus como escalação) ✅ CONCLUÍDA
 
-> Objetivo: Harvey funcionando isoladamente, sem impacto algum no fluxo existente do cliente.
-> Critério de aceite: `HarveyClient.gerar_resposta()` retorna resposta válida num teste de integração.
-
----
-
-### 1.1 — `HarveyClient` (`services/ai/harvey_client.py`) — arquivo NOVO
-
-- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/harvey_client.py`
-- [ ] Criar enum `TipoAnaliseHarvey` com valores:
-  - `ANALISE_COMPLETA = "analise_completa"`
-  - `PONTOS_FRACOS = "pontos_fracos"`
-  - `JURISPRUDENCIA_RELACIONADA = "jurisprudencia_relacionada"`
-  - `RESUMO_EXECUTIVO = "resumo_executivo"`
-  - `CONTRA_ARGUMENTOS = "contra_argumentos"`
-- [ ] Criar dataclass `HarveyResponse` com campos:
-  - `conteudo: str`
-  - `tokens_input: int`
-  - `tokens_output: int`
-  - `custo_estimado: Decimal`
-  - `modelo: str`
-  - `latencia_ms: int`
-- [ ] Criar dataclass `AnaliseHarveyResponse` com campos:
-  - `tipo_peca: str`
-  - `pontos_fortes: list[str]`
-  - `vulnerabilidades: list[str]`
-  - `argumentos_ausentes: list[str]`
-  - `precedentes_relevantes: list[str]`
-  - `sugestoes: list[str]`
-  - `score_qualidade: int` (0–100)
-  - `recomendacao_final: str`
-  - `tokens_input: int`
-  - `tokens_output: int`
-  - `custo_estimado: Decimal`
-- [ ] Criar dataclass `Jurisprudencia` com campos:
-  - `ementa: str`
-  - `tribunal: str`
-  - `numero_processo: str`
-  - `data_julgamento: str`
-  - `aplicabilidade: str` — `"FAVORAVEL" | "DESFAVORAVEL" | "NEUTRO"`
-  - `relevancia_score: float`
-- [ ] Criar classe `HarveyClient` com constantes:
-  - `MODELO_HARVEY = "harvey-v3"` (confirmar com documentação Harvey)
-  - `MAX_TOKENS = 2048`
-  - `TIMEOUT = 45` (Harvey mais lento — raciocínio denso)
-  - `MAX_RETRIES = 3`
-- [ ] Implementar `__init__` com:
-  - Leitura de `settings.HARVEY_API_KEY` e `settings.HARVEY_API_URL`
-  - Circuit breaker via `pybreaker` (padrão já usado no DataJud)
-  - Client HTTP async (`httpx.AsyncClient` com timeout configurável)
-- [ ] Implementar método `async gerar_resposta(system_prompt, mensagem_usuario, contexto_rag, escritorio_id) -> HarveyResponse`:
-  - Retry com backoff exponencial (3 tentativas)
-  - Circuit breaker abre após 3 falhas consecutivas
-  - Log estruturado com `structlog` (latência, tokens, custo)
-  - Retornar `HarveyResponse` tipado com tokens consumidos + custo
-- [ ] Implementar método `async analisar_peticao(conteudo_peticao, tipo_analise, contexto_processo) -> AnaliseHarveyResponse`:
-  - Usar endpoint dedicado Harvey para documentos jurídicos (se disponível)
-  - Chunking do conteúdo se PDF muito grande (reusar lógica de `ingestion.py`)
-  - Parsear resposta para `AnaliseHarveyResponse` estruturado
-- [ ] Implementar método `async pesquisar_jurisprudencia(query, tribunal, periodo) -> list[Jurisprudencia]`:
-  - Usar base de dados jurídica Harvey
-  - Ordenar do mais recente para o mais antigo
-  - Parsear para lista de `Jurisprudencia`
-- [ ] Implementar fallback: se Harvey indisponível (circuit breaker aberto), levantar `HarveyUnavailableError` para o chamador tratar com Claude
+> Harvey substituído por `claude-opus-4-6` via SDK Anthropic. Campos renomeados de `harvey_*` para `escalacao_*`.
 
 ---
 
-### 1.2 — Variáveis de ambiente (`shared/config/settings.py`) — arquivo EXISTENTE
+### 1.1 — `EscalationClient` (`services/ai/escalation_client.py`) ✅ FEITO
 
-- [ ] Adicionar em `shared/config/settings.py`:
-  ```python
-  HARVEY_API_KEY: str = ""
-  HARVEY_API_URL: str = "https://api.harvey.ai/v1"
-  HARVEY_MODELO: str = "harvey-v3"
-  HARVEY_TIMEOUT: int = 45
-  HARVEY_HABILITADO: bool = False
-  ```
-- [ ] Adicionar `HARVEY_API_KEY` no `.env.example` com comentário explicativo
-- [ ] Documentar no `.env.example` que `HARVEY_HABILITADO=False` por padrão (feature flag global; controle por escritório é via banco)
-
----
-
-### 1.3 — Feature flag por escritório (`shared/models/escritorio.py`) — arquivo EXISTENTE
-
-- [ ] Adicionar campos ao modelo `Escritorio`:
-  ```python
-  harvey_habilitado: Mapped[bool] = mapped_column(default=False)
-  harvey_canal_advogado_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
-  harvey_quota_tokens_mes: Mapped[int] = mapped_column(default=500_000)
-  harvey_tokens_usados_mes: Mapped[int] = mapped_column(default=0)
-  harvey_confidence_threshold: Mapped[float] = mapped_column(default=0.70)
-  ```
-- [ ] `harvey_canal_advogado_numero`: se `None`, usa o mesmo número do cliente distinguindo por role do remetente
+- [x] Criar arquivo `feature_1_ia_personalizada/services/ai/escalation_client.py`
+- [x] Criar enum `TipoAnalise` (ex-`TipoAnaliseHarvey`)
+- [x] Criar dataclass `EscalacaoResponse` (ex-`HarveyResponse`)
+- [x] Criar dataclass `AnaliseEscalacaoResponse` (ex-`AnaliseHarveyResponse`)
+- [x] Criar dataclass `Jurisprudencia`
+- [x] Criar classe `EscalationClient` usando SDK Anthropic com `claude-opus-4-6`
+- [x] Implementar retry + backoff + circuit breaker
+- [x] Implementar `gerar_resposta`, `analisar_peticao`, `pesquisar_jurisprudencia`
+- [x] Implementar fallback com `EscalacaoUnavailableError`
 
 ---
 
-### 1.4 — Migration Alembic: campos Harvey em `escritorios` — arquivo NOVO
+### 1.2 — Variáveis de ambiente (`shared/config/settings.py`) ✅ FEITO
 
-> **Atenção:** As migrations recentes do projeto usam formato date-based (`20260402_HHMM_HASH_descricao.py`), não numeração sequencial. Seguir o mesmo padrão.
-
-- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_harvey_fields_to_escritorios.py` (substituir HHMM e HASH gerados pelo `alembic revision`)
-- [ ] `upgrade()`:
-  ```sql
-  ALTER TABLE escritorios ADD COLUMN harvey_habilitado BOOLEAN DEFAULT FALSE;
-  ALTER TABLE escritorios ADD COLUMN harvey_canal_advogado_numero VARCHAR(20);
-  ALTER TABLE escritorios ADD COLUMN harvey_quota_tokens_mes INTEGER DEFAULT 500000;
-  ALTER TABLE escritorios ADD COLUMN harvey_tokens_usados_mes INTEGER DEFAULT 0;
-  ALTER TABLE escritorios ADD COLUMN harvey_confidence_threshold FLOAT DEFAULT 0.70;
-  ```
-- [ ] `downgrade()`: `DROP COLUMN` em todos os 5 campos
-- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1` passam sem erro
+- [x] Adicionado `MODELO_ESCALACAO: str = "claude-opus-4-6"`
+- [x] Adicionado `ESCALACAO_HABILITADO: bool = False`
 
 ---
 
-### 1.5 — Testes unitários `HarveyClient` — arquivo NOVO
+### 1.3 — Feature flag por escritório (`shared/models/escritorio.py`) ✅ FEITO
 
-- [ ] Criar `tests/unit/test_harvey_client.py`
-- [ ] Teste: `gerar_resposta()` com mock HTTP retorna `HarveyResponse` tipado corretamente
-- [ ] Teste: retry dispara em falha HTTP 500 (3 tentativas, depois levanta exceção)
-- [ ] Teste: circuit breaker abre após 3 falhas e não tenta nova chamada
-- [ ] Teste: `analisar_peticao()` parseia resposta estruturada de análise
-- [ ] Teste: `pesquisar_jurisprudencia()` retorna lista de `Jurisprudencia` ordenada por data
-- [ ] Teste: `HarveyUnavailableError` é levantado quando circuit breaker está aberto
+- [x] Campos adicionados como `escalacao_habilitada`, `escalacao_canal_advogado_numero`, `escalacao_quota_tokens_mes`, `escalacao_tokens_usados_mes`, `escalacao_confidence_threshold`
 
 ---
 
-## FASE 2 — Roteador de Confiança (2–3 dias)
+### 1.4 — Migration Alembic: campos escalação em `escritorios` ✅ FEITO
 
-> Objetivo: Claude delega automaticamente para Harvey quando confiança na resposta está abaixo do threshold.
-> Critério de aceite: pergunta jurídica complexa → score < 0.70 → Harvey responde. Pergunta de status → Claude responde.
+- [x] `alembic/versions/20260404_1000_a1b2c3d4e5f6_add_harvey_fields_to_escritorios.py` criada
 
 ---
 
-### 2.1 — `ConfidenceRouter` (`services/ai/confidence_router.py`) — arquivo NOVO
+### 1.5 — Testes unitários `EscalationClient` ✅ FEITO
 
-- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/confidence_router.py`
-- [ ] Criar dataclass `ConfidenceScore`:
-  ```python
-  valor: float                    # 0.0 → 1.0
-  componentes: dict               # breakdown por dimensão
-  deve_escalar_harvey: bool       # True se valor < threshold
-  motivo: str                     # log interno
-  ```
-- [ ] Criar classe `ConfidenceRouter` com constante `THRESHOLD = 0.70`
-- [ ] Implementar método `async avaliar(mensagem, resposta_claude, tipo_intencao, rag_docs, fact_check_result, historico_cliente, escritorio_id) -> ConfidenceScore`
-  - **score_cobertura_rag** (peso 35%): `max(similaridade_coseno)` dos docs recuperados; se RAG retornou 0 docs → score = 0.0
-  - **score_fact_checker** (peso 25%): o `fact_checker.py` retorna um dict `{"verificado": bool, "correcoes": list[str], "dados_reais_resumo": str}` — **NÃO retorna um float**. Converter para float no `ConfidenceRouter`: `score = 1.0 if result["verificado"] else max(0.0, 1.0 - 0.3 * len(result["correcoes"]))`. Reaproveitar o resultado já disponível no state sem chamar fact-checker novamente.
-  - **score_intencao** (peso 25%): mapeamento determinístico por `tipo_intencao`:
-    - `saudacao` → 1.0
-    - `status_processo` → 0.90
-    - `reclamacao` → 0.75
-    - `pergunta_juridica` → 0.45
-    - `perspectiva_caso` → 0.30
-  - **score_historico_cliente** (peso 15%): razão entre respostas com NPS ≥ 4 nas últimas 20 interações do cliente
-  - Fórmula: `0.35 × rag + 0.25 × fact + 0.25 × intencao + 0.15 × historico`
-  - Condições de roteamento forçado para Harvey (score ignorado):
-    - `tipo_intencao == "jurídica_complexa"` → sempre Harvey
-    - `fact_check_result["hallucination_score"] > 0.30` → Harvey
-    - Número de tentativas de geração > 1 → Harvey
-    - Mensagem contém termos: "CPC art", "STJ", "STF", "Súmula", "CLT art" → Harvey
-- [ ] Implementar método `async rotear(state, score) -> str`:
-  - Retorna `"claude"` ou `"harvey"`
-  - Verificar `escritorio.harvey_habilitado` antes de rotear para Harvey
-  - Verificar quota: se `harvey_tokens_usados_mes >= harvey_quota_tokens_mes` → forçar `"claude"` com log de aviso
-  - Usar `escritorio.harvey_confidence_threshold` em vez do `THRESHOLD` fixo (ajustável por escritório)
+- [x] `tests/unit/test_escalation_client.py` criado (ex-`test_harvey_client.py`)
+
+---
+
+## FASE 2 — Roteador de Confiança ✅ CONCLUÍDA
+
+> Claude delega automaticamente para Claude Opus quando confiança está abaixo do threshold.
+> Critério de aceite: pergunta jurídica complexa → score < 0.70 → Claude Opus responde. Pergunta de status → Claude responde.
+
+---
+
+### 2.1 — `ConfidenceRouter` (`services/ai/confidence_router.py`) ✅ FEITO
+
+- [x] `feature_1_ia_personalizada/services/ai/confidence_router.py` criado
+- [x] Dataclass `ConfidenceScore` com `valor`, `componentes`, `deve_escalar_harvey`, `motivo`
+- [x] Classe `ConfidenceRouter` com `THRESHOLD = 0.70`
+- [x] Método `avaliar()` com fórmula ponderada (rag×0.35 + fact×0.25 + intencao×0.25 + historico×0.15)
+- [x] Termos de forçamento (CPC art, STJ, STF, Súmula, CLT art) via regex
+- [x] Método `rotear()` usando `escalacao_habilitada` e `escalacao_confidence_threshold` do escritório
 
 ---
 
