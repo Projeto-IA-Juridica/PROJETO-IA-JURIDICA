@@ -157,6 +157,19 @@ class Escritorio(Base, TimestampMixin):
     #             perfil_cliente_ideal, diferenciais, gerado_em}
     dna_prospeccao: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
 
+    # --- Feature Harvey: Hub do Advogado ---
+    # harvey_habilitado: liga/desliga o Hub por escritório (feature flag por tenant).
+    # harvey_canal_advogado_numero: número WhatsApp dedicado ao Hub; se None usa o mesmo
+    #   canal do cliente distinguindo por role do remetente.
+    # harvey_quota_tokens_mes: limite mensal de tokens Harvey (input+output).
+    # harvey_tokens_usados_mes: consumo acumulado no mês corrente.
+    # harvey_confidence_threshold: score mínimo do ConfidenceRouter para não escalar ao Harvey (0.0–1.0).
+    harvey_habilitado: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    harvey_canal_advogado_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    harvey_quota_tokens_mes: Mapped[int] = mapped_column(Integer, default=500_000, nullable=False)
+    harvey_tokens_usados_mes: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    harvey_confidence_threshold: Mapped[float] = mapped_column(default=0.70, nullable=False)
+
     # --- Relacionamentos ---
     usuarios: Mapped[list["Usuario"]] = relationship(  # noqa: F821
         "Usuario", back_populates="escritorio", cascade="all, delete-orphan"

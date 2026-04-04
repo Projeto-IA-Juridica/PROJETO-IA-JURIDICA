@@ -72,6 +72,15 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: str | None = None
     LINKEDIN_CLIENT_SECRET: str | None = None
 
+    # Harvey AI — Feature Hub do Advogado
+    # Confirmar endpoint e modelo com a equipe Harvey antes de usar em produção.
+    # HARVEY_HABILITADO=False por padrão; controle por escritório é via banco (harvey_habilitado).
+    HARVEY_API_KEY: str = ""
+    HARVEY_API_URL: str = "https://api.harvey.ai/v1"
+    HARVEY_MODELO: str = "harvey-v3"
+    HARVEY_TIMEOUT: int = 45
+    HARVEY_HABILITADO: bool = False
+
     # CORS
     CORS_ALLOWED_ORIGINS: list[str] = [
         "https://app.conciergejuridico.com",
