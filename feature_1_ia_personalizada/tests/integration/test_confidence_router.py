@@ -93,7 +93,7 @@ class TestRoteamentoPorScore:
         destino = router.rotear(score, _escritorio())
         assert destino == "claude"
 
-    def test_perspectiva_caso_gera_score_baixo_e_roteia_harvey(self, router: ConfidenceRouter):
+    def test_perspectiva_caso_gera_score_baixo_e_roteia_escalacao(self, router: ConfidenceRouter):
         """Perspectiva de caso tem score base 0.30 — deve cair abaixo do threshold."""
         score = _avaliar(
             router,
@@ -119,7 +119,7 @@ class TestRoteamentoPorScore:
         destino = router.rotear(score, _escritorio(threshold=0.40))
         assert destino == "claude"
 
-    def test_score_abaixo_threshold_customizado_roteia_harvey(self, router: ConfidenceRouter):
+    def test_score_abaixo_threshold_customizado_roteia_escalacao(self, router: ConfidenceRouter):
         """Escritório exigente (threshold=0.85) — score normal não passa."""
         score = _avaliar(
             router,
@@ -137,9 +137,9 @@ class TestRoteamentoPorScore:
 # ---------------------------------------------------------------------------
 
 
-class TestForcamentosHarvey:
-    def test_mensagem_com_stj_forca_harvey(self, router: ConfidenceRouter):
-        """Referência ao STJ força Harvey independente do score de status."""
+class TestForcamentosEscalacao:
+    def test_mensagem_com_stj_forca_escalacao(self, router: ConfidenceRouter):
+        """Referência ao STJ força escalação independente do score de status."""
         score = _avaliar(
             router,
             mensagem="O STJ tem alguma súmula sobre isso?",
@@ -152,7 +152,7 @@ class TestForcamentosHarvey:
         assert "STJ" in score.motivo
         assert router.rotear(score, _escritorio()) == "escalacao"
 
-    def test_mensagem_com_cpc_art_forca_harvey(self, router: ConfidenceRouter):
+    def test_mensagem_com_cpc_art_forca_escalacao(self, router: ConfidenceRouter):
         score = _avaliar(
             router,
             mensagem="Quais os efeitos do CPC art. 485?",
@@ -162,7 +162,7 @@ class TestForcamentosHarvey:
         assert score.deve_escalar is True
         assert "CPC" in score.motivo
 
-    def test_mensagem_com_sumula_forca_harvey(self, router: ConfidenceRouter):
+    def test_mensagem_com_sumula_forca_escalacao(self, router: ConfidenceRouter):
         score = _avaliar(
             router,
             mensagem="A Súmula 331 do TST se aplica aqui?",
@@ -171,8 +171,8 @@ class TestForcamentosHarvey:
 
         assert score.deve_escalar is True
 
-    def test_hallucination_score_alto_forca_harvey(self, router: ConfidenceRouter):
-        """hallucination_score > 0.30 força Harvey independente da intenção."""
+    def test_hallucination_score_alto_forca_escalacao(self, router: ConfidenceRouter):
+        """hallucination_score > 0.30 força escalação independente da intenção."""
         score = _avaliar(
             router,
             tipo_intencao="status",                    # normalmente seria claude
@@ -194,8 +194,8 @@ class TestForcamentosHarvey:
 
         assert score.deve_escalar is False
 
-    def test_multiplas_tentativas_forcam_harvey(self, router: ConfidenceRouter):
-        """Mais de 1 tentativa de geração indica instabilidade — escala Harvey."""
+    def test_multiplas_tentativas_forcam_escalacao(self, router: ConfidenceRouter):
+        """Mais de 1 tentativa de geração indica instabilidade — escala Opus."""
         score = _avaliar(
             router,
             tipo_intencao="status",
@@ -217,7 +217,7 @@ class TestForcamentosHarvey:
 
         assert score.deve_escalar is False
 
-    def test_intencao_juridica_complexa_forca_harvey(self, router: ConfidenceRouter):
+    def test_intencao_juridica_complexa_forca_escalacao(self, router: ConfidenceRouter):
         score = _avaliar(router, tipo_intencao="juridica_complexa")
 
         assert score.deve_escalar is True
@@ -230,10 +230,10 @@ class TestForcamentosHarvey:
 # ---------------------------------------------------------------------------
 
 
-class TestControleEscritorioHarvey:
-    def test_harvey_desabilitado_sempre_retorna_claude(self, router: ConfidenceRouter):
+class TestControleEscritorioEscalacao:
+    def test_escalacao_desabilitada_sempre_retorna_claude(self, router: ConfidenceRouter):
         """Com escalacao_habilitada=False, score e forçamentos são ignorados."""
-        # Forçamento ativo (STJ na mensagem) mas Harvey desabilitado
+        # Forçamento ativo (STJ na mensagem) mas Escalação desabilitada
         score = _avaliar(
             router,
             mensagem="O STJ decidiu sobre isso?",
@@ -244,8 +244,8 @@ class TestControleEscritorioHarvey:
         destino = router.rotear(score, _escritorio(escalacao_habilitada=False))
         assert destino == "claude"
 
-    def test_harvey_desabilitado_ignora_score_baixo(self, router: ConfidenceRouter):
-        """Score baixo sem Harvey habilitado → Claude."""
+    def test_escalacao_desabilitada_ignora_score_baixo(self, router: ConfidenceRouter):
+        """Score baixo sem escalação habilitada → Claude."""
         score = _avaliar(router, tipo_intencao="perspectiva_caso", rag_docs=[])
 
         destino = router.rotear(score, _escritorio(escalacao_habilitada=False))
@@ -266,7 +266,7 @@ class TestControleEscritorioHarvey:
         )
         assert destino == "claude"
 
-    def test_quota_nao_esgotada_permite_harvey(self, router: ConfidenceRouter):
+    def test_quota_nao_esgotada_permite_escalacao(self, router: ConfidenceRouter):
         score = _avaliar(router, tipo_intencao="juridica_complexa")
 
         destino = router.rotear(

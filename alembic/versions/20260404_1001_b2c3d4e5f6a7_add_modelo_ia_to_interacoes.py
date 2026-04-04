@@ -26,7 +26,7 @@ def upgrade() -> None:
             sa.String(length=50),
             server_default="claude",
             nullable=False,
-            comment="IA que gerou a resposta: claude | harvey | claude_harvey_fallback",
+            comment="IA que gerou a resposta: claude | claude_opus | claude_opus_fallback",
         ),
     )
 

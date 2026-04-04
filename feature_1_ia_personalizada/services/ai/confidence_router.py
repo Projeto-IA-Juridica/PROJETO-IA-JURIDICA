@@ -72,7 +72,7 @@ _PESO_HISTORICO = 0.15
 class ConfidenceScore:
     valor: float                        # 0.0 → 1.0
     componentes: dict[str, float]       # breakdown por dimensão
-    deve_escalar_escalacao: bool           # True se valor < threshold ou forçamento
+    deve_escalar: bool           # True se valor < threshold ou forçamento
     motivo: str                         # log interno — razão do roteamento
 
 
@@ -154,7 +154,7 @@ class ConfidenceRouter:
                     "intencao": 0.0,
                     "historico": 0.0,
                 },
-                deve_escalar_escalacao=True,
+                deve_escalar=True,
                 motivo=motivo_forcado,
             )
 
@@ -193,7 +193,7 @@ class ConfidenceRouter:
         return ConfidenceScore(
             valor=round(valor, 4),
             componentes=componentes,
-            deve_escalar_escalacao=False,  # rotear() decide com base no threshold
+            deve_escalar=False,  # rotear() decide com base no threshold
             motivo="score_calculado",
         )
 
@@ -204,7 +204,7 @@ class ConfidenceRouter:
         Verifica (em ordem):
         1. Claude Opus desabilitado no escritório → sempre claude
         2. Quota Claude Opus esgotada → força claude com log de aviso
-        3. Forçamento (score.deve_escalar_escalacao=True) → escalacao
+        3. Forçamento (score.deve_escalar=True) → escalacao
         4. Score abaixo do threshold do escritório → escalacao
         5. Caso contrário → claude
 
@@ -226,7 +226,7 @@ class ConfidenceRouter:
             return "claude"
 
         # Regra 3: forçamento (independente de score)
-        if score.deve_escalar_escalacao:
+        if score.deve_escalar:
             return "escalacao"
 
         # Regra 4: score abaixo do threshold configurado por escritório
