@@ -1,13 +1,13 @@
 # feature_1_ia_personalizada/services/ai/confidence_router.py
 """
 Roteador de Confiança — decide se a resposta Claude é suficiente ou se
-deve ser escalada para Harvey AI.
+deve ser escalada para Claude Opus AI.
 
 Lógica em duas camadas:
 1. Condições de forçamento (override do score): certas situações sempre vão
-   para Harvey independente do score calculado.
+   para Claude Opus independente do score calculado.
 2. Score ponderado (0.0-1.0): se o score ficar abaixo do threshold do
-   escritório, roteia para Harvey.
+   escritório, roteia para Claude Opus.
 
 O roteador é stateless — recebe todos os dados necessários como parâmetros
 e retorna um ConfidenceScore imutável.
@@ -27,10 +27,10 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Termos jurídicos que forçam roteamento para Harvey (independente do score)
+# Termos jurídicos que forçam roteamento para Claude Opus (independente do score)
 # ---------------------------------------------------------------------------
 
-_TERMOS_HARVEY_FORCADO: list[re.Pattern] = [
+_TERMOS_ESCALACAO_FORCADO: list[re.Pattern] = [
     re.compile(r"\bCPC\s+art\.?\s*\d+", re.IGNORECASE),
     re.compile(r"\bCLT\s+art\.?\s*\d+", re.IGNORECASE),
     re.compile(r"\bSTJ\b", re.IGNORECASE),
@@ -41,7 +41,7 @@ _TERMOS_HARVEY_FORCADO: list[re.Pattern] = [
 # ---------------------------------------------------------------------------
 # Score base por tipo de intenção (componente de 25% da fórmula)
 # Intenções simples têm score alto (Claude consegue responder bem).
-# Intenções jurídicas complexas têm score baixo (Harvey é melhor).
+# Intenções jurídicas complexas têm score baixo (Claude Opus é melhor).
 # ---------------------------------------------------------------------------
 
 _SCORE_INTENCAO: dict[str, float] = {
@@ -53,7 +53,7 @@ _SCORE_INTENCAO: dict[str, float] = {
     "pergunta_juridica": 0.45,
     "perspectivas": 0.35,
     "perspectiva_caso": 0.30,
-    "juridica_complexa": 0.0,   # sempre Harvey via forçamento abaixo
+    "juridica_complexa": 0.0,   # sempre Claude Opus via forçamento abaixo
 }
 
 # Pesos da fórmula de score ponderado
@@ -72,7 +72,7 @@ _PESO_HISTORICO = 0.15
 class ConfidenceScore:
     valor: float                        # 0.0 → 1.0
     componentes: dict[str, float]       # breakdown por dimensão
-    deve_escalar_harvey: bool           # True se valor < threshold ou forçamento
+    deve_escalar_escalacao: bool           # True se valor < threshold ou forçamento
     motivo: str                         # log interno — razão do roteamento
 
 
@@ -83,7 +83,7 @@ class ConfidenceScore:
 
 class ConfidenceRouter:
     """
-    Avalia a confiança da resposta Claude e decide se deve escalar para Harvey.
+    Avalia a confiança da resposta Claude e decide se deve escalar para Claude Opus.
 
     Uso típico no nó LangGraph `avaliar_confianca`:
 
@@ -101,7 +101,7 @@ class ConfidenceRouter:
         destino = router.rotear(score, escritorio)
     """
 
-    THRESHOLD = 0.70  # default; sobrescrito por escritorio.harvey_confidence_threshold
+    THRESHOLD = 0.70  # default; sobrescrito por escritorio.escalacao_confidence_threshold
 
     def avaliar(
         self,
@@ -141,7 +141,7 @@ class ConfidenceRouter:
         )
         if motivo_forcado:
             logger.info(
-                "confidence_harvey_forcado",
+                "confidence_escalacao_forcado",
                 motivo=motivo_forcado,
                 escritorio_id=escritorio_id,
                 tipo_intencao=tipo_intencao,
@@ -154,7 +154,7 @@ class ConfidenceRouter:
                     "intencao": 0.0,
                     "historico": 0.0,
                 },
-                deve_escalar_harvey=True,
+                deve_escalar_escalacao=True,
                 motivo=motivo_forcado,
             )
 
@@ -193,44 +193,44 @@ class ConfidenceRouter:
         return ConfidenceScore(
             valor=round(valor, 4),
             componentes=componentes,
-            deve_escalar_harvey=False,  # rotear() decide com base no threshold
+            deve_escalar_escalacao=False,  # rotear() decide com base no threshold
             motivo="score_calculado",
         )
 
     def rotear(self, score: ConfidenceScore, escritorio: "Escritorio") -> str:
         """
-        Decide o destino da mensagem: "claude" ou "harvey".
+        Decide o destino da mensagem: "claude" ou "escalacao".
 
         Verifica (em ordem):
-        1. Harvey desabilitado no escritório → sempre claude
-        2. Quota Harvey esgotada → força claude com log de aviso
-        3. Forçamento (score.deve_escalar_harvey=True) → harvey
-        4. Score abaixo do threshold do escritório → harvey
+        1. Claude Opus desabilitado no escritório → sempre claude
+        2. Quota Claude Opus esgotada → força claude com log de aviso
+        3. Forçamento (score.deve_escalar_escalacao=True) → escalacao
+        4. Score abaixo do threshold do escritório → escalacao
         5. Caso contrário → claude
 
         Returns:
-            "claude" ou "harvey"
+            "claude" ou "escalacao"
         """
         # Regra 1: feature flag global do escritório
-        if not escritorio.harvey_habilitado:
+        if not escritorio.escalacao_habilitada:
             return "claude"
 
         # Regra 2: quota mensal esgotada
-        if escritorio.harvey_tokens_usados_mes >= escritorio.harvey_quota_tokens_mes:
+        if escritorio.escalacao_tokens_usados_mes >= escritorio.escalacao_quota_tokens_mes:
             logger.warning(
-                "harvey_quota_esgotada",
+                "escalacao_quota_esgotada",
                 escritorio_id=escritorio.id,
-                usados=escritorio.harvey_tokens_usados_mes,
-                limite=escritorio.harvey_quota_tokens_mes,
+                usados=escritorio.escalacao_tokens_usados_mes,
+                limite=escritorio.escalacao_quota_tokens_mes,
             )
             return "claude"
 
         # Regra 3: forçamento (independente de score)
-        if score.deve_escalar_harvey:
-            return "harvey"
+        if score.deve_escalar_escalacao:
+            return "escalacao"
 
         # Regra 4: score abaixo do threshold configurado por escritório
-        threshold = escritorio.harvey_confidence_threshold
+        threshold = escritorio.escalacao_confidence_threshold
         if score.valor < threshold:
             logger.info(
                 "confidence_abaixo_threshold",
@@ -238,7 +238,7 @@ class ConfidenceRouter:
                 threshold=threshold,
                 escritorio_id=escritorio.id,
             )
-            return "harvey"
+            return "escalacao"
 
         return "claude"
 
@@ -254,7 +254,7 @@ class ConfidenceRouter:
         tentativas_geracao: int,
     ) -> str | None:
         """
-        Retorna o motivo do forçamento se Harvey deve responder independente
+        Retorna o motivo do forçamento se Claude Opus deve responder independente
         do score, ou None se a avaliação ponderada deve prosseguir.
         """
         # Intenção explicitamente jurídica-complexa
@@ -271,7 +271,7 @@ class ConfidenceRouter:
             return f"multiplas_tentativas:{tentativas_geracao}"
 
         # Mensagem contém referências legais específicas
-        for padrao in _TERMOS_HARVEY_FORCADO:
+        for padrao in _TERMOS_ESCALACAO_FORCADO:
             match = padrao.search(mensagem)
             if match:
                 return f"termo_legal_detectado:{match.group(0)}"

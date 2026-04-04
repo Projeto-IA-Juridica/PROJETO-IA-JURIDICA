@@ -1,4 +1,4 @@
-"""add_harvey_fields_to_escritorios
+"""add_escalacao_fields_to_escritorios
 
 Revision ID: a1b2c3d4e5f6
 Revises: 35d8599fb2c0
@@ -21,16 +21,16 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column(
         "escritorios",
-        sa.Column("harvey_habilitado", sa.Boolean(), server_default="false", nullable=False),
+        sa.Column("escalacao_habilitada", sa.Boolean(), server_default="false", nullable=False),
     )
     op.add_column(
         "escritorios",
-        sa.Column("harvey_canal_advogado_numero", sa.String(length=20), nullable=True),
+        sa.Column("escalacao_canal_advogado_numero", sa.String(length=20), nullable=True),
     )
     op.add_column(
         "escritorios",
         sa.Column(
-            "harvey_quota_tokens_mes",
+            "escalacao_quota_tokens_mes",
             sa.Integer(),
             server_default="500000",
             nullable=False,
@@ -39,7 +39,7 @@ def upgrade() -> None:
     op.add_column(
         "escritorios",
         sa.Column(
-            "harvey_tokens_usados_mes",
+            "escalacao_tokens_usados_mes",
             sa.Integer(),
             server_default="0",
             nullable=False,
@@ -48,7 +48,7 @@ def upgrade() -> None:
     op.add_column(
         "escritorios",
         sa.Column(
-            "harvey_confidence_threshold",
+            "escalacao_confidence_threshold",
             sa.Float(),
             server_default="0.70",
             nullable=False,
@@ -57,8 +57,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("escritorios", "harvey_confidence_threshold")
-    op.drop_column("escritorios", "harvey_tokens_usados_mes")
-    op.drop_column("escritorios", "harvey_quota_tokens_mes")
-    op.drop_column("escritorios", "harvey_canal_advogado_numero")
-    op.drop_column("escritorios", "harvey_habilitado")
+    op.drop_column("escritorios", "escalacao_confidence_threshold")
+    op.drop_column("escritorios", "escalacao_tokens_usados_mes")
+    op.drop_column("escritorios", "escalacao_quota_tokens_mes")
+    op.drop_column("escritorios", "escalacao_canal_advogado_numero")
+    op.drop_column("escritorios", "escalacao_habilitada")

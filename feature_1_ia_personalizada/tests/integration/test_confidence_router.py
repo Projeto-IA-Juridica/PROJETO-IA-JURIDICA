@@ -28,17 +28,17 @@ from feature_1_ia_personalizada.services.ai.confidence_router import (
 
 
 def _escritorio(
-    harvey_habilitado: bool = True,
+    escalacao_habilitada: bool = True,
     threshold: float = 0.70,
     tokens_usados: int = 0,
     quota: int = 500_000,
 ) -> MagicMock:
     e = MagicMock()
     e.id = 1
-    e.harvey_habilitado = harvey_habilitado
-    e.harvey_confidence_threshold = threshold
-    e.harvey_tokens_usados_mes = tokens_usados
-    e.harvey_quota_tokens_mes = quota
+    e.escalacao_habilitada = escalacao_habilitada
+    e.escalacao_confidence_threshold = threshold
+    e.escalacao_tokens_usados_mes = tokens_usados
+    e.escalacao_quota_tokens_mes = quota
     return e
 
 
@@ -105,7 +105,7 @@ class TestRoteamentoPorScore:
 
         assert score.valor < 0.70
         destino = router.rotear(score, _escritorio())
-        assert destino == "harvey"
+        assert destino == "escalacao"
 
     def test_score_acima_threshold_customizado_roteia_claude(self, router: ConfidenceRouter):
         """Escritório com threshold reduzido a 0.40 — score médio já satisfaz."""
@@ -129,7 +129,7 @@ class TestRoteamentoPorScore:
         )
 
         destino = router.rotear(score, _escritorio(threshold=0.85))
-        assert destino == "harvey"
+        assert destino == "escalacao"
 
 
 # ---------------------------------------------------------------------------
@@ -148,9 +148,9 @@ class TestForcamentosHarvey:
             fact_check_result={"hallucination_score": 0.0},
         )
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
         assert "STJ" in score.motivo
-        assert router.rotear(score, _escritorio()) == "harvey"
+        assert router.rotear(score, _escritorio()) == "escalacao"
 
     def test_mensagem_com_cpc_art_forca_harvey(self, router: ConfidenceRouter):
         score = _avaliar(
@@ -159,7 +159,7 @@ class TestForcamentosHarvey:
             tipo_intencao="duvida_termo",
         )
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
         assert "CPC" in score.motivo
 
     def test_mensagem_com_sumula_forca_harvey(self, router: ConfidenceRouter):
@@ -169,7 +169,7 @@ class TestForcamentosHarvey:
             tipo_intencao="duvida_termo",
         )
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
 
     def test_hallucination_score_alto_forca_harvey(self, router: ConfidenceRouter):
         """hallucination_score > 0.30 força Harvey independente da intenção."""
@@ -179,9 +179,9 @@ class TestForcamentosHarvey:
             fact_check_result={"hallucination_score": 0.40},
         )
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
         assert "hallucination" in score.motivo
-        assert router.rotear(score, _escritorio()) == "harvey"
+        assert router.rotear(score, _escritorio()) == "escalacao"
 
     def test_hallucination_no_limite_nao_forca(self, router: ConfidenceRouter):
         """hallucination_score == 0.30 está no limite — não força (apenas > 0.30 força)."""
@@ -192,7 +192,7 @@ class TestForcamentosHarvey:
             fact_check_result={"hallucination_score": 0.30},
         )
 
-        assert score.deve_escalar_harvey is False
+        assert score.deve_escalar is False
 
     def test_multiplas_tentativas_forcam_harvey(self, router: ConfidenceRouter):
         """Mais de 1 tentativa de geração indica instabilidade — escala Harvey."""
@@ -202,7 +202,7 @@ class TestForcamentosHarvey:
             tentativas=2,
         )
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
         assert "multiplas_tentativas" in score.motivo
 
     def test_uma_tentativa_nao_forca(self, router: ConfidenceRouter):
@@ -215,14 +215,14 @@ class TestForcamentosHarvey:
             tentativas=1,
         )
 
-        assert score.deve_escalar_harvey is False
+        assert score.deve_escalar is False
 
     def test_intencao_juridica_complexa_forca_harvey(self, router: ConfidenceRouter):
         score = _avaliar(router, tipo_intencao="juridica_complexa")
 
-        assert score.deve_escalar_harvey is True
+        assert score.deve_escalar is True
         assert score.valor == 0.0
-        assert router.rotear(score, _escritorio()) == "harvey"
+        assert router.rotear(score, _escritorio()) == "escalacao"
 
 
 # ---------------------------------------------------------------------------
@@ -232,23 +232,23 @@ class TestForcamentosHarvey:
 
 class TestControleEscritorioHarvey:
     def test_harvey_desabilitado_sempre_retorna_claude(self, router: ConfidenceRouter):
-        """Com harvey_habilitado=False, score e forçamentos são ignorados."""
+        """Com escalacao_habilitada=False, score e forçamentos são ignorados."""
         # Forçamento ativo (STJ na mensagem) mas Harvey desabilitado
         score = _avaliar(
             router,
             mensagem="O STJ decidiu sobre isso?",
             tipo_intencao="status",
         )
-        assert score.deve_escalar_harvey is True  # forçamento ativado
+        assert score.deve_escalar is True  # forçamento ativado
 
-        destino = router.rotear(score, _escritorio(harvey_habilitado=False))
+        destino = router.rotear(score, _escritorio(escalacao_habilitada=False))
         assert destino == "claude"
 
     def test_harvey_desabilitado_ignora_score_baixo(self, router: ConfidenceRouter):
         """Score baixo sem Harvey habilitado → Claude."""
         score = _avaliar(router, tipo_intencao="perspectiva_caso", rag_docs=[])
 
-        destino = router.rotear(score, _escritorio(harvey_habilitado=False))
+        destino = router.rotear(score, _escritorio(escalacao_habilitada=False))
         assert destino == "claude"
 
     def test_quota_esgotada_retorna_claude(self, router: ConfidenceRouter):
@@ -273,7 +273,7 @@ class TestControleEscritorioHarvey:
             score,
             _escritorio(tokens_usados=499_999, quota=500_000),
         )
-        assert destino == "harvey"
+        assert destino == "escalacao"
 
 
 # ---------------------------------------------------------------------------
