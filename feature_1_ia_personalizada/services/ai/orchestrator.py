@@ -56,6 +56,11 @@ except Exception:  # ImportError ou TypeError (pydantic v1 + Python 3.12)
     _LANGGRAPH_OK = False
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
+from feature_1_ia_personalizada.services.ai.confidence_router import ConfidenceRouter
+from feature_1_ia_personalizada.services.ai.escalation_client import (
+    EscalacaoClient,
+    EscalacaoIndisponivelError,
+)
 from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.prompts import (
@@ -64,6 +69,8 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
     SYSTEM_PROMPT_DESABAFO,
     SYSTEM_PROMPT_DUVIDA_GERAL,
+    SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE,
+    SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA,
     SYSTEM_PROMPT_PERSPECTIVAS,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,

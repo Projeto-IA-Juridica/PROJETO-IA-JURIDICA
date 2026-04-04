@@ -693,106 +693,55 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-### 2.2 — Campo `modelo_ia` em `Interacao` (`shared/models/interacao.py`) — arquivo EXISTENTE
+### 2.2 — Campo `modelo_ia` em `Interacao` ✅ FEITO
 
-- [ ] Adicionar campo ao modelo `Interacao`:
-  ```python
-  modelo_ia: Mapped[str] = mapped_column(String(50), server_default="claude")
-  # Valores: 'claude', 'harvey', 'claude_harvey_fallback'
-  ```
+- [x] Campo `modelo_ia` adicionado em `shared/models/interacao.py:94`
 
 ---
 
-### 2.3 — Migration Alembic: `modelo_ia` em `interacoes` — arquivo NOVO
+### 2.3 — Migration Alembic: `modelo_ia` em `interacoes` ✅ FEITO
 
-- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_modelo_ia_to_interacoes.py` (formato date-based — ver nota em 1.4)
-- [ ] `upgrade()`:
-  ```sql
-  ALTER TABLE interacoes ADD COLUMN modelo_ia VARCHAR(50) DEFAULT 'claude';
-  ```
-- [ ] `downgrade()`: `DROP COLUMN modelo_ia`
-- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1` passam
+- [x] `alembic/versions/20260404_1001_b2c3d4e5f6a7_add_modelo_ia_to_interacoes.py` criada
 
 ---
 
-### 2.4 — Dois novos nós no LangGraph Orchestrator (`services/ai/orchestrator.py`) — arquivo EXISTENTE
+### 2.4 — Dois novos nós no LangGraph Orchestrator ❌ PENDENTE
 
-- [ ] Adicionar 2 campos em `ConversationState` (TypedDict em `orchestrator.py`):
-  ```python
-  confidence_score: float | None          # score calculado pelo ConfidenceRouter
-  modelo_ia_usado: str                    # 'claude' | 'harvey' | 'claude_harvey_fallback'
-  ```
-- [ ] Adicionar nó `avaliar_confianca` no grafo LangGraph entre `gerar_resposta` e `verificar_resposta`:
-  - Instanciar `ConfidenceRouter`
-  - Chamar `confidence_router.avaliar(...)` com dados já presentes no `state`
-  - Guardar `ConfidenceScore` no `ConversationState` (campo `confidence_score`)
-  - Retornar edge condicional: `score.valor >= threshold` → `"verificar_resposta"`, senão → `"gerar_resposta_harvey"`
-- [ ] Adicionar nó `gerar_resposta_harvey`:
-  - Chamar `HarveyClient.gerar_resposta()` com o mesmo contexto RAG + system prompt
-  - Em caso de `HarveyUnavailableError` (circuit breaker): fallback para resposta Claude existente no state, setar `modelo_ia = "claude_harvey_fallback"`, logar aviso
-  - Setar `modelo_ia = "harvey"` no state
-  - Atualizar `harvey_tokens_usados_mes` no escritório (incrementar atomicamente)
-  - Continuar para `verificar_resposta` → `enviar_resposta` (caminho normal)
-- [ ] Adicionar verificações de feature flag no orchestrator:
-  ```python
-  if not escritorio.harvey_habilitado:
-      # Pular nó avaliar_confianca, ir direto para verificar_resposta
-  if escritorio.harvey_tokens_usados_mes >= escritorio.harvey_quota_tokens_mes:
-      # Logar harvey_quota_esgotada e forçar Claude
-  ```
-- [ ] Grafo final resultante:
-  ```
-  classificar_intencao → buscar_dados → gerar_resposta(Claude)
-    → [NOVO] avaliar_confianca
-      → score≥threshold: verificar_resposta → enviar_resposta
-      → score<threshold: [NOVO] gerar_resposta_harvey → verificar_resposta → enviar_resposta
-  ```
+- [ ] Adicionar `confidence_score: float | None` e `modelo_ia_usado: str` em `ConversationState`
+- [ ] Adicionar nó `avaliar_confianca` entre `gerar_resposta` e `verificar_resposta`
+- [ ] Adicionar nó `gerar_resposta_escalacao` (ex-`gerar_resposta_harvey`)
+- [ ] Verificar feature flag `escalacao_habilitada` e quota antes de escalar
 
 ---
 
-### 2.5 — Prompts Harvey para canal do cliente (`services/ai/prompts.py`) — arquivo EXISTENTE
+### 2.5 — Prompts escalação para canal do cliente (`services/ai/prompts.py`) ❌ PENDENTE
 
-- [ ] Adicionar seção `# === PROMPTS HARVEY — CANAL DO CLIENTE ===`
-- [ ] Criar `SYSTEM_PROMPT_HARVEY_CLIENTE_BASE`:
-  - Tom técnico-jurídico mas ainda acessível ao cliente leigo
-  - Escritório: `{nome_escritorio}`, Persona IA: `{nome_ia}`
-  - Restrições: nunca prever resultado, nunca dar conselho jurídico, nunca citar OAB como barreira
-  - Contexto RAG injetado: `{contexto_documentos}`
-- [ ] Criar `SYSTEM_PROMPT_HARVEY_PERGUNTA_JURIDICA`:
-  - Responde com precisão técnica mas linguagem acessível
-  - Citar artigos de lei e súmulas apenas quando tiver alta certeza
-  - Redirecionar para o advogado responsável ao final da resposta
+- [ ] Adicionar seção `# === PROMPTS ESCALAÇÃO — CANAL DO CLIENTE ===`
+- [ ] Criar `SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE`
+- [ ] Criar `SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA`
 
 ---
 
-### 2.6 — Métricas Harvey em `api/routes/metrics.py` — arquivo EXISTENTE
+### 2.6 — Métricas escalação em `api/routes/metrics.py` ❌ PENDENTE
 
 - [ ] Adicionar contadores Prometheus:
-  - `harvey_requests_total` — counter com labels `escritorio_id`, `resultado` (`"sucesso"`, `"fallback_claude"`, `"circuit_breaker"`)
-  - `harvey_roteamentos_total` — counter de quantas msgs de cliente foram roteadas para Harvey
-  - `harvey_tokens_total` — counter de tokens Harvey consumidos por escritório
-  - `harvey_latencia_segundos` — histogram de latência das chamadas Harvey
-- [ ] Expor métricas no endpoint `/metrics` (Prometheus scrape)
+  - `escalacao_requests_total`
+  - `escalacao_roteamentos_total`
+  - `escalacao_tokens_total`
+  - `escalacao_latencia_segundos`
 
 ---
 
-### 2.7 — Testes de integração do Roteador — arquivo NOVO
+### 2.7 — Testes de integração do Roteador ✅ FEITO
 
-- [ ] Criar `tests/integration/test_confidence_router.py`
-- [ ] Teste: `tipo_intencao="status_processo"` → score ≥ 0.90 → Claude responde
-- [ ] Teste: `tipo_intencao="perspectiva_caso"` → score ≤ 0.30 → Harvey roteado
-- [ ] Teste: mensagem com "STJ" explícito → forçar Harvey independente de score
-- [ ] Teste: `fact_check_result["hallucination_score"] = 0.40` → forçar Harvey
-- [ ] Teste: `harvey_habilitado=False` → score ignorado, Claude sempre responde
-- [ ] Teste: quota Harvey esgotada → fallback Claude com log de aviso
-- [ ] Teste end-to-end (mock Harvey): mensagem jurídica complexa entra no orchestrator → Harvey responde → `modelo_ia="harvey"` gravado na `Interacao`
+- [x] `tests/integration/test_confidence_router.py` criado (commit: "testes confidence")
 
 ---
 
-## FASE 3 — Hub do Advogado via WhatsApp (3–4 dias)
+## FASE 3 — Hub do Advogado via WhatsApp ❌ NÃO INICIADA
 
-> Objetivo: Advogado consegue fazer perguntas jurídicas via WhatsApp e receber respostas Harvey em < 30s.
-> Critério de aceite: Advogado envia "Dúvida sobre CPC art. 485" → Harvey responde via WhatsApp em < 30 segundos.
+> Objetivo: Advogado consegue fazer perguntas jurídicas via WhatsApp e receber respostas Claude Opus em < 30s.
+> Critério de aceite: Advogado envia "Dúvida sobre CPC art. 485" → Claude Opus responde via WhatsApp em < 30 segundos.
 
 ---
 
@@ -819,7 +768,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
       return {"status": "queued_escalation_reply"}
 
   # [NOVO] Ramo Hub do Advogado: advogado sem escalação ativa
-  if escritorio.harvey_habilitado:
+  if escritorio.escalacao_habilitada:
       stmt_adv_hub = select(Usuario).where(
           Usuario.whatsapp_numero == telefone_digitos,
           Usuario.escritorio_id == escritorio.id,
@@ -836,7 +785,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
   ```
 - [ ] `Usuario.whatsapp_numero` **já existe** no modelo (adicionado na migration `20260317_1537_e4bcb5d405fa_add_usuario_whatsapp.py`) — nenhuma alteração de modelo necessária
 - [ ] Verificar que o fluxo existente do cliente e da escalação são completamente inalterados
-- [ ] Verificar que quando `harvey_habilitado=False` o bloco Hub é ignorado (sem overhead)
+- [ ] Verificar que quando `escalacao_habilitada=False` o bloco Hub é ignorado (sem overhead)
 
 ---
 
@@ -860,7 +809,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
   mensagem_advogado: Mapped[str] = mapped_column(Text)
   resposta_hub: Mapped[str] = mapped_column(Text)
   intencao: Mapped[str] = mapped_column(String(50))
-  modelo_ia: Mapped[str] = mapped_column(String(50))  # 'harvey', 'claude', 'harvey_claude'
+  modelo_ia: Mapped[str] = mapped_column(String(50))  # 'claude_opus', 'claude', 'claude_opus_fallback'
   tokens_input: Mapped[int] = mapped_column(default=0)
   tokens_output: Mapped[int] = mapped_column(default=0)
   custo_estimado: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=0)
