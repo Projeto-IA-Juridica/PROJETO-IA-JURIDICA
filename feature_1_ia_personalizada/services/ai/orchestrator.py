@@ -198,6 +198,14 @@ _ia_fallback_used_total = Counter(
     "Total de vezes que o fallback foi ativado (Claude indisponível ou erro)",
 )
 
+# Métricas de escalação importadas do módulo central de métricas
+from feature_1_ia_personalizada.api.routes.metrics import (
+    escalacao_latencia_ms,
+    escalacao_requests_total,
+    escalacao_roteamentos_total,
+    escalacao_tokens_total,
+)
+
 # ---------------------------------------------------------------------------
 # State Schema — CÉREBRO do fluxo
 # ---------------------------------------------------------------------------
@@ -222,6 +230,8 @@ class ConversationState(TypedDict):
     precisa_regenerar: bool  # sinal interno: verificar_resposta → gerar_resposta
     requer_escalacao: bool
     motivo_escalacao: str | None
+    confidence_score: float | None      # score calculado pelo ConfidenceRouter
+    modelo_ia_usado: str                # 'claude' | 'claude_opus' | 'claude_opus_fallback'
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +341,8 @@ class ConversationOrchestrator:
             session_factory=session_factory,
         )
         self._rag = rag_retriever  # None = RAG desativado (graceful degradation)
+        self._confidence_router = ConfidenceRouter()
+        self._escalacao_client = EscalacaoClient()
 
         # FactChecker usa DB via adapter
         self._fact_checker = FactChecker(
@@ -402,6 +414,8 @@ class ConversationOrchestrator:
             "precisa_regenerar": False,
             "requer_escalacao": False,
             "motivo_escalacao": None,
+            "confidence_score": None,
+            "modelo_ia_usado": "claude",
         }
 
         try:
@@ -704,6 +718,8 @@ class ConversationOrchestrator:
         graph.add_node("preparar_escalacao", self._node_preparar_escalacao)
         graph.add_node("buscar_dados", self._node_buscar_dados)
         graph.add_node("gerar_resposta", self._node_gerar_resposta)
+        graph.add_node("avaliar_confianca", self._node_avaliar_confianca)
+        graph.add_node("gerar_resposta_escalacao", self._node_gerar_resposta_escalacao)
         graph.add_node("verificar_resposta", self._node_verificar_resposta)
         graph.add_node("enviar_resposta", self._node_enviar_resposta)
         graph.add_node("tratar_erro", self._node_tratar_erro)
@@ -739,10 +755,22 @@ class ConversationOrchestrator:
             "gerar_resposta",
             self._rota_apos_gerar_resposta,
             {
-                "verificar_resposta": "verificar_resposta",
+                "avaliar_confianca": "avaliar_confianca",
                 "tratar_erro": "tratar_erro",
             },
         )
+
+        graph.add_conditional_edges(
+            "avaliar_confianca",
+            self._rota_apos_avaliar_confianca,
+            {
+                "verificar_resposta": "verificar_resposta",
+                "gerar_resposta_escalacao": "gerar_resposta_escalacao",
+                "tratar_erro": "tratar_erro",
+            },
+        )
+
+        graph.add_edge("gerar_resposta_escalacao", "verificar_resposta")
 
         graph.add_conditional_edges(
             "verificar_resposta",
@@ -790,6 +818,13 @@ class ConversationOrchestrator:
     def _rota_apos_gerar_resposta(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
+        return "avaliar_confianca"
+
+    def _rota_apos_avaliar_confianca(self, state: ConversationState) -> str:
+        if state.get("erro"):
+            return "tratar_erro"
+        if state.get("_escalar_para_opus"):
+            return "gerar_resposta_escalacao"
         return "verificar_resposta"
 
     def _rota_apos_verificacao(self, state: ConversationState) -> str:
