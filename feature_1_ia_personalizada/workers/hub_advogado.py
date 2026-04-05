@@ -547,6 +547,7 @@ async def _handler_resumo_processo(
     usuario: Usuario,
     escritorio: Escritorio,
     session: Any,
+    escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
     """Busca dados do processo e gera resumo com Claude Opus."""
     from shared.models.processo import Processo
@@ -608,6 +609,7 @@ async def _handler_rascunho_mensagem(
     usuario: Usuario,
     escritorio: Escritorio,
     session: Any,
+    escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
     """Gera rascunho de mensagem para o advogado enviar ao cliente."""
     system_prompt = (
