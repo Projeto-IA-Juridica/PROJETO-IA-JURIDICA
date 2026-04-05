@@ -70,6 +70,8 @@ celery_app.conf.task_queues = (
     Queue("notificacoes", routing_key="notificacoes"),
     Queue("ia", routing_key="ia"),
     Queue("relacionamento", routing_key="relacionamento"),
+    # Hub do Advogado — mensagens jurídicas do advogado via WhatsApp
+    Queue("hub_advogado", routing_key="hub_advogado"),
     # Dead Letter Queue: recebe tasks que esgotaram todos os retries.
     # Worker dedicado recomendado para não misturar com filas normais:
     #   celery -A ... worker -Q dead_letter -c 1 --prefetch-multiplier 1
