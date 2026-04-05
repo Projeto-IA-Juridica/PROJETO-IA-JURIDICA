@@ -16,6 +16,7 @@ from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.models.lead_prospeccao import LeadProspeccao
 from shared.models.processo import Processo
+from shared.models.sessao_advogado import SessaoAdvogado
 from shared.models.usuario import Usuario
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "Processo",
     "Interacao",
     "LeadProspeccao",
+    "SessaoAdvogado",
 ]
