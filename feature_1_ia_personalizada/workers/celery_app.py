@@ -146,6 +146,11 @@ celery_app.conf.task_routes = {
         "queue": "ia",
         "routing_key": "ia",
     },
+    # hub_advogado.py
+    "processar_mensagem_advogado": {
+        "queue": "hub_advogado",
+        "routing_key": "hub_advogado",
+    },
     # dead_letter.py
     "workers.dead_letter.processar_dlq": {
         "queue": "dead_letter",
@@ -264,6 +269,7 @@ def _init_worker_process(**kwargs):
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
+import feature_1_ia_personalizada.workers.hub_advogado  # noqa: F401
 import feature_1_ia_personalizada.workers.ingest_documentos  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
