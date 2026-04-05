@@ -232,6 +232,7 @@ class ConversationState(TypedDict):
     motivo_escalacao: str | None
     confidence_score: float | None      # score calculado pelo ConfidenceRouter
     modelo_ia_usado: str                # 'claude' | 'claude_opus' | 'claude_opus_fallback'
+    _escalar_para_opus: bool            # sinal interno: avaliar_confianca → gerar_resposta_escalacao
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +417,7 @@ class ConversationOrchestrator:
             "motivo_escalacao": None,
             "confidence_score": None,
             "modelo_ia_usado": "claude",
+            "_escalar_para_opus": False,
         }
 
         try:
@@ -701,6 +703,7 @@ class ConversationOrchestrator:
             tokens_input=tokens.get("input", 0),
             tokens_output=tokens.get("output", 0),
             custo_estimado=custo,
+            modelo_ia=state.get("modelo_ia_usado", "claude"),
             metadata_json=metadata or None,
         )
         session.add(interacao)
@@ -1289,6 +1292,207 @@ class ConversationOrchestrator:
             return {"erro": f"gerar_resposta:{exc}"}
 
     # -----------------------------------------------------------------------
+    # Nó 3b — avaliar_confianca
+    # -----------------------------------------------------------------------
+
+    async def _node_avaliar_confianca(self, state: ConversationState) -> dict:
+        """
+        Avalia a confiança da resposta Claude e decide se deve escalar para Claude Opus.
+        Se o escritório não tiver escalação habilitada, passa direto para verificar_resposta.
+        """
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+
+        # Fallbacks já são respostas pré-definidas — não faz sentido escalar
+        if state.get("usando_fallback"):
+            return {"_escalar_para_opus": False}
+
+        try:
+            async with self._session_factory() as session:
+                escritorio, _ = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
+                )
+
+            if not escritorio:
+                return {"_escalar_para_opus": False}
+
+            # Heurística: se há contexto RAG, assume cobertura razoável (0.7)
+            rag_docs = (
+                [{"score": 0.7}] if state.get("contexto_rag") else []
+            )
+
+            score = self._confidence_router.avaliar(
+                mensagem=state["mensagem_original"],
+                resposta_claude=state.get("resposta_ia"),
+                tipo_intencao=state.get("intencao", "outro"),
+                rag_docs=rag_docs,
+                fact_check_result={},
+                historico_cliente=state.get("historico", []),
+                tentativas_geracao=state.get("tentativas_correcao", 0),
+                escritorio_id=state["escritorio_id"],
+            )
+
+            destino = self._confidence_router.rotear(score, escritorio)
+            deve_escalar = destino == "escalacao"
+
+            log.info(
+                "confidence_avaliado",
+                score=score.valor,
+                deve_escalar=deve_escalar,
+                motivo=score.motivo,
+            )
+
+            if deve_escalar:
+                motivo_label = "forcado" if score.deve_escalar else "score_baixo"
+                escalacao_roteamentos_total.labels(
+                    escritorio_id=str(state["escritorio_id"]),
+                    motivo=motivo_label,
+                ).inc()
+
+            return {
+                "confidence_score": score.valor,
+                "_escalar_para_opus": deve_escalar,
+            }
+
+        except Exception as exc:
+            _erros_total.labels(no="avaliar_confianca").inc()
+            log.warning("avaliar_confianca_erro_graceful", erro=str(exc))
+            # Falha no roteador não deve derrubar o fluxo — continua com Claude
+            return {"_escalar_para_opus": False}
+
+    # -----------------------------------------------------------------------
+    # Nó 3c — gerar_resposta_escalacao
+    # -----------------------------------------------------------------------
+
+    async def _node_gerar_resposta_escalacao(self, state: ConversationState) -> dict:
+        """
+        Gera resposta usando Claude Opus (escalação) quando o ConfidenceRouter
+        decidiu que a pergunta requer maior precisão jurídica.
+        Fallback: usa a resposta Claude já gerada no state se Opus falhar.
+        """
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+
+        intencao = state.get("intencao", "outro")
+
+        try:
+            async with self._session_factory() as session:
+                escritorio, cliente = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
+                )
+
+            nome_escritorio = escritorio.nome if escritorio else "Escritório"
+            nome_cliente = cliente.nome if cliente else "cliente"
+
+            # Monta system prompt para escalação
+            if intencao in ("perspectivas", "pergunta_juridica", "juridica_complexa"):
+                system_prompt = SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                )
+            else:
+                contexto_docs = state.get("contexto_rag") or ""
+                system_prompt = SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                    contexto_documentos=contexto_docs,
+                )
+
+            import time as _time
+            t_inicio = _time.perf_counter()
+
+            resultado = await asyncio.wait_for(
+                self._escalacao_client.gerar_resposta(
+                    system_prompt=system_prompt,
+                    mensagem_usuario=state["mensagem_original"],
+                    contexto_rag=state.get("contexto_rag") or "",
+                    escritorio_id=state["escritorio_id"],
+                ),
+                timeout=50.0,  # Opus é mais lento — timeout maior
+            )
+
+            latencia = int((_time.perf_counter() - t_inicio) * 1000)
+            escalacao_latencia_ms.observe(latencia)
+            escalacao_requests_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                resultado="sucesso",
+            ).inc()
+            escalacao_tokens_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                tipo="input",
+            ).inc(resultado.tokens_input)
+            escalacao_tokens_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                tipo="output",
+            ).inc(resultado.tokens_output)
+
+            # Atualiza contagem de tokens de escalação no escritório
+            try:
+                async with self._session_factory() as session:
+                    await session.execute(
+                        update(Escritorio)
+                        .where(Escritorio.id == state["escritorio_id"])
+                        .values(
+                            escalacao_tokens_usados_mes=Escritorio.escalacao_tokens_usados_mes
+                            + resultado.tokens_input
+                            + resultado.tokens_output
+                        )
+                    )
+                    await session.commit()
+            except Exception as exc_quota:
+                log.warning("escalacao_atualizar_quota_falhou", erro=str(exc_quota))
+
+            tokens_anteriores = state.get("tokens_usados") or {"input": 0, "output": 0}
+            custo_anterior = Decimal(tokens_anteriores.get("custo_str", "0"))
+            tokens_atualizados = {
+                "input": tokens_anteriores.get("input", 0) + resultado.tokens_input,
+                "output": tokens_anteriores.get("output", 0) + resultado.tokens_output,
+                "custo_str": str(custo_anterior + resultado.custo_estimado),
+            }
+
+            log.info(
+                "resposta_escalacao_gerada",
+                latencia_ms=latencia,
+                tokens=tokens_atualizados,
+            )
+            return {
+                "resposta_ia": resultado.conteudo,
+                "tokens_usados": tokens_atualizados,
+                "modelo_ia_usado": "claude_opus",
+                "precisa_regenerar": False,
+            }
+
+        except (EscalacaoIndisponivelError, TimeoutError) as exc:
+            # Claude Opus indisponível — usa resposta Claude padrão já no state
+            escalacao_requests_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                resultado="fallback_claude",
+            ).inc()
+            log.warning(
+                "escalacao_indisponivel_usando_claude",
+                erro=str(exc),
+            )
+            return {
+                "modelo_ia_usado": "claude_opus_fallback",
+                "precisa_regenerar": False,
+            }
+
+        except Exception as exc:
+            _erros_total.labels(no="gerar_resposta_escalacao").inc()
+            log.error("gerar_resposta_escalacao_erro_inesperado", erro=str(exc))
+            # Não propaga erro — usa resposta Claude já disponível
+            return {
+                "modelo_ia_usado": "claude_opus_fallback",
+                "precisa_regenerar": False,
+            }
+
+    # -----------------------------------------------------------------------
     # Nó 4 — verificar_resposta
     # -----------------------------------------------------------------------
 
@@ -1557,6 +1761,14 @@ class ConversationOrchestrator:
         if state.get("erro"):
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
+
+        # Nó 3b: avaliar confiança e escalar se necessário
+        state.update(await self._node_avaliar_confianca(state))  # type: ignore[typeddict-item]
+        if state.get("_escalar_para_opus"):
+            state.update(await self._node_gerar_resposta_escalacao(state))  # type: ignore[typeddict-item]
+            if state.get("erro"):
+                await self._node_tratar_erro(state)
+                return state  # type: ignore[return-value]
 
         # Nó 4: verificar (com até 1 re-geração)
         for _ in range(2):

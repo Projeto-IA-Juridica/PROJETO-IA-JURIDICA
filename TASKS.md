@@ -705,30 +705,31 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-### 2.4 — Dois novos nós no LangGraph Orchestrator ❌ PENDENTE
+### 2.4 — Dois novos nós no LangGraph Orchestrator ✅ FEITO
 
-- [ ] Adicionar `confidence_score: float | None` e `modelo_ia_usado: str` em `ConversationState`
-- [ ] Adicionar nó `avaliar_confianca` entre `gerar_resposta` e `verificar_resposta`
-- [ ] Adicionar nó `gerar_resposta_escalacao` (ex-`gerar_resposta_harvey`)
-- [ ] Verificar feature flag `escalacao_habilitada` e quota antes de escalar
-
----
-
-### 2.5 — Prompts escalação para canal do cliente (`services/ai/prompts.py`) ❌ PENDENTE
-
-- [ ] Adicionar seção `# === PROMPTS ESCALAÇÃO — CANAL DO CLIENTE ===`
-- [ ] Criar `SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE`
-- [ ] Criar `SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA`
+- [x] `confidence_score: float | None`, `modelo_ia_usado: str` e `_escalar_para_opus: bool` adicionados em `ConversationState`
+- [x] Nó `avaliar_confianca` inserido entre `gerar_resposta` e `verificar_resposta`
+- [x] Nó `gerar_resposta_escalacao` criado com fallback gracioso para Claude
+- [x] Verifica `escalacao_habilitada` e quota via `ConfidenceRouter.rotear()`
+- [x] `modelo_ia_usado` persistido no campo `Interacao.modelo_ia` via `_salvar_interacao`
+- [x] `_fluxo_sequencial` (fallback sem LangGraph) atualizado com os 2 novos nós
 
 ---
 
-### 2.6 — Métricas escalação em `api/routes/metrics.py` ❌ PENDENTE
+### 2.5 — Prompts escalação para canal do cliente (`services/ai/prompts.py`) ✅ FEITO
 
-- [ ] Adicionar contadores Prometheus:
-  - `escalacao_requests_total`
-  - `escalacao_roteamentos_total`
-  - `escalacao_tokens_total`
-  - `escalacao_latencia_segundos`
+- [x] Seção `# === PROMPTS ESCALAÇÃO — CANAL DO CLIENTE ===` adicionada
+- [x] `SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE` criado
+- [x] `SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA` criado
+
+---
+
+### 2.6 — Métricas escalação em `api/routes/metrics.py` ✅ FEITO
+
+- [x] `escalacao_requests_total` (labels: escritorio_id, resultado)
+- [x] `escalacao_roteamentos_total` (labels: escritorio_id, motivo)
+- [x] `escalacao_tokens_total` (labels: escritorio_id, tipo)
+- [x] `escalacao_latencia_ms` (histogram)
 
 ---
 
