@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -47,6 +48,34 @@ _RE_STATUS = re.compile(
 
 # ---------------------------------------------------------------------------
 # Enum público
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Dataclass de resultado — definido antes das classes que o referenciam
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ClassificacaoAdvogado:
+    intencao: IntencaoAdvogado
+    entidades: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def cliente_nome(self) -> str | None:
+        return self.entidades.get("cliente_nome")
+
+    @property
+    def processo_cnj(self) -> str | None:
+        return self.entidades.get("processo_cnj")
+
+    @property
+    def query_juris(self) -> str | None:
+        return self.entidades.get("query_juris")
+
+
+# ---------------------------------------------------------------------------
+# Enum de intenções
 # ---------------------------------------------------------------------------
 
 
@@ -185,27 +214,3 @@ class HubAdvogadoClassificador:
         return ClassificacaoAdvogado(intencao=intencao, entidades=entidades)
 
 
-# ---------------------------------------------------------------------------
-# Dataclass de resultado
-# ---------------------------------------------------------------------------
-
-
-from dataclasses import dataclass, field
-
-
-@dataclass
-class ClassificacaoAdvogado:
-    intencao: IntencaoAdvogado
-    entidades: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def cliente_nome(self) -> str | None:
-        return self.entidades.get("cliente_nome")
-
-    @property
-    def processo_cnj(self) -> str | None:
-        return self.entidades.get("processo_cnj")
-
-    @property
-    def query_juris(self) -> str | None:
-        return self.entidades.get("query_juris")
