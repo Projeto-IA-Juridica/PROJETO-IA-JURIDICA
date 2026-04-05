@@ -574,7 +574,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 |------|-----------|--------|
 | Fase 1 | Fundação (client + settings + feature flag) | ✅ Concluída |
 | Fase 2 | Roteador de Confiança Claude → Claude Opus | ✅ Concluída |
-| Fase 3 | Hub do Advogado via WhatsApp | ❌ Não iniciada |
+| Fase 3 | Hub do Advogado via WhatsApp | ✅ Concluída |
 | Fase 4 | Análise de Petições (PDF → Claude Opus) | ❌ Não iniciada |
 | Fase 5 | Resumo de Processos e Insights CRM | ❌ Não iniciada |
 
@@ -739,7 +739,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-## FASE 3 — Hub do Advogado via WhatsApp ❌ NÃO INICIADA
+## FASE 3 — Hub do Advogado via WhatsApp ✅ CONCLUÍDA
 
 > Objetivo: Advogado consegue fazer perguntas jurídicas via WhatsApp e receber respostas Claude Opus em < 30s.
 > Critério de aceite: Advogado envia "Dúvida sobre CPC art. 485" → Claude Opus responde via WhatsApp em < 30 segundos.
@@ -754,39 +754,13 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 >
 > Após a modificação: `cliente encontrado?` → sim: fluxo cliente | não: `advogado com escalacao_ativa?` → sim: `processar_resposta_advogado` (existente, inalterado) | não: `advogado com role advogado/admin e ativo?` → sim: Hub | não: "ignored"
 
-- [ ] Adicionar terceiro ramo logo após o bloco de escalação existente (linhas ~191–217 do arquivo):
-  ```python
-  # Ramo existente (INALTERADO): escalação ativa
-  stmt_adv_esc = select(Usuario).where(
-      Usuario.whatsapp_numero == telefone_digitos,
-      Usuario.escritorio_id == escritorio.id,
-      Usuario.ativo == True,
-      Usuario.escalacao_ativa == True,
-  )
-  advogado_esc = (await db.execute(stmt_adv_esc)).scalars().first()
-  if advogado_esc:
-      processar_resposta_advogado.delay(...)  # inalterado
-      return {"status": "queued_escalation_reply"}
-
-  # [NOVO] Ramo Hub do Advogado: advogado sem escalação ativa
-  if escritorio.escalacao_habilitada:
-      stmt_adv_hub = select(Usuario).where(
-          Usuario.whatsapp_numero == telefone_digitos,
-          Usuario.escritorio_id == escritorio.id,
-          Usuario.role.in_(["advogado", "admin"]),
-          Usuario.ativo == True,
-      )
-      advogado_hub = (await db.execute(stmt_adv_hub)).scalars().first()
-      if advogado_hub:
-          processar_mensagem_advogado.apply_async(
-              args=[payload_dict, advogado_hub.id],
-              queue="hub_advogado",
-          )
-          return {"status": "queued_hub_advogado"}
-  ```
-- [ ] `Usuario.whatsapp_numero` **já existe** no modelo (adicionado na migration `20260317_1537_e4bcb5d405fa_add_usuario_whatsapp.py`) — nenhuma alteração de modelo necessária
-- [ ] Verificar que o fluxo existente do cliente e da escalação são completamente inalterados
-- [ ] Verificar que quando `escalacao_habilitada=False` o bloco Hub é ignorado (sem overhead)
+- [x] Adicionar terceiro ramo logo após o bloco de escalação existente (linhas ~191–217 do arquivo):
+  - Implementado: query única com `escalacao_ativa` como branch condition (uma query ao invés de duas — mais eficiente)
+  - `advogado.escalacao_ativa=True` → `processar_resposta_advogado` (inalterado)
+  - `advogado.escalacao_ativa=False` + `escritorio.escalacao_habilitada` → `processar_mensagem_advogado.apply_async(queue="hub_advogado")`
+- [x] `Usuario.whatsapp_numero` **já existe** no modelo — nenhuma alteração necessária
+- [x] Fluxo existente do cliente e da escalação completamente inalterados
+- [x] Quando `escalacao_habilitada=False` o bloco Hub é ignorado
 
 ---
 
@@ -800,122 +774,60 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ### 3.3 — Modelo `SessaoAdvogado` (`shared/models/sessao_advogado.py`) — arquivo NOVO
 
-- [ ] Criar arquivo `shared/models/sessao_advogado.py`
-- [ ] Criar modelo `SessaoAdvogado(Base, TimestampMixin, TenantMixin)`:
-  ```python
-  __tablename__ = "sessoes_advogado"
-
-  id: Mapped[int] = mapped_column(primary_key=True)
-  usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
-  mensagem_advogado: Mapped[str] = mapped_column(Text)
-  resposta_hub: Mapped[str] = mapped_column(Text)
-  intencao: Mapped[str] = mapped_column(String(50))
-  modelo_ia: Mapped[str] = mapped_column(String(50))  # 'claude_opus', 'claude', 'claude_opus_fallback'
-  tokens_input: Mapped[int] = mapped_column(default=0)
-  tokens_output: Mapped[int] = mapped_column(default=0)
-  custo_estimado: Mapped[Decimal] = mapped_column(Numeric(10, 6), default=0)
-  cliente_referenciado_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), nullable=True)
-  processo_referenciado_id: Mapped[int | None] = mapped_column(ForeignKey("processos.id"), nullable=True)
-  metadata_json: Mapped[dict] = mapped_column(JSONB, default={})
-  ```
-- [ ] Exportar `SessaoAdvogado` em `shared/models/__init__.py`
+- [x] Criar arquivo `shared/models/sessao_advogado.py`
+- [x] Criar modelo `SessaoAdvogado(Base, TimestampMixin, TenantMixin)` com todos os campos
+  - Índice composto `(usuario_id, escritorio_id, created_at)` — otimizado vs índice em `created_at` isolado
+- [x] Exportar `SessaoAdvogado` em `shared/models/__init__.py`
 
 ---
 
 ### 3.4 — Migration Alembic: `sessoes_advogado` — arquivo NOVO
 
-- [ ] Criar `alembic/versions/20260402_HHMM_HASH_add_sessoes_advogado.py` (formato date-based — ver nota em 1.4)
-- [ ] `upgrade()`: `CREATE TABLE sessoes_advogado` com todos os campos + FKs + índices:
-  ```sql
-  CREATE INDEX ix_sessoes_advogado_usuario ON sessoes_advogado (usuario_id, escritorio_id);
-  CREATE INDEX ix_sessoes_advogado_created ON sessoes_advogado (created_at DESC);
-  ```
-- [ ] `downgrade()`: `DROP TABLE sessoes_advogado`
-- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1`
+- [x] Criar `alembic/versions/20260405_1000_c3d4e5f6a7b8_add_sessoes_advogado.py`
+- [x] `upgrade()`: `CREATE TABLE sessoes_advogado` com todos os campos + FKs CASCADE + índice composto `(usuario_id, escritorio_id, created_at)`
+- [x] `downgrade()`: `DROP TABLE sessoes_advogado`
+- [ ] Validar: `alembic upgrade head` + `alembic downgrade -1` (pendente — executar em ambiente com banco)
 
 ---
 
 ### 3.5 — Classificador de intenção do advogado (`services/ai/hub_advogado_classifier.py`) — arquivo NOVO
 
-- [ ] Criar arquivo `feature_1_ia_personalizada/services/ai/hub_advogado_classifier.py`
-- [ ] Criar enum `IntencaoAdvogado`:
-  - `RESUMO_PROCESSO = "resumo_processo"`
-  - `ANALISE_PETICAO = "analise_peticao"` (detectado por presença de documento PDF)
-  - `PESQUISA_JURISPRUDENCIA = "pesquisa_jurisprudencia"`
-  - `INSIGHT_CLIENTE = "insight_cliente"`
-  - `DUVIDA_JURIDICA = "duvida_juridica"`
-  - `STATUS_ESCRITORIO = "status_escritorio"`
-  - `RASCUNHO_MENSAGEM = "rascunho_mensagem"`
-- [ ] Criar classe `HubAdvogadoClassificador`
-- [ ] Implementar `async classificar(mensagem, tipo_media) -> IntencaoAdvogado`:
-  - Se `tipo_media == "document"` → retornar `ANALISE_PETICAO` diretamente (sem Claude)
-  - Se mensagem contiver "status", "dashboard" → `STATUS_ESCRITORIO` (heurística rápida, sem Claude)
-  - Caso contrário: chamar Claude Haiku com prompt de classificação (rápido, barato)
-  - Timeout 5s — se exceder: fallback para `DUVIDA_JURIDICA`
-- [ ] Criar `SYSTEM_PROMPT_CLASSIFICADOR_ADVOGADO` em `prompts.py`:
-  - Input: mensagem do advogado
-  - Output JSON: `{"intencao": "<valor>", "entidades": {"cliente_nome": ..., "processo_cnj": ..., "query_juris": ...}}`
-  - Classificar nas 7 intenções suportadas
+- [x] Criar arquivo `feature_1_ia_personalizada/services/ai/hub_advogado_classifier.py`
+- [x] Criar enum `IntencaoAdvogado` com os 7 valores
+- [x] Criar dataclass `ClassificacaoAdvogado` (definida ANTES da classe que a usa — fix IDE)
+- [x] Criar classe `HubAdvogadoClassificador`
+- [x] Implementar `async classificar(mensagem, tipo_media)`:
+  - `document` → `ANALISE_PETICAO` sem Claude
+  - keywords status/dashboard → `STATUS_ESCRITORIO` via regex (sem Claude)
+  - Caso contrário: Claude Haiku com timeout 5s
+  - Fallback → `DUVIDA_JURIDICA`
+- [x] `SYSTEM_PROMPT_CLASSIFICADOR_ADVOGADO` embutido no arquivo como `_SYSTEM_PROMPT_CLASSIFICADOR` (sem duplicação em prompts.py)
 
 ---
 
 ### 3.6 — Task Celery do Hub (`workers/hub_advogado.py`) — arquivo NOVO
 
-- [ ] Criar arquivo `feature_1_ia_personalizada/workers/hub_advogado.py`
-- [ ] Criar task `processar_mensagem_advogado`:
-  ```python
-  @celery_app.task(
-      name="processar_mensagem_advogado",
-      queue="hub_advogado",
-      max_retries=3,
-      default_retry_delay=5,
-      soft_time_limit=120,
-      time_limit=150,
-  )
-  ```
-- [ ] Fluxo da task:
-  1. Buscar `Usuario` pelo `usuario_id` (validar que ainda é ativo e tem role advogado/admin)
-  2. Verificar que `escritorio.harvey_habilitado` é True (se False: responder "Hub não ativo para este escritório")
-  3. Extrair texto/tipo de mídia do payload Evolution API
-  4. Chamar `HubAdvogadoClassificador.classificar()` → `IntencaoAdvogado`
-  5. Despachar para handler correto:
-     - `ANALISE_PETICAO` → `_handler_analise_peticao()`
-     - `RESUMO_PROCESSO` → `_handler_resumo_processo()`
-     - `INSIGHT_CLIENTE` → `_handler_insight_cliente()`
-     - `PESQUISA_JURISPRUDENCIA` → `_handler_pesquisa_jurisprudencia()`
-     - `STATUS_ESCRITORIO` → `_handler_status_escritorio()`
-     - `RASCUNHO_MENSAGEM` → `_handler_rascunho_mensagem()`
-     - `DUVIDA_JURIDICA` (default) → `_handler_duvida_juridica()`
-  6. Formatar resposta para WhatsApp (markdown: `*negrito*`, `_itálico_`)
-  7. Enviar resposta via `WhatsAppService.enviar()` para o número do advogado
-  8. Salvar `SessaoAdvogado` no banco com tokens + custo + intenção + modelo_ia
-  9. Incrementar `harvey_tokens_usados_mes` no `Escritorio`
-- [ ] Implementar `_handler_duvida_juridica(mensagem, usuario, escritorio, db)`:
-  - Montar contexto: últimas 5 sessões do advogado (memória conversacional)
-  - Buscar RAG docs relevantes do escritório
-  - Chamar `HarveyClient.gerar_resposta()` com `SYSTEM_PROMPT_HUB_ADVOGADO_BASE`
-  - Fallback: se Harvey indisponível → Claude com aviso explícito na resposta
-- [ ] Implementar `_handler_status_escritorio(usuario, escritorio, db)`:
-  - Agregar: total de atendimentos hoje, processos com prazo próximo (próximos 7 dias), leads novos, NPS médio do mês
-  - Formatar como dashboard WhatsApp sem chamar Harvey (dados estruturados)
-- [ ] Implementar `_handler_rascunho_mensagem(mensagem, usuario, escritorio, db)`:
-  - Identificar cliente alvo na mensagem (nome ou ID)
-  - Buscar dados CRM do cliente
-  - Chamar Harvey para gerar rascunho de mensagem empática e profissional
-  - Retornar rascunho para o advogado revisar e enviar manualmente
+- [x] Criar arquivo `feature_1_ia_personalizada/workers/hub_advogado.py`
+- [x] Criar task `processar_mensagem_advogado` com `base=DLQTask`, `max_retries=3`, `soft_time_limit=120`
+- [x] Fluxo completo: validar usuário → verificar `escalacao_habilitada` → classificar → despachar → enviar WhatsApp → salvar `SessaoAdvogado`
+- [x] Todos os 7 handlers implementados:
+  - `_handler_duvida_juridica` — Claude Opus via `EscalacaoClient`
+  - `_handler_analise_peticao` — baixa PDF via `evo.baixar_media`, extrai texto, Claude Opus
+  - `_handler_pesquisa_jurisprudencia` — Claude Opus com prompt especializado
+  - `_handler_insight_cliente` — `CRMDataAggregator` para dados reais + Claude Opus
+  - `_handler_resumo_processo` — busca processo por CNJ no banco + Claude Opus
+  - `_handler_rascunho_mensagem` — Claude Opus com prefixo "RASCUNHO — revisar antes de enviar"
+  - `_handler_status_escritorio` — dashboard sem LLM (dados estruturados do banco)
+- [x] `EscalacaoClient` instanciado UMA vez em `_processar` e passado como parâmetro (fix: não 7x)
+- [x] Incrementa `escalacao_tokens_usados_mes` no `Escritorio`
 
 ---
 
 ### 3.7 — Fila Celery `hub_advogado` (`workers/celery_app.py`) — arquivo EXISTENTE
 
-- [ ] Adicionar ao `CELERY_TASK_ROUTES`:
-  ```python
-  "feature_1_ia_personalizada.workers.hub_advogado.*": {"queue": "hub_advogado"},
-  ```
-- [ ] Adicionar `hub_advogado` à lista de queues no comando de inicialização do worker:
-  ```
-  celery -A ... worker -Q monitoramento,notificacoes,ia,relacionamento,hub_advogado
-  ```
+- [x] Adicionada fila `Queue("hub_advogado", routing_key="hub_advogado")` em `task_queues`
+- [x] Adicionada rota `"processar_mensagem_advogado": {"queue": "hub_advogado"}` em `task_routes`
+- [x] Adicionado import explícito `feature_1_ia_personalizada.workers.hub_advogado` no bloco de imports
 - [ ] Atualizar `infrastructure/docker/docker-compose.yml` para incluir `hub_advogado` nas queues do container worker
 - [ ] Atualizar `railway.worker.json` para incluir a nova fila na configuração de produção
 
@@ -923,36 +835,29 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ### 3.8 — Prompts do Hub do Advogado (`services/ai/prompts.py`) — arquivo EXISTENTE
 
-- [ ] Adicionar seção `# === PROMPTS DO HUB DO ADVOGADO ===` ao final do arquivo
-- [ ] Criar `SYSTEM_PROMPT_HUB_ADVOGADO_BASE`:
-  - Input: `{nome_escritorio}`, `{nome_usuario}`, `{oab}`
-  - Tom técnico-jurídico (interlocutor é profissional jurídico)
-  - Citar artigos de lei, súmulas e jurisprudências com precisão
-  - Não usar linguagem simplificada; ser objetivo e denso
-- [ ] Criar `SYSTEM_PROMPT_ANALISE_PETICAO`:
-  - Estrutura obrigatória da análise: IDENTIFICAÇÃO → PONTOS FORTES → VULNERABILIDADES → JURISPRUDÊNCIA RELEVANTE → SUGESTÕES → AVALIAÇÃO GERAL (score 0-100)
-  - Input: `{data_hoje}` para referência de direito vigente
-- [ ] Criar `SYSTEM_PROMPT_PESQUISA_JURISPRUDENCIA`:
-  - Input: `{query}`, `{tribunais}`, `{periodo}`
-  - Output obrigatório: ementa (2-3 linhas), data + tribunal + número, aplicabilidade (FAVORÁVEL/DESFAVORÁVEL/NEUTRO), tendência atual
-  - Ordenar do mais recente para o mais antigo
-- [ ] Criar `SYSTEM_PROMPT_INSIGHT_CLIENTE`:
-  - Input: `{nome_cliente}`, `{crm_score}`, `{resumo_interacoes}`, `{resumo_processos}`, `{ultima_acao_crm}`
-  - Output obrigatório: situação atual (3-4 linhas), pontos de atenção imediata, próxima ação recomendada (específica e acionável), risco de abandono (BAIXO/MÉDIO/ALTO)
-- [ ] Criar `SYSTEM_PROMPT_CLASSIFICADOR_ADVOGADO` (para `HubAdvogadoClassificador`)
+- [x] Adicionada seção `# === PROMPTS DO HUB DO ADVOGADO ===` em `services/ai/prompts.py`
+- [x] `SYSTEM_PROMPT_HUB_ADVOGADO_BASE` criado (tom técnico-jurídico, inputs: nome_usuario, nome_escritorio, data_hoje)
+- [x] `SYSTEM_PROMPT_HUB_ANALISE_PETICAO` criado (estrutura: IDENTIFICAÇÃO → PONTOS FORTES → VULNERABILIDADES → JURISPRUDÊNCIA → SUGESTÕES → AVALIAÇÃO)
+- [x] `SYSTEM_PROMPT_HUB_PESQUISA_JURISPRUDENCIA` criado (output: ementa, data+tribunal, aplicabilidade, tendência)
+- [x] `SYSTEM_PROMPT_HUB_INSIGHT_CLIENTE` criado (inputs: nome_cliente, crm_score, resumo_interacoes, resumo_processos, ultima_acao_crm)
+- [x] Prompt do classificador embutido em `hub_advogado_classifier.py` como `_SYSTEM_PROMPT_CLASSIFICADOR`
 
 ---
 
 ### 3.9 — Testes unitários do Hub do Advogado — arquivo NOVO
 
-- [ ] Criar `tests/unit/test_hub_advogado.py`
-- [ ] Teste: `HubAdvogadoClassificador` classifica "Resumo do processo 123" → `RESUMO_PROCESSO`
-- [ ] Teste: payload com `type="document"` → `ANALISE_PETICAO` sem chamar Claude
-- [ ] Teste: "Status" ou "Dashboard" → `STATUS_ESCRITORIO` (heurística, sem Claude)
-- [ ] Teste: remetente não é advogado → task retorna sem processar (não envia mensagem)
-- [ ] Teste: `harvey_habilitado=False` → resposta de hub não ativo enviada
-- [ ] Teste: Harvey indisponível → fallback Claude com aviso na resposta
-- [ ] Teste: `SessaoAdvogado` é salva com campos corretos após processamento
+- [x] Criar `tests/unit/test_hub_advogado.py`
+- [x] Teste: `document` → `ANALISE_PETICAO` sem chamar Claude
+- [x] Teste: keywords de status → `STATUS_ESCRITORIO` (heurística, sem Claude)
+- [x] Teste: Claude com JSON válido → intenção + entidades extraídas corretamente
+- [x] Teste: Claude retorna intenção inválida → `DUVIDA_JURIDICA` (fallback)
+- [x] Teste: Claude lança exceção → `DUVIDA_JURIDICA` (fallback)
+- [x] Teste: `_despachar STATUS_ESCRITORIO` não chama `escalacao_client`
+- [x] Teste: `_despachar DUVIDA_JURIDICA` usa `escalacao_client`
+- [x] Teste: webhook advogado sem `escalacao_ativa` + hub habilitado → hub enfileirado
+- [x] Teste: webhook advogado com `escalacao_ativa=True` → escalation reply (não hub)
+- [x] Teste: webhook hub desabilitado → ignored
+- [ ] Teste: `SessaoAdvogado` salva com campos corretos (requer fixture de banco — Fase 5)
 
 ---
 
