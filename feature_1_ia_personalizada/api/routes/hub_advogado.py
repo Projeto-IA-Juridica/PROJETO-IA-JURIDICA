@@ -34,7 +34,7 @@ from feature_1_ia_personalizada.services.ai.escalation_client import (
 )
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_HUB_ADVOGADO_BASE
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
-from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
+from feature_1_ia_personalizada.services.rag.ingestion import _extrair_texto_pdf
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
@@ -180,7 +180,7 @@ async def analisar_peticao(
     # Extrair e limpar texto do PDF
     try:
         texto = LegalDataCleaner.normalizar_espacos(
-            DocumentoIngester._extrair_texto_pdf(conteudo_bytes) or ""
+            _extrair_texto_pdf(conteudo_bytes) or ""
         )
     except Exception as exc:
         logger.warning("hub_rest_extracao_falhou", erro=str(exc))
