@@ -292,6 +292,10 @@ def auth_token():
     return _gerar_token
 
 
+# CSRF token fixo para testes — CSRFMiddleware exige cookie + header com mesmo valor
+_CSRF_TEST_TOKEN = "a" * 64  # 64 chars hex (mesmo comprimento do token de produção)
+
+
 # AsyncClient (TestClient) para bater nas rotas da API
 @pytest.fixture
 async def async_client(db_session):
@@ -305,7 +309,12 @@ async def async_client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"x-csrf-token": _CSRF_TEST_TOKEN},
+        cookies={"csrf_token": _CSRF_TEST_TOKEN},
+    ) as client:
         yield client
 
     app.dependency_overrides.clear()

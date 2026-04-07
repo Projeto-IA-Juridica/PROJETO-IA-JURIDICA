@@ -171,7 +171,7 @@ async def test_analisar_peticao_falha_extracao_retorna_422(async_client, advogad
     _, _, headers = advogado_setup
 
     with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_texto_pdf",
+        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         side_effect=RuntimeError("PDF corrompido ou protegido"),
     ):
         resp = await async_client.post(
@@ -197,7 +197,7 @@ async def test_analisar_peticao_escalacao_indisponivel_retorna_503(
     )
 
     with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_texto_pdf",
+        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=_FAKE_TEXT,
     ):
         _override(app, mock_client)
@@ -226,7 +226,7 @@ async def test_analisar_peticao_sucesso_chama_escalacao_e_salva_sessao(
     mock_client = _mock_escalacao_client()
 
     with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_texto_pdf",
+        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=_FAKE_TEXT,
     ):
         _override(app, mock_client)
@@ -282,7 +282,7 @@ async def test_analisar_peticao_texto_longo_truncado(async_client, advogado_setu
     mock_client = _mock_escalacao_client()
 
     with patch(
-        "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_texto_pdf",
+        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=texto_longo,
     ):
         _override(app, mock_client)
