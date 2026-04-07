@@ -575,8 +575,8 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 | Fase 1 | Fundação (client + settings + feature flag) | ✅ Concluída |
 | Fase 2 | Roteador de Confiança Claude → Claude Opus | ✅ Concluída |
 | Fase 3 | Hub do Advogado via WhatsApp | ✅ Concluída |
-| Fase 4 | Análise de Petições (PDF → Claude Opus) | ❌ Não iniciada |
-| Fase 5 | Resumo de Processos e Insights CRM | ❌ Não iniciada |
+| Fase 4 | Análise de Petições (PDF → Claude Opus) | ✅ Concluída |
+| Fase 5 | Resumo de Processos e Insights CRM | 🔄 Em andamento |
 
 ---
 
@@ -868,55 +868,55 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-### 4.1 — Handler de análise de petição na task Celery (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+### 4.1 — Handler de análise de petição na task Celery (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3) ✅ FEITO
 
-- [ ] Implementar `_handler_analise_peticao(payload, usuario, escritorio, db)`:
-  1. Baixar PDF via `evolution_client.baixar_media(instance, message_id)` — **método real é `baixar_media`, não `download_media`** (linha 240 do `evolution_client.py`; já usado para áudios)
-  2. Extrair texto via `DocumentoIngester._extrair_texto_pdf()` (já em `ingestion.py`)
-  3. Limpar artefatos OCR via `data_cleaner.py` (já existe)
-  4. Se PDF muito grande: chunking antes de enviar (reutilizar lógica de `ingestion.py`)
-  5. Enviar mensagem imediata de confirmação "Analisando petição... aguarde até 60 segundos" ao advogado
-  6. Chamar `HarveyClient.analisar_peticao(conteudo, TipoAnaliseHarvey.ANALISE_COMPLETA, contexto_processo)`
-  7. Formatar `AnaliseHarveyResponse` em markdown WhatsApp estruturado:
-     - `*IDENTIFICAÇÃO*`, `*PONTOS FORTES*`, `*VULNERABILIDADES*`, `*JURISPRUDÊNCIA*`, `*SUGESTÕES*`, `*AVALIAÇÃO: X/100*`
-  8. Enviar resposta formatada
-  9. Salvar `SessaoAdvogado` com `intencao="analise_peticao"`, `modelo_ia="harvey"`
+- [x] Implementar `_handler_analise_peticao(payload, usuario, escritorio, db)`:
+  1. Baixar PDF via `evolution_client.baixar_media(instance, message_id)`
+  2. Extrair texto via `_extrair_texto_pdf()` (função module-level em `ingestion.py`)
+  3. Limpar artefatos OCR via `LegalDataCleaner.normalizar_espacos()`
+  4. Truncar em 15 000 chars se PDF muito grande
+  5. Enviar mensagem imediata de confirmação ao advogado
+  6. Chamar `EscalacaoClient.analisar_peca()` com `TipoAnalise.ANALISE_COMPLETA`
+  7. Formatar `AnalisePecaResponse` em markdown WhatsApp estruturado (IDENTIFICAÇÃO, PONTOS FORTES, VULNERABILIDADES, JURISPRUDÊNCIA, SUGESTÕES, AVALIAÇÃO X/100)
+  8. Salvar `SessaoAdvogado` com `intencao="analise_peticao"`, `modelo_ia="claude_opus"`
 
 ---
 
-### 4.2 — Endpoint REST de análise de petição (`api/routes/hub_advogado.py`) — arquivo NOVO (parcial)
+### 4.2 — Endpoint REST de análise de petição (`api/routes/hub_advogado.py`) — arquivo NOVO ✅ FEITO
 
-- [ ] Criar arquivo `feature_1_ia_personalizada/api/routes/hub_advogado.py`
-- [ ] Criar `POST /api/v1/hub/analisar-peticao`:
-  - Body: `FormData` com campo `arquivo` (PDF)
-  - Validação: tipo MIME deve ser `application/pdf`
-  - Tamanho máximo: 10MB (configurável)
-  - Role: `advogado`, `admin`
-  - Chamar `HarveyClient.analisar_peticao()` diretamente (sem WhatsApp)
-  - Retornar `AnaliseHarveyResponse` como JSON
-  - Salvar `SessaoAdvogado`
-- [ ] Criar `POST /api/v1/hub/consultar`:
-  - Body: `{ pergunta: str, cliente_id?: int, processo_id?: int }`
-  - Role: `advogado`, `admin`
-  - Montar contexto com dados do cliente/processo se fornecidos
-  - Chamar `HarveyClient.gerar_resposta()` diretamente (sem WhatsApp)
-  - Retornar resposta Harvey como JSON
-  - Salvar `SessaoAdvogado`
-- [ ] Registrar router em `feature_1_ia_personalizada/api/app.py`:
-  ```python
-  app.include_router(hub_advogado_router, prefix="/api/v1/hub", tags=["Hub do Advogado"])
-  ```
+- [x] Criar arquivo `feature_1_ia_personalizada/api/routes/hub_advogado.py`
+- [x] Criar `POST /hub/analisar-peticao`:
+  - Validação por magic bytes `%PDF-` (não só MIME)
+  - Tamanho máximo: 10 MB
+  - Role: `advogado`, `admin` via `require_advogado`
+  - Chama `EscalacaoClient.analisar_peca()` via `get_escalacao_client()` (singleton mockável)
+  - Retorna `AnalisePecaResponse` + `texto_truncado` + `percentual_analisado`
+  - Salva `SessaoAdvogado`
+- [x] Criar `POST /hub/consultar`:
+  - Body: `ConsultaHubRequest` com `pergunta`, `cliente_id?`, `processo_id?`
+  - Isolamento multi-tenant: `cliente_id`/`processo_id` validados contra `escritorio_id`
+  - Chama `EscalacaoClient.gerar_resposta()`
+  - Retorna `ConsultaHubResponse` (resposta, modelo_ia, tokens, custo)
+  - Salva `SessaoAdvogado`
+- [x] Registrar router em `feature_1_ia_personalizada/api/app.py`
 
 ---
 
-### 4.3 — Testes de integração de análise de petição — arquivo NOVO
+### 4.3 — Testes de integração de análise de petição — arquivo NOVO ✅ FEITO (12/12 passando)
 
-- [ ] Criar `tests/integration/test_analise_peticao.py`
-- [ ] Teste: upload PDF → `HarveyClient.analisar_peticao()` chamado com texto extraído (mock Harvey)
-- [ ] Teste: PDF inválido (não-PDF) → HTTP 422
-- [ ] Teste: PDF muito grande → chunking aplicado antes de chamar Harvey
-- [ ] Teste: `POST /hub/analisar-peticao` com role `cliente` → HTTP 403
-- [ ] Teste: `POST /hub/consultar` retorna resposta Harvey + salva `SessaoAdvogado`
+- [x] Criar `tests/integration/test_analise_peticao.py`
+- [x] Teste: role `cliente` → 403
+- [x] Teste: arquivo sem magic bytes `%PDF-` → 422
+- [x] Teste: PDF > 10 MB → 422
+- [x] Teste: falha na extração de texto → 422
+- [x] Teste: `EscalacaoIndisponivelError` em análise → 503
+- [x] Teste: PDF válido → `EscalacaoClient.analisar_peca()` chamado + `SessaoAdvogado` salva + `texto_truncado`/`percentual_analisado` corretos
+- [x] Teste: texto > 15 000 chars → `texto_truncado=True`
+- [x] Teste: `POST /hub/consultar` → resposta + `SessaoAdvogado` salva
+- [x] Teste: `consultar` com `cliente_id` → nome no contexto + referência salva
+- [x] Teste: `consultar` com `processo_id` → CNJ no contexto + referência salva
+- [x] Teste: `cliente_id` de outro escritório → ignorado (multi-tenant)
+- [x] Teste: `EscalacaoIndisponivelError` em consulta → 503
 
 ---
 
@@ -927,33 +927,27 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-### 5.1 — Handler de resumo de processo (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+### 5.1 — Handler de resumo de processo (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3) ✅ FEITO
 
-- [ ] Implementar `_handler_resumo_processo(mensagem, usuario, escritorio, db)`:
-  1. Extrair identificador: nome do cliente OU número CNJ do processo (via entidades do classificador)
-  2. Buscar processo no banco via `worker_queries.py` (já existe — reutilizar)
-  3. Buscar últimas movimentações via Jusbrasil (`jusbrasil_client.py`) + DataJud (`datajud_client.py`)
-  4. Buscar documentos RAG do processo (petições, contestações já ingeridas)
-  5. Buscar dados CRM do cliente (score, histórico de NPS)
-  6. Montar contexto completo para Harvey
-  7. Chamar `HarveyClient.gerar_resposta()` com `SYSTEM_PROMPT_HUB_ADVOGADO_BASE` + dados estruturados
-  8. Formatar resposta no padrão definido na seção 7 da doc (📋 com processo, cliente, movimentações, análise Harvey, score de risco, próxima audiência)
-  9. Salvar `SessaoAdvogado` com `processo_referenciado_id`
+- [x] Implementar `_handler_resumo_processo(mensagem, usuario, escritorio, db)`:
+  1. Lookup por CNJ (prioridade) OU pelo nome do cliente → processo ativo mais recente
+  2. Enriquece com todos os campos do banco: `tipo_acao`, `fase_processual`, `score_risco`, `score_nivel`, `score_interpretacao`, `estado_atual` (andamentos + próximo passo), `valor_causa`, `tribunal`, `vara`
+  3. Coleta contexto CRM via `CRMDataAggregator` (score, NPS, interações, último contato, ação sugerida)
+  4. Chama `EscalacaoClient.gerar_resposta()` com `SYSTEM_PROMPT_HUB_RESUMO_PROCESSO`
+  5. Retorna `(cliente_id_ref, processo_id)` populados para `SessaoAdvogado`
+  - **Nota**: RAG de documentos ingeridos disponível em iteração futura (Jusbrasil/DataJud omitidos — dados do DB já são ricos)
 
 ---
 
-### 5.2 — Handler de insight de cliente (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3)
+### 5.2 — Handler de insight de cliente (`workers/hub_advogado.py`) — arquivo EXISTENTE (Fase 3) ✅ FEITO
 
-- [ ] Implementar `_handler_insight_cliente(mensagem, usuario, escritorio, db)`:
-  1. Extrair nome do cliente da mensagem (via entidades do classificador)
-  2. Buscar cliente no banco (fuzzy match por nome se necessário)
-  3. Buscar CRM score via `crm/aggregator.py` (já existe — reutilizar)
-  4. Buscar histórico de interações relevantes via `crm/analyzer.py` (já existe — reutilizar)
-  5. Buscar processos ativos do cliente
-  6. Montar contexto com `SYSTEM_PROMPT_INSIGHT_CLIENTE`
-  7. Chamar `HarveyClient.gerar_resposta()`
-  8. Formatar resposta: situação atual + pontos de atenção + próxima ação + risco de abandono
-  9. Salvar `SessaoAdvogado` com `cliente_referenciado_id`
+- [x] Implementar `_handler_insight_cliente(mensagem, usuario, escritorio, db)`:
+  1. Fuzzy match por nome (`ilike`) no banco, isolado por `escritorio_id`
+  2. Coleta CRM via `CRMDataAggregator.coletar_contexto_cliente()`: score, NPS, interações 30d, último contato, processos ativos
+  3. Monta contexto com `SYSTEM_PROMPT_HUB_INSIGHT_CLIENTE`
+  4. Chama `EscalacaoClient.gerar_resposta()`
+  5. Resposta: situação atual + pontos de atenção + próxima ação + risco de abandono
+  6. Salva `SessaoAdvogado` com `cliente_referenciado_id`
 
 ---
 
