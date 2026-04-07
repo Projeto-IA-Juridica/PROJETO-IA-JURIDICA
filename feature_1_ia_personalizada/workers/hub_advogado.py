@@ -348,7 +348,7 @@ async def _handler_analise_peticao(
     escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
     """Baixa PDF do WhatsApp, extrai texto e envia para Claude Opus analisar."""
-    from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
+    from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
     from feature_1_ia_personalizada.services.ai.escalation_client import TipoAnalise
     from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
 
@@ -391,7 +391,7 @@ async def _handler_analise_peticao(
             0, 0, Decimal("0"), None, None,
         )
 
-    texto = DataCleaner.normalizar_espacos(texto_bruto or "")
+    texto = LegalDataCleaner.normalizar_espacos(texto_bruto or "")
 
     if len(texto.strip()) < 50:
         return (

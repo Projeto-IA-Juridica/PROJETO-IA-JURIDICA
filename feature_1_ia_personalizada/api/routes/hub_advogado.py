@@ -33,7 +33,7 @@ from feature_1_ia_personalizada.services.ai.escalation_client import (
     TipoAnalise,
 )
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_HUB_ADVOGADO_BASE
-from feature_1_ia_personalizada.services.legal_data.data_cleaner import DataCleaner
+from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
 from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
@@ -63,7 +63,7 @@ _PDF_MAGIC = b"%PDF-"               # primeiros bytes de qualquer PDF válido
 
 
 @functools.lru_cache(maxsize=1)
-def _get_escalacao_client() -> EscalacaoClient:
+def get_escalacao_client() -> EscalacaoClient:
     return EscalacaoClient()
 
 
@@ -148,7 +148,7 @@ async def analisar_peticao(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-    escalacao_client: EscalacaoClient = Depends(_get_escalacao_client),
+    escalacao_client: EscalacaoClient = Depends(get_escalacao_client),
 ):
     """
     Analisa uma petição PDF com Claude Opus e retorna insights estruturados.
@@ -179,7 +179,7 @@ async def analisar_peticao(
 
     # Extrair e limpar texto do PDF
     try:
-        texto = DataCleaner.normalizar_espacos(
+        texto = LegalDataCleaner.normalizar_espacos(
             DocumentoIngester._extrair_texto_pdf(conteudo_bytes) or ""
         )
     except Exception as exc:
@@ -256,7 +256,7 @@ async def consultar(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-    escalacao_client: EscalacaoClient = Depends(_get_escalacao_client),
+    escalacao_client: EscalacaoClient = Depends(get_escalacao_client),
 ):
     """
     Consulta jurídica livre com Claude Opus.
