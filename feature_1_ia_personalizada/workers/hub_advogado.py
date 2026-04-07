@@ -33,6 +33,7 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_HUB_ANALISE_PETICAO,
     SYSTEM_PROMPT_HUB_INSIGHT_CLIENTE,
     SYSTEM_PROMPT_HUB_PESQUISA_JURISPRUDENCIA,
+    SYSTEM_PROMPT_HUB_RESUMO_PROCESSO,
 )
 from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
 from feature_1_ia_personalizada.services.messaging.whatsapp import (
@@ -350,7 +351,7 @@ async def _handler_analise_peticao(
     """Baixa PDF do WhatsApp, extrai texto e envia para Claude Opus analisar."""
     from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
     from feature_1_ia_personalizada.services.ai.escalation_client import TipoAnalise
-    from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
+    from feature_1_ia_personalizada.services.rag.ingestion import _extrair_texto_pdf
 
     instance = escritorio.webhook_whatsapp_instance
     if not instance or not message_id:
@@ -382,7 +383,7 @@ async def _handler_analise_peticao(
 
     # Extrair texto do PDF
     try:
-        texto_bruto = DocumentoIngester._extrair_texto_pdf(conteudo_bytes)
+        texto_bruto = _extrair_texto_pdf(conteudo_bytes)
     except Exception as exc:
         logger.warning("hub_analise_extracao_falhou", erro=str(exc))
         return (
@@ -580,38 +581,138 @@ async def _handler_resumo_processo(
     session: Any,
     escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
-    """Busca dados do processo e gera resumo com Claude Opus."""
+    """
+    Busca dados completos do processo e gera briefing executivo com Claude Opus.
+
+    Lookup: CNJ do classificador (prioridade) → nome do cliente → processo mais recente.
+    Contexto: todos os campos disponíveis no banco + CRM score via CRMDataAggregator.
+    """
+    from shared.models.cliente import Cliente
     from shared.models.processo import Processo
+    from feature_1_ia_personalizada.services.crm.aggregator import CRMDataAggregator
 
+    processo = None
+    cliente_id_ref: int | None = None
     processo_id: int | None = None
-    contexto_processo = ""
 
-    # Tentar localizar processo pelo CNJ mencionado
+    # 1. Buscar por CNJ (prioridade)
     if classificacao.processo_cnj:
         stmt = select(Processo).where(
             Processo.escritorio_id == escritorio.id,
             Processo.numero_cnj == classificacao.processo_cnj,
         ).limit(1)
         processo = (await session.execute(stmt)).scalars().first()
-        if processo:
-            processo_id = processo.id
-            contexto_processo = (
-                f"Processo: {processo.numero_cnj}\n"
-                f"Tribunal: {processo.tribunal or 'N/D'}\n"
-                f"Último andamento: {processo.ultimo_andamento or 'N/D'}\n"
-            )
 
-    system_prompt = SYSTEM_PROMPT_HUB_ADVOGADO_BASE.format(
+    # 2. Fallback: buscar pelo nome do cliente → processo ativo mais recente
+    if processo is None and classificacao.cliente_nome:
+        stmt_cli = select(Cliente).where(
+            Cliente.escritorio_id == escritorio.id,
+            Cliente.nome.ilike(f"%{classificacao.cliente_nome}%"),
+        ).limit(1)
+        cliente_encontrado = (await session.execute(stmt_cli)).scalars().first()
+        if cliente_encontrado:
+            stmt_proc = (
+                select(Processo)
+                .where(
+                    Processo.escritorio_id == escritorio.id,
+                    Processo.cliente_id == cliente_encontrado.id,
+                    Processo.status == "ativo",
+                )
+                .order_by(Processo.data_ultimo_andamento.desc().nullslast())
+                .limit(1)
+            )
+            processo = (await session.execute(stmt_proc)).scalars().first()
+
+    if processo is None:
+        return (
+            "⚠️ Processo não encontrado. Informe o número CNJ completo (ex: 0001234-55.2024.8.26.0001) "
+            "ou o nome exato do cliente.",
+            "claude_opus_fallback",
+            0, 0, Decimal("0"), None, None,
+        )
+
+    processo_id = processo.id
+
+    # 3. Buscar cliente vinculado ao processo
+    cliente = await session.get(Cliente, processo.cliente_id)
+    nome_cliente = cliente.nome if cliente else "N/D"
+    if cliente:
+        cliente_id_ref = cliente.id
+
+    # 4. Coletar contexto CRM
+    contexto_crm = f"Cliente: {nome_cliente} — dados CRM não disponíveis."
+    if cliente:
+        try:
+            aggregator = CRMDataAggregator(session)
+            ctx = await aggregator.coletar_contexto_cliente(cliente.id, escritorio.id)
+            crm_score = ctx.crm_score_anterior or "N/D"
+            ultima_acao = ctx.crm_acao_sugerida_anterior or "Nenhuma registrada"
+            contexto_crm = (
+                f"Cliente: {nome_cliente}\n"
+                f"CRM Score: {crm_score}/100\n"
+                f"Interações (últimos 30d): {ctx.total_interacoes_30d}\n"
+                f"NPS médio (3m): {ctx.nps_medio_3m or 'N/D'}\n"
+                f"Último contato: há {ctx.dias_desde_ultimo_contato} dias\n"
+                f"Última ação CRM sugerida: {ultima_acao}"
+            )
+        except Exception as exc:
+            logger.warning("hub_resumo_crm_falhou", erro=str(exc), processo_id=processo_id)
+
+    # 5. Extrair andamentos e próximo passo do estado_atual (JSONB)
+    andamentos_recentes = "Nenhum andamento registrado."
+    proximo_passo = "N/D"
+    if isinstance(processo.estado_atual, dict):
+        ultimos = processo.estado_atual.get("ultimos_andamentos", [])
+        if ultimos:
+            andamentos_recentes = "\n".join(
+                f"• {a}" if isinstance(a, str) else f"• {a.get('descricao', str(a))}"
+                for a in ultimos[:5]
+            )
+        proximo_passo = processo.estado_atual.get("proximo_passo_esperado", "N/D")
+
+    # 6. Montar bloco de dados do processo
+    data_ult = (
+        processo.data_ultimo_andamento.strftime("%d/%m/%Y")
+        if processo.data_ultimo_andamento else "N/D"
+    )
+    valor_causa = (
+        f"R$ {processo.valor_causa:,.2f}" if processo.valor_causa else "N/D"
+    )
+    score_interpretacao = (
+        f"\nInterpretação do score: {processo.score_interpretacao}"
+        if processo.score_interpretacao else ""
+    )
+    dados_processo = (
+        f"CNJ: {processo.numero_cnj}\n"
+        f"Tribunal: {processo.tribunal or 'N/D'} | Vara: {processo.vara or 'N/D'}\n"
+        f"Tipo de ação: {processo.tipo_acao or 'N/D'}\n"
+        f"Polo do cliente ({nome_cliente}): {processo.polo_cliente}\n"
+        f"Fase processual: {processo.fase_processual or 'N/D'}\n"
+        f"Status: {processo.status}\n"
+        f"Valor da causa: {valor_causa}\n"
+        f"Último andamento ({data_ult}): {processo.ultimo_andamento or 'Nenhum registrado'}\n"
+        f"Próximo passo esperado: {proximo_passo}\n"
+        f"Score de risco: {processo.score_risco or 'N/D'}/100 — nível: {processo.score_nivel or 'N/D'}"
+        f"{score_interpretacao}"
+    )
+
+    system_prompt = SYSTEM_PROMPT_HUB_RESUMO_PROCESSO.format(
         nome_usuario=usuario.nome,
-        nome_escritorio=escritorio.nome,
+        dados_processo=dados_processo,
+        contexto_crm=contexto_crm,
         data_hoje=_hoje(),
     )
+
+    mensagem_usuario = (
+        f"{mensagem}\n\n"
+        f"<andamentos_recentes>\n{andamentos_recentes}\n</andamentos_recentes>"
+    ).strip()
 
     try:
         resultado = await asyncio.wait_for(
             escalacao_client.gerar_resposta(
                 system_prompt=system_prompt,
-                mensagem_usuario=f"{mensagem}\n\n{contexto_processo}".strip(),
+                mensagem_usuario=mensagem_usuario,
                 escritorio_id=escritorio.id,
             ),
             timeout=50.0,
@@ -622,7 +723,7 @@ async def _handler_resumo_processo(
             resultado.tokens_input,
             resultado.tokens_output,
             resultado.custo_estimado,
-            None,
+            cliente_id_ref,
             processo_id,
         )
     except (EscalacaoIndisponivelError, TimeoutError) as exc:
@@ -630,7 +731,7 @@ async def _handler_resumo_processo(
         return (
             "⚠️ Resumo indisponível no momento. Tente novamente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, processo_id,
+            0, 0, Decimal("0"), cliente_id_ref, processo_id,
         )
 
 
