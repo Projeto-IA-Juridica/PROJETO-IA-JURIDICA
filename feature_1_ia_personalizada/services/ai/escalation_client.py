@@ -69,6 +69,9 @@ class AnalisePecaResponse:
     precedentes_relevantes: list[str]
     score_geral: int                    # 0-100
     sugestoes: list[str] = field(default_factory=list)
+    tokens_input: int = 0
+    tokens_output: int = 0
+    custo_estimado: Decimal = field(default_factory=lambda: Decimal("0"))
 
 
 @dataclass
@@ -203,6 +206,9 @@ class EscalacaoClient:
                 f"JSON inválido na análise de peça: {conteudo[:200]}"
             ) from exc
 
+        tokens_in = getattr(getattr(resposta, "usage", None), "input_tokens", 0)
+        tokens_out = getattr(getattr(resposta, "usage", None), "output_tokens", 0)
+
         return AnalisePecaResponse(
             tipo_peca=dados.get("tipo_peca", "desconhecido"),
             pontos_fortes=dados.get("pontos_fortes", []),
@@ -211,6 +217,9 @@ class EscalacaoClient:
             precedentes_relevantes=dados.get("precedentes_relevantes", []),
             score_geral=int(dados.get("score_geral", 0)),
             sugestoes=dados.get("sugestoes", []),
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+            custo_estimado=_calcular_custo(tokens_in, tokens_out),
         )
 
     # ------------------------------------------------------------------

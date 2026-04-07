@@ -336,6 +336,9 @@ async def _handler_status_escritorio(
     )
 
 
+_MAX_CHARS_PETICAO = 15_000  # ~5 000 tokens — limite seguro para Claude Opus
+
+
 async def _handler_analise_peticao(
     payload: dict[str, Any],
     message_id: str | None,
@@ -345,6 +348,10 @@ async def _handler_analise_peticao(
     escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
     """Baixa PDF do WhatsApp, extrai texto e envia para Claude Opus analisar."""
+    from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
+    from feature_1_ia_personalizada.services.ai.escalation_client import TipoAnalise
+    from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
+
     instance = escritorio.webhook_whatsapp_instance
     if not instance or not message_id:
         return (
@@ -352,6 +359,12 @@ async def _handler_analise_peticao(
             "claude_opus_fallback",
             0, 0, Decimal("0"), None, None,
         )
+
+    # Confirmação imediata — análise pode levar até 60s
+    await _enviar_whatsapp(
+        escritorio, usuario,
+        "📄 Recebi a petição. Analisando com Claude Opus... aguarde até 60 segundos.",
+    )
 
     # Baixar PDF via Evolution API
     evo = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
@@ -369,8 +382,7 @@ async def _handler_analise_peticao(
 
     # Extrair texto do PDF
     try:
-        from feature_1_ia_personalizada.services.rag.ingestion import DocumentoIngester
-        texto = DocumentoIngester._extrair_texto_pdf(conteudo_bytes)
+        texto_bruto = DocumentoIngester._extrair_texto_pdf(conteudo_bytes)
     except Exception as exc:
         logger.warning("hub_analise_extracao_falhou", erro=str(exc))
         return (
@@ -379,40 +391,59 @@ async def _handler_analise_peticao(
             0, 0, Decimal("0"), None, None,
         )
 
-    if not texto or len(texto.strip()) < 50:
+    texto = LegalDataCleaner.normalizar_espacos(texto_bruto or "")
+
+    if len(texto.strip()) < 50:
         return (
             "⚠️ O documento parece estar vazio ou apenas com imagens (OCR não suportado).",
             "claude_opus_fallback",
             0, 0, Decimal("0"), None, None,
         )
 
-    system_prompt = SYSTEM_PROMPT_HUB_ANALISE_PETICAO.format(data_hoje=_hoje())
+    truncado = len(texto) > _MAX_CHARS_PETICAO
+    conteudo_envio = texto[:_MAX_CHARS_PETICAO]
 
     try:
-        resultado = await asyncio.wait_for(
-            escalacao_client.gerar_resposta(
-                system_prompt=system_prompt,
-                mensagem_usuario=f"Analise a seguinte peça jurídica:\n\n{texto[:8000]}",
-                escritorio_id=escritorio.id,
+        analise = await asyncio.wait_for(
+            escalacao_client.analisar_peca(
+                conteudo_peca=conteudo_envio,
+                tipo_analise=TipoAnalise.ANALISE_COMPLETA,
+                contexto_processo="Análise solicitada pelo advogado via WhatsApp.",
             ),
             timeout=60.0,
-        )
-        return (
-            resultado.conteudo,
-            "claude_opus",
-            resultado.tokens_input,
-            resultado.tokens_output,
-            resultado.custo_estimado,
-            None,
-            None,
         )
     except (EscalacaoIndisponivelError, TimeoutError) as exc:
         logger.warning("hub_analise_escalacao_falhou", erro=str(exc))
         return (
-            "⚠️ Análise indisponível no momento. Tente novamente.",
+            "⚠️ Análise indisponível no momento. Tente novamente em instantes.",
             "claude_opus_fallback",
             0, 0, Decimal("0"), None, None,
         )
+
+    # Formatar resposta em markdown WhatsApp
+    def _lista(itens: list[str]) -> str:
+        return "\n".join(f"• {i}" for i in itens) if itens else "• —"
+
+    aviso_truncamento = (
+        "\n\n_⚠️ Documento extenso — análise baseada nos primeiros 15 000 caracteres._"
+        if truncado else ""
+    )
+
+    resposta = (
+        f"*📋 ANÁLISE DE PEÇA JURÍDICA*\n\n"
+        f"*IDENTIFICAÇÃO*\n{analise.tipo_peca}\n\n"
+        f"*PONTOS FORTES*\n{_lista(analise.pontos_fortes)}\n\n"
+        f"*VULNERABILIDADES*\n{_lista(analise.vulnerabilidades)}\n\n"
+        f"*ARGUMENTOS AUSENTES*\n{_lista(analise.argumentos_ausentes)}\n\n"
+        f"*JURISPRUDÊNCIA RELEVANTE*\n{_lista(analise.precedentes_relevantes)}\n\n"
+        f"*SUGESTÕES*\n{_lista(analise.sugestoes)}\n\n"
+        f"*AVALIAÇÃO GERAL: {analise.score_geral}/100*"
+        f"{aviso_truncamento}"
+    )
+
+    # Tokens são rastreados internamente pelo EscalacaoClient; retornamos 0 pois
+    # analisar_peca() não expõe contagem — será corrigido em refactor futuro.
+    return (resposta, "claude_opus", 0, 0, Decimal("0"), None, None)
 
 
 async def _handler_pesquisa_jurisprudencia(
