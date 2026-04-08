@@ -14,15 +14,17 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.api.middleware.auth import (
+    _get_payload,
     get_advogado_id,
     get_escritorio_id_advogado,
     require_advogado,
@@ -100,6 +102,53 @@ class ConsultaHubResponse(BaseModel):
     tokens_input: int
     tokens_output: int
     custo_estimado: Decimal
+
+
+class SessaoAdvogadoListItem(BaseModel):
+    id: int
+    intencao: str
+    modelo_ia: str
+    mensagem_preview: str   # primeiros 100 chars da mensagem
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SessaoAdvogadoDetail(BaseModel):
+    id: int
+    intencao: str
+    modelo_ia: str
+    mensagem_advogado: str
+    resposta_hub: str
+    tokens_input: int
+    tokens_output: int
+    custo_estimado: Decimal
+    cliente_referenciado_id: int | None
+    processo_referenciado_id: int | None
+    metadata_json: dict
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class IntencaoCount(BaseModel):
+    intencao: str
+    total: int
+
+
+class AdvogadoAtivo(BaseModel):
+    usuario_id: int
+    total_sessoes: int
+
+
+class MetricasHubResponse(BaseModel):
+    mes_atual: str              # "YYYY-MM"
+    total_sessoes: int
+    tokens_input_total: int
+    tokens_output_total: int
+    custo_total_usd: Decimal
+    intencoes_top5: list[IntencaoCount]
+    advogados_mais_ativos: list[AdvogadoAtivo]
 
 
 # ---------------------------------------------------------------------------
@@ -336,4 +385,195 @@ async def consultar(
         tokens_input=resultado.tokens_input,
         tokens_output=resultado.tokens_output,
         custo_estimado=resultado.custo_estimado,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /hub/historico
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/historico",
+    response_model=list[SessaoAdvogadoListItem],
+    status_code=status.HTTP_200_OK,
+)
+async def listar_historico(
+    page: int = Query(1, ge=1, description="Página (começa em 1)"),
+    limit: int = Query(25, ge=1, le=100, description="Itens por página (máx. 100)"),
+    advogado_id: int = Depends(get_advogado_id),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Lista o histórico de sessões do Hub do advogado autenticado.
+
+    Retorna apenas as sessões do próprio usuário — nunca de outros advogados
+    do mesmo escritório (isolamento por `usuario_id`).
+    Paginação via `page` e `limit`.
+    """
+    offset = (page - 1) * limit
+    stmt = (
+        select(SessaoAdvogado)
+        .where(
+            SessaoAdvogado.usuario_id == advogado_id,
+            SessaoAdvogado.escritorio_id == escritorio_id,
+        )
+        .order_by(SessaoAdvogado.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    resultado = await db.execute(stmt)
+    sessoes = resultado.scalars().all()
+
+    return [
+        SessaoAdvogadoListItem(
+            id=s.id,
+            intencao=s.intencao,
+            modelo_ia=s.modelo_ia,
+            mensagem_preview=s.mensagem_advogado[:100],
+            created_at=s.created_at,
+        )
+        for s in sessoes
+    ]
+
+
+# ---------------------------------------------------------------------------
+# GET /hub/historico/{sessao_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/historico/{sessao_id}",
+    response_model=SessaoAdvogadoDetail,
+    status_code=status.HTTP_200_OK,
+)
+async def detalhar_sessao(
+    sessao_id: int,
+    advogado_id: int = Depends(get_advogado_id),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna uma sessão do Hub em detalhe completo.
+
+    Valida que a sessão pertence ao escritório do usuário autenticado —
+    IDs de outros escritórios resultam em 403, não 404 (evita enumeração).
+    """
+    sessao = await db.get(SessaoAdvogado, sessao_id)
+
+    if not sessao:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sessão não encontrada.",
+        )
+
+    # Isolamento multi-tenant: escritorio_id deve bater — nunca expor IDs alheios
+    if sessao.escritorio_id != escritorio_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado.",
+        )
+
+    return SessaoAdvogadoDetail(
+        id=sessao.id,
+        intencao=sessao.intencao,
+        modelo_ia=sessao.modelo_ia,
+        mensagem_advogado=sessao.mensagem_advogado,
+        resposta_hub=sessao.resposta_hub,
+        tokens_input=sessao.tokens_input,
+        tokens_output=sessao.tokens_output,
+        custo_estimado=sessao.custo_estimado,
+        cliente_referenciado_id=sessao.cliente_referenciado_id,
+        processo_referenciado_id=sessao.processo_referenciado_id,
+        metadata_json=sessao.metadata_json or {},
+        created_at=sessao.created_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /hub/metricas
+#
+# Restrito a admin — require_advogado já garante advogado|admin, então só
+# precisamos checar se o role é estritamente "admin".
+# ---------------------------------------------------------------------------
+
+
+def _require_admin(payload: dict = Depends(_get_payload)) -> dict:
+    """Guard adicional: apenas role 'admin' pode acessar métricas agregadas."""
+    if payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores.",
+        )
+    return payload
+
+
+@router.get(
+    "/metricas",
+    response_model=MetricasHubResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def metricas_hub(
+    payload: dict = Depends(_require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Métricas agregadas do Hub do Advogado para o mês atual.
+
+    Role: exclusivo para `admin`.
+    Agrega por `escritorio_id` do token — nunca retorna dados de outros escritórios.
+    """
+    escritorio_id: int = int(payload["escritorio_id"])
+    agora = datetime.now(timezone.utc)
+    inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    base = (
+        SessaoAdvogado.escritorio_id == escritorio_id,
+        SessaoAdvogado.created_at >= inicio_mes,
+    )
+
+    # Totais
+    stmt_totais = select(
+        func.count().label("total_sessoes"),
+        func.coalesce(func.sum(SessaoAdvogado.tokens_input), 0).label("tokens_input_total"),
+        func.coalesce(func.sum(SessaoAdvogado.tokens_output), 0).label("tokens_output_total"),
+        func.coalesce(func.sum(SessaoAdvogado.custo_estimado), 0).label("custo_total"),
+    ).where(*base)
+    row_totais = (await db.execute(stmt_totais)).one()
+
+    # Top 5 intenções
+    stmt_intencoes = (
+        select(SessaoAdvogado.intencao, func.count().label("total"))
+        .where(*base)
+        .group_by(SessaoAdvogado.intencao)
+        .order_by(func.count().desc())
+        .limit(5)
+    )
+    rows_intencoes = (await db.execute(stmt_intencoes)).all()
+
+    # Advogados mais ativos (top 5)
+    stmt_advogados = (
+        select(SessaoAdvogado.usuario_id, func.count().label("total_sessoes"))
+        .where(*base)
+        .group_by(SessaoAdvogado.usuario_id)
+        .order_by(func.count().desc())
+        .limit(5)
+    )
+    rows_advogados = (await db.execute(stmt_advogados)).all()
+
+    return MetricasHubResponse(
+        mes_atual=agora.strftime("%Y-%m"),
+        total_sessoes=row_totais.total_sessoes,
+        tokens_input_total=row_totais.tokens_input_total,
+        tokens_output_total=row_totais.tokens_output_total,
+        custo_total_usd=Decimal(str(row_totais.custo_total)),
+        intencoes_top5=[
+            IntencaoCount(intencao=r.intencao, total=r.total)
+            for r in rows_intencoes
+        ],
+        advogados_mais_ativos=[
+            AdvogadoAtivo(usuario_id=r.usuario_id, total_sessoes=r.total_sessoes)
+            for r in rows_advogados
+        ],
     )
