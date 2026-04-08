@@ -1,8 +1,10 @@
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 45_000, // Aumentado para 45s para operações pesadas (CRM, RAG, IA)
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // Necessário para enviar cookies CSRF
@@ -28,7 +30,7 @@ let csrfToken: string | null = null
 export async function fetchCsrfToken(): Promise<string | null> {
   if (csrfToken) return csrfToken
   try {
-    const { data } = await axios.get('/api/auth/csrf-token', { withCredentials: true })
+    const { data } = await axios.get(`${API_BASE_URL}/auth/csrf-token`, { withCredentials: true })
     csrfToken = data.csrf_token
     if (csrfToken) {
       const secure = window.location.protocol === 'https:' ? '; Secure' : ''
@@ -87,7 +89,7 @@ api.interceptors.response.use(
           if (!csrfToken) {
             await fetchCsrfToken()
           }
-          const { data } = await axios.post('/api/auth/refresh', null, {
+          const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, null, {
             headers: {
               Authorization: `Bearer ${refresh}`,
               'X-CSRF-Token': csrfToken || '',
