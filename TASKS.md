@@ -554,7 +554,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 | Fase 2 | Roteador de Confiança Claude → Claude Opus | ✅ Concluída |
 | Fase 3 | Hub do Advogado via WhatsApp | ✅ Concluída |
 | Fase 4 | Análise de Petições (PDF → Claude Opus) | ✅ Concluída |
-| Fase 5 | Resumo de Processos e Insights CRM | 🔄 Em andamento |
+| Fase 5 | Resumo de Processos e Insights CRM | ✅ Concluída |
 
 ---
 
@@ -929,61 +929,35 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ---
 
-### 5.3 — Endpoints REST de histórico (`api/routes/hub_advogado.py`) — arquivo EXISTENTE (Fase 4)
+### 5.3 — Endpoints REST de histórico (`api/routes/hub_advogado.py`) — arquivo EXISTENTE (Fase 4) ✅ FEITO
 
-- [ ] Criar `GET /api/v1/hub/historico?page=1&limit=25`:
-  - Query `SessaoAdvogado` filtrado por `usuario_id` do JWT autenticado
-  - Paginação com `page` e `limit`
-  - Role: `advogado`, `admin`
-  - Retornar lista com `id`, `intencao`, `modelo_ia`, `created_at`, preview da mensagem (100 chars)
-- [ ] Criar `GET /api/v1/hub/historico/{sessao_id}`:
-  - Buscar `SessaoAdvogado` por ID
-  - Validar que `escritorio_id` bate com o do usuário autenticado (isolamento multi-tenant)
-  - Retornar sessão completa
-- [ ] Criar `GET /api/v1/hub/metricas`:
-  - Role: `admin`
-  - Agregar `SessaoAdvogado` por `escritorio_id`: tokens consumidos total, custo total, intenções mais usadas (TOP 5), advogados mais ativos
-  - Retornar JSON com período `mes_atual`
+- [x] `GET /hub/historico?page=1&limit=25` — paginação por `usuario_id` autenticado
+- [x] `GET /hub/historico/{sessao_id}` — detalhe com isolamento multi-tenant (403 em vez de 404)
+- [x] `GET /hub/metricas` — role `admin`, agrega por `escritorio_id`, período `mes_atual`
 
 ---
 
-### 5.4 — Schemas Pydantic para Hub (`shared/schemas/`) — arquivo NOVO
+### 5.4 — Schemas Pydantic para Hub (`shared/schemas/`) — arquivo NOVO ✅ FEITO
 
-- [ ] Criar `shared/schemas/hub_advogado.py`
-- [ ] Criar `ConsultaHubRequest`:
-  ```python
-  pergunta: str
-  cliente_id: int | None = None
-  processo_id: int | None = None
-  ```
-- [ ] Criar `SessaoAdvogadoResponse`:
-  ```python
-  id: int
-  intencao: str
-  mensagem_advogado: str
-  resposta_hub: str
-  modelo_ia: str
-  tokens_input: int
-  tokens_output: int
-  custo_estimado: Decimal
-  cliente_referenciado_id: int | None
-  processo_referenciado_id: int | None
-  created_at: datetime
-  ```
-- [ ] Criar `SessaoAdvogadoListItem` (versão reduzida para listagem)
-- [ ] Criar `MetricasHubResponse`
-- [ ] Exportar em `shared/schemas/__init__.py`
+- [x] Criar `shared/schemas/hub_advogado.py`
+- [x] Criar `ConsultaHubRequest` com validação `min_length=1, max_length=4096`
+- [x] Criar `SessaoAdvogadoResponse` (detalhe completo)
+- [x] Criar `SessaoAdvogadoListItem` com `mensagem_preview` validado (`max_length=100`)
+- [x] Criar `MetricasHubResponse` com `mes_atual` validado (`pattern=r"^\d{4}-\d{2}$"`)
+- [x] Exportar em `shared/schemas/__init__.py`
+- [x] Rotas `hub_advogado.py` atualizadas para importar de `shared/schemas/hub_advogado.py`
 
 ---
 
-### 5.5 — Testes de integração de resumos e insights — arquivo NOVO
+### 5.5 — Testes de integração de resumos e insights — arquivo NOVO ✅ FEITO
 
-- [ ] Criar `tests/integration/test_hub_resumos_insights.py`
-- [ ] Teste: "Resumo do processo 0001234-55.2023.8.26.0001" → Harvey recebe dados reais do banco (mock Harvey)
-- [ ] Teste: "Insight da cliente Maria" → CRM `aggregator.py` chamado + Harvey gera recomendação
-- [ ] Teste: `GET /hub/historico` retorna apenas sessões do usuário autenticado (isolamento)
-- [ ] Teste: `GET /hub/historico/{id}` de outro escritório → HTTP 403
-- [ ] Teste: `GET /hub/metricas` com role `advogado` → HTTP 403; com role `admin` → HTTP 200
+- [x] Criar `feature_1_ia_personalizada/tests/integration/test_hub_resumos_insights.py` (7 testes, 7/7 passando)
+- [x] Teste: processo real no banco → CNJ injetado na mensagem enviada ao EscalacaoClient
+- [x] Teste: cliente no banco → nome injetado no contexto + sessão com `cliente_referenciado_id`
+- [x] Teste: `GET /hub/historico` retorna apenas sessões do usuário autenticado (isolamento)
+- [x] Teste: `GET /hub/historico/{id}` de outro escritório → HTTP 403
+- [x] Teste: `GET /hub/metricas` com role `advogado` → HTTP 403; com role `admin` → HTTP 200
+- [x] Teste: `SessaoAdvogado` salva com todos os campos obrigatórios corretos (Fase 5)
 
 ---
 
