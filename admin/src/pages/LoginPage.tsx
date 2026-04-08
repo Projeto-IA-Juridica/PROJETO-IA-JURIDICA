@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Spinner, ErrorBox } from '../components/ui'
-import { Scale } from 'lucide-react'
+import { Scale, ShieldCheck, ArrowRight } from 'lucide-react'
 
 type Tab = 'login' | 'register'
 
@@ -89,21 +89,37 @@ export default function LoginPage() {
 
   return (
     <div className="login-viewport">
-      <div className="login-card surface">
-        <div className="login-brand">
-          <div className="login-logo" aria-hidden>
-            <Scale size={22} />
+      <div className="login-shell">
+        <section className="login-panel login-panel-copy surface">
+          <div className="login-brand">
+            <div className="login-logo" aria-hidden>
+              <Scale size={22} />
+            </div>
+            <div>
+              <div className="login-title">Hub Jurídico</div>
+              <div className="login-subtitle">Painel administrativo</div>
+            </div>
           </div>
-          <div>
-            <div className="login-title">Hub Jurídico</div>
-            <div className="login-subtitle">Painel de administração</div>
-          </div>
-        </div>
 
-        <div style={{ marginTop: 18 }}>
-          <div className="tab-row" role="tablist">
-            <button className={`tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</button>
-            <button className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
+          <div className="login-copy-block">
+            <div className="login-eyebrow">Operação interna</div>
+            <h1 className="login-heading">Uma interface discreta, séria e orientada à operação.</h1>
+            <p className="login-copy">
+              Gestão do escritório, processos, CRM e prospecção com visual limpo, leitura rápida e foco no que importa.
+            </p>
+          </div>
+
+          <div className="login-points">
+            <div className="login-point"><ShieldCheck size={14} /> Acesso restrito por perfil</div>
+            <div className="login-point"><ShieldCheck size={14} /> Fluxo enxuto para operação diária</div>
+            <div className="login-point"><ShieldCheck size={14} /> Navegação simples e consistente</div>
+          </div>
+        </section>
+
+        <section className="login-panel login-card surface">
+          <div className="tab-row" role="tablist" aria-label="Autenticação">
+            <button type="button" className={`tab ${tab === 'login' ? 'active' : ''}`} onClick={() => { setTab('login'); setError('') }}>Entrar</button>
+            <button type="button" className={`tab ${tab === 'register' ? 'active' : ''}`} onClick={() => { setTab('register'); setError('') }}>Criar conta</button>
           </div>
 
           {error && <div style={{ marginTop: 14 }}><ErrorBox message={error} /></div>}
@@ -116,12 +132,8 @@ export default function LoginPage() {
               <label className="label" style={{ marginTop: 8 }}>Senha</label>
               <input className="input" type="password" required value={senha} onChange={e => setSenha(e.target.value)} placeholder="••••••••" />
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                <a href="#" style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }}>Esqueceu a senha?</a>
-              </div>
-
-              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 12 }}>
-                {loading ? <Spinner size={14} /> : null} Entrar
+              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 10 }}>
+                {loading ? <Spinner size={14} /> : <ArrowRight size={14} />} Entrar
               </button>
             </form>
           ) : (
@@ -152,12 +164,12 @@ export default function LoginPage() {
                   <input className="input" type="password" required minLength={8} value={reg.senha} onChange={e => setReg(r => ({ ...r, senha: e.target.value }))} placeholder="••••••••" />
                 </div>
               </div>
-              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 12 }}>
-                {loading ? <Spinner size={14} /> : null} Criar conta
+              <button className="btn btn-primary btn-lg" type="submit" disabled={loading} style={{ marginTop: 10 }}>
+                {loading ? <Spinner size={14} /> : <ArrowRight size={14} />} Criar conta
               </button>
             </form>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )
