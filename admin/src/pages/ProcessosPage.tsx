@@ -17,11 +17,11 @@ function ProcessoForm({
   const [tipoAcao, setTipoAcao] = useState('')
 
   return (
-    <div className="surface" style={{ padding: 14, marginBottom: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+    <div className="surface page-panel page-stack">
+      <div className="page-panel-kicker">
         <Plus size={13} /> Novo processo
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1.4fr auto', gap: 6 }}>
+      <div className="page-grid page-grid-5" style={{ gridTemplateColumns: '2fr 1.2fr 1fr 1.4fr auto' }}>
         <input className="input" placeholder="CNJ" value={numeroCnj} onChange={(e) => setNumeroCnj(e.target.value)} />
         <select className="input" value={clienteId} onChange={(e) => setClienteId(Number(e.target.value))}>
           <option value="">Selecione cliente</option>
@@ -65,7 +65,7 @@ function ProcessoRow({
   const [frequencia, setFrequencia] = useState<'diario' | 'semanal'>((processo.frequencia_monitoramento as 'diario' | 'semanal') ?? 'diario')
 
   return (
-    <div className="surface" style={{ padding: 10 }}>
+    <div className="surface page-panel-tight">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
         <div>
           <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{processo.numero_cnj}</div>
@@ -154,47 +154,51 @@ export default function ProcessosPage() {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Processos</h1>
-        <p className="page-subtitle">Gestão de processos monitorados</p>
-      </div>
-
-      <ProcessoForm
-        onSubmit={criarProcesso}
-        loading={creating}
-        clientes={(clientesData?.items ?? []).map(c => ({ id: c.id, nome: c.nome }))}
-      />
-
-      <div className="surface" style={{ padding: 10, marginBottom: 10 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: 6 }}>
-          <input className="input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por CNJ" />
-          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">todos</option>
-            <option value="ativo">ativo</option>
-            <option value="arquivado">arquivado</option>
-            <option value="suspenso">suspenso</option>
-            <option value="encerrado">encerrado</option>
-          </select>
-          <button className="btn btn-secondary" onClick={() => setPage(1)}><RefreshCw size={12} /></button>
+        <div className="page-header-main">
+          <h1 className="page-title">Processos</h1>
+          <p className="page-subtitle">Gestão de processos monitorados</p>
         </div>
       </div>
 
-      {isLoading && !data ? (
-        <div style={{ paddingTop: 20 }}><SkeletonGrid count={5} /></div>
-      ) : items.length === 0 ? (
-        <EmptyState icon={<FolderOpen size={24} style={{ color: 'var(--text-muted)' }} />} title="Nenhum processo encontrado" desc="Cadastre um processo para iniciar o monitoramento." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {items.map(p => (
-            <ProcessoRow
-              key={p.id} processo={p}
-              onSave={(id, payload) => atualizarProcesso({ id, payload })}
-              onArchive={(id) => arquivarProcesso(id)}
-              saving={saving} archiving={archiving}
-            />
-          ))}
-          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={data?.total} />
+      <div className="page-stack">
+        <ProcessoForm
+          onSubmit={criarProcesso}
+          loading={creating}
+          clientes={(clientesData?.items ?? []).map(c => ({ id: c.id, nome: c.nome }))}
+        />
+
+        <div className="surface page-panel">
+          <div className="page-grid" style={{ gridTemplateColumns: '1fr 160px auto' }}>
+            <input className="input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por CNJ" />
+            <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">todos</option>
+              <option value="ativo">ativo</option>
+              <option value="arquivado">arquivado</option>
+              <option value="suspenso">suspenso</option>
+              <option value="encerrado">encerrado</option>
+            </select>
+            <button className="btn btn-secondary" onClick={() => setPage(1)}><RefreshCw size={12} /></button>
+          </div>
         </div>
-      )}
+
+        {isLoading && !data ? (
+          <div style={{ paddingTop: 20 }}><SkeletonGrid count={5} /></div>
+        ) : items.length === 0 ? (
+          <EmptyState icon={<FolderOpen size={24} style={{ color: 'var(--text-muted)' }} />} title="Nenhum processo encontrado" desc="Cadastre um processo para iniciar o monitoramento." />
+        ) : (
+          <div className="page-stack">
+            {items.map(p => (
+              <ProcessoRow
+                key={p.id} processo={p}
+                onSave={(id, payload) => atualizarProcesso({ id, payload })}
+                onArchive={(id) => arquivarProcesso(id)}
+                saving={saving} archiving={archiving}
+              />
+            ))}
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={data?.total} />
+          </div>
+        )}
+      </div>
     </>
   )
 }

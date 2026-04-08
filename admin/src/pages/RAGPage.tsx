@@ -57,22 +57,24 @@ export default function RAGPage() {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Base de Conhecimento</h1>
-        <p className="page-subtitle">Documentos jurídicos injetados nas respostas da IA</p>
+        <div className="page-header-main">
+          <h1 className="page-title">Base de Conhecimento</h1>
+          <p className="page-subtitle">Documentos jurídicos injetados nas respostas da IA</p>
+        </div>
       </div>
 
       {/* Métricas */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20, maxWidth: 300 }}>
+      <div className="page-grid page-grid-2" style={{ marginBottom: 18, maxWidth: 340 }}>
         <MetricCard value={docs?.length ?? 0} label="Documentos" />
         <MetricCard value={docs?.reduce((s, d) => s + d.chunks, 0) ?? 0} label="Chunks" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14 }}>
+      <div className="page-grid page-grid-rag">
         {/* Left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="page-stack">
           {/* Upload */}
-          <div className="surface" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+          <div className="surface page-panel page-stack">
+            <div className="page-panel-kicker">
               <Upload size={14} /> Adicionar Documento
             </div>
 
@@ -115,8 +117,8 @@ export default function RAGPage() {
           </div>
 
           {/* Lista */}
-          <div className="surface" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+          <div className="surface page-panel page-stack">
+            <div className="page-panel-kicker">
               <BookOpen size={14} /> Documentos Indexados
             </div>
             {isLoading ? <Spinner /> : !docs?.length ? (
@@ -142,8 +144,8 @@ export default function RAGPage() {
         </div>
 
         {/* Right: Busca */}
-        <div className="surface" style={{ padding: 16, alignSelf: 'start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+        <div className="surface page-panel page-stack" style={{ alignSelf: 'start' }}>
+          <div className="page-panel-kicker">
             <Search size={14} /> Busca Semântica
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.5 }}>

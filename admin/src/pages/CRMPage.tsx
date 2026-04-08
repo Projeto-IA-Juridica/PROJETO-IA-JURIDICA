@@ -108,11 +108,13 @@ export default function CRMPage() {
   return (
     <>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="page-header-main">
           <div>
             <h1 className="page-title">CRM Inteligente</h1>
             <p className="page-subtitle">Classificação de satisfação e ações sugeridas por IA</p>
           </div>
+        </div>
+        <div className="page-header-actions">
           <button className="btn btn-primary" onClick={() => analisarTudo()} disabled={analisando}>
             {analisando ? <><Spinner size={12} /> Analisando...</> : '🔄 Analisar escritório'}
           </button>
@@ -121,7 +123,7 @@ export default function CRMPage() {
 
       {/* KPI Header */}
       {lr ? <Spinner /> : resumo && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
+        <div className="page-grid page-grid-6" style={{ marginBottom: 20 }}>
           {(['critico', 'em_risco', 'neutro', 'satisfeito', 'excelente'] as const).map(n => {
             const icons = { critico: '🔴', em_risco: '🟠', neutro: '🟡', satisfeito: '🟢', excelente: '🟢' }
             const labels = { critico: 'Crítico', em_risco: 'Em Risco', neutro: 'Neutro', satisfeito: 'Satisfeito', excelente: 'Excelente' }
@@ -134,7 +136,7 @@ export default function CRMPage() {
       )}
 
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="page-toolbar">
         <div style={{ flex: 1, minWidth: 200 }}>
           <input className="input" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome..." />
         </div>
@@ -149,7 +151,7 @@ export default function CRMPage() {
 
       {/* Lista */}
       {lc && !clientes ? <div style={{ paddingTop: 20 }}><SkeletonGrid count={5} /></div> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="page-stack">
           {filtrados.length === 0 ? (
             <EmptyState icon="🤝" title="Nenhum cliente encontrado" desc="Ajuste os filtros ou analise o escritório." />
           ) : filtrados.map(c => (

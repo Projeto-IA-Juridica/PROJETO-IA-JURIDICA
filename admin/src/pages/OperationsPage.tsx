@@ -70,13 +70,15 @@ export default function OperationsPage() {
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">Operações</h1>
-        <p className="page-subtitle">Saúde da API e prospecção inteligente</p>
+        <div className="page-header-main">
+          <h1 className="page-title">Operações</h1>
+          <p className="page-subtitle">Saúde da API e prospecção inteligente</p>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <div className="surface" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
+      <div className="page-grid page-grid-2">
+        <div className="surface page-panel page-stack">
+          <div className="page-panel-kicker">
             <Activity size={14} /> Health
           </div>
           {loadingHealth ? <Spinner /> : (
@@ -97,8 +99,8 @@ export default function OperationsPage() {
           )}
         </div>
 
-        <div className="surface" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
+        <div className="surface page-panel page-stack">
+          <div className="page-panel-kicker">
             <Radar size={14} /> DNA & Descoberta
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -127,9 +129,9 @@ export default function OperationsPage() {
         </div>
       </div>
 
-      <div className="surface" style={{ padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Pipeline</div>
+      <div className="surface page-panel page-stack">
+        <div className="page-panel-head">
+          <div className="page-panel-kicker">Pipeline</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{pipeline?.total ?? 0} leads</div>
         </div>
 

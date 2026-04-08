@@ -78,7 +78,7 @@ export default function HubPage() {
   return (
     <>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="page-header-main">
           <div>
             <h1 className="page-title">Hub do Advogado</h1>
             <p className="page-subtitle">{data?.total ?? 0} clientes no total</p>
@@ -95,7 +95,7 @@ export default function HubPage() {
         />
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          <div className="page-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
             {clientes.map(c => (
               <ClienteCard
                 key={c.id}
