@@ -12,6 +12,7 @@ from shared.database.connection import async_session_factory
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
+from shared.models.mensagem_agendada import MensagemAgendada
 from shared.models.processo import Processo as ProcessoModel
 
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
@@ -426,9 +427,21 @@ class SQLWhatsAppRepository:
         enviar_em: datetime,
         motivo: str,
     ) -> None:
-        # TODO: Implementar agendamento real usando algo como celery beat ou tabela de agendamentos
-        logger.warning(
-            "agendamento_ainda_nao_suportado",
+        async with async_session_factory() as session:
+            agendada = MensagemAgendada(
+                escritorio_id=escritorio_id,
+                cliente_id=cliente_id,
+                processo_id=processo_id,
+                texto=texto,
+                motivo=motivo,
+                enviar_em=enviar_em,
+                status="pendente",
+                tentativas=0,
+            )
+            session.add(agendada)
+            await session.commit()
+        logger.info(
+            "mensagem_agendada",
             cliente_id=cliente_id,
             enviar_em=enviar_em.isoformat(),
             motivo=motivo,

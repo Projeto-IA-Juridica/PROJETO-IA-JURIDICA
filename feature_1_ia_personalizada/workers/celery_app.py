@@ -151,6 +151,11 @@ celery_app.conf.task_routes = {
         "queue": "hub_advogado",
         "routing_key": "hub_advogado",
     },
+    # dispatcher_agendadas.py
+    "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas": {
+        "queue": "notificacoes",
+        "routing_key": "notificacoes",
+    },
     # dead_letter.py
     "workers.dead_letter.processar_dlq": {
         "queue": "dead_letter",
@@ -187,6 +192,10 @@ celery_app.conf.beat_schedule = {
     "monitorar-escalacoes-pendentes": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_escalacoes_pendentes",
         "schedule": crontab(minute="*/30"),
+    },
+    "despachar-mensagens-agendadas": {
+        "task": "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas",
+        "schedule": crontab(minute="*/5"),
     },
 }
 
@@ -269,6 +278,7 @@ def _init_worker_process(**kwargs):
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
+import feature_1_ia_personalizada.workers.dispatcher_agendadas  # noqa: F401
 import feature_1_ia_personalizada.workers.hub_advogado  # noqa: F401
 import feature_1_ia_personalizada.workers.ingest_documentos  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
