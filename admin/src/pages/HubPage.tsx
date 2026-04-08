@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { clientesApi, type Cliente } from '../api'
-import { BadgeCRM, Spinner, EmptyState, ErrorBox, Pagination, SkeletonGrid } from '../components/ui'
+import { BadgeCRM, EmptyState, ErrorBox, Pagination, SkeletonGrid } from '../components/ui'
 
 function ClienteCard({ cliente, onClick }: { cliente: Cliente; onClick: () => void }) {
   const iniciais = cliente.nome.split(' ').slice(0, 2).map(n => n[0]).join('')

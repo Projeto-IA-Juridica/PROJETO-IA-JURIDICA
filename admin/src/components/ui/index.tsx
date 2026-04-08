@@ -89,7 +89,7 @@ if (typeof document !== 'undefined' && !document.getElementById('spin-style')) {
 }
 
 // EmptyState
-interface EmptyStateProps { icon?: string; title: string; desc?: string; action?: React.ReactNode }
+interface EmptyStateProps { icon?: React.ReactNode; title: string; desc?: string; action?: React.ReactNode }
 export function EmptyState({ icon = '📭', title, desc, action }: EmptyStateProps) {
   return (
     <div className="empty-state">

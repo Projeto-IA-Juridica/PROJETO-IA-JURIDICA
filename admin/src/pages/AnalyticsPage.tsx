@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { analyticsApi } from '../api/analytics'
-import { MetricCard, ProgressBar, Spinner, ErrorBox, SkeletonGrid } from '../components/ui'
+import { MetricCard, ProgressBar, ErrorBox, SkeletonGrid } from '../components/ui'
 
 type Dias = 7 | 30 | 90
 
