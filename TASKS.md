@@ -806,8 +806,8 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 - [x] Adicionada fila `Queue("hub_advogado", routing_key="hub_advogado")` em `task_queues`
 - [x] Adicionada rota `"processar_mensagem_advogado": {"queue": "hub_advogado"}` em `task_routes`
 - [x] Adicionado import explícito `feature_1_ia_personalizada.workers.hub_advogado` no bloco de imports
-- [ ] Atualizar `infrastructure/docker/docker-compose.yml` para incluir `hub_advogado` nas queues do container worker
-- [ ] Atualizar `railway.worker.json` para incluir a nova fila na configuração de produção
+- [x] Atualizar `infrastructure/docker/docker-compose.yml` para incluir `hub_advogado` nas queues do container worker
+- [x] Atualizar `railway.worker.json` para incluir a nova fila na configuração de produção
 
 ---
 
@@ -835,7 +835,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 - [x] Teste: webhook advogado sem `escalacao_ativa` + hub habilitado → hub enfileirado
 - [x] Teste: webhook advogado com `escalacao_ativa=True` → escalation reply (não hub)
 - [x] Teste: webhook hub desabilitado → ignored
-- [ ] Teste: `SessaoAdvogado` salva com campos corretos (requer fixture de banco — Fase 5)
+- [x] Teste: `SessaoAdvogado` salva com campos corretos — `test_sessao_advogado_salva_campos_corretos` em `tests/integration/test_hub_resumos_insights.py`
 
 ---
 
