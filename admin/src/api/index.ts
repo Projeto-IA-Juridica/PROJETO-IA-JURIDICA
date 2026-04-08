@@ -140,26 +140,12 @@ export const clientesApi = {
   detalhe: async (id: number): Promise<Cliente> => {
     const crmCard = await api.get<CRMCliente>(`/crm/clientes/${id}`).then((r) => r.data)
 
-    // Em alguns ambientes /clientes/{id}/exportar pode estar indisponível.
-    // Mantemos o detalhe funcional com os dados de CRM e completamos campos extras quando possível.
-    let base: ClienteExport['cliente'] | undefined
-    try {
-      const exportData = await api.get<ClienteExport>(`/clientes/${id}/exportar`).then((r) => r.data)
-      base = exportData.cliente
-    } catch (error) {
-      console.warn('Falha ao obter dados LGPD exportáveis do cliente; usando fallback CRM.', error)
-    }
-
     return {
       id: crmCard.id,
-      nome: base?.nome || crmCard.nome,
-      telefone_whatsapp: base?.telefone_whatsapp || crmCard.telefone_whatsapp,
-      cpf: base?.cpf ?? (base?.cpf_presente ? 'Protegido (LGPD)' : undefined),
-      data_nascimento: base?.data_nascimento ?? undefined,
-      profissao: base?.profissao ?? undefined,
-      empresa: base?.empresa ?? base?.empresa_atual ?? undefined,
-      status: base?.ativo === false ? 'inativo' : 'ativo',
-      ativo: base?.ativo !== false,
+      nome: crmCard.nome,
+      telefone_whatsapp: crmCard.telefone_whatsapp,
+      status: 'ativo',
+      ativo: true,
       crm_nivel: crmCard.crm_nivel,
       crm_score: crmCard.crm_score,
       total_processos: crmCard.total_processos,

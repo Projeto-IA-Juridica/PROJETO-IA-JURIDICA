@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { clientesApi, processosApi } from '../api'
 import { chatApi, type Mensagem } from '../api/chat'
 import { BadgeCRM, BadgeRisco, ProgressBar, Spinner, ErrorBox, EmptyState } from '../components/ui'
@@ -108,6 +108,21 @@ export default function ClientDetailPage() {
   const clienteId = Number(id)
   const [selectedProcessoId, setSelectedProcessoId] = useState<number | null>(null)
 
+  const exportarDados = useMutation({
+    mutationFn: () => clientesApi.exportar(clienteId),
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' })
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `lgpd_cliente_${clienteId}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.URL.revokeObjectURL(url)
+    },
+  })
+
   const { data: cliente, isLoading: lcli, error: ecli } = useQuery({
     queryKey: ['cliente', clienteId],
     queryFn: () => clientesApi.detalhe(clienteId),
@@ -148,12 +163,23 @@ export default function ClientDetailPage() {
 
         {/* Col 1: Cliente Info */}
         <div className="surface" style={{ padding: 16, overflowY: 'auto' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Dados do Cliente</div>
-          <InfoRow label="CPF" value={cliente.cpf} />
-          <InfoRow label="Nascimento" value={cliente.data_nascimento} />
-          <InfoRow label="Profissão" value={cliente.profissao} />
-          <InfoRow label="Empresa" value={cliente.empresa} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Dados do Cliente</div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => exportarDados.mutate()}
+              disabled={exportarDados.isPending}
+              title="Baixar exportação LGPD"
+            >
+              {exportarDados.isPending ? <Spinner size={12} /> : null} Exportar LGPD
+            </button>
+          </div>
+          {exportarDados.error ? <ErrorBox message="Falha ao gerar a exportação LGPD do cliente." /> : null}
+          <InfoRow label="CPF" value={cliente.cpf ?? 'Protegido (LGPD)'} />
           <InfoRow label="Status" value={<span style={{ color: cliente.ativo ? 'var(--success)' : 'var(--danger)' }}>{cliente.ativo ? 'Ativo' : 'Inativo'}</span>} />
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            A exportação completa de dados pessoais, processos e interações fica disponível quando você solicitar.
+          </div>
         </div>
 
         {/* Col 2: Processo + Score */}
