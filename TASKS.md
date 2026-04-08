@@ -8,7 +8,6 @@
 
 ## O que a Feature 3 entrega
 
-<<<<<<< HEAD
 | Entrega | Descrição |
 |---|---|
 | **DNA do Advogado** | Analisa o histórico de processos do escritório e classifica as especialidades, setores de atuação e o tipo de lead ideal (empresa ou pessoa). |
@@ -16,27 +15,6 @@
 | **Enriquecimento** | Empresas → Receita Federal (porte, setor, sócios) + LinkedIn opcional. Pessoas → apenas dados do processo público (nome, polo, fase). |
 | **Matching & Score** | Claude cruza o DNA com os dados do lead e gera score 0–100 + motivo + abordagem personalizada. |
 | **Pipeline de Prospecção** | Lista ranqueada de leads com status gerenciável (novo → contatado → qualificado → descartado). Suporta os dois tipos no mesmo pipeline. |
-=======
-| Feature | Status | Observações |
-|---------|--------|-------------|
-| Feature 7 — CRM Inteligente | **100% ✅** | Totalmente implementada e testada |
-| Feature 3 — Resumo Inteligente | **100% ✅** | Totalmente implementada e testada |
-| Feature 2 — Score de Risco | **100% ✅** | Implementada dentro de `vitoria_preditor.py`; ver nota 2.2 |
-| Feature 5 — Analytics | **100% ✅** | Totalmente implementada e testada |
-| Feature 6 — Escalação | **100% ✅** | Funcional; arquitetura consolidada no manager; ver nota 6.1 |
-| Feature 1 — RAG | **100% ✅** | Totalmente implementada; divergências intencionais do spec (ver notas) |
-| Feature 4 — Onboarding | **100% ✅** | Totalmente implementada e testada |
-| P1 — Paralelismo Orquestrador | **100% ✅** | `asyncio.gather` em DataJud + RAG com timeout 15s |
-| P2 — Prefetch Worker | **100% ✅** | `ThreadPoolExecutor` paralela `update_andamento` + `_atualizar_score` |
-| P3 — Cache contexto escritório | **100% ✅** | Embeddings em batch com Redis; escritorio carregado por request |
-| P4 — Warm-up embeddings | **100% ✅** | `_warmup_embeddings()` no lifespan de `app.py`; falha silenciosa |
-
-### Problemas Conhecidos / Resolvidos
-1. ~~**Migration 004 com down_revision errado**~~ — **✅ CORRIGIDO** `down_revision` atualizado de `"003_add_processo_state"` para `"e4bcb5d405fa"`. Migration agora segue a cadeia correta após o merge node.
-2. **Dois arquivos `008_*`** — `008_add_analytics_indexes.py` e `008_add_onboarding_fields.py` ambos dependem de `e4bcb5d405fa`. Alembic trata como branches paralelas; ok enquanto não interferirem.
-3. **ScoreRiscoCalculator em `vitoria_preditor.py`** — implementado no arquivo legado em vez do `score_risco.py` separado especificado no task. Funcional, mas acoplado ao arquivo antigo.
-4. **RAG usa `vector(1024)` e índice HNSW** — spec pedia `vector(1536)` e IVFFlat. Decisão intencional: HNSW funciona em tabela vazia e tem recall estável com inserts incrementais.
->>>>>>> 7ee32f2 (config inicial ts/react)
 
 ---
 
