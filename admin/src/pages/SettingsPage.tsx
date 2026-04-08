@@ -11,11 +11,12 @@ export default function SettingsPage() {
   const qc = useQueryClient()
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('profile')
+  const isStatusTab = activeTab === 'status'
 
   const { data: status, isLoading, error: statusError } = useQuery({
     queryKey: ['onboarding-status'],
     queryFn: onboardingApi.status,
-    retry: 1, // Retry 1 vez em caso de erro
+    retry: 0,
     staleTime: 5 * 60_000, // 5 min cache
     refetchInterval: false, // ❌ Disable polling - backend returning errors
     placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega
@@ -99,8 +100,9 @@ export default function SettingsPage() {
   const { data: whatsappStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: onboardingApi.whatsappStatus,
-    refetchInterval: 60_000, // Aumentado para 60s (era 30s) para reduzir carga na API
-    retry: 1, // Retry apenas 1 vez em caso de falha
+    enabled: isStatusTab,
+    refetchInterval: isStatusTab ? 60_000 : false,
+    retry: 0,
     staleTime: 50_000, // Considera dados frescos por 50s
   })
 

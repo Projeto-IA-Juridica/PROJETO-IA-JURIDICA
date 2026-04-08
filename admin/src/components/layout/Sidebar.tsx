@@ -20,10 +20,10 @@ export default function Sidebar() {
   const { user, logout } = useAuth()
   const location = useLocation()
 
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
 
   useEffect(() => {
-    document.documentElement.className = theme === 'light' ? 'light-theme' : ''
+    document.documentElement.dataset.theme = theme
     localStorage.setItem('theme', theme)
   }, [theme])
 

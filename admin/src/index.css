@@ -26,7 +26,28 @@
     --icon-color: #475569;
   }
 
-  html.light-theme {
+  html[data-theme='dark'] {
+    --surface-base: #0b1220;
+    --surface-raised: rgba(15, 23, 42, 0.78);
+    --surface-overlay: rgba(30, 41, 59, 0.72);
+    --surface-border: rgba(255, 255, 255, 0.10);
+    --surface-border-muted: rgba(255, 255, 255, 0.05);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --accent: #60a5fa;
+    --accent-glow: rgba(96, 165, 250, 0.16);
+    --accent-dim: #3b82f6;
+    --input-bg: rgba(15, 23, 42, 0.88);
+    --input-focus-bg: rgba(15, 23, 42, 0.96);
+    --hover-bg: rgba(255, 255, 255, 0.06);
+    --icon-color: #cbd5e1;
+    --danger-surface: rgba(239, 68, 68, 0.12);
+    --danger-border: rgba(239, 68, 68, 0.25);
+    --danger-text: #fca5a5;
+  }
+
+  html[data-theme='light'] {
     --surface-base: #f8fafc;
     --surface-raised: rgba(255, 255, 255, 0.92);
     --surface-overlay: rgba(241, 245, 249, 0.92);
@@ -97,7 +118,7 @@
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
   }
   .surface:hover { border-color: rgba(15, 76, 129, 0.18); box-shadow: 0 12px 34px rgba(15, 23, 42, 0.07); }
-  html.light-theme .surface:hover { border-color: rgba(15, 76, 129, 0.18); }
+  html[data-theme='light'] .surface:hover { border-color: rgba(15, 76, 129, 0.18); }
 
   /* ---- Buttons ---- */
   .btn {
