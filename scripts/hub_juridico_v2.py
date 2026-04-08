@@ -57,11 +57,24 @@ DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
 
 # ── Imports do projeto ────────────────────────────────────────────────────────
 
+import anthropic as _anthropic
+
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.orchestrator import ConversationOrchestrator
-from feature_1_ia_personalizada.services.ai.prompts import gerar_instrucao_persona
+from feature_1_ia_personalizada.services.ai.prompts import (
+    gerar_instrucao_persona,
+    SYSTEM_PROMPT_HUB_ADVOGADO_BASE,
+    SYSTEM_PROMPT_HUB_ANALISE_PETICAO,
+    SYSTEM_PROMPT_HUB_PESQUISA_JURISPRUDENCIA,
+    SYSTEM_PROMPT_HUB_INSIGHT_CLIENTE,
+    SYSTEM_PROMPT_HUB_RESUMO_PROCESSO,
+)
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
+from feature_1_ia_personalizada.services.ai.hub_advogado_classifier import (
+    HubAdvogadoClassificador,
+    IntencaoAdvogado,
+)
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
 from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import ScoreRiscoCalculator
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
@@ -96,9 +109,153 @@ _TJ_INDICES: dict[str, str] = {
     "25": "api_publica_tjse", "26": "api_publica_tjsp", "27": "api_publica_tjto",
 }
 
+# ── Modelo barato para demo (troca por claude-opus-4-6 em produção) ───────────
+# Haiku 4.5 custa ~$0.80/M input e $4/M output — ideal para testes sem gastar.
+_MODELO_HUB_DEMO = "claude-haiku-4-5-20251001"
+
 # ── Instâncias globais (stateless, seguras para reuso) ────────────────────────
 
 _score_calculator = ScoreRiscoCalculator()
+_hub_classificador = HubAdvogadoClassificador()
+
+
+# =============================================================================
+# SEÇÃO HUB DO ADVOGADO — Cliente leve para o demo (modelo Haiku)
+# =============================================================================
+
+
+class _EscalacaoDemo:
+    """
+    Substituto leve do EscalationClient para o demo Streamlit.
+
+    Usa o modelo Haiku (barato/rápido) em vez do Opus para não consumir tokens
+    desnecessariamente durante testes. A interface é idêntica ao EscalacaoClient
+    real — trocar _MODELO_HUB_DEMO por "claude-opus-4-6" ativa a versão produção.
+    """
+
+    _MAX_TOKENS = 1024  # suficiente para testes; Opus usa 2048
+
+    def __init__(self) -> None:
+        self._client = _anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+
+    async def gerar_resposta(self, system_prompt: str, mensagem: str) -> dict:
+        """Retorna dict com conteudo, tokens_input, tokens_output."""
+        inicio = time.perf_counter()
+        resp = await self._client.messages.create(
+            model=_MODELO_HUB_DEMO,
+            max_tokens=self._MAX_TOKENS,
+            system=system_prompt,
+            messages=[{"role": "user", "content": mensagem}],
+        )
+        latencia = int((time.perf_counter() - inicio) * 1000)
+        texto = "".join(b.text for b in resp.content if hasattr(b, "text"))
+        return {
+            "conteudo": texto,
+            "tokens_input": resp.usage.input_tokens,
+            "tokens_output": resp.usage.output_tokens,
+            "latencia_ms": latencia,
+            "modelo": _MODELO_HUB_DEMO,
+        }
+
+    async def analisar_peticao(self, texto_pdf: str) -> dict:
+        """Analisa petição PDF. Retorna dict com os campos estruturados."""
+        system = SYSTEM_PROMPT_HUB_ANALISE_PETICAO.format(
+            data_hoje=date.today().strftime("%d/%m/%Y")
+        )
+        prompt = (
+            "Analise a petição abaixo e responda EXATAMENTE no formato JSON:\n"
+            "{\n"
+            '  "tipo_peca": "...",\n'
+            '  "pontos_fortes": ["...", "..."],\n'
+            '  "vulnerabilidades": ["...", "..."],\n'
+            '  "argumentos_ausentes": ["..."],\n'
+            '  "precedentes_relevantes": ["..."],\n'
+            '  "sugestoes": ["..."],\n'
+            '  "score_geral": 75\n'
+            "}\n\n"
+            f"PETIÇÃO:\n{texto_pdf[:8000]}"
+        )
+        resultado = await self.gerar_resposta(system, prompt)
+        conteudo = resultado["conteudo"].strip()
+        # Extrair JSON do bloco de markdown se presente
+        if "```json" in conteudo:
+            conteudo = conteudo.split("```json")[1].split("```")[0].strip()
+        elif "```" in conteudo:
+            conteudo = conteudo.split("```")[1].split("```")[0].strip()
+        try:
+            import json as _json
+            dados = _json.loads(conteudo)
+        except Exception:
+            dados = {
+                "tipo_peca": "Não identificado",
+                "pontos_fortes": [],
+                "vulnerabilidades": ["Não foi possível estruturar a análise"],
+                "argumentos_ausentes": [],
+                "precedentes_relevantes": [],
+                "sugestoes": ["Tente reenviar o documento"],
+                "score_geral": 0,
+            }
+        dados["tokens_input"] = resultado["tokens_input"]
+        dados["tokens_output"] = resultado["tokens_output"]
+        dados["latencia_ms"] = resultado.get("latencia_ms", 0)
+        return dados
+
+    async def pesquisar_jurisprudencia(self, query: str, tribunais: str = "STJ, STF, TJs") -> dict:
+        """Pesquisa jurisprudência sobre a query informada."""
+        system = SYSTEM_PROMPT_HUB_PESQUISA_JURISPRUDENCIA.format(
+            query=query,
+            tribunais=tribunais,
+            periodo="últimos 5 anos",
+        )
+        return await self.gerar_resposta(system, f"Pesquise jurisprudência sobre: {query}")
+
+
+class _SessoesEmRam:
+    """Histórico de sessões Hub do Advogado armazenado em memória (demo)."""
+
+    def __init__(self) -> None:
+        self._sessoes: list[dict] = []
+
+    def registrar(
+        self,
+        intencao: str,
+        mensagem: str,
+        resposta: str,
+        tokens_in: int,
+        tokens_out: int,
+    ) -> None:
+        self._sessoes.append({
+            "id": len(self._sessoes) + 1,
+            "intencao": intencao,
+            "mensagem_preview": mensagem[:100],
+            "mensagem_completa": mensagem,
+            "resposta": resposta,
+            "tokens_input": tokens_in,
+            "tokens_output": tokens_out,
+            "custo_usd": round((tokens_in * 0.8 + tokens_out * 4.0) / 1_000_000, 6),
+            "criado_em": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        })
+
+    @property
+    def todas(self) -> list[dict]:
+        return list(reversed(self._sessoes))
+
+    @property
+    def total_tokens(self) -> tuple[int, int]:
+        return (
+            sum(s["tokens_input"] for s in self._sessoes),
+            sum(s["tokens_output"] for s in self._sessoes),
+        )
+
+    @property
+    def custo_total(self) -> float:
+        return sum(s["custo_usd"] for s in self._sessoes)
+
+    def contagem_por_intencao(self) -> dict[str, int]:
+        contagem: dict[str, int] = {}
+        for s in self._sessoes:
+            contagem[s["intencao"]] = contagem.get(s["intencao"], 0) + 1
+        return contagem
 
 # =============================================================================
 # SEÇÃO 1 — Helpers CNJ / DataJud
@@ -3096,6 +3253,389 @@ Candidatos com 75+ são os mais quentes. Entre 40 e 74, valem uma abordagem cuid
 # =============================================================================
 
 
+# =============================================================================
+# SEÇÃO — Hub do Advogado (integração Harvey / Claude Opus)
+# =============================================================================
+
+
+def _get_hub_client() -> _EscalacaoDemo:
+    """Retorna instância singleton do cliente Hub (criada uma vez por sessão)."""
+    if "hub_client" not in st.session_state:
+        st.session_state["hub_client"] = _EscalacaoDemo()
+    return st.session_state["hub_client"]
+
+
+def _get_hub_sessoes() -> _SessoesEmRam:
+    """Retorna o histórico de sessões Hub (criado uma vez por sessão)."""
+    if "hub_sessoes" not in st.session_state:
+        st.session_state["hub_sessoes"] = _SessoesEmRam()
+    return st.session_state["hub_sessoes"]
+
+
+def _render_hub_metrica(label: str, valor: str, detalhe: str = "") -> None:
+    st.markdown(
+        f"""<div style="border:1px solid #e0e0e0;border-radius:8px;padding:12px 16px;
+                       background:#fafafa;text-align:center;">
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.05em;">{label}</div>
+            <div style="font-size:22px;font-weight:700;color:#1a1a2e;margin:4px 0;">{valor}</div>
+            <div style="font-size:11px;color:#aaa;">{detalhe}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def page_hub_advogado() -> None:
+    """
+    Hub do Advogado — consulta jurídica com Claude (modelo Haiku para testes).
+
+    Integra as 5 fases do Harvey:
+      Fase 1 — EscalationClient (aqui: _EscalacaoDemo com Haiku barato)
+      Fase 2 — HubAdvogadoClassificador (classifica intenção do advogado)
+      Fase 3 — Consulta livre via WhatsApp / interface web
+      Fase 4 — Análise de petições PDF
+      Fase 5 — Pesquisa de jurisprudência + histórico de sessões
+    """
+    ob = st.session_state.get("onboarding", {})
+    nome_advogado = ob.get("nome_responsavel") or "Advogado"
+    nome_escritorio = ob.get("nome_escritorio") or "Escritório"
+
+    if not ANTHROPIC_API_KEY:
+        st.error("🔑 **ANTHROPIC_API_KEY** não configurada. Defina no `.env` e reinicie.")
+        return
+
+    hub = _get_hub_client()
+    sessoes = _get_hub_sessoes()
+
+    # ── Header ────────────────────────────────────────────────────────────────
+    col_tit, col_model = st.columns([3, 1])
+    with col_tit:
+        st.title("⚖️ Hub do Advogado")
+        st.caption(
+            f"Dr(a). **{nome_advogado}** · {nome_escritorio} · "
+            f"Modelo: `{_MODELO_HUB_DEMO}` *(barato — trocar por `claude-opus-4-6` em prod)*"
+        )
+    with col_model:
+        tin, tout = sessoes.total_tokens
+        st.metric("Tokens usados", f"{tin + tout:,}", help=f"In: {tin:,} | Out: {tout:,}")
+
+    st.divider()
+
+    # ── Tabs ──────────────────────────────────────────────────────────────────
+    tab_consulta, tab_peticao, tab_juris, tab_historico = st.tabs([
+        "💬 Consulta Jurídica",
+        "📄 Analisar Petição",
+        "🔍 Jurisprudência",
+        "📊 Histórico",
+    ])
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # TAB 1 — Consulta Jurídica livre
+    # ──────────────────────────────────────────────────────────────────────────
+    with tab_consulta:
+        st.markdown("### 💬 Consulta Jurídica")
+        st.caption(
+            "Faça qualquer pergunta jurídica. O classificador detecta a intenção automaticamente "
+            "e direciona para o handler correto."
+        )
+
+        pergunta = st.text_area(
+            "Sua pergunta",
+            placeholder=(
+                "Ex: Qual o prazo para apelar? • Quais os efeitos do CPC art. 485? "
+                "• Resumo do cliente João Silva • Status do escritório"
+            ),
+            height=100,
+            key="hub_pergunta",
+        )
+
+        col_btn, col_cls = st.columns([1, 2])
+        with col_btn:
+            enviar = st.button("Consultar →", type="primary", use_container_width=True, key="hub_btn_consulta")
+        with col_cls:
+            if st.session_state.get("hub_ultima_intencao"):
+                intencao_label = {
+                    "duvida_juridica": "⚖️ Dúvida jurídica",
+                    "resumo_processo": "📋 Resumo de processo",
+                    "insight_cliente": "👤 Insight de cliente",
+                    "pesquisa_jurisprudencia": "🔍 Jurisprudência",
+                    "rascunho_mensagem": "✍️ Rascunho",
+                    "status_escritorio": "📊 Status",
+                    "analise_peticao": "📄 Petição",
+                }.get(st.session_state["hub_ultima_intencao"], st.session_state["hub_ultima_intencao"])
+                st.info(f"Intenção detectada: **{intencao_label}**", icon="🤖")
+
+        if enviar and pergunta.strip():
+            with st.spinner("Classificando intenção..."):
+                classificacao = asyncio.run(
+                    _hub_classificador.classificar(pergunta.strip(), tipo_media="texto")
+                )
+
+            st.session_state["hub_ultima_intencao"] = classificacao.intencao.value
+
+            system_prompt = SYSTEM_PROMPT_HUB_ADVOGADO_BASE.format(
+                nome_usuario=nome_advogado,
+                nome_escritorio=nome_escritorio,
+                data_hoje=date.today().strftime("%d/%m/%Y"),
+            )
+
+            # Handler por intenção
+            if classificacao.intencao == IntencaoAdvogado.STATUS_ESCRITORIO:
+                clientes = st.session_state.get("clientes_hub", [])
+                tin_hist, tout_hist = sessoes.total_tokens
+                resposta_txt = (
+                    f"**📊 Status do Escritório — {date.today().strftime('%d/%m/%Y')}**\n\n"
+                    f"- Clientes cadastrados: **{len(clientes)}**\n"
+                    f"- Com processo ativo: **{sum(1 for c in clientes if c.get('numero_cnj'))}**\n"
+                    f"- Sessões Hub hoje: **{len(sessoes.todas)}**\n"
+                    f"- Tokens consumidos: **{tin_hist + tout_hist:,}** (in: {tin_hist:,} | out: {tout_hist:,})\n"
+                    f"- Custo estimado: **${sessoes.custo_total:.4f} USD**\n"
+                    f"- Modelo em uso: `{_MODELO_HUB_DEMO}`"
+                )
+                tokens_in, tokens_out = 0, 0
+            else:
+                # Enriquecer mensagem com dados disponíveis em sessão
+                contexto_extra = ""
+                if classificacao.cliente_nome:
+                    clientes = st.session_state.get("clientes_hub", [])
+                    encontrado = next(
+                        (c for c in clientes if classificacao.cliente_nome.lower() in c["nome"].lower()),
+                        None,
+                    )
+                    if encontrado:
+                        contexto_extra = (
+                            f"\nCliente encontrado: {encontrado['nome']} "
+                            f"(processo: {encontrado.get('numero_cnj') or 'não cadastrado'})"
+                        )
+
+                mensagem_final = pergunta.strip() + contexto_extra
+
+                with st.spinner(f"Consultando `{_MODELO_HUB_DEMO}`..."):
+                    resultado = asyncio.run(hub.gerar_resposta(system_prompt, mensagem_final))
+
+                resposta_txt = resultado["conteudo"]
+                tokens_in = resultado["tokens_input"]
+                tokens_out = resultado["tokens_output"]
+
+            # Salvar no histórico
+            sessoes.registrar(
+                intencao=classificacao.intencao.value,
+                mensagem=pergunta.strip(),
+                resposta=resposta_txt,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+            )
+
+            # Exibir resposta
+            st.markdown("---")
+            st.markdown("#### Resposta")
+            st.markdown(resposta_txt)
+
+            if tokens_in or tokens_out:
+                st.caption(f"Tokens: {tokens_in} in / {tokens_out} out · Latência: {resultado.get('latencia_ms', 0)} ms")
+
+            st.rerun()
+
+        # Histórico rápido da tab
+        if sessoes.todas:
+            with st.expander(f"Últimas {min(3, len(sessoes.todas))} consultas"):
+                for s in sessoes.todas[:3]:
+                    st.markdown(f"**{s['criado_em']}** — `{s['intencao']}`")
+                    st.markdown(f"> {s['mensagem_preview']}")
+                    st.caption(f"Tokens: {s['tokens_input']} in / {s['tokens_output']} out")
+                    st.divider()
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # TAB 2 — Análise de Petição PDF
+    # ──────────────────────────────────────────────────────────────────────────
+    with tab_peticao:
+        st.markdown("### 📄 Análise de Petição")
+        st.caption(
+            "Faça upload de uma petição em PDF ou TXT. O modelo analisa estrutura, "
+            "pontos fortes, vulnerabilidades e retorna score de qualidade."
+        )
+
+        arquivo = st.file_uploader(
+            "Petição (PDF ou TXT, máx. 10 MB)",
+            type=["pdf", "txt"],
+            key="hub_peticao_upload",
+        )
+
+        if arquivo:
+            tamanho_mb = len(arquivo.getvalue()) / (1024 * 1024)
+            if tamanho_mb > 10:
+                st.error(f"Arquivo muito grande ({tamanho_mb:.1f} MB). Limite: 10 MB.")
+            else:
+                st.success(f"✅ {arquivo.name} ({tamanho_mb:.2f} MB)")
+
+                if st.button("🔍 Analisar Petição", type="primary", key="hub_btn_peticao"):
+                    with st.spinner("Extraindo texto do documento..."):
+                        texto = _extrair_texto(arquivo.getvalue(), arquivo.name)
+
+                    if len(texto.strip()) < 50:
+                        st.error("Documento vazio ou apenas com imagens (OCR não suportado neste demo).")
+                    else:
+                        texto_truncado = len(texto) > 8000
+                        st.info(
+                            f"📄 {len(texto):,} chars extraídos"
+                            + (" · **truncado em 8.000** para o demo" if texto_truncado else "")
+                        )
+
+                        with st.spinner(f"Analisando com `{_MODELO_HUB_DEMO}`..."):
+                            analise = asyncio.run(hub.analisar_peticao(texto))
+
+                        # Salvar no histórico
+                        sessoes.registrar(
+                            intencao="analise_peticao",
+                            mensagem=f"[PDF] {arquivo.name}",
+                            resposta=str(analise),
+                            tokens_in=analise.get("tokens_input", 0),
+                            tokens_out=analise.get("tokens_output", 0),
+                        )
+
+                        # Renderizar resultado
+                        score = analise.get("score_geral", 0)
+                        cor_score = "#2e7d32" if score >= 70 else "#f57c00" if score >= 40 else "#c62828"
+                        st.markdown(
+                            f"""<div style="border:1.5px solid {cor_score};border-radius:10px;
+                                           padding:14px 18px;background:{cor_score}18;margin-bottom:12px;">
+                                <span style="font-size:13px;font-weight:600;color:{cor_score};">
+                                    SCORE DE QUALIDADE
+                                </span>
+                                <span style="font-size:28px;font-weight:700;color:{cor_score};float:right;">
+                                    {score}/100
+                                </span>
+                                <div style="background:#e0e0e0;border-radius:4px;height:7px;margin-top:10px;">
+                                    <div style="width:{score}%;background:{cor_score};height:7px;border-radius:4px;"></div>
+                                </div>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            st.markdown(f"**Tipo:** {analise.get('tipo_peca', '—')}")
+                            st.markdown("**✅ Pontos Fortes**")
+                            for p in analise.get("pontos_fortes", []):
+                                st.markdown(f"- {p}")
+                            st.markdown("**📌 Sugestões**")
+                            for s in analise.get("sugestoes", []):
+                                st.markdown(f"- {s}")
+                        with col_b:
+                            st.markdown("**⚠️ Vulnerabilidades**")
+                            for v in analise.get("vulnerabilidades", []):
+                                st.markdown(f"- {v}")
+                            st.markdown("**➕ Argumentos Ausentes**")
+                            for a in analise.get("argumentos_ausentes", []):
+                                st.markdown(f"- {a}")
+                            st.markdown("**⚖️ Precedentes Relevantes**")
+                            for pr in analise.get("precedentes_relevantes", []):
+                                st.markdown(f"- {pr}")
+
+                        st.caption(
+                            f"Tokens: {analise.get('tokens_input', 0)} in / "
+                            f"{analise.get('tokens_output', 0)} out · "
+                            f"Latência: {analise.get('latencia_ms', 0)} ms"
+                        )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # TAB 3 — Pesquisa de Jurisprudência
+    # ──────────────────────────────────────────────────────────────────────────
+    with tab_juris:
+        st.markdown("### 🔍 Pesquisa de Jurisprudência")
+        st.caption(
+            "O modelo sintetiza jurisprudência sobre o tema informado com base no seu "
+            "treinamento até agosto/2025. Para julgados mais recentes, consulte o DataJud."
+        )
+
+        col_q, col_t = st.columns([2, 1])
+        with col_q:
+            query_juris = st.text_input(
+                "Tema ou tese jurídica",
+                placeholder="Ex: dano moral em relação de consumo • prescrição trabalhista • CPC art. 485",
+                key="hub_juris_query",
+            )
+        with col_t:
+            tribunais_sel = st.multiselect(
+                "Tribunais",
+                ["STJ", "STF", "TST", "TRF", "TJs Estaduais"],
+                default=["STJ", "STF"],
+                key="hub_juris_tribunais",
+            )
+
+        if st.button("🔍 Pesquisar", type="primary", key="hub_btn_juris") and query_juris.strip():
+            tribunais_str = ", ".join(tribunais_sel) if tribunais_sel else "STJ, STF"
+            with st.spinner(f"Pesquisando com `{_MODELO_HUB_DEMO}`..."):
+                resultado = asyncio.run(hub.pesquisar_jurisprudencia(query_juris.strip(), tribunais_str))
+
+            sessoes.registrar(
+                intencao="pesquisa_jurisprudencia",
+                mensagem=query_juris.strip(),
+                resposta=resultado["conteudo"],
+                tokens_in=resultado["tokens_input"],
+                tokens_out=resultado["tokens_output"],
+            )
+
+            st.markdown("---")
+            st.markdown(resultado["conteudo"])
+            st.caption(
+                f"Tokens: {resultado['tokens_input']} in / {resultado['tokens_output']} out · "
+                f"Latência: {resultado.get('latencia_ms', 0)} ms"
+            )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # TAB 4 — Histórico de Sessões
+    # ──────────────────────────────────────────────────────────────────────────
+    with tab_historico:
+        st.markdown("### 📊 Histórico de Sessões Hub")
+
+        todas = sessoes.todas
+        if not todas:
+            st.info("Nenhuma consulta realizada ainda. Use as abas acima para começar.")
+            return
+
+        # Métricas resumidas
+        tin_tot, tout_tot = sessoes.total_tokens
+        contagem = sessoes.contagem_por_intencao()
+        top_intencao = max(contagem, key=contagem.get) if contagem else "—"
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            _render_hub_metrica("Consultas", str(len(todas)), "total na sessão")
+        with col2:
+            _render_hub_metrica("Tokens", f"{tin_tot + tout_tot:,}", f"in: {tin_tot:,} · out: {tout_tot:,}")
+        with col3:
+            _render_hub_metrica("Custo estimado", f"${sessoes.custo_total:.4f}", "USD · modelo Haiku")
+        with col4:
+            _render_hub_metrica("Mais usado", top_intencao, f"{contagem.get(top_intencao, 0)}x")
+
+        st.divider()
+
+        # Lista de sessões
+        rotulos = {
+            "duvida_juridica": "⚖️ Dúvida jurídica",
+            "resumo_processo": "📋 Resumo processo",
+            "insight_cliente": "👤 Insight cliente",
+            "pesquisa_jurisprudencia": "🔍 Jurisprudência",
+            "rascunho_mensagem": "✍️ Rascunho",
+            "status_escritorio": "📊 Status",
+            "analise_peticao": "📄 Petição",
+        }
+
+        for sessao in todas:
+            label = rotulos.get(sessao["intencao"], sessao["intencao"])
+            with st.expander(
+                f"{label} · {sessao['criado_em']} · {sessao['tokens_input'] + sessao['tokens_output']} tokens",
+                expanded=False,
+            ):
+                st.markdown(f"**Pergunta:** {sessao['mensagem_completa']}")
+                st.markdown("**Resposta:**")
+                st.markdown(sessao["resposta"])
+                st.caption(
+                    f"Tokens: {sessao['tokens_input']} in / {sessao['tokens_output']} out · "
+                    f"Custo: ${sessao['custo_usd']:.6f} USD"
+                )
+
+
 def _render_sidebar() -> None:
     ob = st.session_state.get("onboarding", {})
     onboarding_ok = ob.get("onboarding_completo", False)
@@ -3111,17 +3651,22 @@ def _render_sidebar() -> None:
         if onboarding_ok or clientes:
             paginas_disponiveis += [
                 "👥 Meus Clientes",
+                "⚖️ Hub do Advogado",
                 "🤝 Relacionamento",
                 "📚 Documentos do Escritório",
                 "🔍 Captar Novos Clientes",
                 "📊 Painel de Resultados",
                 "⚙️ Configurações",
             ]
+        elif ANTHROPIC_API_KEY:
+            # Hub disponível mesmo sem onboarding completo (só precisa da API key)
+            paginas_disponiveis.append("⚖️ Hub do Advogado")
 
         pagina_selecionada = st.radio("Navegação", paginas_disponiveis, label_visibility="collapsed")
         mapa = {
             "🚀 Configuração Inicial": "onboarding",
             "👥 Meus Clientes": "hub",
+            "⚖️ Hub do Advogado": "hub_advogado",
             "🤝 Relacionamento": "crm",
             "📚 Documentos do Escritório": "rag",
             "🔍 Captar Novos Clientes": "prospeccao",
@@ -3176,7 +3721,7 @@ def _render_sidebar() -> None:
 
         # Status APIs
         if ANTHROPIC_API_KEY:
-            st.success("Claude Sonnet: ativo", icon="✅")
+            st.success("Claude ativo", icon="✅")
         else:
             st.error("ANTHROPIC_API_KEY ausente", icon="🔑")
 
@@ -3191,10 +3736,21 @@ def _render_sidebar() -> None:
         else:
             st.info("RAG: base vazia", icon="📚")
 
+        # Status Hub do Advogado
+        hub_sessoes: _SessoesEmRam | None = st.session_state.get("hub_sessoes")
+        if hub_sessoes and hub_sessoes.todas:
+            tin, tout = hub_sessoes.total_tokens
+            st.success(
+                f"Hub: {len(hub_sessoes.todas)} sessão(ões) · {tin + tout:,} tokens",
+                icon="⚖️",
+            )
+        else:
+            st.info(f"Hub: modelo `{_MODELO_HUB_DEMO}`", icon="⚖️")
+
         st.divider()
         st.caption(
             "**Stack:**\n"
-            "LangGraph · Claude Sonnet · DataJud API\n"
+            "LangGraph · Claude Haiku/Opus · DataJud API\n"
             "pgvector · Voyage AI · Evolution WhatsApp"
         )
 
@@ -3238,6 +3794,8 @@ def main() -> None:
         page_onboarding()
     elif pagina == "hub":
         page_hub()
+    elif pagina == "hub_advogado":
+        page_hub_advogado()
     elif pagina == "rag":
         page_rag()
     elif pagina == "crm":
