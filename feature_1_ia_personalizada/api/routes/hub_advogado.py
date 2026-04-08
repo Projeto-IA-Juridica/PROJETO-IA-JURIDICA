@@ -7,7 +7,6 @@ Endpoints REST para o Hub do Advogado — complemento à interface WhatsApp.
 Permite que front-ends ou integrações consumam o Hub sem depender do WhatsApp.
 
 Acesso: exclusivo para advogado e admin (require_advogado).
-Schemas de request/response serão movidos para shared/schemas/hub_advogado.py na Fase 5.
 """
 
 from __future__ import annotations
@@ -19,7 +18,6 @@ from decimal import Decimal
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +41,15 @@ from shared.models.escritorio import Escritorio
 from shared.models.processo import Processo
 from shared.models.sessao_advogado import SessaoAdvogado
 from shared.models.usuario import Usuario
+from shared.schemas.hub_advogado import (
+    AdvogadoAtivo,
+    ConsultaHubRequest,
+    ConsultaHubResponse,
+    IntencaoCount,
+    MetricasHubResponse,
+    SessaoAdvogadoListItem,
+    SessaoAdvogadoResponse,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -83,73 +90,6 @@ router = APIRouter(
     tags=["Hub do Advogado"],
     dependencies=[Depends(require_advogado)],
 )
-
-# ---------------------------------------------------------------------------
-# Schemas locais
-# Serão movidos para shared/schemas/hub_advogado.py na Fase 5.
-# ---------------------------------------------------------------------------
-
-
-class ConsultaHubRequest(BaseModel):
-    pergunta: str
-    cliente_id: int | None = None
-    processo_id: int | None = None
-
-
-class ConsultaHubResponse(BaseModel):
-    resposta: str
-    modelo_ia: str
-    tokens_input: int
-    tokens_output: int
-    custo_estimado: Decimal
-
-
-class SessaoAdvogadoListItem(BaseModel):
-    id: int
-    intencao: str
-    modelo_ia: str
-    mensagem_preview: str   # primeiros 100 chars da mensagem
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class SessaoAdvogadoDetail(BaseModel):
-    id: int
-    intencao: str
-    modelo_ia: str
-    mensagem_advogado: str
-    resposta_hub: str
-    tokens_input: int
-    tokens_output: int
-    custo_estimado: Decimal
-    cliente_referenciado_id: int | None
-    processo_referenciado_id: int | None
-    metadata_json: dict
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class IntencaoCount(BaseModel):
-    intencao: str
-    total: int
-
-
-class AdvogadoAtivo(BaseModel):
-    usuario_id: int
-    total_sessoes: int
-
-
-class MetricasHubResponse(BaseModel):
-    mes_atual: str              # "YYYY-MM"
-    total_sessoes: int
-    tokens_input_total: int
-    tokens_output_total: int
-    custo_total_usd: Decimal
-    intencoes_top5: list[IntencaoCount]
-    advogados_mais_ativos: list[AdvogadoAtivo]
-
 
 # ---------------------------------------------------------------------------
 # Helpers internos
@@ -445,7 +385,7 @@ async def listar_historico(
 
 @router.get(
     "/historico/{sessao_id}",
-    response_model=SessaoAdvogadoDetail,
+    response_model=SessaoAdvogadoResponse,
     status_code=status.HTTP_200_OK,
 )
 async def detalhar_sessao(
@@ -475,7 +415,7 @@ async def detalhar_sessao(
             detail="Acesso negado.",
         )
 
-    return SessaoAdvogadoDetail(
+    return SessaoAdvogadoResponse(
         id=sessao.id,
         intencao=sessao.intencao,
         modelo_ia=sessao.modelo_ia,
