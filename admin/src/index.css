@@ -91,14 +91,26 @@
     min-height: 100vh;
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
+    background: var(--surface-base);
+  }
+
+  html[data-theme='light'] .app-shell {
     background:
       radial-gradient(circle at top left, rgba(15, 76, 129, 0.08), transparent 35%),
       linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
   }
 
+  html[data-theme='dark'] .app-shell {
+    background:
+      radial-gradient(circle at top left, rgba(96, 165, 250, 0.12), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.72), transparent 44%),
+      linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+  }
+
   .app-main {
     min-width: 0;
     overflow-y: auto;
+    background: transparent;
   }
 
   .app-content {
@@ -257,7 +269,7 @@
     width: 280px;
     min-width: 280px;
     border-right: 1px solid var(--surface-border);
-    background: rgba(255, 255, 255, 0.68);
+    background: var(--surface-raised);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     display: flex;
@@ -415,6 +427,11 @@
     color: var(--text-muted);
     transition: color 0.18s ease;
     user-select: none;
+  }
+
+  .theme-switch-track.dark .theme-switch-option.dark,
+  .theme-switch-track.light .theme-switch-option.light {
+    color: var(--text-primary);
   }
 
   .theme-switch-track.light .theme-switch-option.light,
