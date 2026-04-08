@@ -20,10 +20,15 @@ export default function Sidebar() {
   const { user, logout } = useAuth()
   const location = useLocation()
 
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('theme')
+    if (stored === 'light' || stored === 'dark') return stored
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    document.documentElement.style.colorScheme = theme
     localStorage.setItem('theme', theme)
   }, [theme])
 
@@ -66,15 +71,24 @@ export default function Sidebar() {
 
       <div className="sidebar-footer">
         <button
-          className="sidebar-link"
+          className="theme-switch"
           onClick={toggleTheme}
           type="button"
+          aria-pressed={theme === 'dark'}
+          title={theme === 'light' ? 'Alternar para tema escuro' : 'Alternar para tema claro'}
         >
-          <div className="theme-toggle">
-            <Sun size={16} className={`icon ${theme === 'light' ? 'active' : ''}`} />
-            <Moon size={16} className={`icon ${theme === 'dark' ? 'active' : ''}`} />
-          </div>
-          <span>{theme === 'light' ? 'Tema claro' : 'Tema escuro'}</span>
+          <span className="theme-switch-label">Tema</span>
+          <span className={`theme-switch-track ${theme}`}>
+            <span className="theme-switch-thumb" />
+            <span className="theme-switch-option light">
+              <Sun size={14} />
+              <span>Claro</span>
+            </span>
+            <span className="theme-switch-option dark">
+              <Moon size={14} />
+              <span>Escuro</span>
+            </span>
+          </span>
         </button>
 
         <button

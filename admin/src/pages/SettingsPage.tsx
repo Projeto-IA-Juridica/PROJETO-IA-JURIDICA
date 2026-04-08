@@ -20,6 +20,7 @@ export default function SettingsPage() {
     staleTime: 5 * 60_000, // 5 min cache
     refetchInterval: false, // ❌ Disable polling - backend returning errors
     placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega
+    enabled: isStatusTab,
   })
 
   const [persona, setPersona] = useState({ persona_nome: '', persona_tom: 'formal', horario_inicio: '08:00', horario_fim: '18:00' })
