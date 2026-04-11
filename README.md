@@ -532,6 +532,54 @@ make type-check         # mypy
 
 ---
 
+## Moats Estratégicos — Vantagens Competitivas Defensáveis
+
+A defensibilidade do Concierge não está no código — está nos dados, na rede e no switching cost acumulado. Cada escritório que entra alimenta múltiplos moats simultaneamente.
+
+### Moats ativos (já operando)
+
+| Moat | Tipo | Como funciona | Replicabilidade |
+|------|------|---------------|-----------------|
+| **Base RAG proprietária** | Dados | Petições, teses e jurisprudências do escritório alimentam a IA. Quanto mais documentos, melhor a resposta. Efeito composto irreplicável de fora. | ⬛⬛⬛⬛⬛ Quase impossível |
+| **Dados de prospecção acumulados** | Dados | DNA do advogado + histórico de leads + taxa de conversão por perfil. O matching score se calibra com feedback real — concorrente começa com heurística genérica. | ⬛⬛⬛⬛⬜ Muito difícil |
+
+### Moats em construção (próximos 6 meses)
+
+| Moat | Tipo | Como funciona | Replicabilidade |
+|------|------|---------------|-----------------|
+| **Persona treinada por uso** | Switching cost | Cada correção do advogado refina a IA via few-shot acumulado. Após meses de uso, a persona é insubstituível — trocar de produto significa recomeçar do zero. | ⬛⬛⬛⬛⬛ Quase impossível |
+| **Dados de experiência jurídica** | Dados | NPS, tempo de resposta, satisfação por fase processual — dados cross-escritório anonimizados que ninguém mais coleta. Nem o CNJ, nem a Jusbrasil. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **Rede processual própria** | Escala | Cada escritório traz processos monitorados. Com 50 escritórios = milhares de processos com contexto que a Jusbrasil não tem (fase real, satisfação, histórico do escritório). Reduz e eventualmente elimina dependência de API terceira. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **Inteligência preditiva por vara/juiz** | Tecnologia | ML de prazos que melhora com cada processo concluído na plataforma. Novos entrantes precisam de 1–2 anos de dados para chegar onde já estamos. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **API aberta para escritórios** | Switching cost | Escritórios integram dados do Concierge nos próprios sites e sistemas internos. Cada integração é uma raiz no stack do cliente — arrancar significa refazer sistemas. | ⬛⬛⬛⬜⬜ Difícil |
+
+### Moats de longo prazo (12–18 meses)
+
+| Moat | Tipo | Como funciona | Replicabilidade |
+|------|------|---------------|-----------------|
+| **Efeito de rede cross-escritório** | Rede | Marketplace de indicações: leads fora da especialidade são encaminhados para outros escritórios da rede com comissão rastreada. Cada novo escritório torna a plataforma mais valiosa para todos os outros. | ⬛⬛⬛⬛⬛ Quase impossível |
+| **Selo "Escritório Digital"** | Marca | Certificação pública de qualidade de atendimento (NPS, tempo de resposta, taxa de autonomia). Inverte a dinâmica comercial: escritórios precisam estar na plataforma para competir, não o contrário. | ⬛⬛⬛⬜⬜ Difícil |
+| **Índice de Experiência Jurídica** | Marca | Relatório público periódico com benchmarks anonimizados do mercado. Posiciona a empresa como autoridade — jornalistas citam, escritórios querem ranking favorável. Glassdoor fez com salários; nós fazemos com atendimento jurídico. | ⬛⬛⬛⬜⬜ Difícil |
+| **Dados para litechs e seguradoras** | Dados | Dados anonimizados e agregados vendidos como análises e APIs de consulta: seguradoras querem prever custo de litígio, litechs querem avaliar risco de financiamento, departamentos jurídicos querem benchmarks. Linha de receita que não depende de SaaS. | ⬛⬛⬛⬛⬜ Muito difícil |
+
+### Tese de defensibilidade
+
+```
+Fase 1 (agora):      Dados proprietários por escritório (RAG + prospecção)
+                      → Lock-in individual: cada escritório acumula inteligência própria
+
+Fase 2 (6 meses):    Dados cross-escritório + persona treinável + rede processual
+                      → Lock-in de plataforma: valor cresce com a base instalada
+
+Fase 3 (12+ meses):  Efeito de rede + marca + dados vendáveis
+                      → Lock-in de ecossistema: trocar não é perder uma ferramenta,
+                        é perder acesso a uma rede e a uma posição de mercado
+```
+
+> **Insight central:** o ativo mais valioso não é o software — são os dados de experiência jurídica. Nenhum concorrente tem dados estruturados de interação entre escritórios e clientes, cruzados com dados processuais em tempo real e feedback de satisfação. Isso não existe em nenhum lugar do Brasil. O SaaS é o mecanismo de coleta; o valor real está na rede e nos dados.
+
+---
+
 ## Variáveis de Ambiente
 
 ```bash
