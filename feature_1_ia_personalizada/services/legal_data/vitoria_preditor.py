@@ -15,9 +15,7 @@ Fluxo:
   5. Ajusta perspectiva para polo do cliente (autor ou réu)
   6. Retorna EstatisticaProcessual (com todos os percentuais) ou None
 
-ScoreRiscoCalculator (novo — Feature 2):
-  Calcula score de complexidade/risco (0–100) para uso interno do advogado.
-  NÃO prevê vitória/derrota. Alimenta o painel e a Feature 4 (ML de prazos).
+Score de risco processual (Feature 2) → score_risco.py
 """
 
 from __future__ import annotations
@@ -26,24 +24,15 @@ import asyncio
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 import structlog
 from prometheus_client import Counter, Histogram
-from pydantic import BaseModel, Field
 
 from feature_1_ia_personalizada.services.legal_data.datajud_client import (
     DataJudClientError,
     _indice_para_cnj,
-)
-from shared.config.constants import (
-    SCORE_RISCO_COMPLEXIDADE_POR_TIPO,
-    SCORE_RISCO_PESOS,
-    SCORE_RISCO_POR_FASE,
-    SCORE_RISCO_PRAZO_MAX_REFERENCIA,
-    SCORE_RISCO_SALARIO_MINIMO_REF,
 )
 
 logger = structlog.get_logger(__name__)
