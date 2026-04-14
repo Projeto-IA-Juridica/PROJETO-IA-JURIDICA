@@ -76,7 +76,7 @@ from feature_1_ia_personalizada.services.ai.hub_advogado_classifier import (
     IntencaoAdvogado,
 )
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import ScoreRiscoCalculator
+from feature_1_ia_personalizada.services.legal_data.score_risco import ScoreRiscoCalculator
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
 from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
