@@ -664,7 +664,7 @@ make coverage           # relatório HTML de cobertura
 |---|----------|--------|
 | 1 | Migration `004` com `down_revision` errado | ✅ **Corrigido** — aponta corretamente para `e4bcb5d405fa` |
 | 2 | Dois arquivos com prefixo `008_` | ✅ **Sem conflito** — cadeia sequencial (`008_add_analytics_indexes` → `008_add_onboarding_fields`); sem branches paralelas |
-| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ℹ️ **Dívida técnica** — classe ativa (usada em `monitor_processos`, `hub_juridico_v2`); nome do módulo inadequado, refatoração opcional |
+| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ✅ **Corrigido** — movida para `score_risco.py`; imports atualizados em `monitor_processos`, `hub_juridico_v2`, `hub_advogado_teste`, `test_score_risco` |
 | 4 | RAG usa `vector(1024)` e HNSW (spec pedia 1536 + IVFFlat) | ℹ️ **Intencional** — HNSW funciona em tabela vazia e mantém recall estável com inserts incrementais, sem necessidade de recriar índice |
 
 ---
