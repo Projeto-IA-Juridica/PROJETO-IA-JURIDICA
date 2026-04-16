@@ -87,7 +87,7 @@ Hub do Advogado (Harvey AI):              ████████████�
 Feature 3 — Prospecção Inteligente:       ██████████████████░░   90%  ← LinkedIn pendente
 Features 2, 4–6 (backlog):               ░░░░░░░░░░░░░░░░░░░░    0%  ← não iniciadas
 
-TOTAL DO PROJETO:  ~50% do roadmap completo
+TOTAL DO PROJETO:  ~50% do roadmap completo.
 ```
 
 ### Tabela de Features
