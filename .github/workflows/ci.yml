@@ -191,3 +191,126 @@ jobs:
             -t concierge-f1:ci \
             -f infrastructure/docker/Dockerfile.f1 \
             .
+
+  # ----------------------------------------------------------------------------
+  # Job 5: Smoke Load Test — valida performance básica com Locust
+  # Roda apenas em push para main (após todos os outros jobs passarem).
+  # Cenário: 10 usuários, 30s — detecta regressões grosseiras de latência.
+  # Não substitui o load test completo de staging (50 usuários, 5 min).
+  # ----------------------------------------------------------------------------
+  load-smoke:
+    name: Smoke Load Test (Locust)
+    runs-on: ubuntu-latest
+    needs: [test, integration-postgres]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_concierge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependências + Locust
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-f1.txt
+          pip install -e ".[dev]"
+          pip install "locust>=2.20"
+
+      - name: Gerar ENCRYPTION_KEY e exportar env vars
+        run: |
+          ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+          echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >> $GITHUB_ENV
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+          REDIS_URL: redis://localhost:6379/0
+
+      - name: Rodar migrações Alembic
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+          EVOLUTION_API_URL: http://localhost:8765
+          EVOLUTION_API_KEY: test-evolution-key
+          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+          OPENAI_API_KEY: sk-fake-openai-ci-key
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/2
+        run: python -m alembic upgrade head
+
+      - name: Popular banco com seed data
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+          EVOLUTION_API_URL: http://localhost:8765
+          EVOLUTION_API_KEY: test-evolution-key
+          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+          OPENAI_API_KEY: sk-fake-openai-ci-key
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/2
+        run: python -m scripts.setup.seed_data
+
+      - name: Iniciar servidor FastAPI em background
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+          EVOLUTION_API_URL: http://localhost:8765
+          EVOLUTION_API_KEY: test-evolution-key
+          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+          OPENAI_API_KEY: sk-fake-openai-ci-key
+          CELERY_BROKER_URL: redis://localhost:6379/1
+          CELERY_RESULT_BACKEND: redis://localhost:6379/2
+        run: |
+          uvicorn feature_1_ia_personalizada.api.app:app \
+            --host 0.0.0.0 --port 8000 --workers 1 --log-level warning &
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/health; do sleep 1; done'
+          echo "Servidor pronto"
+
+      - name: Executar smoke load test (10 usuários, 30s)
+        run: |
+          mkdir -p tests/load/reports
+          locust -f tests/load/locustfile.py \
+            --host=http://localhost:8000 \
+            --users=10 --spawn-rate=2 --run-time=30s --headless \
+            --html=tests/load/reports/ci_smoke_report.html \
+            HealthChecker AdvogadoAutenticado EvolutionWebhookSimulator
+
+      - name: Upload relatório de load test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-smoke-report
+          path: tests/load/reports/ci_smoke_report.html
