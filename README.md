@@ -645,7 +645,7 @@ make coverage           # relatório HTML de cobertura
 | Item | Impacto |
 |------|---------|
 | **LinkedIn API real** (Partner Program) | Enriquecimento B2B retorna dados mock de contato; funcionalidade existe, dado é vazio |
-| **Load testing no CI** | Scripts existem em `tests/load/` mas não rodam no pipeline — sem garantia de performance sob carga |
+| **Load testing no CI** | ✅ Job `load-smoke` adicionado ao CI (10 usuários, 30s, push para `main`) — valida SLAs básicos; teste completo (50 usuários, 5 min) permanece para staging |
 | **Documentação de API** | `docs/api/` vazia — sem Postman collection nem snapshot OpenAPI para integrações externas |
 
 ### Roadmap (não bloqueia, mas são features de valor)
