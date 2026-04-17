@@ -23,6 +23,7 @@ import httpx
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +35,7 @@ from shared.models.processo import Processo
 from shared.models.usuario import Usuario
 from shared.schemas.escritorio import EscritorioResponse
 from shared.security.encryption import hash_senha
-from shared.security.jwt import criar_refresh_token, criar_token
+from shared.security.jwt import criar_refresh_token, criar_token, token_esta_revogado, validar_token
 from shared.utils.validators import normalizar_cnpj, validar_cnpj, validar_oab
 
 logger = structlog.get_logger(__name__)
@@ -155,9 +156,30 @@ class ConfigurarTemplatesRequest(BaseModel):
 
 def _exigir_admin(request: Request) -> dict:
     """Valida que o token pertence a um admin e retorna o payload."""
-    if not hasattr(request.state, "user_payload"):
-        raise HTTPException(status_code=401, detail="Token JWT ausente.")
-    payload = request.state.user_payload
+    payload = getattr(request.state, "user_payload", None)
+
+    # Fallback defensivo: em alguns fluxos locais o middleware pode não ter injetado
+    # request.state.user_payload, mas o header Authorization ainda está presente.
+    if not isinstance(payload, dict):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Token JWT ausente.")
+
+        token = auth_header.split(" ", 1)[1].strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="Token JWT ausente.")
+
+        try:
+            payload = validar_token(token)
+        except (ValueError, JWTError) as exc:
+            raise HTTPException(status_code=401, detail="Token JWT inválido.") from exc
+
+        if token_esta_revogado(token):
+            raise HTTPException(status_code=401, detail="Token revogado. Faça login novamente.")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=401, detail="Token JWT inválido.")
+
     if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Apenas administradores podem realizar o onboarding.")
     return payload
@@ -399,7 +421,10 @@ async def connect_whatsapp(
         raise
     except Exception as exc:
         logger.error("connect_whatsapp_auth_erro", erro=str(exc))
-        raise HTTPException(status_code=500, detail="Erro de autenticação ao conectar WhatsApp.") from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao validar autenticação no onboarding: {str(exc)[:180]}",
+        ) from exc
 
     instance_name = f"escritorio_{escritorio.id}"
     configured_base = settings.EVOLUTION_API_URL.rstrip("/")
