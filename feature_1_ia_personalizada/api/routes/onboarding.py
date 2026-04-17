@@ -415,8 +415,44 @@ async def connect_whatsapp(
             ),
         )
 
+    def _tem_qr(payload: dict | None) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("qrcode") or payload.get("qr_code") or payload.get("base64") or payload.get("qr"):
+            return True
+        instance = payload.get("instance")
+        if isinstance(instance, dict) and (
+            instance.get("qrcode") or instance.get("qr_code") or instance.get("base64") or instance.get("qr")
+        ):
+            return True
+        return False
+
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
+            async def _reconectar_instancia() -> dict:
+                ultima_resposta = None
+                for metodo in ("GET", "POST"):
+                    resp_connect = await client.request(
+                        metodo,
+                        f"{settings.EVOLUTION_API_URL}/instance/connect/{instance_name}",
+                        headers={"apikey": settings.EVOLUTION_API_KEY},
+                    )
+                    if resp_connect.status_code in (200, 201):
+                        return resp_connect.json()
+                    ultima_resposta = resp_connect
+
+                detail = "Instância criada/existente, mas falhou ao iniciar conexão para gerar QR."
+                if ultima_resposta is not None:
+                    detail = f"{detail} HTTP {ultima_resposta.status_code}."
+                    try:
+                        raw = ultima_resposta.text
+                        if raw:
+                            detail = f"{detail} Resposta: {raw[:400]}"
+                    except Exception:
+                        pass
+                logger.warning("evolution_reconnect_erro", escritorio_id=escritorio.id)
+                raise HTTPException(status_code=502, detail=detail)
+
             # 1. Cria a instância
             resp = await client.post(
                 f"{settings.EVOLUTION_API_URL}/instance/create",
@@ -430,26 +466,13 @@ async def connect_whatsapp(
 
             if resp.status_code in (200, 201):
                 data = resp.json()
+                # Em algumas versões da Evolution o QR não vem no /instance/create.
+                # Tentamos conectar explicitamente para obter o QR atual.
+                if not _tem_qr(data):
+                    data = await _reconectar_instancia()
             elif resp.status_code == 409:
                 # Instância já existe — reconecta e busca QR atual
-                resp_connect = await client.get(
-                    f"{settings.EVOLUTION_API_URL}/instance/connect/{instance_name}",
-                    headers={"apikey": settings.EVOLUTION_API_KEY},
-                )
-                if resp_connect.status_code not in (200, 201):
-                    detail = f"Instância já existe mas falhou ao reconectar (HTTP {resp_connect.status_code})."
-                    try:
-                        raw = resp_connect.text
-                        if raw:
-                            detail = f"{detail} Resposta: {raw[:400]}"
-                    except Exception:
-                        pass
-                    logger.warning("evolution_reconnect_erro", status=resp_connect.status_code, escritorio_id=escritorio.id)
-                    raise HTTPException(
-                        status_code=502,
-                        detail=detail,
-                    )
-                data = resp_connect.json()
+                data = await _reconectar_instancia()
             else:
                 detail = f"Evolution API retornou erro inesperado (HTTP {resp.status_code})."
                 try:
@@ -494,7 +517,10 @@ async def connect_whatsapp(
             escritorio.onboarding_etapa = 3
         await db.commit()
 
-        qr_code = data.get("qrcode", {})
+        qr_code = data.get("qrcode") or data.get("qr_code") or data.get("base64") or data.get("qr")
+        if not qr_code and isinstance(data.get("instance"), dict):
+            inst_data = data.get("instance")
+            qr_code = inst_data.get("qrcode") or inst_data.get("qr_code") or inst_data.get("base64") or inst_data.get("qr")
         logger.info("onboarding_connect_whatsapp", escritorio_id=escritorio.id)
 
         return {

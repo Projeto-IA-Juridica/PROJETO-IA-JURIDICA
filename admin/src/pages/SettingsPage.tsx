@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('profile')
   const isStatusTab = activeTab === 'status'
+  const isWhatsappMonitorTab = activeTab === 'status' || activeTab === 'onboarding'
 
   const { data: status, isLoading, error: statusError } = useQuery({
     queryKey: ['onboarding-status'],
@@ -81,7 +82,10 @@ export default function SettingsPage() {
       const q = res?.qr_code ?? res?.qrcode ?? null
       let src = null
       if (q) {
-        if (typeof q === 'string') src = q
+        if (typeof q === 'string') {
+          const maybeUrl = q.startsWith('http://') || q.startsWith('https://') || q.startsWith('data:image')
+          src = maybeUrl ? q : `data:image/png;base64,${q}`
+        }
         else if (q.data) src = q.data
         else if (q.base64) src = `data:image/png;base64,${q.base64}`
         else if (q.png) src = `data:image/png;base64,${q.png}`
@@ -101,10 +105,10 @@ export default function SettingsPage() {
   const { data: whatsappStatus } = useQuery({
     queryKey: ['whatsapp-status'],
     queryFn: onboardingApi.whatsappStatus,
-    enabled: isStatusTab,
-    refetchInterval: isStatusTab ? 60_000 : false,
+    enabled: isWhatsappMonitorTab,
+    refetchInterval: isWhatsappMonitorTab ? 15_000 : false,
     retry: 0,
-    staleTime: 50_000, // Considera dados frescos por 50s
+    staleTime: 12_000, // Dados quase em tempo real durante conexão
   })
 
   const { mutate: goLive, isPending: goingLive } = useMutation({
