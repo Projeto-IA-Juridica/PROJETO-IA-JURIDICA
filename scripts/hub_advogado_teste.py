@@ -69,7 +69,7 @@ from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslato
 from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
     JusbrasilClient,
 )
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ScoreRiscoCalculator,
 )
 

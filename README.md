@@ -87,7 +87,7 @@ Hub do Advogado (Harvey AI):              ████████████�
 Feature 3 — Prospecção Inteligente:       ██████████████████░░   90%  ← LinkedIn pendente
 Features 2, 4–6 (backlog):               ░░░░░░░░░░░░░░░░░░░░    0%  ← não iniciadas
 
-TOTAL DO PROJETO:  ~50% do roadmap completo
+TOTAL DO PROJETO:  ~50% do roadmap completo.
 ```
 
 ### Tabela de Features
@@ -509,6 +509,8 @@ make type-check         # mypy
 | `GET` | `/prospeccao/pipeline` | Lista leads com filtros e paginação | JWT (advogado) |
 | `PATCH` | `/prospeccao/{id}/status` | Atualiza status e notas de um lead | JWT (advogado) |
 | `DELETE` | `/prospeccao/{id}` | Remove um lead do pipeline | JWT (advogado) |
+| `GET` | `/clientes/{id}/exportar` | Exporta dados pessoais do cliente (LGPD Art. 18, V) | JWT (advogado) |
+| `DELETE` | `/clientes/{id}` | Anonimiza dados pessoais do cliente (LGPD Art. 18, IV) | JWT (advogado) |
 
 ---
 
@@ -528,7 +530,7 @@ make type-check         # mypy
 - Mascaramento: CPF → `***.***.***-XX`, telefone → `(**)****-XXXX`
 - Isolamento de dados por `escritorio_id` (row-level multi-tenancy)
 - Retenção: dados de processos arquivados removidos após 5 anos
-- **Pendente:** endpoints de exportação e exclusão por solicitação do titular (LGPD art. 18)
+- Endpoints de portabilidade e anonimização implementados: `GET /clientes/{id}/exportar` (Art. 18, V) e `DELETE /clientes/{id}` (Art. 18, IV)
 
 ---
 
@@ -636,7 +638,6 @@ make coverage           # relatório HTML de cobertura
 
 | Item | Por que é bloqueador | Estimativa |
 |------|---------------------|------------|
-| **Endpoints LGPD** (`/cliente/{id}/exportar` e `/cliente/{id}/deletar`) | Exigência legal — portabilidade e direito ao esquecimento (LGPD art. 18). Sem isso, operar com dados de clientes é um risco jurídico | Baixo esforço de implementação |
 | **Validação de produção do banco** | `alembic upgrade head` precisa ser testado em ambiente de staging com dados reais antes do primeiro deploy | Processo, não código |
 
 ### Importante (não bloqueia o lançamento, mas afeta qualidade)
@@ -664,7 +665,7 @@ make coverage           # relatório HTML de cobertura
 |---|----------|--------|
 | 1 | Migration `004` com `down_revision` errado | ✅ **Corrigido** — aponta corretamente para `e4bcb5d405fa` |
 | 2 | Dois arquivos com prefixo `008_` | ✅ **Sem conflito** — cadeia sequencial (`008_add_analytics_indexes` → `008_add_onboarding_fields`); sem branches paralelas |
-| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ℹ️ **Dívida técnica** — classe ativa (usada em `monitor_processos`, `hub_juridico_v2`); nome do módulo inadequado, refatoração opcional |
+| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ✅ **Corrigido** — movida para `score_risco.py`; imports atualizados em `monitor_processos`, `hub_juridico_v2`, `hub_advogado_teste`, `test_score_risco` |
 | 4 | RAG usa `vector(1024)` e HNSW (spec pedia 1536 + IVFFlat) | ℹ️ **Intencional** — HNSW funciona em tabela vazia e mantém recall estável com inserts incrementais, sem necessidade de recriar índice |
 
 ---
