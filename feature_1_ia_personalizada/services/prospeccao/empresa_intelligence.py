@@ -33,6 +33,9 @@ from feature_1_ia_personalizada.services.prospeccao.receita_federal_client impor
     EmpresaDados,
     ReceitaFederalClient,
 )
+from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client import (
+    VibeProspectingClient,
+)
 from shared.utils.validators import normalizar_cnpj, validar_cnpj
 
 logger = structlog.get_logger(__name__)
@@ -85,15 +88,17 @@ class EmpresaIntelligenceService:
         self,
         receita: ReceitaFederalClient | None = None,
         linkedin: LinkedInClient | None = None,
+        vibe: VibeProspectingClient | None = None,
         redis: Any = None,
     ) -> None:
         self._receita = receita or ReceitaFederalClient(redis=None)
         self._linkedin = linkedin or LinkedInClient(redis=None)
+        self._vibe = vibe or VibeProspectingClient(redis=None)
         self._redis = redis
 
     async def linkedin_disponivel(self) -> bool:
-        """Retorna True se o LinkedInClient tem credenciais configuradas."""
-        return self._linkedin.disponivel
+        """Retorna True se LinkedIn ou Vibe Prospecting tem credenciais configuradas."""
+        return self._linkedin.disponivel or self._vibe.disponivel
 
     # ------------------------------------------------------------------
     # Interface pública
@@ -116,11 +121,13 @@ class EmpresaIntelligenceService:
                 logger.debug("empresa_intel.cache_hit", cnpj=cnpj)
                 return cached
 
-        empresa_dados, contatos = await asyncio.gather(
+        empresa_dados, contatos_linkedin, contatos_vibe = await asyncio.gather(
             self._buscar_receita(cnpj),
             self._buscar_linkedin(litigante.nome),
+            self._buscar_vibe(litigante.nome),
         )
 
+        contatos = self._mesclar_contatos(contatos_linkedin, contatos_vibe)
         inteligencia = self._montar(litigante, cnpj, empresa_dados, contatos)
 
         if cnpj:
@@ -179,6 +186,32 @@ class EmpresaIntelligenceService:
             )
             return []
 
+    async def _buscar_vibe(self, nome_empresa: str) -> list[ContatoLinkedIn]:
+        try:
+            return await self._vibe.buscar_contatos_empresa(nome_empresa)
+        except Exception as exc:
+            logger.debug(
+                "empresa_intel.vibe_erro",
+                nome=nome_empresa,
+                error=str(exc),
+            )
+            return []
+
+    @staticmethod
+    def _mesclar_contatos(
+        linkedin: list[ContatoLinkedIn],
+        vibe: list[ContatoLinkedIn],
+    ) -> list[ContatoLinkedIn]:
+        """Combina contatos de LinkedIn e Vibe Prospecting, deduplicando por nome."""
+        vistos: set[str] = set()
+        merged: list[ContatoLinkedIn] = []
+        for contato in linkedin + vibe:
+            chave = contato.nome.lower().strip()
+            if chave not in vistos:
+                vistos.add(chave)
+                merged.append(contato)
+        return merged
+
     # ------------------------------------------------------------------
     # Internos — montagem
     # ------------------------------------------------------------------
@@ -221,7 +254,7 @@ class EmpresaIntelligenceService:
             processos_count=litigante.processos_count,
             tipos_acao_envolvida=[litigante.tipo_acao],
             contatos_linkedin=contatos_dict,
-            linkedin_disponivel=self._linkedin.disponivel,
+            linkedin_disponivel=self._linkedin.disponivel or self._vibe.disponivel,
             enriquecimento_parcial=(empresa is None),
             tribunal=litigante.tribunal,
             polo=litigante.polo,
