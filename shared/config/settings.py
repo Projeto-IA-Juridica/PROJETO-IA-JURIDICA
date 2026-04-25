@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     LINKEDIN_CLIENT_ID: str | None = None
     LINKEDIN_CLIENT_SECRET: str | None = None
 
+    # Vibe Prospecting (Explorium AgentSource) — Feature 3 (Prospecção Inteligente)
+    # Alternativa/complemento ao LinkedIn Partner Program para enriquecimento B2B.
+    # Sem essa variável o VibeProspectingClient opera em modo degradado (retorna []).
+    EXPLORIUM_API_KEY: str | None = None
+
     # Modelo de Escalação — Feature Hub do Advogado
     # Modelo Claude usado quando o ConfidenceRouter decide escalar (score baixo ou forçamento).
     # ESCALACAO_HABILITADO=False por padrão; controle por escritório é via banco (escalacao_habilitada).
