@@ -676,4 +676,4 @@ make coverage           # relatório HTML de cobertura
 - **Guia de desenvolvimento:** [docs/guides/development.md](docs/guides/development.md)
 - **Checklist de produção:** [docs/guides/production-readiness.md](docs/guides/production-readiness.md)
 - **Gestão de secrets:** [docs/guides/secrets.md](docs/guides/secrets.md)
-- **Documentação do banco:** [bancodedados_api.md](bancodedados_api.md)
+- **Documentação do banco:** [bancodedados_api.md](bancodedados_api.md)  
