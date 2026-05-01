@@ -259,3 +259,35 @@ class DataJudClient:
             referencia=data_referencia_iso,
         )
         return andamentos
+
+    async def buscar_andamentos_async(self, numero_cnj: str) -> list[dict]:
+        """
+        Versão assíncrona para o caminho real-time do orchestrator.
+        Retorna [{"descricao": str, "data": str|None}] ou [] em caso de falha.
+        """
+        try:
+            data = await self.consultar_processo(numero_cnj)
+        except DataJudClientError as exc:
+            logger.warning("datajud_async_erro", cnj=numero_cnj, erro=str(exc))
+            return []
+
+        hits = data.get("hits", {}).get("hits", [])
+        if not hits:
+            return []
+
+        movimentos = hits[0].get("_source", {}).get("movimentos", [])
+        andamentos = []
+
+        for m in movimentos:
+            nome = m.get("nome", "")
+            complementos = m.get("complementosTabelados", [])
+            if complementos:
+                valores = "; ".join(
+                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
+                )
+                if valores:
+                    nome = f"{nome}: {valores}"
+            andamentos.append({"descricao": nome, "data": m.get("dataHora")})
+
+        logger.info("datajud_async_andamentos", cnj=numero_cnj, total=len(andamentos))
+        return andamentos
