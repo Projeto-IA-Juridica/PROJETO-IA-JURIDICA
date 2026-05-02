@@ -75,7 +75,7 @@ from feature_1_ia_personalizada.services.ai.hub_advogado_classifier import (
     HubAdvogadoClassificador,
     IntencaoAdvogado,
 )
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import JusbrasilClient
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 from feature_1_ia_personalizada.services.legal_data.score_risco import ScoreRiscoCalculator
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
 from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
@@ -745,8 +745,8 @@ def _fake_processo(cliente: dict, dados_dj: dict | None) -> MagicMock | None:
     return obj
 
 
-def _fake_jusbrasil(dados_dj: dict | None) -> JusbrasilClient:
-    client = AsyncMock(spec=JusbrasilClient)
+def _fake_datajud(dados_dj: dict | None) -> DataJudClient:
+    client = AsyncMock(spec=DataJudClient)
     if dados_dj:
         movimentos = dados_dj.get("movimentos", [])
         andamentos = [
@@ -755,7 +755,7 @@ def _fake_jusbrasil(dados_dj: dict | None) -> JusbrasilClient:
         ]
     else:
         andamentos = []
-    client.sincronizar_andamentos = AsyncMock(return_value=andamentos)
+    client.buscar_andamentos_async = AsyncMock(return_value=andamentos)
     return client
 
 
@@ -838,7 +838,7 @@ def criar_orchestrator(
       - ClaudeClient: chamadas reais ao Claude Sonnet
       - _MemoriaEmRam: substitui Redis (histórico in-memory por cliente)
       - JuridicalTranslator: dicionário jurídico real (identifica + explica termos)
-      - _fake_jusbrasil: andamentos do DataJud injetados como se fossem do Jusbrasil
+      - _fake_datajud: andamentos do DataJud injetados no cliente fake
       - _fake_cache: cache miss → orchestrator busca dados frescos
       - _MockRAGRetriever: conecta _MockRAGBase ao pipeline do orchestrator
         (await self._rag.buscar → injeção do bloco <contexto_juridico> no system_prompt)
@@ -853,7 +853,7 @@ def criar_orchestrator(
         claude_client=ClaudeClient(api_key=ANTHROPIC_API_KEY),
         memory=memoria,
         translator=JuridicalTranslator(),
-        jusbrasil_client=_fake_jusbrasil(dados_dj),
+        datajud_client=_fake_datajud(dados_dj),
         cache_manager=_fake_cache(),
         evolution_client=_fake_evolution(),
         session_factory=_make_session_factory(ob, cliente, dados_dj),

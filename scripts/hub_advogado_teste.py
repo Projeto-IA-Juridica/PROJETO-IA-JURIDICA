@@ -66,9 +66,7 @@ from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.orchestrator import ConversationOrchestrator
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
-    JusbrasilClient,
-)
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ScoreRiscoCalculator,
 )
@@ -495,8 +493,8 @@ def _fake_processo(cliente: dict, dados_datajud: dict | None) -> MagicMock | Non
     return obj
 
 
-def _fake_jusbrasil(dados_datajud: dict | None) -> JusbrasilClient:
-    client = AsyncMock(spec=JusbrasilClient)
+def _fake_datajud(dados_datajud: dict | None) -> DataJudClient:
+    client = AsyncMock(spec=DataJudClient)
     if dados_datajud:
         movimentos = dados_datajud.get("movimentos", [])
         andamentos = [
@@ -506,7 +504,7 @@ def _fake_jusbrasil(dados_datajud: dict | None) -> JusbrasilClient:
         ]
     else:
         andamentos = []
-    client.sincronizar_andamentos = AsyncMock(return_value=andamentos)
+    client.buscar_andamentos_async = AsyncMock(return_value=andamentos)
     return client
 
 
@@ -571,7 +569,7 @@ def criar_orchestrator(
         claude_client=ClaudeClient(api_key=ANTHROPIC_API_KEY),
         memory=memoria,
         translator=JuridicalTranslator(),
-        jusbrasil_client=_fake_jusbrasil(dados_datajud),
+        datajud_client=_fake_datajud(dados_datajud),
         cache_manager=_fake_cache(),
         evolution_client=_fake_evolution(),
         session_factory=_make_session_factory(escritorio_nome, cliente, dados_datajud),

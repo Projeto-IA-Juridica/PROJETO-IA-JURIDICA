@@ -45,9 +45,7 @@ from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.orchestrator import ConversationOrchestrator
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
-    JusbrasilClient,
-)
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 
 # ---------------------------------------------------------------------------
 # Memória em RAM (substitui Redis)
@@ -140,10 +138,10 @@ def _make_session_factory(*, com_processo: bool, nome_cliente: str, nome_escrito
     return _factory
 
 
-def _jusbrasil_fake(com_processo: bool) -> JusbrasilClient:
-    client = AsyncMock(spec=JusbrasilClient)
+def _datajud_fake(com_processo: bool) -> DataJudClient:
+    client = AsyncMock(spec=DataJudClient)
     if com_processo:
-        client.sincronizar_andamentos = AsyncMock(
+        client.buscar_andamentos_async = AsyncMock(
             return_value=[
                 {
                     "descricao": "Concluso para sentença. Aguardando decisão do juiz.",
@@ -152,7 +150,7 @@ def _jusbrasil_fake(com_processo: bool) -> JusbrasilClient:
             ]
         )
     else:
-        client.sincronizar_andamentos = AsyncMock(return_value=[])
+        client.buscar_andamentos_async = AsyncMock(return_value=[])
     return client
 
 
@@ -176,7 +174,7 @@ def _criar_orchestrator(
         claude_client=ClaudeClient(api_key=ANTHROPIC_API_KEY),
         memory=_MemoriaEmRam(),
         translator=JuridicalTranslator(),
-        jusbrasil_client=_jusbrasil_fake(com_processo),
+        datajud_client=_datajud_fake(com_processo),
         cache_manager=_cache_fake(),
         evolution_client=_evolution_fake(),
         session_factory=_make_session_factory(

@@ -82,9 +82,7 @@ from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManag
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     LegalDataCacheManager,
 )
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
-    JusbrasilClient,
-)
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 from feature_1_ia_personalizada.services.messaging.evolution_client import (
     EvolutionClient,
 )
@@ -127,7 +125,7 @@ _MSG_QUOTA_CLIENTE = (
 
 _TIMEOUT_FLUXO_SEGUNDOS = 120.0   # guard absoluto de último recurso (não deve ser atingido)
 _TIMEOUT_CLAUDE_SEGUNDOS = 25.0   # timeout por chamada ao Claude
-_TIMEOUT_JUSBRASIL_SEGUNDOS = 20.0  # timeout por chamada ao Jusbrasil/cache
+_TIMEOUT_DATAJUD_SEGUNDOS = 20.0  # timeout por chamada ao DataJud/cache
 
 # ---------------------------------------------------------------------------
 # Humanização — fragmentação de mensagens para WhatsApp
@@ -233,6 +231,8 @@ class ConversationState(TypedDict):
     confidence_score: float | None      # score calculado pelo ConfidenceRouter
     modelo_ia_usado: str                # 'claude' | 'claude_opus' | 'claude_opus_fallback'
     _escalar_para_opus: bool            # sinal interno: avaliar_confianca → gerar_resposta_escalacao
+    rag_docs_com_score: list[dict]      # [{"score": float}] — scores reais do RAG para ConfidenceRouter
+    fact_check_result: dict             # resultado do FactChecker — reaproveitado entre nós
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ class ConversationOrchestrator:
         claude_client: ClaudeClient,
         memory: ConversationMemory,
         translator: JuridicalTranslator,
-        jusbrasil_client: JusbrasilClient,
+        datajud_client: DataJudClient,
         cache_manager: LegalDataCacheManager,
         evolution_client: EvolutionClient,
         session_factory: async_sessionmaker[AsyncSession],
@@ -331,7 +331,7 @@ class ConversationOrchestrator:
         self._claude = claude_client
         self._memory = memory
         self._translator = translator
-        self._jusbrasil = jusbrasil_client
+        self._datajud = datajud_client
         self._cache = cache_manager
         self._redis: Redis = cache_manager._redis  # reutiliza conexão já existente
         self._evolution = evolution_client
@@ -512,22 +512,23 @@ class ConversationOrchestrator:
         self,
         state: ConversationState,
         contexto_processo: dict | None = None,
-    ) -> str:
+    ) -> tuple[str, list[dict]]:
         """
         Chama o RAGRetriever de forma segura.
-        Retorna string vazia se RAG não configurado ou em caso de erro.
+        Retorna (contexto_str, rag_docs_com_score).
+        rag_docs_com_score = [{"score": float}] para uso no ConfidenceRouter.
         """
         if not self._rag:
-            return ""
+            return "", []
         try:
-            return await self._rag.buscar(
+            return await self._rag.buscar_com_scores(
                 query=state["mensagem_original"],
                 escritorio_id=state["escritorio_id"],
                 contexto_processo=contexto_processo,
             )
         except Exception as exc:
             logger.warning("rag_busca_falhou_graceful", erro=str(exc))
-            return ""
+            return "", []
 
     async def _buscar_resumo_processo_para_fact_checker(self, processo_id: str) -> dict[str, Any]:
         """Adapter para FactChecker — lê dados reais do processo no banco."""
@@ -978,37 +979,48 @@ class ConversationOrchestrator:
                 log.info("cliente_sem_processos")
                 return {"resposta_verificada": TEMPLATE_CLIENTE_SEM_PROCESSO}
 
-            # MVP: usa o processo com andamento mais recente (primeiro da lista)
+            # Seleciona processo: se a mensagem menciona um CNJ explícito, usa esse;
+            # caso contrário usa o com andamento mais recente (primeiro da lista).
+            _CNJ_NA_MENSAGEM = re.compile(r"\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}")
             processo = processos[0]
+            match_cnj = _CNJ_NA_MENSAGEM.search(state["mensagem_original"])
+            if match_cnj and len(processos) > 1:
+                cnj_mencionado = match_cnj.group(0)
+                for p in processos:
+                    if p.numero_cnj and cnj_mencionado in p.numero_cnj:
+                        processo = p
+                        break
+
             numero_cnj = processo.numero_cnj
 
-            # Tenta cache de andamentos → Jusbrasil como fallback.
-            # RAG é executado em paralelo com Jusbrasil quando há cache miss,
+            # Tenta cache de andamentos → DataJud como fallback.
+            # RAG é executado em paralelo com DataJud quando há cache miss,
             # eliminando latência adicional no caminho crítico.
             andamentos = await self._cache.get_andamentos(numero_cnj)
+            rag_docs_com_score: list[dict] = []
             if andamentos:
                 log.debug("andamentos_do_cache", cnj=numero_cnj)
-                contexto_rag = await self._buscar_rag(state)
+                contexto_rag, rag_docs_com_score = await self._buscar_rag(state)
             else:
                 contexto_processo_para_rag = {
                     "tipo_acao": getattr(processo, "tipo_acao", None),
                     "tribunal": processo.tribunal,
                 }
                 try:
-                    andamentos, contexto_rag = await asyncio.wait_for(
+                    (andamentos, (contexto_rag, rag_docs_com_score)) = await asyncio.wait_for(
                         asyncio.gather(
-                            self._jusbrasil.sincronizar_andamentos(numero_cnj),
+                            self._datajud.buscar_andamentos_async(numero_cnj),
                             self._buscar_rag(state, contexto_processo_para_rag),
                         ),
-                        timeout=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                        timeout=_TIMEOUT_DATAJUD_SEGUNDOS,
                     )
-                    await self._cache.set_andamentos(numero_cnj, andamentos)
-                    log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
+                    if andamentos:
+                        await self._cache.set_andamentos(numero_cnj, andamentos)
+                    log.info("andamentos_do_datajud", cnj=numero_cnj, total=len(andamentos))
                 except TimeoutError:
-                    # Jusbrasil lento → degrada gracefully com dados do banco
                     log.warning(
-                        "jusbrasil_timeout_usando_dados_banco",
-                        timeout_s=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                        "datajud_timeout_usando_dados_banco",
+                        timeout_s=_TIMEOUT_DATAJUD_SEGUNDOS,
                         cnj=numero_cnj,
                     )
                     andamentos = []
@@ -1044,6 +1056,13 @@ class ConversationOrchestrator:
                 if a.get("descricao")
             ]
 
+            # Informa a IA se o cliente tem mais de um processo ativo
+            outros_processos = [
+                {"numero_cnj": p.numero_cnj, "tipo_acao": getattr(p, "tipo_acao", None) or "N/D"}
+                for p in processos
+                if p.id != processo.id
+            ]
+
             dados_processo = {
                 "processo_id": processo.id,
                 "numero_cnj": numero_cnj,
@@ -1054,14 +1073,21 @@ class ConversationOrchestrator:
                 "data_ultimo_andamento": data_ultimo,
                 "andamentos_recentes": andamentos_recentes,
                 "glossario_andamento": glossario_andamento,
+                "outros_processos_ativos": outros_processos,
             }
 
-            log.info("dados_processo_obtidos", cnj=numero_cnj, rag_ativo=bool(contexto_rag))
+            log.info(
+                "dados_processo_obtidos",
+                cnj=numero_cnj,
+                rag_ativo=bool(contexto_rag),
+                total_processos=len(processos),
+            )
 
             return {
                 "processo_id": processo.id,
                 "dados_processo": dados_processo,
                 "contexto_rag": contexto_rag or None,
+                "rag_docs_com_score": rag_docs_com_score,
             }
 
         except Exception as exc:
@@ -1319,17 +1345,38 @@ class ConversationOrchestrator:
             if not escritorio:
                 return {"_escalar_para_opus": False}
 
-            # Heurística: se há contexto RAG, assume cobertura razoável (0.7)
-            rag_docs = (
-                [{"score": 0.7}] if state.get("contexto_rag") else []
-            )
+            # Scores reais do RAG (armazenados pelo nó buscar_dados)
+            rag_docs = state.get("rag_docs_com_score") or []
+
+            # Fact check — roda aqui para alimentar o ConfidenceRouter.
+            # O resultado bruto (verificado/correcoes) é armazenado no state para
+            # ser reaproveitado por verificar_resposta sem segunda chamada ao banco.
+            fact_check_result: dict = {}
+            fact_check_para_router: dict = {}
+            if state.get("dados_processo") and state.get("processo_id"):
+                class _InteracaoStub:
+                    metadata_json: dict | None = None
+
+                try:
+                    fact_check_result = await self._fact_checker.verificar_status_processo(
+                        processo_id=str(state["processo_id"]),
+                        afirmacao_ia=state.get("resposta_ia") or "",
+                        interacao=_InteracaoStub(),
+                    )
+                    # Converte para o formato esperado pelo ConfidenceRouter:
+                    # hallucination_score = proporção de correções (FactChecker verifica 3 campos)
+                    correcoes = fact_check_result.get("correcoes", [])
+                    hallucination_score = 0.0 if fact_check_result.get("verificado", True) else min(1.0, len(correcoes) / 3)
+                    fact_check_para_router = {"hallucination_score": hallucination_score}
+                except Exception as exc_fc:
+                    log.warning("avaliar_confianca_fact_check_falhou", erro=str(exc_fc))
 
             score = self._confidence_router.avaliar(
                 mensagem=state["mensagem_original"],
                 resposta_claude=state.get("resposta_ia"),
                 tipo_intencao=state.get("intencao", "outro"),
                 rag_docs=rag_docs,
-                fact_check_result={},
+                fact_check_result=fact_check_para_router,
                 historico_cliente=state.get("historico", []),
                 tentativas_geracao=state.get("tentativas_correcao", 0),
                 escritorio_id=state["escritorio_id"],
@@ -1355,6 +1402,7 @@ class ConversationOrchestrator:
             return {
                 "confidence_score": score.valor,
                 "_escalar_para_opus": deve_escalar,
+                "fact_check_result": fact_check_result,
             }
 
         except Exception as exc:
@@ -1528,15 +1576,19 @@ class ConversationOrchestrator:
                 adicionar_disclaimer=eh_sobre_processo,
             )
 
-            # Verificar factualidade quando há dados de processo
+            # Verificar factualidade quando há dados de processo.
+            # Reaproveitamos o resultado do nó avaliar_confianca quando disponível
+            # para evitar uma segunda chamada ao banco.
             precisa_regenerar = False
             if state.get("dados_processo") and state.get("processo_id"):
-                resultado_fc = await self._fact_checker.verificar_status_processo(
-                    processo_id=str(state["processo_id"]),
-                    afirmacao_ia=resposta_filtrada,
-                    interacao=stub,
-                )
-                if not resultado_fc["verificado"]:
+                resultado_fc = state.get("fact_check_result") or {}
+                if not resultado_fc:
+                    resultado_fc = await self._fact_checker.verificar_status_processo(
+                        processo_id=str(state["processo_id"]),
+                        afirmacao_ia=resposta_filtrada,
+                        interacao=stub,
+                    )
+                if not resultado_fc.get("verificado", True):
                     tentativas = state.get("tentativas_correcao") or 0
                     if tentativas < 2:
                         precisa_regenerar = True
@@ -1800,7 +1852,7 @@ def criar_orchestrador(
     api_key_anthropic: str,
     redis_client: Redis,
     session_factory: async_sessionmaker[AsyncSession],
-    api_key_jusbrasil: str | None = None,
+    api_key_datajud: str | None = None,
     api_key_evolution: str | None = None,
     evolution_base_url: str = "http://localhost:8080",
 ) -> ConversationOrchestrator:
@@ -1808,7 +1860,7 @@ def criar_orchestrador(
         claude_client=ClaudeClient(api_key=api_key_anthropic),
         memory=ConversationMemory(redis=redis_client),
         translator=JuridicalTranslator(),
-        jusbrasil_client=JusbrasilClient(api_key=api_key_jusbrasil),
+        datajud_client=DataJudClient(api_key=api_key_datajud),
         cache_manager=LegalDataCacheManager(redis_client=redis_client),
         evolution_client=EvolutionClient(
             base_url=evolution_base_url,
@@ -1861,7 +1913,7 @@ def executar_fluxo_orquestrador(
                 claude_client=ClaudeClient(api_key=settings.ANTHROPIC_API_KEY),
                 memory=ConversationMemory(redis=redis_client),
                 translator=_criar_translator(),
-                jusbrasil_client=JusbrasilClient(api_key=settings.JUSBRASIL_API_KEY),
+                datajud_client=DataJudClient(api_key=settings.DATAJUD_API_KEY),
                 cache_manager=LegalDataCacheManager(redis_client=redis_client),
                 evolution_client=EvolutionClient(
                     base_url=settings.EVOLUTION_API_URL,

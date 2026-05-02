@@ -136,6 +136,53 @@ class RAGRetriever:
 
         return _formatar_contexto(selecionados)
 
+    async def buscar_com_scores(
+        self,
+        query: str,
+        escritorio_id: int,
+        contexto_processo: dict[str, Any] | None = None,
+    ) -> tuple[str, list[dict[str, float]]]:
+        """
+        Igual a `buscar`, mas também retorna os scores de similaridade dos docs selecionados.
+
+        Returns:
+            (contexto_str, [{"score": float}, ...])  — score = 1.0 - distancia coseno
+        """
+        filtros: dict[str, Any] | None = None
+        if contexto_processo and contexto_processo.get("tipo_acao"):
+            filtros = {"tipo_acao": contexto_processo["tipo_acao"]}
+
+        candidatos = await self._store.buscar_por_texto(
+            query_texto=query,
+            escritorio_id=escritorio_id,
+            top_k=RAG_TOP_K_CANDIDATOS,
+            filtros=filtros,
+        )
+
+        if filtros and len(candidatos) < RAG_TOP_K_FINAL:
+            candidatos_sem_filtro = await self._store.buscar_por_texto(
+                query_texto=query,
+                escritorio_id=escritorio_id,
+                top_k=RAG_TOP_K_CANDIDATOS,
+            )
+            ids_vistos = {c.id for c in candidatos}
+            for c in candidatos_sem_filtro:
+                if c.id not in ids_vistos:
+                    candidatos.append(c)
+                    ids_vistos.add(c.id)
+
+        relevantes = [c for c in candidatos if c.distancia <= _MAX_DISTANCIA]
+
+        if not relevantes:
+            _rag_vazio.inc()
+            return "", []
+
+        selecionados = _mmr(relevantes, k=RAG_TOP_K_FINAL)
+        _rag_usado.inc()
+
+        rag_docs = [{"score": max(0.0, 1.0 - c.distancia)} for c in selecionados]
+        return _formatar_contexto(selecionados), rag_docs
+
 
 # ---------------------------------------------------------------------------
 # Re-ranking: Maximum Marginal Relevance (MMR)

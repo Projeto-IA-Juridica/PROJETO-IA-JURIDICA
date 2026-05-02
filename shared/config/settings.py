@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Integrações
     EVOLUTION_API_URL: str
     EVOLUTION_API_KEY: str
-    JUSBRASIL_API_KEY: str
+    JUSBRASIL_API_KEY: str | None = None  # não utilizado; mantido para compatibilidade de env
     DATAJUD_API_KEY: str | None = None
 
     # RAG — Voyage AI (opcional; se ausente usa OpenAI text-embedding-3-small)
