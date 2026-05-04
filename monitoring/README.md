@@ -1,11 +1,42 @@
-# Monitoramento — Grafana Agent + Grafana Cloud
+# 📊 Monitoramento — Prometheus + Grafana + Grafana Cloud
+
+Sistema de monitoramento para **Métricas RAG Retriever** com suporte para:
+- **Local**: Docker Compose (desenvolvimento/debug)
+- **Produção**: Grafana Cloud (sem gerenciar infraestrutura)
+
+---
+
+## 🚀 Opção 1: LOCAL (Desenvolvimento com Docker)
+
+### Quick Start
+
+```bash
+# Iniciar Prometheus + Grafana
+docker-compose -f docker-compose.monitoring.yml up -d
+
+# Acessar
+# - Prometheus: http://localhost:9090
+# - Grafana: http://localhost:3000 (admin/admin123)
+```
+
+### Arquitetura Local
+
+```
+[FastAPI :8000/metrics]  →  [Prometheus :9090]  →  [Grafana :3000]
+                                                        ↓
+                              [Dashboard: RAG Retriever]
+```
+
+O Prometheus scrapa `/metrics` do FastAPI a cada 10s.
+
+---
+
+## 🌥️ Opção 2: PRODUÇÃO (Grafana Cloud - Recomendado)
 
 Este guia explica como conectar a API ao Grafana Cloud para visualizar métricas em tempo real.  
 **Nenhum Docker local é necessário em produção.** O Grafana Agent é um binário leve que roda direto no servidor.
 
----
-
-## Arquitetura
+### Arquitetura Produção
 
 ```
 [FastAPI :8000/metrics]  →  [Grafana Agent]  →  [Grafana Cloud Prometheus]  →  [Grafana Dashboard]

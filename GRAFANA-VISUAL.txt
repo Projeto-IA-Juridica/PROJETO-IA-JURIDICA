@@ -1,0 +1,147 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                    📊 GRAFANA SETUP — GUIA VISUAL                           ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+ARQUITETURA
+═══════════
+
+  FastAPI (http://localhost:8000)
+         │
+         ├─ /metrics (Prometheus format)
+         │
+         ▼
+  Prometheus (http://localhost:9090)
+         │
+         ├─ Coleta métricas a cada 10s
+         ├─ Armazena em memória (30 dias)
+         │
+         ▼
+  Grafana (http://localhost:3000)
+         │
+         ├─ Dashboard RAG
+         ├─ Alertas
+         └─ Visualização em tempo real
+
+
+INSTRUÇÕES RÁPIDAS
+══════════════════
+
+1️⃣  Terminal 1 — FastAPI
+    $ source .venv/bin/activate
+    $ uvicorn feature_1_ia_personalizada.api.app:app --port 8000
+
+
+2️⃣  Terminal 2 — Prometheus + Grafana
+    $ cd monitoring
+    $ bash quick-start.sh
+    # Aguarde ~1 min para Docker fazer download
+
+
+3️⃣  Acessar Grafana
+    • URL: http://localhost:3000
+    • User: admin
+    • Pass: admin123
+
+
+4️⃣  Ver Dashboard
+    Dashboard → RAG Retriever — Métricas Prometheus
+
+
+5️⃣  Testar Métricas (Terminal 3)
+    $ source .venv/bin/activate
+    $ python scripts/test_and_report_rag_metrics.py
+
+
+PARAR TUDO
+══════════
+
+    Terminal 1: Ctrl+C
+    Terminal 2: $ docker-compose -f docker-compose.monitoring.yml down
+
+
+ARQUIVOS CRIADOS
+════════════════
+
+monitoring/
+├── docker-compose.monitoring.yml ............ Stack Docker (Prometheus + Grafana)
+├── prometheus.yml .......................... Config de scraping (FastAPI target)
+├── quick-start.sh .......................... Script de inicialização rápida
+├── setup-grafana.sh ........................ Setup com verificações
+├── start-all.sh ............................ Inicia tudo de uma vez
+├── check-status.py ......................... Verifica status do stack
+├── grafana/provisioning/
+│   ├── datasources/prometheus.yml ......... Configura Prometheus como source
+│   └── dashboards/
+│       ├── rag-dashboard.json ............ ⭐ DASHBOARD PRÉ-CONFIGURADO
+│       └── dashboards.yml ............... Provisioning config
+└── README.md .............................. Docs completa
+
+
+MÉTRICAS DO DASHBOARD
+═════════════════════
+
+📊 Contextos Ao Longo do Tempo
+   • Injetados (✓) — Respostas com contexto RAG
+   • Vazios (✗) — Buscas sem resultado
+
+🎯 Taxa de Sucesso RAG (Hit Rate %)
+   • Verde (≥70%) — OK
+   • Amarelo (50-70%) — Revisar
+   • Vermelho (<50%) — Problema
+
+⚡ Latência de Busca (P50, P95, P99)
+   • Identifica gargalos
+   • Monitora degradação
+
+💾 Cache Redis Hits
+   • Taxa de acertos/segundo
+   • Indica eficiência
+
+📈 Estatísticas
+   • Total de Buscas
+   • Contextos Injetados
+   • Contextos Vazios
+
+
+DICAS
+═════
+
+✅ Métrica não aparece?
+   • Aguarde 1-2 min (Prometheus leva tempo para coletar)
+   • Execute testes: python scripts/test_and_report_rag_metrics.py
+   • Refresque Grafana: F5
+
+✅ Quer alertas?
+   • Configure em Prometheus: monitoring/prometheus/rules.yml
+   • Configure em Grafana: Alerting → Notification channels
+
+✅ Quer em produção?
+   • Use Grafana Cloud (sem gerenciar Docker)
+   • Veja: cat monitoring/README.md
+
+
+STATUS
+══════
+
+✅ Docker Compose com Prometheus + Grafana
+✅ Dashboard pré-configurado para RAG
+✅ Métricas em tempo real
+✅ Scripts de inicialização
+✅ Testes de conectividade
+
+
+PRÓXIMOS PASSOS
+═══════════════
+
+1. Inicie FastAPI (Terminal 1)
+2. Inicie Grafana (Terminal 2)
+3. Abra http://localhost:3000
+4. Explore o dashboard RAG
+5. Configure alertas conforme necessário
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Mais informações: cat GRAFANA-SETUP.md
