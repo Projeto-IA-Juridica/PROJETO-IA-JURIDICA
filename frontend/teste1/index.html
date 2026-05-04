@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Concierge Jurídico Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Outfit',sans-serif;font-weight:300}
+:root{
+  --bg:#F4F8FC;--nevoa:#EAF2FA;--pasta:#A8C8E8;--primary:#3A7AB8;--primaryD:#2E6399;
+  --tinta:#0C1E30;--white:#fff;--success:#27A060;--warning:#D4900A;--danger:#D63B3B;
+  --border:#D4E5F4;--txtMid:#4A6380;--txtFaint:#8AAAC8;
+  --hub-bg:#14161C;--hub-surface:#1C1F28;--hub-border:#252836;
+}
+
+/* ── utils ── */
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex}
+.serif{font-family:'DM Serif Display',Georgia,serif;font-weight:400}
+.mono{font-family:'JetBrains Mono',monospace;font-weight:300}
+
+/* ── Light inputs ── */
+.l-inp{width:100%;padding:11px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;color:var(--tinta);font-size:14px;font-family:'Outfit',sans-serif;font-weight:300;outline:none;transition:all .15s}
+.l-inp:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(58,122,184,.14)}
+select.l-inp{cursor:pointer}
+textarea.l-inp{resize:vertical;line-height:1.6}
+
+/* ── Buttons ── */
+.btn-primary{padding:12px 24px;background:var(--primary);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;font-weight:500;transition:background .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary:hover{background:var(--primaryD)}
+.btn-primary.full{width:100%}
+.btn-ghost{padding:11px 20px;background:transparent;color:var(--tinta);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;font-weight:400;transition:all .15s}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-ghost.full{width:100%}
+
+/* ── Cards ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 24px rgba(12,30,48,.07);padding:32px 28px}
+
+/* ── Blob bg ── */
+.blob-bg{position:fixed;pointer-events:none;border-radius:50%}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+
+/* ────────────────────────────────────────────────
+   LOGIN
+──────────────────────────────────────────────── */
+#screen-login{background:var(--bg);align-items:center;justify-content:center;padding:24px}
+.login-wrap{width:100%;max-width:400px;position:relative;z-index:1}
+.login-logo{text-align:center;margin-bottom:36px}
+.login-logo-icon{display:inline-flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:16px;background:var(--nevoa);border:1px solid var(--pasta);margin-bottom:20px}
+.login-logo h1{font-size:32px;color:var(--tinta);margin-bottom:6px}
+.login-logo p{font-size:14px;color:var(--txtMid);font-weight:300}
+.login-field{margin-bottom:18px}
+.login-field label{display:block;font-size:11px;font-weight:500;color:var(--txtMid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px}
+.field-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.forgot-btn{background:none;border:none;color:var(--primary);font-size:12px;cursor:pointer;font-family:'Outfit',sans-serif}
+.inp-icon{position:relative}
+.inp-icon svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none}
+.inp-icon .l-inp{padding-left:38px}
+.inp-icon.has-right .l-inp{padding-right:40px}
+.inp-icon .eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--txtFaint)}
+.divider{position:relative;margin:20px 0;text-align:center}
+.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border)}
+.divider span{position:relative;background:var(--white);padding:0 12px;font-size:12px;color:var(--txtFaint)}
+.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;background:transparent;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;font-weight:300;color:var(--txtMid);transition:border-color .15s}
+.google-btn:hover{border-color:var(--primary)}
+.login-footer-text{text-align:center;margin-top:20px;font-size:13px;color:var(--txtMid)}
+.login-footer-text a{color:var(--primary);cursor:pointer;font-weight:500;text-decoration:none}
+.trust-row{display:flex;gap:20px;justify-content:center;margin-top:22px}
+.trust-dot{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txtMid)}
+.trust-dot::before{content:'';display:block;width:5px;height:5px;border-radius:50%}
+.trust-dot.green::before{background:var(--success)}
+.trust-dot.blue::before{background:var(--primary)}
+
+/* ────────────────────────────────────────────────
+   FIRST SETUP
+──────────────────────────────────────────────── */
+#screen-setup{background:var(--bg);align-items:center;justify-content:center;padding:24px}
+.setup-wrap{width:100%;max-width:640px;position:relative;z-index:1}
+.setup-header{margin-bottom:28px}
+.setup-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.setup-brand{display:flex;align-items:center;gap:9px}
+.setup-brand-icon{width:32px;height:32px;border-radius:8px;background:var(--nevoa);border:1px solid var(--pasta);display:flex;align-items:center;justify-content:center}
+.setup-brand span{font-size:13px;font-weight:500;color:var(--tinta)}
+.setup-progress-bar{width:100%;height:4px;background:var(--border);border-radius:4px;overflow:hidden}
+.setup-progress-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .4s}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.setup-grid .full{grid-column:1/-1}
+.spec-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.spec-pill{padding:7px 16px;border-radius:20px;font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:300;background:var(--white);border:1.5px solid var(--border);color:var(--tinta);transition:all .14s}
+.spec-pill.active{background:rgba(58,122,184,.14);border-color:var(--primary);color:var(--primary)}
+.setup-info-box{display:flex;gap:10px;padding:12px 16px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:8px;margin-bottom:24px;font-size:12px;color:var(--txtMid);line-height:1.6}
+.setup-step{display:none}
+.setup-step.active{display:block}
+.confirm-icon{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;border-radius:50%;background:rgba(39,160,96,.1);border:2px solid rgba(39,160,96,.25);margin-bottom:20px}
+.confirm-list{display:flex;flex-direction:column;gap:8px;margin-bottom:28px}
+.confirm-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;border:1px solid var(--border);border-radius:8px;gap:16px}
+.confirm-row .key{font-size:13px;color:var(--txtMid);flex-shrink:0}
+.confirm-row .val{font-size:13px;color:var(--tinta);text-align:right}
+.next-steps{padding:14px 16px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:10px;margin-bottom:24px}
+.next-step-item{display:flex;gap:10px;margin-bottom:8px}
+.next-step-item:last-child{margin-bottom:0}
+.next-step-num{width:20px;height:20px;border-radius:50%;background:rgba(58,122,184,.14);border:1.5px solid var(--pasta);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;font-size:10px;font-weight:600;color:var(--primary)}
+
+/* ────────────────────────────────────────────────
+   CADASTRO WIZARD
+──────────────────────────────────────────────── */
+#screen-cadastro{background:var(--bg);padding:28px 24px;justify-content:center}
+.cad-wrap{max-width:1020px;width:100%;display:flex;gap:28px}
+.cad-sidebar{width:200px;flex-shrink:0}
+.cad-stepper{background:var(--white);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 12px rgba(12,30,48,.05);padding:20px 16px;margin-bottom:14px}
+.cad-step-lbl{font-size:10px;color:var(--txtFaint);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:18px}
+.cad-step-item{display:flex;align-items:center;gap:11px;padding:10px 4px;border:none;background:none;cursor:default;width:100%;text-align:left;border-bottom:1px solid var(--border)}
+.cad-step-item:last-child{border-bottom:none}
+.cad-step-item.done{cursor:pointer}
+.cad-step-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--bg);border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--txtFaint)}
+.cad-step-item.active .cad-step-num{background:rgba(58,122,184,.14);border-color:var(--primary);color:var(--primary)}
+.cad-step-item.done .cad-step-num{background:rgba(39,160,96,.1);border-color:var(--success)}
+.cad-step-name{font-size:13px;font-weight:300;color:var(--txtFaint)}
+.cad-step-item.active .cad-step-name{font-weight:500;color:var(--primary)}
+.cad-step-item.done .cad-step-name{color:var(--txtMid)}
+.cad-help{padding:13px 15px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:10px}
+.cad-help p:first-child{font-size:12px;color:var(--primary);font-weight:500;margin-bottom:4px}
+.cad-help p:last-child{font-size:12px;color:var(--txtMid);line-height:1.55}
+.cad-content{flex:1;background:var(--white);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 24px rgba(12,30,48,.06);padding:32px 36px}
+.cad-page{display:none}
+.cad-page.active{display:block}
+.cad-h1{font-size:26px;color:var(--tinta);margin-bottom:4px}
+.cad-sub{font-size:14px;color:var(--txtMid);font-weight:300;margin-bottom:28px}
+.cad-label{display:block;font-size:11px;font-weight:500;color:var(--txtMid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:7px}
+.cad-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.cad-nav{display:flex;justify-content:space-between;margin-top:28px;padding-top:22px;border-top:1px solid var(--border)}
+.info-box{padding:12px 16px;background:rgba(58,122,184,.08);border:1px solid var(--pasta);border-radius:8px;font-size:13px;color:var(--primary);line-height:1.6;margin-bottom:0}
+.check-list{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.check-item{display:flex;gap:14px;padding:13px 16px;border:1px solid var(--border);border-radius:10px}
+.check-icon{width:22px;height:22px;border-radius:6px;background:rgba(39,160,96,.1);border:1px solid rgba(39,160,96,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.upload-zone{display:flex;align-items:center;gap:16px;padding:18px 20px;background:var(--bg);border:1.5px dashed var(--primary);border-radius:8px}
+.qr-box{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.qr-inner{background:var(--white);padding:16px;border-radius:10px;border:1px solid var(--border)}
+
+/* ────────────────────────────────────────────────
+   HUB
+──────────────────────────────────────────────── */
+#screen-hub{background:var(--hub-bg);flex-direction:row;min-height:100vh}
+.hub-sidebar{width:220px;border-right:1px solid var(--hub-border);display:flex;flex-direction:column;background:var(--hub-surface);flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.hub-brand{padding:20px 18px 16px;border-bottom:1px solid var(--hub-border)}
+.hub-brand-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.hub-brand-icon{width:32px;height:32px;border-radius:8px;background:rgba(58,122,184,.14);border:1px solid var(--pasta);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hub-brand-name{font-size:12px;font-weight:500;color:#fff}
+.hub-brand-sub{font-size:10px;color:rgba(255,255,255,.35)}
+.hub-status{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;background:rgba(39,160,96,.12);border:1px solid rgba(39,160,96,.22)}
+.hub-status-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.hub-status span{font-size:11px;color:var(--success)}
+.hub-nav{flex:1;padding:12px 10px}
+.hub-nav-btn{width:100%;display:flex;flex-direction:column;gap:2px;padding:10px 12px;background:transparent;border:1px solid transparent;border-radius:8px;cursor:pointer;text-align:left;margin-bottom:3px;transition:all .12s}
+.hub-nav-btn:hover{background:rgba(255,255,255,.05)}
+.hub-nav-btn.active{background:rgba(58,122,184,.14);border-color:rgba(58,122,184,.28)}
+.hub-nav-label{font-size:13px;font-weight:300;color:rgba(255,255,255,.6)}
+.hub-nav-btn.active .hub-nav-label{font-weight:500;color:var(--pasta)}
+.hub-nav-sub{font-size:10px;color:rgba(255,255,255,.3)}
+.hub-user{padding:12px 10px;border-top:1px solid var(--hub-border)}
+.hub-user-row{display:flex;align-items:center;gap:8px;padding:8px 12px;margin-bottom:6px}
+.hub-avatar{width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:500;color:#fff}
+.hub-user-name{font-size:12px;color:#fff;font-weight:400}
+.hub-user-plan{font-size:10px;color:rgba(255,255,255,.35)}
+.hub-logout{width:100%;padding:8px 12px;background:transparent;border:1px solid var(--hub-border);border-radius:7px;color:rgba(255,255,255,.35);font-size:12px;font-family:'Outfit',sans-serif;cursor:pointer;text-align:left}
+.hub-main{flex:1;padding:28px 36px;overflow-y:auto;max-height:100vh}
+.hub-page{display:none}
+.hub-page.active{display:block}
+
+/* Hub card (white on dark) */
+.h-card{background:var(--white);border-radius:12px;padding:20px 24px;border:1px solid var(--border)}
+
+/* Hub tabs */
+.h-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:24px;background:var(--white);border-radius:12px 12px 0 0;padding:0 4px}
+.h-tab{padding:12px 18px;background:none;border:none;cursor:pointer;font-size:13px;font-family:'Outfit',sans-serif;color:var(--txtMid);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .14s}
+.h-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.h-tab-page{display:none}
+.h-tab-page.active{display:block}
+
+/* Stat cards */
+.stat-cards{display:flex;gap:12px;margin-bottom:24px}
+.stat-card{background:var(--white);border-radius:12px;padding:18px 20px;flex:1}
+.stat-label{font-size:10px;font-weight:500;color:var(--txtMid);text-transform:uppercase;letter-spacing:.09em;margin-bottom:8px}
+.stat-val{font-size:36px;color:var(--tinta);line-height:1;margin-bottom:6px}
+.stat-delta{font-size:12px;color:var(--success)}
+
+/* Process table */
+.proc-table{background:var(--white);border-radius:12px;overflow:hidden}
+.proc-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border)}
+.proc-header span:first-child{font-size:12px;font-weight:500;color:var(--primary);letter-spacing:.04em}
+.proc-header span:last-child{font-size:12px;color:var(--txtFaint);font-family:'JetBrains Mono',monospace}
+.proc-row{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--border)}
+.proc-row:last-child{border-bottom:none}
+.proc-bar{width:3px;height:44px;border-radius:2px;flex-shrink:0}
+.proc-info{flex:1;min-width:0}
+.proc-name{font-size:14px;color:var(--tinta);margin-bottom:3px}
+.proc-cnj{font-size:11px;color:var(--txtFaint);font-family:'JetBrains Mono',monospace}
+.proc-fase{padding:3px 10px;border-radius:6px;font-size:12px}
+.proc-risk{text-align:right}
+.proc-risk-num{font-size:24px;color:var(--tinta);line-height:1}
+.proc-risk-lbl{font-size:10px;color:var(--txtFaint)}
+
+/* Chat */
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding-bottom:16px;max-height:400px}
+.chat-msg{display:flex;gap:12px;align-items:flex-start}
+.chat-msg.user{flex-direction:row-reverse}
+.chat-avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+.chat-avatar.ai{background:var(--primary);border:1.5px solid var(--primary)}
+.chat-avatar.user{background:var(--nevoa);border:1.5px solid var(--pasta)}
+.chat-bubble{max-width:76%;padding:12px 16px;background:var(--white);border:1px solid var(--border);border-radius:4px 14px 14px 14px;box-shadow:0 1px 6px rgba(12,30,48,.04)}
+.chat-msg.user .chat-bubble{border-radius:14px 4px 14px 14px}
+.chat-bubble p{font-size:14px;color:var(--tinta);line-height:1.7;white-space:pre-wrap}
+.chat-input-area{background:var(--white);border-radius:12px;padding:16px 20px;border:1px solid var(--border)}
+
+/* CRM badges */
+.crm-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 22px;display:grid;grid-template-columns:1.2fr 1fr auto;gap:20px;align-items:center;margin-bottom:12px}
+
+/* Captação */
+.cap-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+
+/* Docs */
+.doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+.doc-stat{background:var(--white);border-radius:12px;padding:18px 20px;border:1px solid var(--border)}
+
+/* Risco */
+.risco-header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:2px solid var(--danger)}
+.risco-bar-wrap{padding:0 20px 16px;background:rgba(214,59,59,.08)}
+.risco-bar-bg{width:100%;height:6px;background:rgba(214,59,59,.2);border-radius:6px;overflow:hidden}
+.risco-bar-fill{height:100%;background:var(--danger);border-radius:6px}
+
+/* Data table */
+.data-table{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.data-row{display:grid;grid-template-columns:120px 1fr;border-bottom:1px solid var(--border)}
+.data-row:last-child{border-bottom:none}
+.data-k{padding:9px 14px;background:var(--bg);font-size:13px;font-weight:500;color:var(--tinta)}
+.data-v{padding:9px 14px;font-size:13px;color:var(--tinta)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     LOGIN
+═══════════════════════════════════════════ -->
+<div id="screen-login" class="screen active">
+  <div class="blob-bg" style="top:-180px;right:-120px;width:500px;height:500px;background:var(--nevoa);opacity:.7"></div>
+  <div class="blob-bg" style="bottom:-200px;left:-140px;width:580px;height:580px;background:var(--nevoa);opacity:.5"></div>
+
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="login-logo-icon">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="6" width="20" height="15" rx="2.5" fill="#A8C8E8" stroke="#3A7AB8" stroke-width="1.3"/>
+          <path d="M2 10.5h20" stroke="#3A7AB8" stroke-width="1.1"/>
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="#3A7AB8" stroke-width="1.2" fill="none"/>
+          <circle cx="12" cy="15.5" r="2" fill="#3A7AB8" opacity=".5"/>
+        </svg>
+      </div>
+      <h1 class="serif">Bem-vindo de volta</h1>
+      <p>Acesse seu escritório digital</p>
+    </div>
+
+    <div class="card">
+      <div class="login-field">
+        <label>E-mail</label>
+        <div class="inp-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8AAAC8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="top:50%;transform:translateY(-50%);left:12px;position:absolute">
+            <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+          <input type="email" class="l-inp" placeholder="advogado@escritorio.com.br" id="loginEmail"/>
+        </div>
+      </div>
+
+      <div class="login-field">
+        <div class="field-row">
+          <label style="margin:0">Senha</label>
+          <button class="forgot-btn">Esqueceu?</button>
+        </div>
+        <div class="inp-icon has-right">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8AAAC8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="top:50%;transform:translateY(-50%);left:12px;position:absolute">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <input type="password" class="l-inp" placeholder="••••••••" id="loginPass"/>
+          <button class="eye-btn" onclick="togglePass('loginPass',this)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8AAAC8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-primary full" onclick="goTo('screen-setup')">Entrar</button>
+
+      <div class="divider"><span>ou</span></div>
+
+      <button class="google-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continuar com Google
+      </button>
+
+      <p class="login-footer-text">Novo escritório? <a onclick="goTo('screen-cadastro')">Criar conta grátis</a></p>
+    </div>
+
+    <div class="trust-row">
+      <span class="trust-dot green">OAB 205/2021</span>
+      <span class="trust-dot blue">LGPD</span>
+      <span class="trust-dot blue">AES-256</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     FIRST SETUP
+═══════════════════════════════════════════ -->
+<div id="screen-setup" class="screen">
+  <div class="blob-bg" style="top:-200px;right:-150px;width:560px;height:560px;background:var(--nevoa);opacity:.7"></div>
+  <div class="blob-bg" style="bottom:-220px;left:-160px;width:620px;height:620px;background:var(--nevoa);opacity:.5"></div>
+
+  <div class="setup-wrap">
+    <div class="setup-header">
+      <div class="setup-topbar">
+        <div class="setup-brand">
+          <div class="setup-brand-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="6" width="20" height="15" rx="2" fill="#A8C8E8" stroke="#3A7AB8" stroke-width="1.3"/>
+              <path d="M2 10.5h20" stroke="#3A7AB8" stroke-width="1"/>
+              <circle cx="12" cy="15" r="1.8" fill="#3A7AB8" opacity=".5"/>
+            </svg>
+          </div>
+          <span>Concierge Jurídico Digital</span>
+        </div>
+        <span style="font-size:12px;color:var(--txtFaint)" id="setup-step-label">Etapa 1 de 2</span>
+      </div>
+      <div class="setup-progress-bar">
+        <div class="setup-progress-fill" id="setup-prog" style="width:50%"></div>
+      </div>
+    </div>
+
+    <!-- step 1 -->
+    <div class="setup-step active" id="setup-s1">
+      <div class="card" style="padding:36px 40px">
+        <p style="font-size:12px;color:var(--primary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Bem-vindo ao Concierge</p>
+        <h1 class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:8px">Configure seu escritório</h1>
+        <p style="font-size:14px;color:var(--txtMid);margin-bottom:28px;line-height:1.6">Em poucos minutos sua IA estará pronta para atender clientes no WhatsApp 24h.</p>
+
+        <div class="setup-grid">
+          <div class="full">
+            <label class="cad-label">Nome do Escritório *</label>
+            <input class="l-inp" placeholder="Silva & Associados Advogados"/>
+          </div>
+          <div>
+            <label class="cad-label">CNPJ *</label>
+            <input class="l-inp mono" placeholder="11.222.333/0001-81"/>
+          </div>
+          <div>
+            <label class="cad-label">OAB do Responsável *</label>
+            <input class="l-inp mono" placeholder="SP 123.456"/>
+          </div>
+          <div>
+            <label class="cad-label">Nome do Responsável *</label>
+            <input class="l-inp" placeholder="Dr. João Silva"/>
+          </div>
+          <div>
+            <label class="cad-label">Nº de Advogados</label>
+            <select class="l-inp">
+              <option>1</option><option>2–5</option><option>6–15</option><option>15–50</option><option>50+</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="cad-label" style="margin-bottom:8px">Áreas de Atuação</label>
+        <div class="spec-pills" style="margin-bottom:24px" id="setup-specs">
+          <button class="spec-pill" onclick="togglePill(this)">Cível</button>
+          <button class="spec-pill" onclick="togglePill(this)">Trabalhista</button>
+          <button class="spec-pill" onclick="togglePill(this)">Família</button>
+          <button class="spec-pill" onclick="togglePill(this)">Previdenciário</button>
+          <button class="spec-pill" onclick="togglePill(this)">Criminal</button>
+          <button class="spec-pill" onclick="togglePill(this)">Tributário</button>
+          <button class="spec-pill" onclick="togglePill(this)">Empresarial</button>
+          <button class="spec-pill" onclick="togglePill(this)">Digital</button>
+          <button class="spec-pill" onclick="togglePill(this)">Consumidor</button>
+          <button class="spec-pill" onclick="togglePill(this)">Imobiliário</button>
+        </div>
+
+        <div class="setup-info-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Dados do escritório protegidos por <strong style="color:var(--tinta);font-weight:400">AES-256</strong>. Nunca compartilhamos com terceiros. Conforme <strong style="color:var(--tinta);font-weight:400">LGPD Lei 13.709/2018</strong>.</span>
+        </div>
+
+        <div style="margin-top:24px">
+          <button class="btn-primary full" onclick="setupNext()">Continuar →</button>
+          <p style="text-align:center;margin-top:12px;font-size:12px;color:var(--txtFaint)">(*) Campos obrigatórios · Você pode editar tudo depois nas configurações</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- step 2 -->
+    <div class="setup-step" id="setup-s2">
+      <div class="card" style="padding:36px 40px;text-align:center">
+        <div class="confirm-icon" style="margin:0 auto 20px">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg>
+        </div>
+        <h2 class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:8px">Escritório cadastrado!</h2>
+        <p style="font-size:14px;color:var(--txtMid);margin-bottom:28px">Seu espaço está pronto. Complete a configuração quando quiser.</p>
+
+        <div style="text-align:left">
+          <p style="font-size:11px;font-weight:500;color:var(--txtMid);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Resumo do cadastro</p>
+          <div class="confirm-list">
+            <div class="confirm-row"><span class="key">Escritório</span><span class="val">Silva &amp; Associados</span></div>
+            <div class="confirm-row"><span class="key">CNPJ</span><span class="val mono">11.222.333/0001-81</span></div>
+            <div class="confirm-row"><span class="key">OAB</span><span class="val mono">SP 123.456</span></div>
+            <div class="confirm-row"><span class="key">Responsável</span><span class="val">Dr. João Silva</span></div>
+            <div class="confirm-row"><span class="key">Status da IA</span><span class="val" style="color:var(--warning)">WhatsApp pendente</span></div>
+          </div>
+
+          <div class="next-steps">
+            <p style="font-size:12px;font-weight:500;color:var(--primary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Próximos passos</p>
+            <div class="next-step-item"><span class="next-step-num">1</span><div><p style="font-size:13px;color:var(--tinta);margin-bottom:1px">Conectar WhatsApp Business</p><p style="font-size:12px;color:var(--txtMid)">Receba e responda clientes automaticamente</p></div></div>
+            <div class="next-step-item"><span class="next-step-num">2</span><div><p style="font-size:13px;color:var(--tinta);margin-bottom:1px">Carregar documentos do escritório</p><p style="font-size:12px;color:var(--txtMid)">Treine a IA com suas teses e jurisprudências</p></div></div>
+            <div class="next-step-item"><span class="next-step-num">3</span><div><p style="font-size:13px;color:var(--tinta);margin-bottom:1px">Importar clientes e processos</p><p style="font-size:12px;color:var(--txtMid)">Comece o monitoramento processual</p></div></div>
+          </div>
+        </div>
+
+        <button class="btn-primary full" onclick="goTo('screen-hub')">Acessar o escritório →</button>
+        <button onclick="setupBack()" style="width:100%;background:none;border:none;color:var(--txtFaint);font-size:12px;cursor:pointer;margin-top:12px;font-family:'Outfit',sans-serif">← Corrigir dados</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CADASTRO WIZARD
+═══════════════════════════════════════════ -->
+<div id="screen-cadastro" class="screen">
+  <div class="cad-wrap">
+    <!-- sidebar -->
+    <div class="cad-sidebar">
+      <div class="cad-stepper">
+        <p class="cad-step-lbl" id="cad-step-lbl">Etapa 1 de 6</p>
+        <button class="cad-step-item active" id="cad-si-1" onclick="cadGoTo(1)">
+          <span class="cad-step-num">1</span><span class="cad-step-name">Escritório</span>
+        </button>
+        <button class="cad-step-item" id="cad-si-2" onclick="cadGoTo(2)">
+          <span class="cad-step-num">2</span><span class="cad-step-name">WhatsApp</span>
+        </button>
+        <button class="cad-step-item" id="cad-si-3" onclick="cadGoTo(3)">
+          <span class="cad-step-num">3</span><span class="cad-step-name">Clientes</span>
+        </button>
+        <button class="cad-step-item" id="cad-si-4" onclick="cadGoTo(4)">
+          <span class="cad-step-num">4</span><span class="cad-step-name">Persona IA</span>
+        </button>
+        <button class="cad-step-item" id="cad-si-5" onclick="cadGoTo(5)">
+          <span class="cad-step-num">5</span><span class="cad-step-name">OAB</span>
+        </button>
+        <button class="cad-step-item" id="cad-si-6" onclick="cadGoTo(6)">
+          <span class="cad-step-num">6</span><span class="cad-step-name">Ativação</span>
+        </button>
+      </div>
+      <div class="cad-help">
+        <p>Precisa de ajuda?</p>
+        <p>Chat ou WhatsApp disponível durante toda a configuração.</p>
+      </div>
+    </div>
+
+    <!-- content -->
+    <div class="cad-content">
+      <!-- etapa 1 -->
+      <div class="cad-page active" id="cad-p1">
+        <h2 class="serif cad-h1">Dados do escritório</h2>
+        <p class="cad-sub">Informações básicas para começar</p>
+        <div class="cad-grid">
+          <div style="grid-column:1/-1"><label class="cad-label">Nome do Escritório</label><input class="l-inp" placeholder="Silva &amp; Associados Advogados"/></div>
+          <div><label class="cad-label">Número OAB</label><input class="l-inp" placeholder="OAB/SP 123.456"/></div>
+          <div></div>
+        </div>
+        <label class="cad-label">Áreas de Atuação</label>
+        <div class="spec-pills" style="margin-bottom:20px">
+          <button class="spec-pill" onclick="togglePill(this)">Cível</button>
+          <button class="spec-pill" onclick="togglePill(this)">Trabalhista</button>
+          <button class="spec-pill active" onclick="togglePill(this)">Família</button>
+          <button class="spec-pill" onclick="togglePill(this)">Previdenciário</button>
+          <button class="spec-pill" onclick="togglePill(this)">Criminal</button>
+          <button class="spec-pill" onclick="togglePill(this)">Tributário</button>
+          <button class="spec-pill" onclick="togglePill(this)">Empresarial</button>
+          <button class="spec-pill" onclick="togglePill(this)">Digital</button>
+        </div>
+        <div class="cad-grid">
+          <div><label class="cad-label">Estado</label><select class="l-inp"><option>SP</option><option>RJ</option><option>MG</option><option>RS</option></select></div>
+          <div><label class="cad-label">Advogados</label><select class="l-inp"><option>1</option><option>2–5</option><option>6–15</option><option>15+</option></select></div>
+        </div>
+        <div class="cad-nav">
+          <div></div>
+          <button class="btn-primary" onclick="cadNext()">Próximo →</button>
+        </div>
+      </div>
+
+      <!-- etapa 2 -->
+      <div class="cad-page" id="cad-p2">
+        <h2 class="serif cad-h1">Conectar WhatsApp Business</h2>
+        <p class="cad-sub">Integração com Evolution API — QR Code para autenticação.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:28px">
+          <div class="qr-box">
+            <div class="qr-inner">
+              <svg width="130" height="130" viewBox="0 0 130 130">
+                <rect x="4" y="4" width="28" height="28" rx="3" fill="#0C1E30" opacity=".85"/>
+                <rect x="4" y="54" width="14" height="14" rx="2" fill="#0C1E30" opacity=".85"/>
+                <rect x="4" y="82" width="28" height="28" rx="3" fill="#0C1E30" opacity=".85"/>
+                <rect x="54" y="4" width="14" height="14" rx="2" fill="#0C1E30" opacity=".85"/>
+                <rect x="54" y="36" width="14" height="14" rx="2" fill="#0C1E30" opacity=".85"/>
+                <rect x="54" y="64" width="14" height="14" rx="2" fill="#0C1E30" opacity=".85"/>
+                <rect x="54" y="96" width="28" height="28" rx="3" fill="#0C1E30" opacity=".85"/>
+                <rect x="82" y="4" width="28" height="28" rx="3" fill="#0C1E30" opacity=".85"/>
+                <rect x="82" y="54" width="14" height="14" rx="2" fill="#0C1E30" opacity=".85"/>
+                <rect x="82" y="82" width="28" height="28" rx="3" fill="#0C1E30" opacity=".85"/>
+                <rect x="44" y="44" width="42" height="42" rx="5" fill="#A8C8E8" opacity=".35"/>
+                <rect x="52" y="52" width="26" height="26" rx="4" fill="#3A7AB8" opacity=".45"/>
+                <rect x="59" y="59" width="12" height="12" rx="2" fill="#3A7AB8"/>
+              </svg>
+            </div>
+            <p style="font-size:12px;color:var(--txtFaint);text-align:center">QR Code simulado · demo mode</p>
+          </div>
+          <div>
+            <p style="font-size:14px;font-weight:500;color:var(--tinta);margin-bottom:12px">Em produção:</p>
+            <ol style="padding-left:18px;color:var(--txtMid);font-size:14px;line-height:2.2">
+              <li>Abra o WhatsApp Business no celular</li>
+              <li>Configurações → Dispositivos Vinculados</li>
+              <li>Escaneie o QR code ao lado</li>
+              <li>Aguarde ≈ 10 segundos</li>
+            </ol>
+            <div style="padding:10px 14px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:8px;font-size:12px;color:var(--txtMid);margin-top:16px">
+              <strong style="color:var(--tinta);font-weight:400">Tecnologia:</strong> Evolution API v2 + webhook
+            </div>
+            <button class="btn-ghost" style="margin-top:16px">Simular Conexão (Demo)</button>
+          </div>
+        </div>
+        <label class="cad-label">Janela comercial de envio</label>
+        <div class="cad-grid">
+          <div><label class="cad-label" style="font-size:10px">Início</label><input type="time" class="l-inp" value="08:00"/></div>
+          <div><label class="cad-label" style="font-size:10px">Fim</label><input type="time" class="l-inp" value="18:00"/></div>
+        </div>
+        <div class="cad-nav">
+          <button class="btn-ghost" onclick="cadPrev()">← Anterior</button>
+          <button class="btn-primary" onclick="cadNext()">Próximo →</button>
+        </div>
+      </div>
+
+      <!-- etapa 3 -->
+      <div class="cad-page" id="cad-p3">
+        <h2 class="serif cad-h1">Importar Clientes e Processos</h2>
+        <p class="cad-sub">Faça upload do CSV. O sistema valida o CNJ e consulta o DataJud em tempo real.</p>
+        <button class="btn-ghost" style="margin-bottom:20px;display:inline-flex;align-items:center;gap:6px">⬇ Baixar CSV de exemplo</button>
+        <label class="cad-label" style="margin-bottom:10px">Upload do CSV</label>
+        <div class="upload-zone">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+          <div style="flex:1"><p style="font-size:14px;color:var(--tinta);font-weight:400;margin-bottom:2px">Drag and drop file here</p><p style="font-size:12px;color:var(--txtMid)">Limit 200MB per file • CSV</p></div>
+          <button class="btn-ghost" style="padding:8px 14px;font-size:13px">Browse files</button>
+        </div>
+        <div class="cad-nav">
+          <button class="btn-ghost" onclick="cadPrev()">← Anterior</button>
+          <div style="display:flex;gap:10px">
+            <button class="btn-ghost" onclick="cadNext()">Pular →</button>
+            <button class="btn-primary" onclick="cadNext()">Salvar e Avançar →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- etapa 4 -->
+      <div class="cad-page" id="cad-p4">
+        <h2 class="serif cad-h1">Persona da IA</h2>
+        <p class="cad-sub">Como a assistente virtual vai se apresentar para seus clientes</p>
+        <div style="border:1px solid var(--border);border-radius:10px;padding:22px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div>
+              <p style="font-size:15px;font-weight:500;color:var(--tinta);margin-bottom:16px">Identidade da IA</p>
+              <div style="margin-bottom:16px"><label class="cad-label">Como a IA vai se chamar?</label><input class="l-inp" value="Assistente Jurídico" id="aiName" oninput="updateAiPreview()"/></div>
+              <div><label class="cad-label">Tom de voz</label>
+                <select class="l-inp" id="aiTom" onchange="updateAiPreview()">
+                  <option>Formal (protocolar, distante)</option><option>Formal e acessível</option><option>Próximo e cordial</option><option>Neutro e objetivo</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <p style="font-size:15px;font-weight:500;color:var(--tinta);margin-bottom:16px">Horário de Atendimento</p>
+              <div style="margin-bottom:14px"><label class="cad-label">A partir de</label><input type="time" class="l-inp" value="08:00" id="h1" oninput="updateAiPreview()"/></div>
+              <div style="margin-bottom:10px"><label class="cad-label">Até</label><input type="time" class="l-inp" value="18:00" id="h2" oninput="updateAiPreview()"/></div>
+              <p style="font-size:12px;color:var(--txtMid)">Fora deste horário a IA informa que o escritório está fechado.</p>
+            </div>
+          </div>
+        </div>
+        <div class="info-box" id="aiPreview">A IA vai se apresentar como <strong>"Assistente Jurídico"</strong>, atender de forma formal (protocolar, distante) e responder mensagens entre <strong>08:00</strong> e <strong>18:00</strong>.</div>
+        <div class="cad-nav">
+          <button class="btn-ghost" onclick="cadPrev()">← Anterior</button>
+          <button class="btn-primary" onclick="cadNext()">Próximo →</button>
+        </div>
+      </div>
+
+      <!-- etapa 5 -->
+      <div class="cad-page" id="cad-p5">
+        <h2 class="serif cad-h1">Conformidade OAB</h2>
+        <p class="cad-sub">Provimento 205/2021 do Conselho Federal da OAB</p>
+        <div class="check-list">
+          <div class="check-item"><div class="check-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg></div><div><p style="font-size:14px;font-weight:500;color:var(--tinta);margin-bottom:3px">A IA nunca emite pareceres jurídicos</p><p style="font-size:13px;color:var(--txtMid)">Respostas são informativas; estratégia é escalada ao advogado.</p></div></div>
+          <div class="check-item"><div class="check-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg></div><div><p style="font-size:14px;font-weight:500;color:var(--tinta);margin-bottom:3px">Score de risco é exclusivo para advogados</p><p style="font-size:13px;color:var(--txtMid)">Probabilidade de resultado jamais exibida ao cliente final.</p></div></div>
+          <div class="check-item"><div class="check-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg></div><div><p style="font-size:14px;font-weight:500;color:var(--tinta);margin-bottom:3px">Prospecção B2C sem dados pessoais sensíveis</p><p style="font-size:13px;color:var(--txtMid)">Sem CPF, telefone ou e-mail via fontes processuais.</p></div></div>
+          <div class="check-item"><div class="check-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg></div><div><p style="font-size:14px;font-weight:500;color:var(--tinta);margin-bottom:3px">Escalação automática fora de escopo</p><p style="font-size:13px;color:var(--txtMid)">Pareceres e situações sensíveis vão ao advogado.</p></div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:4px">
+          <input type="checkbox" checked style="margin-top:3px;accent-color:var(--primary);width:15px;height:15px"/>
+          <label style="font-size:13px;color:var(--txtMid);line-height:1.6">Li e concordo com os termos de uso ético conforme o Provimento 205/2021 da OAB.</label>
+        </div>
+        <div class="cad-nav">
+          <button class="btn-ghost" onclick="cadPrev()">← Anterior</button>
+          <button class="btn-primary" onclick="cadNext()">Aceitar e continuar</button>
+        </div>
+      </div>
+
+      <!-- etapa 6 -->
+      <div class="cad-page" id="cad-p6" style="text-align:center;padding-top:16px">
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:68px;height:68px;border-radius:50%;background:rgba(39,160,96,.1);border:2px solid rgba(39,160,96,.25);margin-bottom:22px">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h2 class="serif" style="font-size:30px;color:var(--tinta);margin-bottom:8px"><em>Tudo pronto.</em></h2>
+        <p style="font-size:14px;color:var(--txtMid);margin-bottom:28px">Seu escritório está configurado e operacional.</p>
+        <div class="confirm-list" style="text-align:left">
+          <div class="confirm-row"><span class="key">Escritório</span><span class="val">Silva &amp; Associados</span></div>
+          <div class="confirm-row"><span class="key">WhatsApp</span><span class="val" style="color:var(--success)">+55 (11) 9 9999-0000 · conectado</span></div>
+          <div class="confirm-row"><span class="key">Persona</span><span class="val">Assistente Jurídico · formal</span></div>
+          <div class="confirm-row"><span class="key">OAB / LGPD</span><span class="val" style="color:var(--success)">Conformidade confirmada</span></div>
+        </div>
+        <button class="btn-primary full" onclick="goTo('screen-hub')" style="margin-top:0">Acessar o escritório →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     HUB
+═══════════════════════════════════════════ -->
+<div id="screen-hub" class="screen">
+  <!-- sidebar -->
+  <div class="hub-sidebar">
+    <div class="hub-brand">
+      <div class="hub-brand-row">
+        <div class="hub-brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="6" width="20" height="15" rx="2" fill="#A8C8E8" stroke="#3A7AB8" stroke-width="1.3"/>
+            <path d="M2 10.5h20" stroke="#3A7AB8" stroke-width="1"/>
+            <circle cx="12" cy="15" r="1.8" fill="#3A7AB8" opacity=".6"/>
+          </svg>
+        </div>
+        <div>
+          <div class="hub-brand-name">Concierge Jurídico</div>
+          <div class="hub-brand-sub">Silva &amp; Associados</div>
+        </div>
+      </div>
+      <div class="hub-status">
+        <div class="hub-status-dot"></div>
+        <span>Claude ativo</span>
+      </div>
+    </div>
+
+    <nav class="hub-nav">
+      <button class="hub-nav-btn active" onclick="hubNav(this,'hub-chat')">
+        <span class="hub-nav-label">Hub IA · Chatbot</span>
+        <span class="hub-nav-sub">Consulta · Petição · Jurisprudência</span>
+      </button>
+      <button class="hub-nav-btn" onclick="hubNav(this,'hub-dashboard')">
+        <span class="hub-nav-label">Dashboard</span>
+        <span class="hub-nav-sub">Processos · Métricas · NPS</span>
+      </button>
+      <button class="hub-nav-btn" onclick="hubNav(this,'hub-clientes')">
+        <span class="hub-nav-label">Clientes</span>
+        <span class="hub-nav-sub">Ficha · CRM · Análise de Risco</span>
+      </button>
+      <button class="hub-nav-btn" onclick="hubNav(this,'hub-captacao')">
+        <span class="hub-nav-label">Captação</span>
+        <span class="hub-nav-sub">DNA · Buscar Leads · Pipeline</span>
+      </button>
+      <button class="hub-nav-btn" onclick="hubNav(this,'hub-docs')">
+        <span class="hub-nav-label">Documentos</span>
+        <span class="hub-nav-sub">RAG · Upload · Testar IA</span>
+      </button>
+    </nav>
+
+    <div class="hub-user">
+      <div class="hub-user-row">
+        <div class="hub-avatar">SA</div>
+        <div><div class="hub-user-name">Silva &amp; Associados</div><div class="hub-user-plan">Plano MVP</div></div>
+      </div>
+      <button class="hub-logout" onclick="goTo('screen-login')">← Sair</button>
+    </div>
+  </div>
+
+  <!-- main -->
+  <div class="hub-main">
+
+    <!-- CHAT -->
+    <div class="hub-page active" id="hub-chat">
+      <div class="h-tabs">
+        <button class="h-tab active" onclick="hubTab(this,'cht-consulta')">Consulta Jurídica</button>
+        <button class="h-tab" onclick="hubTab(this,'cht-peticao')">Analisar Petição</button>
+        <button class="h-tab" onclick="hubTab(this,'cht-juris')">Jurisprudência</button>
+        <button class="h-tab" onclick="hubTab(this,'cht-hist')">Histórico</button>
+      </div>
+
+      <div class="h-tab-page active" id="cht-consulta">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg">
+            <div class="chat-avatar ai">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="6" width="20" height="15" rx="2" fill="#A8C8E8" stroke="white" stroke-width="1.2"/>
+                <path d="M2 10h20" stroke="white" stroke-width="1"/>
+                <circle cx="12" cy="15" r="1.8" fill="white" opacity=".7"/>
+              </svg>
+            </div>
+            <div class="chat-bubble"><p>Olá! Sou o Assistente Jurídico do seu escritório. Faça qualquer pergunta — status de processo, prazo recursal, dúvida jurídica ou resumo de cliente. O classificador detecta a intenção automaticamente.</p></div>
+          </div>
+        </div>
+        <div class="chat-input-area" style="margin-top:16px">
+          <textarea class="l-inp" rows="2" placeholder="Ex: Qual o prazo para apelar? • Resumo do cliente João Silva • Status do processo 0001234…" id="chatInput" onkeydown="chatKey(event)" style="margin-bottom:10px"></textarea>
+          <button class="btn-primary full" onclick="sendChat()">Consultar →</button>
+        </div>
+      </div>
+
+      <div class="h-tab-page" id="cht-peticao">
+        <div class="h-card">
+          <h3 class="serif" style="font-size:20px;color:var(--tinta);margin-bottom:4px">Análise de Petição</h3>
+          <p style="font-size:13px;color:var(--txtMid);margin-bottom:20px">Upload PDF ou TXT. Analisa estrutura, pontos fortes, vulnerabilidades e retorna score de qualidade.</p>
+          <label class="cad-label" style="margin-bottom:10px">Petição (PDF ou TXT, máx. 10 MB)</label>
+          <div class="upload-zone">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            <div style="flex:1"><p style="font-size:14px;color:var(--tinta);font-weight:400;margin-bottom:2px">Drag and drop file here</p><p style="font-size:12px;color:var(--txtMid)">PDF, TXT • Limit 200MB</p></div>
+            <button class="btn-ghost" style="padding:8px 14px;font-size:13px">Browse files</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-tab-page" id="cht-juris">
+        <div class="h-card">
+          <h3 class="serif" style="font-size:20px;color:var(--tinta);margin-bottom:4px">Pesquisa de Jurisprudência</h3>
+          <p style="font-size:13px;color:var(--txtMid);margin-bottom:20px">Sintetiza jurisprudência até ago/2025. Para julgados recentes, consulte o DataJud.</p>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;margin-bottom:18px">
+            <div><label class="cad-label">Tema ou tese jurídica</label><input class="l-inp" placeholder="Ex: dano moral em relação de consumo • prescrição trabalhista"/></div>
+            <div>
+              <label class="cad-label">Tribunais</label>
+              <div style="display:flex;gap:6px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
+                <span style="padding:3px 10px;border-radius:20px;background:var(--primary);color:#fff;font-size:12px">STJ ×</span>
+                <span style="padding:3px 10px;border-radius:20px;background:var(--primary);color:#fff;font-size:12px">STF ×</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary">Pesquisar</button>
+        </div>
+      </div>
+
+      <div class="h-tab-page" id="cht-hist">
+        <div style="padding:14px 16px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:8px">
+          <p style="font-size:14px;color:var(--primary)">Nenhuma consulta realizada ainda. Use as abas acima para começar.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="hub-page" id="hub-dashboard">
+      <div class="stat-cards">
+        <div class="stat-card"><p class="stat-label">Processos</p><p class="stat-val serif">148</p><p class="stat-delta">↑ 12 este mês</p></div>
+        <div class="stat-card"><p class="stat-label">Autonomia</p><p class="stat-val serif">76<span style="font-size:18px;color:var(--txtMid)">%</span></p><p class="stat-delta">↑ 4pp vs anterior</p></div>
+        <div class="stat-card"><p class="stat-label">NPS Médio</p><p class="stat-val serif">84</p><p class="stat-delta">Excelente</p></div>
+        <div class="stat-card"><p class="stat-label">Custo/MSG</p><p class="stat-val serif">0,23<span style="font-size:18px;color:var(--txtMid)">¢</span></p><p class="stat-delta">↓ 8% vs média</p></div>
+      </div>
+      <div class="proc-table">
+        <div class="proc-header">
+          <span>PROCESSOS ATIVOS</span>
+          <span class="mono">148 total</span>
+        </div>
+        <div class="proc-row">
+          <div class="proc-bar" style="background:var(--primary)"></div>
+          <div class="proc-info"><p class="proc-name">Alves &amp; Costa Transportes ME</p><p class="proc-cnj">0001234-56.2024.8.26.0100 · TRT 2ª</p></div>
+          <span class="proc-fase" style="background:rgba(58,122,184,.1);color:var(--primary);border:1px solid rgba(58,122,184,.2)">Instrução</span>
+          <div class="proc-risk"><p class="proc-risk-num serif" style="color:var(--warning)">67</p><p class="proc-risk-lbl">risco</p></div>
+        </div>
+        <div class="proc-row">
+          <div class="proc-bar" style="background:var(--success)"></div>
+          <div class="proc-info"><p class="proc-name">Rodrigues Transportes LTDA</p><p class="proc-cnj">0005678-12.2024.5.02.0038 · TJ-SP</p></div>
+          <span class="proc-fase" style="background:rgba(39,160,96,.1);color:var(--success);border:1px solid rgba(39,160,96,.2)">Julgamento</span>
+          <div class="proc-risk"><p class="proc-risk-num serif" style="color:var(--success)">82</p><p class="proc-risk-lbl">risco</p></div>
+        </div>
+        <div class="proc-row">
+          <div class="proc-bar" style="background:var(--danger)"></div>
+          <div class="proc-info"><p class="proc-name">Ferreira &amp; Associados</p><p class="proc-cnj">0009012-34.2024.5.15.0001 · TRF 3ª</p></div>
+          <span class="proc-fase" style="background:rgba(214,59,59,.1);color:var(--danger);border:1px solid rgba(214,59,59,.2)">Risco alto</span>
+          <div class="proc-risk"><p class="proc-risk-num serif" style="color:var(--danger)">31</p><p class="proc-risk-lbl">risco</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="hub-page" id="hub-clientes">
+      <div class="h-tabs">
+        <button class="h-tab active" onclick="hubTab(this,'cl-ficha')">Ficha do Cliente</button>
+        <button class="h-tab" onclick="hubTab(this,'cl-crm')">Relacionamento CRM</button>
+        <button class="h-tab" onclick="hubTab(this,'cl-risco')">Análise de Risco</button>
+      </div>
+      <!-- sub tabs clientes -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:22px;background:var(--nevoa);padding:0 4px;border-radius:8px 8px 0 0">
+        <button class="h-tab active" onclick="clienteTab(this,'cl-joao')" style="background:none">João</button>
+        <button class="h-tab" onclick="clienteTab(this,'cl-maria')" style="background:none">Maria</button>
+        <button class="h-tab" onclick="clienteTab(this,'cl-carlos')" style="background:none">Carlos</button>
+      </div>
+
+      <div class="h-tab-page active" id="cl-ficha">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div style="background:var(--nevoa);padding:12px 16px;border-bottom:1px solid var(--border);border-radius:10px 10px 0 0"><p style="font-size:13px;font-weight:500;color:var(--tinta)">Cliente</p></div>
+            <div class="data-table" style="border-radius:0 0 10px 10px">
+              <div class="data-row"><span class="data-k">Nome</span><span class="data-v">João da Silva</span></div>
+              <div class="data-row"><span class="data-k">Telefone</span><span class="data-v mono" style="color:var(--success)">5511999990001</span></div>
+              <div class="data-row"><span class="data-k">CPF</span><span class="data-v mono">123.456.789-00</span></div>
+              <div class="data-row"><span class="data-k">Nascimento</span><span class="data-v">15/03/1980</span></div>
+              <div class="data-row"><span class="data-k">Profissão</span><span class="data-v">Engenheiro</span></div>
+              <div class="data-row"><span class="data-k">Empresa</span><span class="data-v">Tech Corp</span></div>
+              <div class="data-row" style="border-bottom:none"><span class="data-k">Status</span><span class="data-v" style="color:var(--success)">● Ativo</span></div>
+            </div>
+          </div>
+          <div>
+            <div style="background:var(--nevoa);padding:12px 16px;border-bottom:1px solid var(--border);border-radius:10px 10px 0 0"><p style="font-size:13px;font-weight:500;color:var(--tinta)">Processo Judicial</p></div>
+            <div class="data-table" style="border-radius:0 0 10px 10px">
+              <div class="data-row"><span class="data-k">CNJ</span><span class="data-v mono" style="color:var(--primary)">0000001-68.2019.8.26.0053</span></div>
+              <div class="data-row"><span class="data-k">Polo</span><span class="data-v">AUTOR</span></div>
+              <div class="data-row" style="border-bottom:none"><span class="data-k">DataJud</span><span class="data-v" style="color:var(--warning)">Processo não encontrado</span></div>
+            </div>
+            <div style="padding:10px 14px;background:rgba(217,144,10,.1);border:1px solid rgba(217,144,10,.25);border-radius:8px;font-size:13px;color:var(--warning);margin-top:12px">
+              ⚠ Processo não encontrado no DataJud. O orchestrator responde com dados do cadastro.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="h-tab-page" id="cl-crm">
+        <div class="crm-card">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:16px;font-weight:500;color:var(--tinta)">João da Silva</span>
+              <span class="badge" style="background:rgba(39,160,96,.12);border:1px solid rgba(39,160,96,.2);color:var(--success)">SATISFEITO</span>
+            </div>
+            <p style="font-size:12px;color:var(--txtMid);font-family:'JetBrains Mono',monospace">📞 5511999990001 · 💼 Engenheiro</p>
+          </div>
+          <div>
+            <p style="font-size:10px;color:var(--txtFaint);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Situação</p>
+            <p class="serif" style="font-size:24px;color:var(--tinta);margin-bottom:6px">Satisfeito</p>
+            <p style="font-size:12px;color:var(--txtMid)">12 dias sem contato · 18 msgs/mês</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn-ghost" style="font-size:13px;white-space:nowrap">› Por que esta classificação?</button>
+            <button style="padding:9px 14px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.22);border-radius:8px;cursor:pointer;color:var(--primary);font-size:13px;font-family:'Outfit',sans-serif;white-space:nowrap">ℹ Check-in de relacionamento</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:28px;padding:20px 0;border-top:1px solid var(--border)">
+          <div><p class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:3px">0</p><p style="font-size:12px;color:var(--success)">Excelente</p></div>
+          <div><p class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:3px">1</p><p style="font-size:12px;color:var(--success)">Satisfeito</p></div>
+          <div><p class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:3px">2</p><p style="font-size:12px;color:var(--warning)">Neutro</p></div>
+          <div><p class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:3px">0</p><p style="font-size:12px;color:var(--warning)">Em Risco</p></div>
+          <div><p class="serif" style="font-size:28px;color:var(--tinta);margin-bottom:3px">0</p><p style="font-size:12px;color:var(--danger)">Crítico</p></div>
+        </div>
+      </div>
+
+      <div class="h-tab-page" id="cl-risco">
+        <div style="border:2px solid var(--danger);border-radius:12px;overflow:hidden;margin-bottom:20px">
+          <div class="risco-header" style="background:rgba(214,59,59,.1)">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:var(--danger)"></div><span style="font-size:11px;font-weight:500;color:var(--txtMid);text-transform:uppercase;letter-spacing:.08em">Análise de Risco do Processo</span></div>
+            <span style="font-size:14px;font-weight:700;color:var(--danger);letter-spacing:.05em">RISCO ALTO</span>
+          </div>
+          <div class="risco-bar-wrap">
+            <div class="risco-bar-bg"><div class="risco-bar-fill" style="width:78%"></div></div>
+          </div>
+        </div>
+        <p style="font-size:14px;color:var(--tinta);line-height:1.7;margin-bottom:20px">Este processo apresenta <strong>alto risco</strong>. Fatores como complexidade da ação, valor em disputa ou histórico desfavorável no tribunal aumentam a incerteza.</p>
+        <div class="h-card">
+          <div id="risco-details">
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:13px;color:var(--txtMid)">Complexidade da Ação</span><span style="font-size:12px;color:var(--warning);font-weight:500">atenção</span></div>
+              <div style="height:5px;background:var(--nevoa);border-radius:5px;overflow:hidden"><div style="width:68%;height:100%;background:var(--warning);border-radius:5px"></div></div>
+              <p style="font-size:12px;color:var(--txtFaint);margin-top:3px">Quão complexo é este tipo de processo juridicamente</p>
+            </div>
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:13px;color:var(--txtMid)">Histórico da Vara</span><span style="font-size:12px;color:var(--warning);font-weight:500">atenção</span></div>
+              <div style="height:5px;background:var(--nevoa);border-radius:5px;overflow:hidden"><div style="width:55%;height:100%;background:var(--warning);border-radius:5px"></div></div>
+              <p style="font-size:12px;color:var(--txtFaint);margin-top:3px">Como este juízo costuma decidir casos parecidos</p>
+            </div>
+            <div style="margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:13px;color:var(--txtMid)">Fase do Processo</span><span style="font-size:12px;color:var(--danger);font-weight:500">desfavorável</span></div>
+              <div style="height:5px;background:var(--nevoa);border-radius:5px;overflow:hidden"><div style="width:30%;height:100%;background:var(--danger);border-radius:5px"></div></div>
+              <p style="font-size:12px;color:var(--txtFaint);margin-top:3px">Em que momento o processo se encontra atualmente</p>
+            </div>
+            <div style="padding:10px 14px;background:rgba(217,144,10,.1);border:1px solid rgba(217,144,10,.25);border-radius:8px">
+              <p style="font-size:12px;color:var(--warning)">⚠ Esta análise é de uso interno do advogado e não representa previsão de resultado (OAB Provimento 205/2021).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPTAÇÃO -->
+    <div class="hub-page" id="hub-captacao">
+      <div class="h-tabs">
+        <button class="h-tab active" onclick="hubTab(this,'cap-perfil')">Perfil do Escritório</button>
+        <button class="h-tab" onclick="hubTab(this,'cap-buscar')">Buscar Candidatos</button>
+        <button class="h-tab" onclick="hubTab(this,'cap-lista')">Minha Lista (0)</button>
+      </div>
+      <div class="h-tab-page active" id="cap-perfil">
+        <div class="h-card">
+          <h3 class="serif" style="font-size:20px;color:var(--tinta);margin-bottom:4px">Qual é o perfil do seu escritório?</h3>
+          <p style="font-size:13px;color:var(--txtMid);margin-bottom:24px">Este perfil é usado para pontuar quais candidatos têm mais chances de virar clientes.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:24px">
+            <div>
+              <p style="font-weight:500;color:var(--tinta);margin-bottom:12px">Especialidades</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:8px">• Reclamação Trabalhista</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:8px">• Horas Extras</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:20px">• Indenização Por Danos Morais</p>
+              <p style="font-weight:500;color:var(--tinta);margin-bottom:10px">Tipo de lead predominante</p>
+              <div style="padding:10px 14px;background:rgba(58,122,184,.08);border:1px solid var(--pasta);border-radius:8px;font-size:14px;color:var(--primary)">Empresa (B2B)</div>
+            </div>
+            <div>
+              <p style="font-weight:500;color:var(--tinta);margin-bottom:12px">Setores-alvo</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:8px">• Indústria</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:8px">• Comércio</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:8px">• Serviços</p>
+              <p style="font-size:14px;color:var(--tinta);margin-bottom:20px">• Transporte</p>
+              <p style="font-weight:500;color:var(--tinta);margin-bottom:8px">Perfil do cliente ideal</p>
+              <p style="font-size:13px;color:var(--txtMid)">Empresas de médio e grande porte com demandas em reclamação trabalhista</p>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:20px">
+            <p style="font-weight:500;color:var(--tinta);margin-bottom:14px">Distribuição de tipos de ação</p>
+            <div style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:13px;color:var(--tinta)">reclamação trabalhista</span><span style="font-size:13px;color:var(--primary);font-weight:500">65%</span></div>
+              <div style="height:6px;background:var(--nevoa);border-radius:6px;overflow:hidden"><div style="width:65%;height:100%;background:var(--primary);border-radius:6px"></div></div>
+            </div>
+            <div style="margin-bottom:20px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:13px;color:var(--tinta)">horas extras</span><span style="font-size:13px;color:var(--txtMid)">25%</span></div>
+              <div style="height:6px;background:var(--nevoa);border-radius:6px;overflow:hidden"><div style="width:25%;height:100%;background:var(--txtFaint);border-radius:6px"></div></div>
+            </div>
+            <button class="btn-ghost">Regenerar DNA</button>
+          </div>
+        </div>
+      </div>
+      <div class="h-tab-page" id="cap-buscar">
+        <div class="h-card">
+          <h3 class="serif" style="font-size:20px;color:var(--tinta);margin-bottom:4px">Encontrar novos clientes em potencial</h3>
+          <p style="font-size:13px;color:var(--txtMid);margin-bottom:24px">A IA busca empresas e pessoas com processos parecidos nos tribunais.</p>
+          <div class="cap-grid">
+            <div>
+              <div style="margin-bottom:20px"><label class="cad-label">Tipo de ação</label><select class="l-inp"><option>Reclamação Trabalhista</option><option>Horas Extras</option><option>Dano Moral</option></select></div>
+              <div><label class="cad-label">Tipo de lead</label>
+                <div style="display:flex;gap:20px">
+                  <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--tinta)"><input type="radio" name="lt" checked style="accent-color:var(--primary)">Empresa (B2B)</label>
+                  <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--tinta)"><input type="radio" name="lt" style="accent-color:var(--primary)">Pessoa (B2C)</label>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="margin-bottom:18px">
+                <label class="cad-label">Score mínimo para qualificar</label>
+                <p class="serif" style="font-size:30px;color:var(--primary);margin-bottom:8px" id="scoreVal">40</p>
+                <input type="range" min="0" max="100" value="40" style="width:100%;accent-color:var(--primary)" oninput="document.getElementById('scoreVal').textContent=this.value"/>
+              </div>
+              <div>
+                <label class="cad-label">Candidatos a analisar</label>
+                <p class="serif" style="font-size:30px;color:var(--primary);margin-bottom:8px" id="candsVal">5</p>
+                <input type="range" min="1" max="20" value="5" style="width:100%;accent-color:var(--primary)" oninput="document.getElementById('candsVal').textContent=this.value"/>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary full" style="margin-top:24px;padding:14px 0;font-size:15px">Buscar e Qualificar Leads</button>
+        </div>
+      </div>
+      <div class="h-tab-page" id="cap-lista">
+        <div style="padding:14px 16px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:8px">
+          <p style="font-size:14px;color:var(--primary)">Nenhum candidato na lista. Use "Buscar Candidatos" para encontrar leads qualificados.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENTOS -->
+    <div class="hub-page" id="hub-docs">
+      <div class="doc-grid">
+        <div class="doc-stat"><p class="stat-label">Documentos enviados</p><p class="stat-val serif">0</p></div>
+        <div class="doc-stat"><p class="stat-label">Trechos aprendidos</p><p class="stat-val serif">0</p></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:24px">
+        <div class="h-card">
+          <h3 class="serif" style="font-size:18px;color:var(--tinta);margin-bottom:4px">Enviar Documento</h3>
+          <p style="font-size:13px;color:var(--txtMid);margin-bottom:16px">PDF ou TXT do seu escritório</p>
+          <div class="upload-zone">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            <div style="flex:1"><p style="font-size:13px;color:var(--tinta);font-weight:400;margin-bottom:1px">Drag and drop</p><p style="font-size:11px;color:var(--txtMid)">PDF, TXT até 200MB</p></div>
+            <button class="btn-ghost" style="padding:7px 12px;font-size:12px">Browse</button>
+          </div>
+        </div>
+        <div class="h-card">
+          <h3 class="serif" style="font-size:18px;color:var(--tinta);margin-bottom:12px">Como funciona?</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px"><span style="font-size:12px;color:var(--txtFaint);font-weight:500;min-width:16px">1.</span><p style="font-size:13px;color:var(--txtMid);line-height:1.6;margin:0"><strong style="color:var(--tinta);font-weight:400">Identifica</strong> quais documentos são relevantes para a pergunta</p></div>
+            <div style="display:flex;gap:10px"><span style="font-size:12px;color:var(--txtFaint);font-weight:500;min-width:16px">2.</span><p style="font-size:13px;color:var(--txtMid);line-height:1.6;margin:0"><strong style="color:var(--tinta);font-weight:400">Lê</strong> os trechos mais pertinentes automaticamente</p></div>
+            <div style="display:flex;gap:10px"><span style="font-size:12px;color:var(--txtFaint);font-weight:500;min-width:16px">3.</span><p style="font-size:13px;color:var(--txtMid);line-height:1.6;margin:0"><strong style="color:var(--tinta);font-weight:400">Responde</strong> usando o raciocínio e a linguagem desses documentos</p></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:14px 16px;background:var(--nevoa);border:1px solid var(--pasta);border-radius:8px">
+        <p style="font-size:14px;color:var(--primary)">Nenhum documento enviado ainda. Use o painel acima para começar.</p>
+      </div>
+    </div>
+
+  </div><!-- /hub-main -->
+</div><!-- /screen-hub -->
+
+<script>
+// ── screen switch ──
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── password toggle ──
+function togglePass(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ── spec pills ──
+function togglePill(el) {
+  el.classList.toggle('active');
+}
+
+// ── FIRST SETUP ──
+let setupStep = 1;
+function setupNext() {
+  setupStep = 2;
+  document.getElementById('setup-s1').classList.remove('active');
+  document.getElementById('setup-s2').classList.add('active');
+  document.getElementById('setup-prog').style.width = '100%';
+  document.getElementById('setup-step-label').textContent = 'Etapa 2 de 2';
+}
+function setupBack() {
+  setupStep = 1;
+  document.getElementById('setup-s2').classList.remove('active');
+  document.getElementById('setup-s1').classList.add('active');
+  document.getElementById('setup-prog').style.width = '50%';
+  document.getElementById('setup-step-label').textContent = 'Etapa 1 de 2';
+}
+
+// ── CADASTRO WIZARD ──
+let cadStep = 1;
+const cadTotal = 6;
+
+function cadGoTo(n) {
+  if (n > cadStep) return;
+  const old = document.getElementById('cad-p' + cadStep);
+  old && old.classList.remove('active');
+  const si = document.getElementById('cad-si-' + cadStep);
+  si && si.classList.remove('active');
+  cadStep = n;
+  const np = document.getElementById('cad-p' + cadStep);
+  np && np.classList.add('active');
+  updateCadStepper();
+}
+
+function cadNext() {
+  if (cadStep >= cadTotal) return;
+  const old = document.getElementById('cad-p' + cadStep);
+  old && old.classList.remove('active');
+  const osi = document.getElementById('cad-si-' + cadStep);
+  osi && osi.classList.remove('active');
+  if (osi) osi.classList.add('done');
+  cadStep++;
+  const np = document.getElementById('cad-p' + cadStep);
+  np && np.classList.add('active');
+  updateCadStepper();
+}
+
+function cadPrev() {
+  if (cadStep <= 1) return;
+  const old = document.getElementById('cad-p' + cadStep);
+  old && old.classList.remove('active');
+  const osi = document.getElementById('cad-si-' + cadStep);
+  osi && osi.classList.remove('active');
+  cadStep--;
+  const np = document.getElementById('cad-p' + cadStep);
+  np && np.classList.add('active');
+  const nsi = document.getElementById('cad-si-' + cadStep);
+  if (nsi) { nsi.classList.remove('done'); nsi.classList.add('active'); }
+  updateCadStepper();
+}
+
+function updateCadStepper() {
+  document.getElementById('cad-step-lbl').textContent = 'Etapa ' + cadStep + ' de 6';
+  const si = document.getElementById('cad-si-' + cadStep);
+  if (si) si.classList.add('active');
+  // update check icons
+  for (let i = 1; i <= 6; i++) {
+    const item = document.getElementById('cad-si-' + i);
+    if (!item) continue;
+    const num = item.querySelector('.cad-step-num');
+    if (i < cadStep) {
+      num.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 12 4 9"/></svg>';
+    } else {
+      num.textContent = i;
+    }
+  }
+}
+
+// ── persona preview ──
+function updateAiPreview() {
+  const name = document.getElementById('aiName').value || 'Assistente Jurídico';
+  const tom = document.getElementById('aiTom').value.toLowerCase();
+  const h1 = document.getElementById('h1').value || '08:00';
+  const h2 = document.getElementById('h2').value || '18:00';
+  document.getElementById('aiPreview').innerHTML =
+    `A IA vai se apresentar como <strong>"${name}"</strong>, atender de forma ${tom} e responder mensagens entre <strong>${h1}</strong> e <strong>${h2}</strong>.`;
+}
+
+// ── HUB NAV ──
+function hubNav(btn, pageId) {
+  document.querySelectorAll('.hub-nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.hub-page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+}
+
+// ── HUB TABS ──
+function hubTab(btn, pageId) {
+  const container = btn.closest('.hub-page') || btn.closest('.h-tabs').parentElement;
+  container.querySelectorAll('.h-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  // find sibling tab pages
+  const allPages = container.querySelectorAll('.h-tab-page');
+  allPages.forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+}
+
+// ── CLIENTE SUB TABS ──
+function clienteTab(btn, pageId) {
+  const container = btn.closest('div');
+  container.querySelectorAll('.h-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── CHAT ──
+const API_URL = "https://api.anthropic.com/v1/messages";
+let chatHistory = [];
+
+function chatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const q = inp.value.trim();
+  if (!q) return;
+  inp.value = '';
+  addMsg('user', q);
+  chatHistory.push({ role:'user', content:q });
+  const loadEl = addMsg('ai', 'Processando…');
+
+  try {
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:'Você é o Assistente Jurídico de um escritório de advocacia brasileiro. Responda de forma técnica e precisa, em português formal. Nunca emita pareceres ou preveja resultados de processos (OAB Provimento 205/2021). Seja conciso e direto.',
+        messages: chatHistory.map(m => ({ role:m.role, content:m.content }))
+      })
+    });
+    const d = await res.json();
+    const text = d.content?.[0]?.text || 'Erro na resposta.';
+    loadEl.querySelector('p').textContent = text;
+    chatHistory.push({ role:'assistant', content:text });
+  } catch(e) {
+    loadEl.querySelector('p').textContent = 'Erro de conexão com a IA.';
+  }
+}
+
+function addMsg(role, text) {
+  const wrap = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (role==='user'?' user':'');
+  const isAI = role === 'ai';
+  div.innerHTML = `
+    <div class="chat-avatar ${isAI?'ai':'user'}">
+      ${isAI
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="15" rx="2" fill="#A8C8E8" stroke="white" stroke-width="1.2"/><path d="M2 10h20" stroke="white" stroke-width="1"/><circle cx="12" cy="15" r="1.8" fill="white" opacity=".7"/></svg>`
+        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`}
+    </div>
+    <div class="chat-bubble"><p>${text}</p></div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+  return div;
+}
+</script>
+</body>
+</html>
