@@ -1,0 +1,21 @@
+{
+  "relatorio": "Métricas RAG + Prometheus",
+  "versao": "1.0",
+  "gerado_em": "2026-05-03T21:39:03.430769",
+  "metricas": {
+    "timestamp": "2026-05-03T21:39:03.430769",
+    "duracao_testes_s": 0.403,
+    "total_queries_testadas": 7,
+    "rag_contexto_injetado_total": 4,
+    "rag_contexto_vazio_total": 3,
+    "total_buscas_rag": 7,
+    "taxa_sucesso_pct": 57.1,
+    "status": "⚠️  REVISAR"
+  },
+  "interpretacao": {
+    "hit_rate_recomendado": ">= 70%",
+    "rag_injetado": "Respostas que receberam contexto RAG no prompt",
+    "rag_vazio": "Buscas que retornaram contexto vazio (threshold)",
+    "taxa_sucesso": "(rag_injetado / total_buscas) * 100"
+  }
+}

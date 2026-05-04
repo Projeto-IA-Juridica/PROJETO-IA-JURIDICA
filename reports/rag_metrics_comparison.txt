@@ -1,0 +1,40 @@
+
+======================================================================
+RELATÓRIO DE MÉTRICAS RAG — PROMETHEUS
+======================================================================
+
+Gerado em: 2026-05-03T21:36:14.058778
+
+📊 MÉTRICAS CAPTURADAS
+----------------------------------------------------------------------
+
+1. Contextos RAG Injetados (✓ com sucesso)
+   Total: 0 buscas
+
+2. Contextos RAG Vazios (✗ sem resultado)
+   Total: 0 buscas
+
+3. Total de Buscas
+   0 buscas
+
+4. Taxa de Sucesso RAG
+   0.0% de hit rate
+
+5. Cache Hits
+   0 acertos em cache
+
+📈 INDICADORES
+----------------------------------------------------------------------
+
+Proporção sucesso/vazio: 0.0:0.0
+Hit rate recomendado: > 80%
+Status: ⚠️  REVISAR
+
+📝 INTERPRETAÇÃO
+----------------------------------------------------------------------
+
+• Se taxa_sucesso < 70%: threshold RAG_MIN_SIMILARITY pode estar alto
+• Se cache_hits baixo: Redis pode estar indisponível em produção
+• Histórico em CSV útil para identificar tendências (melhorias vs. regressões)
+
+======================================================================
