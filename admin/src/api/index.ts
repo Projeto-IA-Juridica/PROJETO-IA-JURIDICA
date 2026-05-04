@@ -98,23 +98,28 @@ export interface ClienteExport {
 
 export const clientesApi = {
   listar: async (params?: { page?: number; page_size?: number; search?: string }) => {
+    const page = params?.page ?? 1
+    const pageSize = params?.page_size ?? 20
+
+    // Usa paginação no BACKEND diretamente
     const data = await api.get<CRMCliente[]>('/crm/clientes', {
       params: {
-        page: params?.page ?? 1,
-        page_size: params?.page_size ?? 20,
-      },
+        page,
+        page_size: pageSize,
+      }
     }).then((r) => r.data)
 
+    // Filtra busca no frontend (idealmente seria no backend também)
     const search = params?.search?.trim().toLowerCase()
     const filtered = search ? data.filter((item) => item.nome.toLowerCase().includes(search)) : data
 
-    const page = params?.page ?? 1
-    const pageSize = params?.page_size ?? 20
-    const offset = (page - 1) * pageSize
-    const items = filtered.slice(offset, offset + pageSize)
+    // IMPORTANTE: Backend não retorna total, então estimamos baseado no tamanho da resposta
+    // Se retornou menos que page_size, assumimos que é a última página
+    const isLastPage = filtered.length < pageSize
+    const estimatedTotal = isLastPage ? (page - 1) * pageSize + filtered.length : page * pageSize + 1
 
     return {
-      items: items.map((item) => ({
+      items: filtered.map((item) => ({
         id: item.id,
         nome: item.nome,
         telefone_whatsapp: item.telefone_whatsapp,
@@ -128,33 +133,19 @@ export const clientesApi = {
       })),
       page,
       per_page: pageSize,
-      total: filtered.length,
+      total: estimatedTotal,
     } satisfies PaginatedResponse<Cliente>
   },
 
   detalhe: async (id: number): Promise<Cliente> => {
     const crmCard = await api.get<CRMCliente>(`/crm/clientes/${id}`).then((r) => r.data)
 
-    // Em alguns ambientes /clientes/{id}/exportar pode estar indisponível.
-    // Mantemos o detalhe funcional com os dados de CRM e completamos campos extras quando possível.
-    let base: ClienteExport['cliente'] | undefined
-    try {
-      const exportData = await api.get<ClienteExport>(`/clientes/${id}/exportar`).then((r) => r.data)
-      base = exportData.cliente
-    } catch (error) {
-      console.warn('Falha ao obter dados LGPD exportáveis do cliente; usando fallback CRM.', error)
-    }
-
     return {
       id: crmCard.id,
-      nome: base?.nome || crmCard.nome,
-      telefone_whatsapp: base?.telefone_whatsapp || crmCard.telefone_whatsapp,
-      cpf: base?.cpf ?? (base?.cpf_presente ? 'Protegido (LGPD)' : undefined),
-      data_nascimento: base?.data_nascimento ?? undefined,
-      profissao: base?.profissao ?? undefined,
-      empresa: base?.empresa ?? base?.empresa_atual ?? undefined,
-      status: base?.ativo === false ? 'inativo' : 'ativo',
-      ativo: base?.ativo !== false,
+      nome: crmCard.nome,
+      telefone_whatsapp: crmCard.telefone_whatsapp,
+      status: 'ativo',
+      ativo: true,
       crm_nivel: crmCard.crm_nivel,
       crm_score: crmCard.crm_score,
       total_processos: crmCard.total_processos,
@@ -238,7 +229,10 @@ export interface RAGChunk {
 
 export const ragApi = {
   listar: () =>
-    api.get<{ items: RAGDoc[] }>('/rag/documentos', { params: { page: 1, per_page: 200 } }).then((r) => r.data.items),
+    api.get<RAGDoc[] | { items: RAGDoc[] }>('/rag/documentos').then((r) => {
+      const d = r.data
+      return Array.isArray(d) ? d : d.items ?? []
+    }),
 
   upload: (file: File, titulo: string, tipo: string) => {
     const form = new FormData()

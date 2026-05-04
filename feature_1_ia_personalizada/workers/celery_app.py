@@ -8,6 +8,7 @@ from celery import Celery, Task
 from celery.schedules import crontab
 from celery.signals import worker_process_init
 from kombu import Queue
+from redbeat import RedBeatScheduler  # noqa: F401 — importação necessária para registro do scheduler
 
 _dlq_logger = structlog.get_logger("workers.dlq")
 
@@ -39,6 +40,17 @@ celery_app.conf.update(
     task_time_limit=60 * 20,
     task_soft_time_limit=60 * 18,
     broker_connection_retry_on_startup=True,
+    # RedBeat — scheduler dinâmico armazenado no Redis.
+    # Permite ajustar crons via CLI ou endpoint sem redeploy:
+    #   redbeat -A workers.celery_app beat -l info
+    # Para inspecionar/editar schedules:
+    #   from redbeat import RedBeatSchedulerEntry
+    #   RedBeatSchedulerEntry.from_key('redbeat:nome-da-task', app=celery_app)
+    beat_scheduler="redbeat.RedBeatScheduler",
+    redbeat_redis_url=BROKER_URL,
+    # Intervalo máximo de loop do beat (segundos). Padrão RedBeat é 5 min;
+    # reduzimos para 30s para que alterações de schedule se propaguem rapidamente.
+    beat_max_loop_interval=30,
     # DLQ — garantia de entrega
     # task_acks_late=True: a mensagem só é removida da fila APÓS a task concluir
     # (sucesso ou falha definitiva). Se o worker cair durante a execução, a task
@@ -58,6 +70,8 @@ celery_app.conf.task_queues = (
     Queue("notificacoes", routing_key="notificacoes"),
     Queue("ia", routing_key="ia"),
     Queue("relacionamento", routing_key="relacionamento"),
+    # Hub do Advogado — mensagens jurídicas do advogado via WhatsApp
+    Queue("hub_advogado", routing_key="hub_advogado"),
     # Dead Letter Queue: recebe tasks que esgotaram todos os retries.
     # Worker dedicado recomendado para não misturar com filas normais:
     #   celery -A ... worker -Q dead_letter -c 1 --prefetch-multiplier 1
@@ -132,6 +146,16 @@ celery_app.conf.task_routes = {
         "queue": "ia",
         "routing_key": "ia",
     },
+    # hub_advogado.py
+    "processar_mensagem_advogado": {
+        "queue": "hub_advogado",
+        "routing_key": "hub_advogado",
+    },
+    # dispatcher_agendadas.py
+    "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas": {
+        "queue": "notificacoes",
+        "routing_key": "notificacoes",
+    },
     # dead_letter.py
     "workers.dead_letter.processar_dlq": {
         "queue": "dead_letter",
@@ -168,6 +192,10 @@ celery_app.conf.beat_schedule = {
     "monitorar-escalacoes-pendentes": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_escalacoes_pendentes",
         "schedule": crontab(minute="*/30"),
+    },
+    "despachar-mensagens-agendadas": {
+        "task": "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas",
+        "schedule": crontab(minute="*/5"),
     },
 }
 
@@ -250,6 +278,8 @@ def _init_worker_process(**kwargs):
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
+import feature_1_ia_personalizada.workers.dispatcher_agendadas  # noqa: F401
+import feature_1_ia_personalizada.workers.hub_advogado  # noqa: F401
 import feature_1_ia_personalizada.workers.ingest_documentos  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401

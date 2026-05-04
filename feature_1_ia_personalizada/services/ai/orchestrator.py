@@ -35,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -43,7 +44,7 @@ import time
 
 from prometheus_client import Counter
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from typing_extensions import TypedDict
 
@@ -55,6 +56,11 @@ except Exception:  # ImportError ou TypeError (pydantic v1 + Python 3.12)
     _LANGGRAPH_OK = False
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
+from feature_1_ia_personalizada.services.ai.confidence_router import ConfidenceRouter
+from feature_1_ia_personalizada.services.ai.escalation_client import (
+    EscalacaoClient,
+    EscalacaoIndisponivelError,
+)
 from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.prompts import (
@@ -63,6 +69,8 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
     SYSTEM_PROMPT_DESABAFO,
     SYSTEM_PROMPT_DUVIDA_GERAL,
+    SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE,
+    SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA,
     SYSTEM_PROMPT_PERSPECTIVAS,
     SYSTEM_PROMPT_SAUDACAO_RECORRENTE,
     SYSTEM_PROMPT_STATUS_PROCESSO,
@@ -74,9 +82,7 @@ from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManag
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     LegalDataCacheManager,
 )
-from feature_1_ia_personalizada.services.legal_data.jusbrasil_client import (
-    JusbrasilClient,
-)
+from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
 from feature_1_ia_personalizada.services.messaging.evolution_client import (
     EvolutionClient,
 )
@@ -93,9 +99,33 @@ from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
 
+# ---------------------------------------------------------------------------
+# Quota de tokens
+# ---------------------------------------------------------------------------
+
+
+class QuotaExcedidaError(Exception):
+    """Lançado quando o escritório atingiu o limite mensal de tokens Claude."""
+
+    def __init__(self, escritorio_id: int, usados: int, limite: int) -> None:
+        self.escritorio_id = escritorio_id
+        self.usados = usados
+        self.limite = limite
+        super().__init__(
+            f"Escritório {escritorio_id} atingiu quota mensal: {usados}/{limite} tokens"
+        )
+
+
+# Fallback genérico exibido ao CLIENTE quando a quota está esgotada.
+# Não expõe informações de billing — aviso real vai para o escritório via log/alerta.
+_MSG_QUOTA_CLIENTE = (
+    "No momento não consigo processar sua mensagem. "
+    "Por favor, entre em contato diretamente com o escritório."
+)
+
 _TIMEOUT_FLUXO_SEGUNDOS = 120.0   # guard absoluto de último recurso (não deve ser atingido)
 _TIMEOUT_CLAUDE_SEGUNDOS = 25.0   # timeout por chamada ao Claude
-_TIMEOUT_JUSBRASIL_SEGUNDOS = 20.0  # timeout por chamada ao Jusbrasil/cache
+_TIMEOUT_DATAJUD_SEGUNDOS = 20.0  # timeout por chamada ao DataJud/cache
 
 # ---------------------------------------------------------------------------
 # Humanização — fragmentação de mensagens para WhatsApp
@@ -166,6 +196,14 @@ _ia_fallback_used_total = Counter(
     "Total de vezes que o fallback foi ativado (Claude indisponível ou erro)",
 )
 
+# Métricas de escalação importadas do módulo central de métricas
+from feature_1_ia_personalizada.api.routes.metrics import (
+    escalacao_latencia_ms,
+    escalacao_requests_total,
+    escalacao_roteamentos_total,
+    escalacao_tokens_total,
+)
+
 # ---------------------------------------------------------------------------
 # State Schema — CÉREBRO do fluxo
 # ---------------------------------------------------------------------------
@@ -190,6 +228,11 @@ class ConversationState(TypedDict):
     precisa_regenerar: bool  # sinal interno: verificar_resposta → gerar_resposta
     requer_escalacao: bool
     motivo_escalacao: str | None
+    confidence_score: float | None      # score calculado pelo ConfidenceRouter
+    modelo_ia_usado: str                # 'claude' | 'claude_opus' | 'claude_opus_fallback'
+    _escalar_para_opus: bool            # sinal interno: avaliar_confianca → gerar_resposta_escalacao
+    rag_docs_com_score: list[dict]      # [{"score": float}] — scores reais do RAG para ConfidenceRouter
+    fact_check_result: dict             # resultado do FactChecker — reaproveitado entre nós
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +322,7 @@ class ConversationOrchestrator:
         claude_client: ClaudeClient,
         memory: ConversationMemory,
         translator: JuridicalTranslator,
-        jusbrasil_client: JusbrasilClient,
+        datajud_client: DataJudClient,
         cache_manager: LegalDataCacheManager,
         evolution_client: EvolutionClient,
         session_factory: async_sessionmaker[AsyncSession],
@@ -288,7 +331,7 @@ class ConversationOrchestrator:
         self._claude = claude_client
         self._memory = memory
         self._translator = translator
-        self._jusbrasil = jusbrasil_client
+        self._datajud = datajud_client
         self._cache = cache_manager
         self._redis: Redis = cache_manager._redis  # reutiliza conexão já existente
         self._evolution = evolution_client
@@ -299,6 +342,8 @@ class ConversationOrchestrator:
             session_factory=session_factory,
         )
         self._rag = rag_retriever  # None = RAG desativado (graceful degradation)
+        self._confidence_router = ConfidenceRouter()
+        self._escalacao_client = EscalacaoClient()
 
         # FactChecker usa DB via adapter
         self._fact_checker = FactChecker(
@@ -336,6 +381,19 @@ class ConversationOrchestrator:
             }
         """
         t_inicio = time.perf_counter()
+
+        # Verifica quota ANTES de invocar o LangGraph (e portanto antes de chamar Claude)
+        try:
+            await self._verificar_quota_tokens(escritorio_id)
+        except QuotaExcedidaError:
+            return {
+                "resposta": _MSG_QUOTA_CLIENTE,
+                "intencao": "outro",
+                "usando_fallback": True,
+                "tokens_usados": {},
+                "processo_id": None,
+            }
+
         historico = await self._memory.buscar_historico(escritorio_id, cliente_id)
 
         initial_state: ConversationState = {
@@ -357,6 +415,9 @@ class ConversationOrchestrator:
             "precisa_regenerar": False,
             "requer_escalacao": False,
             "motivo_escalacao": None,
+            "confidence_score": None,
+            "modelo_ia_usado": "claude",
+            "_escalar_para_opus": False,
         }
 
         try:
@@ -427,6 +488,14 @@ class ConversationOrchestrator:
         except Exception:
             pass  # métricas nunca bloqueiam o fluxo principal
 
+        # Registra consumo de tokens para controle de quota (fire-and-forget)
+        _tok_in_final = int(_tokens_finais.get("input", 0))
+        _tok_out_final = int(_tokens_finais.get("output", 0))
+        if _tok_in_final + _tok_out_final > 0:
+            asyncio.create_task(
+                self._atualizar_uso_tokens(escritorio_id, _tok_in_final + _tok_out_final)
+            )
+
         return {
             "resposta": resposta_final,
             "intencao": final_state.get("intencao", "outro"),
@@ -443,22 +512,23 @@ class ConversationOrchestrator:
         self,
         state: ConversationState,
         contexto_processo: dict | None = None,
-    ) -> str:
+    ) -> tuple[str, list[dict]]:
         """
         Chama o RAGRetriever de forma segura.
-        Retorna string vazia se RAG não configurado ou em caso de erro.
+        Retorna (contexto_str, rag_docs_com_score).
+        rag_docs_com_score = [{"score": float}] para uso no ConfidenceRouter.
         """
         if not self._rag:
-            return ""
+            return "", []
         try:
-            return await self._rag.buscar(
+            return await self._rag.buscar_com_scores(
                 query=state["mensagem_original"],
                 escritorio_id=state["escritorio_id"],
                 contexto_processo=contexto_processo,
             )
         except Exception as exc:
             logger.warning("rag_busca_falhou_graceful", erro=str(exc))
-            return ""
+            return "", []
 
     async def _buscar_resumo_processo_para_fact_checker(self, processo_id: str) -> dict[str, Any]:
         """Adapter para FactChecker — lê dados reais do processo no banco."""
@@ -503,6 +573,78 @@ class ConversationOrchestrator:
         escritorio = await session.get(Escritorio, escritorio_id)
         cliente = await session.get(Cliente, cliente_id)
         return escritorio, cliente
+
+    async def _verificar_quota_tokens(self, escritorio_id: int) -> None:
+        """
+        Verifica se o escritório ainda tem quota mensal disponível.
+
+        - Se tokens_reset_em é de um mês anterior, reseta o contador.
+        - Se quota_tokens_mes é None (enterprise), sempre passa.
+        - Lança QuotaExcedidaError se o limite foi atingido.
+          O aviso ao escritório fica no log estruturado; o cliente vê apenas
+          a mensagem genérica _MSG_QUOTA_CLIENTE.
+        """
+        now = datetime.now(tz=timezone.utc)
+        async with self._session_factory() as session:
+            escritorio = await session.get(Escritorio, escritorio_id)
+            if escritorio is None:
+                return  # escritório não encontrado — deixa o fluxo principal lidar
+
+            # Sem limite configurado (enterprise ou plano não mapeado)
+            if escritorio.quota_tokens_mes is None:
+                return
+
+            # Reset mensal: se o último reset foi em mês/ano diferente do atual
+            reset_em = escritorio.tokens_reset_em
+            precisa_reset = reset_em is None or (
+                reset_em.year != now.year or reset_em.month != now.month
+            )
+            if precisa_reset:
+                await session.execute(
+                    update(Escritorio)
+                    .where(Escritorio.id == escritorio_id)
+                    .values(tokens_usados_mes=0, tokens_reset_em=now)
+                )
+                await session.commit()
+                return  # acabou de resetar — quota disponível
+
+            # Verifica se já atingiu o limite
+            if escritorio.tokens_usados_mes >= escritorio.quota_tokens_mes:
+                logger.warning(
+                    "quota_tokens_excedida",
+                    escritorio_id=escritorio_id,
+                    tokens_usados=escritorio.tokens_usados_mes,
+                    quota_tokens_mes=escritorio.quota_tokens_mes,
+                    plano=escritorio.plano,
+                )
+                raise QuotaExcedidaError(
+                    escritorio_id=escritorio_id,
+                    usados=escritorio.tokens_usados_mes,
+                    limite=escritorio.quota_tokens_mes,
+                )
+
+    async def _atualizar_uso_tokens(self, escritorio_id: int, tokens_total: int) -> None:
+        """
+        Incrementa tokens_usados_mes de forma atômica (UPDATE ... SET x = x + delta).
+        Falhas são silenciosas — não devem bloquear a resposta ao cliente.
+        """
+        if tokens_total <= 0:
+            return
+        try:
+            async with self._session_factory() as session:
+                await session.execute(
+                    update(Escritorio)
+                    .where(Escritorio.id == escritorio_id)
+                    .values(tokens_usados_mes=Escritorio.tokens_usados_mes + tokens_total)
+                )
+                await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "quota_update_falhou",
+                escritorio_id=escritorio_id,
+                tokens=tokens_total,
+                erro=str(exc),
+            )
 
     async def _obter_persona(
         self,
@@ -562,6 +704,7 @@ class ConversationOrchestrator:
             tokens_input=tokens.get("input", 0),
             tokens_output=tokens.get("output", 0),
             custo_estimado=custo,
+            modelo_ia=state.get("modelo_ia_usado", "claude"),
             metadata_json=metadata or None,
         )
         session.add(interacao)
@@ -579,6 +722,8 @@ class ConversationOrchestrator:
         graph.add_node("preparar_escalacao", self._node_preparar_escalacao)
         graph.add_node("buscar_dados", self._node_buscar_dados)
         graph.add_node("gerar_resposta", self._node_gerar_resposta)
+        graph.add_node("avaliar_confianca", self._node_avaliar_confianca)
+        graph.add_node("gerar_resposta_escalacao", self._node_gerar_resposta_escalacao)
         graph.add_node("verificar_resposta", self._node_verificar_resposta)
         graph.add_node("enviar_resposta", self._node_enviar_resposta)
         graph.add_node("tratar_erro", self._node_tratar_erro)
@@ -614,10 +759,22 @@ class ConversationOrchestrator:
             "gerar_resposta",
             self._rota_apos_gerar_resposta,
             {
-                "verificar_resposta": "verificar_resposta",
+                "avaliar_confianca": "avaliar_confianca",
                 "tratar_erro": "tratar_erro",
             },
         )
+
+        graph.add_conditional_edges(
+            "avaliar_confianca",
+            self._rota_apos_avaliar_confianca,
+            {
+                "verificar_resposta": "verificar_resposta",
+                "gerar_resposta_escalacao": "gerar_resposta_escalacao",
+                "tratar_erro": "tratar_erro",
+            },
+        )
+
+        graph.add_edge("gerar_resposta_escalacao", "verificar_resposta")
 
         graph.add_conditional_edges(
             "verificar_resposta",
@@ -665,6 +822,13 @@ class ConversationOrchestrator:
     def _rota_apos_gerar_resposta(self, state: ConversationState) -> str:
         if state.get("erro"):
             return "tratar_erro"
+        return "avaliar_confianca"
+
+    def _rota_apos_avaliar_confianca(self, state: ConversationState) -> str:
+        if state.get("erro"):
+            return "tratar_erro"
+        if state.get("_escalar_para_opus"):
+            return "gerar_resposta_escalacao"
         return "verificar_resposta"
 
     def _rota_apos_verificacao(self, state: ConversationState) -> str:
@@ -815,37 +979,48 @@ class ConversationOrchestrator:
                 log.info("cliente_sem_processos")
                 return {"resposta_verificada": TEMPLATE_CLIENTE_SEM_PROCESSO}
 
-            # MVP: usa o processo com andamento mais recente (primeiro da lista)
+            # Seleciona processo: se a mensagem menciona um CNJ explícito, usa esse;
+            # caso contrário usa o com andamento mais recente (primeiro da lista).
+            _CNJ_NA_MENSAGEM = re.compile(r"\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}")
             processo = processos[0]
+            match_cnj = _CNJ_NA_MENSAGEM.search(state["mensagem_original"])
+            if match_cnj and len(processos) > 1:
+                cnj_mencionado = match_cnj.group(0)
+                for p in processos:
+                    if p.numero_cnj and cnj_mencionado in p.numero_cnj:
+                        processo = p
+                        break
+
             numero_cnj = processo.numero_cnj
 
-            # Tenta cache de andamentos → Jusbrasil como fallback.
-            # RAG é executado em paralelo com Jusbrasil quando há cache miss,
+            # Tenta cache de andamentos → DataJud como fallback.
+            # RAG é executado em paralelo com DataJud quando há cache miss,
             # eliminando latência adicional no caminho crítico.
             andamentos = await self._cache.get_andamentos(numero_cnj)
+            rag_docs_com_score: list[dict] = []
             if andamentos:
                 log.debug("andamentos_do_cache", cnj=numero_cnj)
-                contexto_rag = await self._buscar_rag(state)
+                contexto_rag, rag_docs_com_score = await self._buscar_rag(state)
             else:
                 contexto_processo_para_rag = {
                     "tipo_acao": getattr(processo, "tipo_acao", None),
                     "tribunal": processo.tribunal,
                 }
                 try:
-                    andamentos, contexto_rag = await asyncio.wait_for(
+                    (andamentos, (contexto_rag, rag_docs_com_score)) = await asyncio.wait_for(
                         asyncio.gather(
-                            self._jusbrasil.sincronizar_andamentos(numero_cnj),
+                            self._datajud.buscar_andamentos_async(numero_cnj),
                             self._buscar_rag(state, contexto_processo_para_rag),
                         ),
-                        timeout=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                        timeout=_TIMEOUT_DATAJUD_SEGUNDOS,
                     )
-                    await self._cache.set_andamentos(numero_cnj, andamentos)
-                    log.info("andamentos_do_jusbrasil", cnj=numero_cnj)
+                    if andamentos:
+                        await self._cache.set_andamentos(numero_cnj, andamentos)
+                    log.info("andamentos_do_datajud", cnj=numero_cnj, total=len(andamentos))
                 except TimeoutError:
-                    # Jusbrasil lento → degrada gracefully com dados do banco
                     log.warning(
-                        "jusbrasil_timeout_usando_dados_banco",
-                        timeout_s=_TIMEOUT_JUSBRASIL_SEGUNDOS,
+                        "datajud_timeout_usando_dados_banco",
+                        timeout_s=_TIMEOUT_DATAJUD_SEGUNDOS,
                         cnj=numero_cnj,
                     )
                     andamentos = []
@@ -881,6 +1056,13 @@ class ConversationOrchestrator:
                 if a.get("descricao")
             ]
 
+            # Informa a IA se o cliente tem mais de um processo ativo
+            outros_processos = [
+                {"numero_cnj": p.numero_cnj, "tipo_acao": getattr(p, "tipo_acao", None) or "N/D"}
+                for p in processos
+                if p.id != processo.id
+            ]
+
             dados_processo = {
                 "processo_id": processo.id,
                 "numero_cnj": numero_cnj,
@@ -891,14 +1073,21 @@ class ConversationOrchestrator:
                 "data_ultimo_andamento": data_ultimo,
                 "andamentos_recentes": andamentos_recentes,
                 "glossario_andamento": glossario_andamento,
+                "outros_processos_ativos": outros_processos,
             }
 
-            log.info("dados_processo_obtidos", cnj=numero_cnj, rag_ativo=bool(contexto_rag))
+            log.info(
+                "dados_processo_obtidos",
+                cnj=numero_cnj,
+                rag_ativo=bool(contexto_rag),
+                total_processos=len(processos),
+            )
 
             return {
                 "processo_id": processo.id,
                 "dados_processo": dados_processo,
                 "contexto_rag": contexto_rag or None,
+                "rag_docs_com_score": rag_docs_com_score,
             }
 
         except Exception as exc:
@@ -1129,6 +1318,229 @@ class ConversationOrchestrator:
             return {"erro": f"gerar_resposta:{exc}"}
 
     # -----------------------------------------------------------------------
+    # Nó 3b — avaliar_confianca
+    # -----------------------------------------------------------------------
+
+    async def _node_avaliar_confianca(self, state: ConversationState) -> dict:
+        """
+        Avalia a confiança da resposta Claude e decide se deve escalar para Claude Opus.
+        Se o escritório não tiver escalação habilitada, passa direto para verificar_resposta.
+        """
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+
+        # Fallbacks já são respostas pré-definidas — não faz sentido escalar
+        if state.get("usando_fallback"):
+            return {"_escalar_para_opus": False}
+
+        try:
+            async with self._session_factory() as session:
+                escritorio, _ = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
+                )
+
+            if not escritorio:
+                return {"_escalar_para_opus": False}
+
+            # Scores reais do RAG (armazenados pelo nó buscar_dados)
+            rag_docs = state.get("rag_docs_com_score") or []
+
+            # Fact check — roda aqui para alimentar o ConfidenceRouter.
+            # O resultado bruto (verificado/correcoes) é armazenado no state para
+            # ser reaproveitado por verificar_resposta sem segunda chamada ao banco.
+            fact_check_result: dict = {}
+            fact_check_para_router: dict = {}
+            if state.get("dados_processo") and state.get("processo_id"):
+                class _InteracaoStub:
+                    metadata_json: dict | None = None
+
+                try:
+                    fact_check_result = await self._fact_checker.verificar_status_processo(
+                        processo_id=str(state["processo_id"]),
+                        afirmacao_ia=state.get("resposta_ia") or "",
+                        interacao=_InteracaoStub(),
+                    )
+                    # Converte para o formato esperado pelo ConfidenceRouter:
+                    # hallucination_score = proporção de correções (FactChecker verifica 3 campos)
+                    correcoes = fact_check_result.get("correcoes", [])
+                    hallucination_score = 0.0 if fact_check_result.get("verificado", True) else min(1.0, len(correcoes) / 3)
+                    fact_check_para_router = {"hallucination_score": hallucination_score}
+                except Exception as exc_fc:
+                    log.warning("avaliar_confianca_fact_check_falhou", erro=str(exc_fc))
+
+            score = self._confidence_router.avaliar(
+                mensagem=state["mensagem_original"],
+                resposta_claude=state.get("resposta_ia"),
+                tipo_intencao=state.get("intencao", "outro"),
+                rag_docs=rag_docs,
+                fact_check_result=fact_check_para_router,
+                historico_cliente=state.get("historico", []),
+                tentativas_geracao=state.get("tentativas_correcao", 0),
+                escritorio_id=state["escritorio_id"],
+            )
+
+            destino = self._confidence_router.rotear(score, escritorio)
+            deve_escalar = destino == "escalacao"
+
+            log.info(
+                "confidence_avaliado",
+                score=score.valor,
+                deve_escalar=deve_escalar,
+                motivo=score.motivo,
+            )
+
+            if deve_escalar:
+                motivo_label = "forcado" if score.deve_escalar else "score_baixo"
+                escalacao_roteamentos_total.labels(
+                    escritorio_id=str(state["escritorio_id"]),
+                    motivo=motivo_label,
+                ).inc()
+
+            return {
+                "confidence_score": score.valor,
+                "_escalar_para_opus": deve_escalar,
+                "fact_check_result": fact_check_result,
+            }
+
+        except Exception as exc:
+            _erros_total.labels(no="avaliar_confianca").inc()
+            log.warning("avaliar_confianca_erro_graceful", erro=str(exc))
+            # Falha no roteador não deve derrubar o fluxo — continua com Claude
+            return {"_escalar_para_opus": False}
+
+    # -----------------------------------------------------------------------
+    # Nó 3c — gerar_resposta_escalacao
+    # -----------------------------------------------------------------------
+
+    async def _node_gerar_resposta_escalacao(self, state: ConversationState) -> dict:
+        """
+        Gera resposta usando Claude Opus (escalação) quando o ConfidenceRouter
+        decidiu que a pergunta requer maior precisão jurídica.
+        Fallback: usa a resposta Claude já gerada no state se Opus falhar.
+        """
+        log = logger.bind(
+            escritorio_id=state["escritorio_id"],
+            cliente_id=state["cliente_id"],
+            intencao=state.get("intencao"),
+        )
+
+        intencao = state.get("intencao", "outro")
+
+        try:
+            async with self._session_factory() as session:
+                escritorio, cliente = await self._obter_escritorio_cliente(
+                    session, state["escritorio_id"], state["cliente_id"]
+                )
+
+            nome_escritorio = escritorio.nome if escritorio else "Escritório"
+            nome_cliente = cliente.nome if cliente else "cliente"
+
+            # Monta system prompt para escalação
+            if intencao in ("perspectivas", "pergunta_juridica", "juridica_complexa"):
+                system_prompt = SYSTEM_PROMPT_ESCALACAO_PERGUNTA_JURIDICA.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                )
+            else:
+                contexto_docs = state.get("contexto_rag") or ""
+                system_prompt = SYSTEM_PROMPT_ESCALACAO_CLIENTE_BASE.format(
+                    nome_escritorio=nome_escritorio,
+                    nome_cliente=nome_cliente,
+                    contexto_documentos=contexto_docs,
+                )
+
+            import time as _time
+            t_inicio = _time.perf_counter()
+
+            resultado = await asyncio.wait_for(
+                self._escalacao_client.gerar_resposta(
+                    system_prompt=system_prompt,
+                    mensagem_usuario=state["mensagem_original"],
+                    contexto_rag=state.get("contexto_rag") or "",
+                    escritorio_id=state["escritorio_id"],
+                ),
+                timeout=50.0,  # Opus é mais lento — timeout maior
+            )
+
+            latencia = int((_time.perf_counter() - t_inicio) * 1000)
+            escalacao_latencia_ms.observe(latencia)
+            escalacao_requests_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                resultado="sucesso",
+            ).inc()
+            escalacao_tokens_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                tipo="input",
+            ).inc(resultado.tokens_input)
+            escalacao_tokens_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                tipo="output",
+            ).inc(resultado.tokens_output)
+
+            # Atualiza contagem de tokens de escalação no escritório
+            try:
+                async with self._session_factory() as session:
+                    await session.execute(
+                        update(Escritorio)
+                        .where(Escritorio.id == state["escritorio_id"])
+                        .values(
+                            escalacao_tokens_usados_mes=Escritorio.escalacao_tokens_usados_mes
+                            + resultado.tokens_input
+                            + resultado.tokens_output
+                        )
+                    )
+                    await session.commit()
+            except Exception as exc_quota:
+                log.warning("escalacao_atualizar_quota_falhou", erro=str(exc_quota))
+
+            tokens_anteriores = state.get("tokens_usados") or {"input": 0, "output": 0}
+            custo_anterior = Decimal(tokens_anteriores.get("custo_str", "0"))
+            tokens_atualizados = {
+                "input": tokens_anteriores.get("input", 0) + resultado.tokens_input,
+                "output": tokens_anteriores.get("output", 0) + resultado.tokens_output,
+                "custo_str": str(custo_anterior + resultado.custo_estimado),
+            }
+
+            log.info(
+                "resposta_escalacao_gerada",
+                latencia_ms=latencia,
+                tokens=tokens_atualizados,
+            )
+            return {
+                "resposta_ia": resultado.conteudo,
+                "tokens_usados": tokens_atualizados,
+                "modelo_ia_usado": "claude_opus",
+                "precisa_regenerar": False,
+            }
+
+        except (EscalacaoIndisponivelError, TimeoutError) as exc:
+            # Claude Opus indisponível — usa resposta Claude padrão já no state
+            escalacao_requests_total.labels(
+                escritorio_id=str(state["escritorio_id"]),
+                resultado="fallback_claude",
+            ).inc()
+            log.warning(
+                "escalacao_indisponivel_usando_claude",
+                erro=str(exc),
+            )
+            return {
+                "modelo_ia_usado": "claude_opus_fallback",
+                "precisa_regenerar": False,
+            }
+
+        except Exception as exc:
+            _erros_total.labels(no="gerar_resposta_escalacao").inc()
+            log.error("gerar_resposta_escalacao_erro_inesperado", erro=str(exc))
+            # Não propaga erro — usa resposta Claude já disponível
+            return {
+                "modelo_ia_usado": "claude_opus_fallback",
+                "precisa_regenerar": False,
+            }
+
+    # -----------------------------------------------------------------------
     # Nó 4 — verificar_resposta
     # -----------------------------------------------------------------------
 
@@ -1164,15 +1576,19 @@ class ConversationOrchestrator:
                 adicionar_disclaimer=eh_sobre_processo,
             )
 
-            # Verificar factualidade quando há dados de processo
+            # Verificar factualidade quando há dados de processo.
+            # Reaproveitamos o resultado do nó avaliar_confianca quando disponível
+            # para evitar uma segunda chamada ao banco.
             precisa_regenerar = False
             if state.get("dados_processo") and state.get("processo_id"):
-                resultado_fc = await self._fact_checker.verificar_status_processo(
-                    processo_id=str(state["processo_id"]),
-                    afirmacao_ia=resposta_filtrada,
-                    interacao=stub,
-                )
-                if not resultado_fc["verificado"]:
+                resultado_fc = state.get("fact_check_result") or {}
+                if not resultado_fc:
+                    resultado_fc = await self._fact_checker.verificar_status_processo(
+                        processo_id=str(state["processo_id"]),
+                        afirmacao_ia=resposta_filtrada,
+                        interacao=stub,
+                    )
+                if not resultado_fc.get("verificado", True):
                     tentativas = state.get("tentativas_correcao") or 0
                     if tentativas < 2:
                         precisa_regenerar = True
@@ -1398,6 +1814,14 @@ class ConversationOrchestrator:
             await self._node_tratar_erro(state)
             return state  # type: ignore[return-value]
 
+        # Nó 3b: avaliar confiança e escalar se necessário
+        state.update(await self._node_avaliar_confianca(state))  # type: ignore[typeddict-item]
+        if state.get("_escalar_para_opus"):
+            state.update(await self._node_gerar_resposta_escalacao(state))  # type: ignore[typeddict-item]
+            if state.get("erro"):
+                await self._node_tratar_erro(state)
+                return state  # type: ignore[return-value]
+
         # Nó 4: verificar (com até 1 re-geração)
         for _ in range(2):
             state.update(await self._node_verificar_resposta(state))  # type: ignore[typeddict-item]
@@ -1428,7 +1852,7 @@ def criar_orchestrador(
     api_key_anthropic: str,
     redis_client: Redis,
     session_factory: async_sessionmaker[AsyncSession],
-    api_key_jusbrasil: str | None = None,
+    api_key_datajud: str | None = None,
     api_key_evolution: str | None = None,
     evolution_base_url: str = "http://localhost:8080",
 ) -> ConversationOrchestrator:
@@ -1436,7 +1860,7 @@ def criar_orchestrador(
         claude_client=ClaudeClient(api_key=api_key_anthropic),
         memory=ConversationMemory(redis=redis_client),
         translator=JuridicalTranslator(),
-        jusbrasil_client=JusbrasilClient(api_key=api_key_jusbrasil),
+        datajud_client=DataJudClient(api_key=api_key_datajud),
         cache_manager=LegalDataCacheManager(redis_client=redis_client),
         evolution_client=EvolutionClient(
             base_url=evolution_base_url,
@@ -1489,7 +1913,7 @@ def executar_fluxo_orquestrador(
                 claude_client=ClaudeClient(api_key=settings.ANTHROPIC_API_KEY),
                 memory=ConversationMemory(redis=redis_client),
                 translator=_criar_translator(),
-                jusbrasil_client=JusbrasilClient(api_key=settings.JUSBRASIL_API_KEY),
+                datajud_client=DataJudClient(api_key=settings.DATAJUD_API_KEY),
                 cache_manager=LegalDataCacheManager(redis_client=redis_client),
                 evolution_client=EvolutionClient(
                     base_url=settings.EVOLUTION_API_URL,

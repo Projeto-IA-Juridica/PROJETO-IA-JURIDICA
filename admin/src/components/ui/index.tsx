@@ -89,7 +89,7 @@ if (typeof document !== 'undefined' && !document.getElementById('spin-style')) {
 }
 
 // EmptyState
-interface EmptyStateProps { icon?: string; title: string; desc?: string; action?: React.ReactNode }
+interface EmptyStateProps { icon?: React.ReactNode; title: string; desc?: string; action?: React.ReactNode }
 export function EmptyState({ icon = '📭', title, desc, action }: EmptyStateProps) {
   return (
     <div className="empty-state">
@@ -104,14 +104,43 @@ export function EmptyState({ icon = '📭', title, desc, action }: EmptyStatePro
 // ErrorBox
 export function ErrorBox({ message }: { message: string }) {
   return (
-    <div style={{
-      background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: 8,
-      padding: '12px 16px', color: '#fca5a5', fontSize: 13,
-    }}>
-      ⚠️ {message}
+    <div className="error-box" role="alert">
+      <span style={{ fontSize: 14 }}>⚠️</span>
+      <div style={{ marginLeft: 8 }}>{message}</div>
     </div>
   )
 }
 
 // Pagination
 export { Pagination } from './Pagination'
+
+// SkeletonCard — placeholder enquanto carrega dados
+export function SkeletonCard() {
+  return (
+    <div className="surface" style={{
+      padding: '16px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      backgroundColor: 'var(--surface-base)', userSelect: 'none',
+    }}>
+      <div style={{ height: 16, background: 'var(--surface-border)', borderRadius: 4, marginBottom: 8 }} />
+      <div style={{ height: 12, background: 'var(--surface-border)', borderRadius: 4, width: '70%' }} />
+    </div>
+  )
+}
+
+export function SkeletonGrid({ count = 3 }: { count?: number }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  )
+}
+
+// Inject pulse keyframe once
+if (typeof document !== 'undefined' && !document.getElementById('pulse-style')) {
+  const s = document.createElement('style')
+  s.id = 'pulse-style'
+  s.textContent = '@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }'
+  document.head.appendChild(s)
+}

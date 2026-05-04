@@ -170,10 +170,10 @@ def _mock_cache(andamentos=None) -> MagicMock:
     return c
 
 
-def _mock_jusbrasil(andamentos=None) -> MagicMock:
+def _mock_datajud(andamentos=None) -> MagicMock:
     j = MagicMock()
     default = [{"descricao": "Despacho proferido.", "data": "2024-06-01T10:00:00"}]
-    j.sincronizar_andamentos = AsyncMock(
+    j.buscar_andamentos_async = AsyncMock(
         return_value=andamentos if andamentos is not None else default
     )
     return j
@@ -205,7 +205,7 @@ def _make_orchestrator(
     claude: MagicMock | None = None,
     translator: MagicMock | None = None,
     cache: MagicMock | None = None,
-    jusbrasil: MagicMock | None = None,
+    datajud: MagicMock | None = None,
     evolution: MagicMock | None = None,
     memory: MagicMock | None = None,
 ) -> ConversationOrchestrator:
@@ -217,7 +217,7 @@ def _make_orchestrator(
             claude_client=claude or _mock_claude(),
             memory=memory or _mock_memory(),
             translator=translator or _mock_translator(),
-            jusbrasil_client=jusbrasil or _mock_jusbrasil(),
+            datajud_client=datajud or _mock_datajud(),
             cache_manager=cache or _mock_cache(andamentos=None),
             evolution_client=evolution or _mock_evolution(),
             session_factory=_session_factory_from(session),
@@ -348,29 +348,29 @@ class TestNodeBuscarDados:
         assert dados["tribunal"] == "TJSP"
         assert result["processo_id"] == 1
 
-    async def test_cache_hit_nao_chama_jusbrasil(self):
+    async def test_cache_hit_nao_chama_datajud(self):
         andamentos_cache = [{"descricao": "Andamento do cache.", "data": "2024-01-01"}]
         cache = _mock_cache(andamentos=andamentos_cache)
-        jusbrasil = _mock_jusbrasil()
-        orq = _make_orchestrator(cache=cache, jusbrasil=jusbrasil)
+        datajud = _mock_datajud()
+        orq = _make_orchestrator(cache=cache, datajud=datajud)
         result = await orq._node_buscar_dados(_base_state())
-        jusbrasil.sincronizar_andamentos.assert_not_called()
+        datajud.buscar_andamentos_async.assert_not_called()
         assert result["dados_processo"]["ultimo_andamento"] == "Andamento do cache."
 
-    async def test_cache_miss_chama_jusbrasil_e_salva_cache(self):
+    async def test_cache_miss_chama_datajud_e_salva_cache(self):
         cache = _mock_cache(andamentos=None)
-        jusbrasil = _mock_jusbrasil([{"descricao": "Despacho judicial.", "data": "2024-06-01"}])
-        orq = _make_orchestrator(cache=cache, jusbrasil=jusbrasil)
+        datajud = _mock_datajud([{"descricao": "Despacho judicial.", "data": "2024-06-01"}])
+        orq = _make_orchestrator(cache=cache, datajud=datajud)
         result = await orq._node_buscar_dados(_base_state())
-        jusbrasil.sincronizar_andamentos.assert_called_once()
+        datajud.buscar_andamentos_async.assert_called_once()
         cache.set_andamentos.assert_called_once()
         assert result["dados_processo"]["ultimo_andamento"] == "Despacho judicial."
 
     async def test_andamentos_vazios_usa_ultimo_andamento_do_banco(self):
-        """Jusbrasil retorna lista vazia → usa processo.ultimo_andamento do banco."""
+        """DataJud retorna lista vazia → usa processo.ultimo_andamento do banco."""
         cache = _mock_cache(andamentos=None)
-        jusbrasil = _mock_jusbrasil(andamentos=[])
-        orq = _make_orchestrator(cache=cache, jusbrasil=jusbrasil)
+        datajud = _mock_datajud(andamentos=[])
+        orq = _make_orchestrator(cache=cache, datajud=datajud)
         result = await orq._node_buscar_dados(_base_state())
         # _Processo.ultimo_andamento = "Audiência agendada para 10/02/2025."
         assert result["dados_processo"]["ultimo_andamento"] == "Audiência agendada para 10/02/2025."
@@ -385,7 +385,7 @@ class TestNodeBuscarDados:
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=_mock_evolution(),
                 session_factory=factory,
@@ -942,7 +942,7 @@ class TestNodeTratarErro:
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=_mock_evolution(),
                 session_factory=factory,
@@ -1217,7 +1217,7 @@ class TestFluxoSequencial:
                 claude_client=claude,
                 memory=memory,
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=evolution,
                 session_factory=_session_factory_from(_make_session()),
@@ -1239,7 +1239,7 @@ class TestFluxoSequencial:
                 claude_client=claude,
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=evolution,
                 session_factory=_session_factory_from(_make_session()),
@@ -1262,7 +1262,7 @@ class TestFluxoSequencial:
                 claude_client=claude,
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=evolution,
                 session_factory=_session_factory_from(_make_session(processos=[])),
@@ -1280,7 +1280,7 @@ class TestFluxoSequencial:
                 claude_client=_mock_claude(),
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=_mock_evolution(),
                 session_factory=_session_factory_from(_make_session()),
@@ -1303,7 +1303,7 @@ class TestFluxoSequencial:
                 claude_client=claude,
                 memory=_mock_memory(),
                 translator=_mock_translator(),
-                jusbrasil_client=_mock_jusbrasil(),
+                datajud_client=_mock_datajud(),
                 cache_manager=_mock_cache(),
                 evolution_client=_mock_evolution(),
                 session_factory=_session_factory_from(_make_session()),

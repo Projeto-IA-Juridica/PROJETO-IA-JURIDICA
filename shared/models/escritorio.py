@@ -13,7 +13,7 @@ from datetime import time
 from datetime import datetime
 
 from sqlalchemy import Boolean, Integer, SmallInteger, String, Text, Time, UniqueConstraint
-from sqlalchemy import TIMESTAMP
+from sqlalchemy import TIMESTAMP, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -130,11 +130,45 @@ class Escritorio(Base, TimestampMixin):
         comment="Template personalizado para quando não há novidades",
     )
 
+    # --- Quota de Tokens Claude ---
+    # Limite mensal por plano. None = sem limite (enterprise).
+    # Defaults aplicados automaticamente na migration.
+    # Planos: basico=500K | profissional=2M | enterprise=None
+    quota_tokens_mes: Mapped[int | None] = mapped_column(
+        BigInteger(),
+        nullable=True,
+        comment="Limite mensal de tokens Claude (input+output). None = ilimitado.",
+    )
+    tokens_usados_mes: Mapped[int] = mapped_column(
+        BigInteger(),
+        nullable=False,
+        server_default="0",
+        comment="Total de tokens consumidos no mês corrente.",
+    )
+    tokens_reset_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        comment="Timestamp do último reset mensal do contador de tokens.",
+    )
+
     # --- Feature 3: Prospecção Inteligente ---
     # Perfil de especialização gerado pelo DNAAdvogadoService.
     # Estrutura: {especialidades, setores_alvo, tipo_lead_predominante,
     #             perfil_cliente_ideal, diferenciais, gerado_em}
     dna_prospeccao: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
+
+    # --- Feature Hub do Advogado — Modelo de Escalação (Claude Opus) ---
+    # escalacao_habilitada: liga/desliga o Hub por escritório (feature flag por tenant).
+    # escalacao_canal_advogado_numero: número WhatsApp dedicado ao Hub; se None usa o mesmo
+    #   canal do cliente distinguindo por role do remetente.
+    # escalacao_quota_tokens_mes: limite mensal de tokens do modelo de escalação (input+output).
+    # escalacao_tokens_usados_mes: consumo acumulado no mês corrente.
+    # escalacao_confidence_threshold: score mínimo do ConfidenceRouter para não escalar (0.0–1.0).
+    escalacao_habilitada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    escalacao_canal_advogado_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    escalacao_quota_tokens_mes: Mapped[int] = mapped_column(Integer, default=500_000, nullable=False)
+    escalacao_tokens_usados_mes: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    escalacao_confidence_threshold: Mapped[float] = mapped_column(default=0.70, nullable=False)
 
     # --- Relacionamentos ---
     usuarios: Mapped[list["Usuario"]] = relationship(  # noqa: F821

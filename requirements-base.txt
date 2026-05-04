@@ -46,6 +46,7 @@ opentelemetry-exporter-otlp-proto-http==1.23.0
 opentelemetry-instrumentation-fastapi==0.44b0
 opentelemetry-instrumentation-httpx==0.44b0
 opentelemetry-instrumentation-celery==0.44b0
+setuptools<70.0.0  # OTel 0.44b0 exige pkg_resources, removido nas versões 70+ do setuptools
 
 # Logging estruturado
 structlog==24.1.0

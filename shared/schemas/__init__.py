@@ -41,6 +41,15 @@ from shared.schemas.processo import (
     ProcessoResponse,
     ProcessoUpdate,
 )
+from shared.schemas.hub_advogado import (
+    AdvogadoAtivo,
+    ConsultaHubRequest,
+    ConsultaHubResponse,
+    IntencaoCount,
+    MetricasHubResponse,
+    SessaoAdvogadoListItem,
+    SessaoAdvogadoResponse,
+)
 from shared.schemas.response import ErrorResponse, PaginatedResponse, SuccessResponse
 from shared.schemas.usuario import (
     TokenResponse,
@@ -77,4 +86,12 @@ __all__ = [
     "SuccessResponse",
     "ErrorResponse",
     "PaginatedResponse",
+    # Hub do Advogado
+    "ConsultaHubRequest",
+    "ConsultaHubResponse",
+    "SessaoAdvogadoListItem",
+    "SessaoAdvogadoResponse",
+    "IntencaoCount",
+    "AdvogadoAtivo",
+    "MetricasHubResponse",
 ]

@@ -42,6 +42,7 @@ feature1 = [
     # Async tasks
     "celery==5.3.6",
     "flower==2.0.1",
+    "redbeat==2.2.0",
     # HTTP async
     "aiohttp==3.9.3",
     # Audio

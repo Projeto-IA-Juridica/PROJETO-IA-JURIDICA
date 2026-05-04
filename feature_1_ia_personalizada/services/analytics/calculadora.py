@@ -122,6 +122,8 @@ class CalculadoraAnalytics:
         """
         dt_inicio = datetime.now(timezone.utc) - timedelta(weeks=semanas)
 
+        from sqlalchemy import text
+
         stmt = (
             select(
                 func.date_trunc("week", Interacao.created_at).label("semana"),
@@ -135,8 +137,8 @@ class CalculadoraAnalytics:
                 Interacao.escritorio_id == self.escritorio_id,
                 Interacao.created_at >= dt_inicio,
             )
-            .group_by(func.date_trunc("week", Interacao.created_at))
-            .order_by(func.date_trunc("week", Interacao.created_at))
+            .group_by(text("semana"))
+            .order_by(text("semana"))
         )
         result = await self.db.execute(stmt)
         rows = result.all()

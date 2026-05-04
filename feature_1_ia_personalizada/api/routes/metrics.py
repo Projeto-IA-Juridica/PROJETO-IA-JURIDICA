@@ -119,6 +119,34 @@ audio_transcritos_total = Counter(
     labelnames=["resultado"],  # sucesso | erro_duracao | erro_whisper | erro_inesperado
 )
 
+# ---------------------------------------------------------------------------
+# Métricas de escalação — Claude Opus (ex-Harvey)
+# ---------------------------------------------------------------------------
+
+escalacao_requests_total = Counter(
+    "escalacao_requests_total",
+    "Total de chamadas ao modelo de escalação (Claude Opus)",
+    labelnames=["escritorio_id", "resultado"],  # resultado: sucesso | fallback_claude | circuit_breaker
+)
+
+escalacao_roteamentos_total = Counter(
+    "escalacao_roteamentos_total",
+    "Total de mensagens roteadas para Claude Opus pelo ConfidenceRouter",
+    labelnames=["escritorio_id", "motivo"],  # motivo: score_baixo | forcado_termos | forcado_intencao
+)
+
+escalacao_tokens_total = Counter(
+    "escalacao_tokens_total",
+    "Total de tokens consumidos pelo modelo de escalação por escritório",
+    labelnames=["escritorio_id", "tipo"],  # tipo: input | output
+)
+
+escalacao_latencia_ms = Histogram(
+    "escalacao_latencia_ms",
+    "Latência das chamadas ao modelo de escalação em milissegundos",
+    buckets=(1000, 2000, 5000, 10000, 20000, 30000, 45000, 60000),
+)
+
 
 def _verificar_token(request: Request) -> None:
     """

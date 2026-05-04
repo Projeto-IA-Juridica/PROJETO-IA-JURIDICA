@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # Integrações
     EVOLUTION_API_URL: str
     EVOLUTION_API_KEY: str
-    JUSBRASIL_API_KEY: str
+    JUSBRASIL_API_KEY: str | None = None  # não utilizado; mantido para compatibilidade de env
     DATAJUD_API_KEY: str | None = None
 
     # RAG — Voyage AI (opcional; se ausente usa OpenAI text-embedding-3-small)
@@ -71,6 +71,17 @@ class Settings(BaseSettings):
     # Sem essas variáveis o LinkedInClient opera em modo degradado (retorna []).
     LINKEDIN_CLIENT_ID: str | None = None
     LINKEDIN_CLIENT_SECRET: str | None = None
+
+    # Vibe Prospecting (Explorium AgentSource) — Feature 3 (Prospecção Inteligente)
+    # Alternativa/complemento ao LinkedIn Partner Program para enriquecimento B2B.
+    # Sem essa variável o VibeProspectingClient opera em modo degradado (retorna []).
+    EXPLORIUM_API_KEY: str | None = None
+
+    # Modelo de Escalação — Feature Hub do Advogado
+    # Modelo Claude usado quando o ConfidenceRouter decide escalar (score baixo ou forçamento).
+    # ESCALACAO_HABILITADO=False por padrão; controle por escritório é via banco (escalacao_habilitada).
+    MODELO_ESCALACAO: str = "claude-opus-4-6"
+    ESCALACAO_HABILITADO: bool = False
 
     # CORS
     CORS_ALLOWED_ORIGINS: list[str] = [

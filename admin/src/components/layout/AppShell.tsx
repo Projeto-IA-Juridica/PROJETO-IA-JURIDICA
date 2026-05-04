@@ -3,10 +3,10 @@ import Sidebar from './Sidebar'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-base)' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '28px 32px' }}>
+      <main className="app-main">
+        <div className="app-content">
           {children}
         </div>
       </main>

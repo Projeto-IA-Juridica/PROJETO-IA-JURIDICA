@@ -162,7 +162,7 @@ services:
     command: >
       celery -A feature_1_ia_personalizada.workers.celery_app worker
       --loglevel=info
-      --queues=monitoramento,notificacoes,ia,relacionamento
+      --queues=monitoramento,notificacoes,ia,relacionamento,hub_advogado
       --concurrency=4
 
   # ---------------------------------------------------------------------------

@@ -91,6 +91,12 @@ class Interacao(Base, TimestampMixin, TenantMixin):
     )
 
     # --- Métricas de IA ---
+    modelo_ia: Mapped[str] = mapped_column(
+        String(50),
+        server_default="claude",
+        nullable=False,
+        comment="IA que gerou a resposta: claude | claude_opus | claude_opus_fallback",
+    )
     tokens_input: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     tokens_output: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     custo_estimado: Mapped[Decimal] = mapped_column(

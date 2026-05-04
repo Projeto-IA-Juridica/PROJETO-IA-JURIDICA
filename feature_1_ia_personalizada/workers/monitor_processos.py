@@ -25,7 +25,7 @@ from feature_1_ia_personalizada.services.legal_data.data_cleaner import (
     LegalDataCleaner as DataCleaner,
 )
 from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ScoreRiscoCalculator,
 )
 from shared.config.settings import settings

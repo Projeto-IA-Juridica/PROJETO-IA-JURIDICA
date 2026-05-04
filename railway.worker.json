@@ -5,7 +5,7 @@
     "dockerfilePath": "infrastructure/docker/Dockerfile.f1"
   },
   "deploy": {
-    "startCommand": "celery -A feature_1_ia_personalizada.workers.celery_app worker --loglevel=info --concurrency=2",
+    "startCommand": "celery -A feature_1_ia_personalizada.workers.celery_app worker --loglevel=info --queues=monitoramento,notificacoes,ia,relacionamento,hub_advogado --concurrency=2",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }

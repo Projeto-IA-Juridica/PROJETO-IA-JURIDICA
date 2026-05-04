@@ -15,7 +15,14 @@ import { Spinner } from './components/ui'
 
 const qc = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 2 * 60_000 },
+    queries: {
+      retry: 1, // Retry 1 vez em caso de falha de rede
+      staleTime: 2 * 60_000, // 2 min — dados frescos mantidos por mais tempo (menos requisições)
+      gcTime: 10 * 60_000, // 10 min — cache mantido por 10 min antes de descartar
+      refetchOnWindowFocus: false, // Não refetch ao voltar para a aba
+      refetchOnMount: false, // Não refetch ao montar componente se tem cache (CRITICAL)
+      refetchOnReconnect: false, // Não refetch ao reconectar (evita travamentos)
+    },
   },
 })
 
@@ -25,7 +32,7 @@ function ProtectedRoutes() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <Spinner size={28} />
+        <Spinner size={24} />
       </div>
     )
   }

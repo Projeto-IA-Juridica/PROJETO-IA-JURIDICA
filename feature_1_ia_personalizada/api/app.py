@@ -22,7 +22,6 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from shared.config.settings import settings
-from shared.telemetry import setup_telemetry
 
 # Validar formato das chaves no startup
 
@@ -133,6 +132,7 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     clientes,
     crm,
     health,
+    hub_advogado,
     metrics,
     onboarding,
     processos,
@@ -215,14 +215,6 @@ app = FastAPI(
 )
 
 # ==========================================
-# OPENTELEMETRY — distributed tracing
-# ==========================================
-# Propaga W3C traceparent: FastAPI → Celery → httpx (DataJud, Evolution, Voyage).
-# trace_id fica disponível em todos os logs structlog via RequestLoggingMiddleware.
-# Exportação de spans habilitada apenas quando OTLP_ENDPOINT estiver no .env.
-setup_telemetry(app)
-
-# ==========================================
 # MIDDLEWARES GLOBAIS
 # ==========================================
 # CORS: em development permite qualquer origem; em staging/production restringe
@@ -266,6 +258,7 @@ app.include_router(onboarding)
 app.include_router(processos)
 app.include_router(clientes.router)
 app.include_router(prospeccao.router)
+app.include_router(hub_advogado.router)
 app.include_router(crm.router)
 app.include_router(chat)
 app.include_router(rag)

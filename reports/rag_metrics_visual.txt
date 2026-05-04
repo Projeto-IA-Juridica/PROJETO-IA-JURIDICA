@@ -1,0 +1,55 @@
+
+╔══════════════════════════════════════════════════════════════════════╗
+║         RELATÓRIO DE TESTES — MÉTRICAS PROMETHEUS RAG               ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📅 Gerado em: 2026-05-03T21:39:03.430769
+⏱️  Duração dos testes: 0.403s
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 📊 MÉTRICAS CAPTURADAS                                               │
+└──────────────────────────────────────────────────────────────────────┘
+
+  Total de queries testadas:
+    7 buscas
+
+  Contextos RAG Injetados (✓ Sucesso):
+    4 respostas receberam contexto
+
+  Contextos RAG Vazios (✗ Sem resultado):
+    3 buscas sem resultado acima do threshold
+
+  Total de buscas processadas:
+    7 buscas
+
+  Taxa de Sucesso RAG (Hit Rate):
+    57.1%
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 📈 ANÁLISE                                                           │
+└──────────────────────────────────────────────────────────────────────┘
+
+  Status: ⚠️  REVISAR
+
+  Interpretação:
+    • Hit rate >= 70%: ✓ Aceitável (RAG funcionando bem)
+    • Hit rate < 70%:  ⚠️  Revisar configuração
+    • Hit rate ~ 0%:   ❌ Problema grave (verificar VectorStore)
+
+  Possíveis causas se taxa baixa:
+    ✗ RAG_MIN_SIMILARITY threshold muito alto
+    ✗ VectorStore sem documentos carregados
+    ✗ Embeddings mal calibrados
+    ✗ Redis cache indisponível em produção
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 📋 RECOMENDAÇÕES                                                     │
+└──────────────────────────────────────────────────────────────────────┘
+
+  1. Monitorar hit rate ao longo do tempo (criar gráfico em Grafana)
+  2. Se baixo: revisar RAG_MIN_SIMILARITY em shared/config/constants.py
+  3. Testar com dados reais (não apenas mocks)
+  4. Verificar latência: rag_vector_search_seconds (Prometheus histogram)
+  5. Monitorar cache hits: rag_search_cache_hits_total
+
+╔══════════════════════════════════════════════════════════════════════╗

@@ -23,6 +23,7 @@ import httpx
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +35,7 @@ from shared.models.processo import Processo
 from shared.models.usuario import Usuario
 from shared.schemas.escritorio import EscritorioResponse
 from shared.security.encryption import hash_senha
-from shared.security.jwt import criar_refresh_token, criar_token
+from shared.security.jwt import criar_refresh_token, criar_token, token_esta_revogado, validar_token
 from shared.utils.validators import normalizar_cnpj, validar_cnpj, validar_oab
 
 logger = structlog.get_logger(__name__)
@@ -155,9 +156,30 @@ class ConfigurarTemplatesRequest(BaseModel):
 
 def _exigir_admin(request: Request) -> dict:
     """Valida que o token pertence a um admin e retorna o payload."""
-    if not hasattr(request.state, "user_payload"):
-        raise HTTPException(status_code=401, detail="Token JWT ausente.")
-    payload = request.state.user_payload
+    payload = getattr(request.state, "user_payload", None)
+
+    # Fallback defensivo: em alguns fluxos locais o middleware pode não ter injetado
+    # request.state.user_payload, mas o header Authorization ainda está presente.
+    if not isinstance(payload, dict):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Token JWT ausente.")
+
+        token = auth_header.split(" ", 1)[1].strip()
+        if not token:
+            raise HTTPException(status_code=401, detail="Token JWT ausente.")
+
+        try:
+            payload = validar_token(token)
+        except (ValueError, JWTError) as exc:
+            raise HTTPException(status_code=401, detail="Token JWT inválido.") from exc
+
+        if token_esta_revogado(token):
+            raise HTTPException(status_code=401, detail="Token revogado. Faça login novamente.")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=401, detail="Token JWT inválido.")
+
     if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Apenas administradores podem realizar o onboarding.")
     return payload
@@ -393,7 +415,16 @@ async def connect_whatsapp(
     Cria a instância na Evolution API e retorna o QR Code base64 para o cliente escanear.
     Ao conectar, o frontend deve fazer polling em GET /onboarding/whatsapp-status.
     """
-    escritorio = await _obter_escritorio_do_token(request, db)
+    try:
+        escritorio = await _obter_escritorio_do_token(request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("connect_whatsapp_auth_erro", erro=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro interno ao validar autenticação no onboarding: {str(exc)[:180]}",
+        ) from exc
 
     instance_name = f"escritorio_{escritorio.id}"
     configured_base = settings.EVOLUTION_API_URL.rstrip("/")
@@ -409,8 +440,44 @@ async def connect_whatsapp(
             ),
         )
 
+    def _tem_qr(payload: dict | None) -> bool:
+        if not isinstance(payload, dict):
+            return False
+        if payload.get("qrcode") or payload.get("qr_code") or payload.get("base64") or payload.get("qr"):
+            return True
+        instance = payload.get("instance")
+        if isinstance(instance, dict) and (
+            instance.get("qrcode") or instance.get("qr_code") or instance.get("base64") or instance.get("qr")
+        ):
+            return True
+        return False
+
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
+            async def _reconectar_instancia() -> dict:
+                ultima_resposta = None
+                for metodo in ("GET", "POST"):
+                    resp_connect = await client.request(
+                        metodo,
+                        f"{settings.EVOLUTION_API_URL}/instance/connect/{instance_name}",
+                        headers={"apikey": settings.EVOLUTION_API_KEY},
+                    )
+                    if resp_connect.status_code in (200, 201):
+                        return resp_connect.json()
+                    ultima_resposta = resp_connect
+
+                detail = "Instância criada/existente, mas falhou ao iniciar conexão para gerar QR."
+                if ultima_resposta is not None:
+                    detail = f"{detail} HTTP {ultima_resposta.status_code}."
+                    try:
+                        raw = ultima_resposta.text
+                        if raw:
+                            detail = f"{detail} Resposta: {raw[:400]}"
+                    except Exception:
+                        pass
+                logger.warning("evolution_reconnect_erro", escritorio_id=escritorio.id)
+                raise HTTPException(status_code=502, detail=detail)
+
             # 1. Cria a instância
             resp = await client.post(
                 f"{settings.EVOLUTION_API_URL}/instance/create",
@@ -424,25 +491,13 @@ async def connect_whatsapp(
 
             if resp.status_code in (200, 201):
                 data = resp.json()
+                # Em algumas versões da Evolution o QR não vem no /instance/create.
+                # Tentamos conectar explicitamente para obter o QR atual.
+                if not _tem_qr(data):
+                    data = await _reconectar_instancia()
             elif resp.status_code == 409:
                 # Instância já existe — reconecta e busca QR atual
-                resp_connect = await client.get(
-                    f"{settings.EVOLUTION_API_URL}/instance/connect/{instance_name}",
-                    headers={"apikey": settings.EVOLUTION_API_KEY},
-                )
-                if resp_connect.status_code not in (200, 201):
-                    detail = f"Instância já existe mas falhou ao reconectar (HTTP {resp_connect.status_code})."
-                    try:
-                        raw = resp_connect.text
-                        if raw:
-                            detail = f"{detail} Resposta: {raw[:400]}"
-                    except Exception:
-                        pass
-                    raise HTTPException(
-                        status_code=502,
-                        detail=detail,
-                    )
-                data = resp_connect.json()
+                data = await _reconectar_instancia()
             else:
                 detail = f"Evolution API retornou erro inesperado (HTTP {resp.status_code})."
                 try:
@@ -456,6 +511,7 @@ async def connect_whatsapp(
                             )
                 except Exception:
                     pass
+                logger.warning("evolution_create_erro", status=resp.status_code, escritorio_id=escritorio.id)
                 raise HTTPException(
                     status_code=502,
                     detail=detail,
@@ -465,34 +521,42 @@ async def connect_whatsapp(
         # Preserva detalhes de erro já preparados acima.
         raise
     except httpx.TimeoutException as exc:
+        logger.warning("evolution_timeout", escritorio_id=escritorio.id)
         raise HTTPException(
             status_code=504, detail="Evolution API não respondeu a tempo."
         ) from exc
     except httpx.HTTPError as exc:
-        logger.error("evolution_connect_http_error", erro=str(exc))
+        logger.error("evolution_connect_http_error", erro=str(exc), escritorio_id=escritorio.id)
         raise HTTPException(
             status_code=502,
             detail=f"Falha de comunicação com Evolution API: {str(exc)[:300]}",
         ) from exc
     except Exception as exc:
-        logger.error("evolution_connect_error", erro=str(exc))
-        raise HTTPException(status_code=502, detail="Erro ao conectar com a Evolution API.")
+        logger.error("evolution_connect_error", erro=str(exc), escritorio_id=escritorio.id, exc_info=True)
+        raise HTTPException(status_code=502, detail="Erro ao conectar com a Evolution API.") from exc
 
-    # Persiste o nome da instância no escritório
-    escritorio.webhook_whatsapp_instance = instance_name
-    if (escritorio.onboarding_etapa or 0) < 3:
-        escritorio.onboarding_etapa = 3
-    await db.commit()
+    try:
+        # Persiste o nome da instância no escritório
+        escritorio.webhook_whatsapp_instance = instance_name
+        if (escritorio.onboarding_etapa or 0) < 3:
+            escritorio.onboarding_etapa = 3
+        await db.commit()
 
-    qr_code = data.get("qrcode", {})
-    logger.info("onboarding_connect_whatsapp", escritorio_id=escritorio.id)
+        qr_code = data.get("qrcode") or data.get("qr_code") or data.get("base64") or data.get("qr")
+        if not qr_code and isinstance(data.get("instance"), dict):
+            inst_data = data.get("instance")
+            qr_code = inst_data.get("qrcode") or inst_data.get("qr_code") or inst_data.get("base64") or inst_data.get("qr")
+        logger.info("onboarding_connect_whatsapp", escritorio_id=escritorio.id)
 
-    return {
-        "etapa": 3,
-        "instance_name": instance_name,
-        "qr_code": qr_code,
-        "status": data.get("instance", {}).get("state", "qr"),
-    }
+        return {
+            "etapa": 3,
+            "instance_name": instance_name,
+            "qr_code": qr_code,
+            "status": data.get("instance", {}).get("state", "qr"),
+        }
+    except Exception as exc:
+        logger.error("connect_whatsapp_persist_erro", erro=str(exc), escritorio_id=escritorio.id, exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro ao salvar configuração do WhatsApp.") from exc
 
 
 @router.get(
@@ -507,7 +571,13 @@ async def whatsapp_status(
     Endpoint de polling para o frontend verificar se o WhatsApp foi conectado.
     Retorna `connected=true` quando a instância estiver online.
     """
-    escritorio = await _obter_escritorio_do_token(request, db)
+    try:
+        escritorio = await _obter_escritorio_do_token(request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("whatsapp_status_auth_erro", erro=str(exc))
+        return {"connected": False, "state": "error"}
 
     if not escritorio.webhook_whatsapp_instance:
         return {"connected": False, "state": "not_configured"}
@@ -518,18 +588,35 @@ async def whatsapp_status(
                 f"{settings.EVOLUTION_API_URL}/instance/connectionState/{escritorio.webhook_whatsapp_instance}",
                 headers={"apikey": settings.EVOLUTION_API_KEY},
             )
+
+            if resp.status_code >= 500:
+                logger.warning("evolution_api_5xx", status=resp.status_code, escritorio_id=escritorio.id)
+                return {"connected": False, "state": "evolution_offline"}
+
+            if resp.status_code >= 400:
+                logger.warning("evolution_api_error", status=resp.status_code, escritorio_id=escritorio.id)
+                return {"connected": False, "state": "error"}
+
             data = resp.json()
-    except Exception:
+    except httpx.TimeoutException:
+        logger.warning("evolution_timeout", escritorio_id=escritorio.id)
+        return {"connected": False, "state": "timeout"}
+    except Exception as exc:
+        logger.error("whatsapp_status_evolution_erro", erro=str(exc), escritorio_id=escritorio.id)
         return {"connected": False, "state": "error"}
 
-    state = data.get("instance", {}).get("state", "unknown")
-    connected = state == "open"
+    try:
+        state = data.get("instance", {}).get("state", "unknown")
+        connected = state == "open"
 
-    if connected and (escritorio.onboarding_etapa or 0) < 3:
-        escritorio.onboarding_etapa = 3
-        await db.commit()
+        if connected and (escritorio.onboarding_etapa or 0) < 3:
+            escritorio.onboarding_etapa = 3
+            await db.commit()
 
-    return {"connected": connected, "state": state}
+        return {"connected": connected, "state": state}
+    except Exception as exc:
+        logger.error("whatsapp_status_processing_erro", erro=str(exc), escritorio_id=escritorio.id)
+        return {"connected": False, "state": "error"}
 
 
 # ---------------------------------------------------------------------------
@@ -651,63 +738,73 @@ async def onboarding_status(
     """
     Retorna a etapa atual e o checklist completo do onboarding.
     """
-    escritorio = await _obter_escritorio_do_token(request, db)
+    try:
+        escritorio = await _obter_escritorio_do_token(request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("onboarding_status_erro", erro=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro ao carregar status do onboarding.") from exc
 
-    etapa = escritorio.onboarding_etapa or 0
-    total_etapas = 5
+    try:
+        etapa = escritorio.onboarding_etapa or 0
+        total_etapas = 5
 
-    etapas = [
-        {
-            "numero": 0,
-            "nome": "Registro",
-            "concluida": etapa >= 0,
-            "descricao": "Escritório e usuário admin criados",
-        },
-        {
-            "numero": 1,
-            "nome": "Configuração da IA",
-            "concluida": etapa >= 1,
-            "descricao": "Persona, tom e horários configurados",
-        },
-        {
-            "numero": 2,
-            "nome": "Importação de Processos",
-            "concluida": etapa >= 2,
-            "descricao": "Clientes e processos importados",
-        },
-        {
-            "numero": 3,
-            "nome": "Conexão WhatsApp",
-            "concluida": etapa >= 3,
-            "descricao": "Instância WhatsApp conectada",
-        },
-        {
-            "numero": 4,
-            "nome": "Templates de Mensagem",
-            "concluida": etapa >= 4,
-            "descricao": "Templates personalizados configurados",
-        },
-        {
-            "numero": 5,
-            "nome": "Go Live",
-            "concluida": etapa >= 5,
-            "descricao": "Monitoramento ativo para todos os processos",
-        },
-    ]
+        etapas = [
+            {
+                "numero": 0,
+                "nome": "Registro",
+                "concluida": etapa >= 0,
+                "descricao": "Escritório e usuário admin criados",
+            },
+            {
+                "numero": 1,
+                "nome": "Configuração da IA",
+                "concluida": etapa >= 1,
+                "descricao": "Persona, tom e horários configurados",
+            },
+            {
+                "numero": 2,
+                "nome": "Importação de Processos",
+                "concluida": etapa >= 2,
+                "descricao": "Clientes e processos importados",
+            },
+            {
+                "numero": 3,
+                "nome": "Conexão WhatsApp",
+                "concluida": etapa >= 3,
+                "descricao": "Instância WhatsApp conectada",
+            },
+            {
+                "numero": 4,
+                "nome": "Templates de Mensagem",
+                "concluida": etapa >= 4,
+                "descricao": "Templates personalizados configurados",
+            },
+            {
+                "numero": 5,
+                "nome": "Go Live",
+                "concluida": etapa >= 5,
+                "descricao": "Monitoramento ativo para todos os processos",
+            },
+        ]
 
-    percentual = int((etapa / total_etapas) * 100)
+        percentual = int((etapa / total_etapas) * 100)
 
-    return {
-        "onboarding_completo": escritorio.onboarding_completo or False,
-        "etapa_atual": etapa,
-        "percentual_completo": percentual,
-        "proxima_etapa": etapa + 1 if etapa < total_etapas else None,
-        "etapas": etapas,
-        "escritorio": {
-            "id": escritorio.id,
-            "nome": escritorio.nome,
-            "persona_nome": escritorio.persona_nome,
-            "persona_tom": escritorio.persona_tom,
-            "whatsapp_conectado": bool(escritorio.webhook_whatsapp_instance),
-        },
-    }
+        return {
+            "onboarding_completo": escritorio.onboarding_completo or False,
+            "etapa_atual": etapa,
+            "percentual_completo": percentual,
+            "proxima_etapa": etapa + 1 if etapa < total_etapas else None,
+            "etapas": etapas,
+            "escritorio": {
+                "id": escritorio.id,
+                "nome": escritorio.nome,
+                "persona_nome": escritorio.persona_nome,
+                "persona_tom": escritorio.persona_tom,
+                "whatsapp_conectado": bool(escritorio.webhook_whatsapp_instance),
+            },
+        }
+    except Exception as exc:
+        logger.error("onboarding_status_processamento", erro=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Erro ao processar status do onboarding.") from exc

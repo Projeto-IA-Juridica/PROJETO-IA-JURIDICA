@@ -25,6 +25,7 @@ from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import 
 )
 from feature_1_ia_personalizada.services.prospeccao.receita_federal_client import EmpresaDados
 from feature_1_ia_personalizada.services.prospeccao.linkedin_client import ContatoLinkedIn
+from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client import VibeProspectingClient
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +79,16 @@ def _make_linkedin_mock(
     return mock
 
 
+def _make_vibe_mock(
+    contatos: list[ContatoLinkedIn] | None = None,
+    disponivel: bool = False,
+) -> MagicMock:
+    mock = MagicMock(spec=VibeProspectingClient)
+    mock.disponivel = disponivel
+    mock.buscar_contatos_empresa = AsyncMock(return_value=contatos or [])
+    return mock
+
+
 def _make_redis_mock(cached_data: str | None = None) -> MagicMock:
     mock = MagicMock()
     mock.get = AsyncMock(return_value=cached_data)
@@ -96,7 +107,7 @@ class TestEnriquecimentoCompleto:
         linkedin = _make_linkedin_mock([
             ContatoLinkedIn(nome="Ana Gerente", cargo="Gerente Jurídico", url_perfil=None, empresa="Empresa Teste"),
         ])
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=_make_vibe_mock())
 
         intel = await svc.enriquecer(_litigante_pj())
 
@@ -113,7 +124,7 @@ class TestEnriquecimentoCompleto:
         """Sócios armazenados apenas com nome e qualificação — LGPD."""
         receita = _make_receita_mock(_empresa_dados())
         linkedin = _make_linkedin_mock([])
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=_make_vibe_mock())
 
         intel = await svc.enriquecer(_litigante_pj())
 
@@ -131,9 +142,9 @@ class TestSemCNPJ:
     @pytest.mark.asyncio
     async def test_sem_cnpj_enriquecimento_parcial(self):
         """Nome sem CNPJ → enriquecimento_parcial=True, sem erro."""
-        receita = _make_receita_mock(None)  # nunca chamado na prática
+        receita = _make_receita_mock(None)
         linkedin = _make_linkedin_mock([])
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=_make_vibe_mock())
 
         litigante_sem_cnpj = _litigante_pj(nome="EMPRESA SEM CNPJ LTDA")
         intel = await svc.enriquecer(litigante_sem_cnpj)
@@ -150,9 +161,11 @@ class TestSemCNPJ:
 class TestLinkedInIndisponivel:
     @pytest.mark.asyncio
     async def test_linkedin_indisponivel_contatos_vazio(self):
+        """LinkedIn e Vibe ambos indisponíveis → contatos = [], linkedin_disponivel = False."""
         receita = _make_receita_mock(_empresa_dados())
         linkedin = _make_linkedin_mock([], disponivel=False)
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin)
+        vibe = _make_vibe_mock([], disponivel=False)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
 
         intel = await svc.enriquecer(_litigante_pj())
 
@@ -199,7 +212,7 @@ class TestCacheEmpresa:
         redis = _make_redis_mock(json.dumps(payload))
         receita = _make_receita_mock(_empresa_dados())
         linkedin = _make_linkedin_mock([])
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, redis=redis)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=_make_vibe_mock(), redis=redis)
 
         intel = await svc.enriquecer(_litigante_pj())
 
@@ -209,11 +222,88 @@ class TestCacheEmpresa:
     @pytest.mark.asyncio
     async def test_falha_receita_retorna_parcial_sem_excecao(self):
         """Receita Federal falhando não deve levantar exceção."""
-        receita = _make_receita_mock(None)  # retorna None = falha
+        receita = _make_receita_mock(None)
         receita.buscar_cnpj = AsyncMock(side_effect=Exception("Timeout"))
         linkedin = _make_linkedin_mock([])
-        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=_make_vibe_mock())
 
         intel = await svc.enriquecer(_litigante_pj())
 
         assert intel.enriquecimento_parcial is True
+
+
+# ---------------------------------------------------------------------------
+# Integração Vibe Prospecting
+# ---------------------------------------------------------------------------
+
+class TestVibeProspecting:
+    @pytest.mark.asyncio
+    async def test_vibe_disponivel_sem_linkedin_ativa_flag(self):
+        """Vibe disponível sem LinkedIn → linkedin_disponivel=True."""
+        receita = _make_receita_mock(_empresa_dados())
+        linkedin = _make_linkedin_mock([], disponivel=False)
+        vibe = _make_vibe_mock(
+            [ContatoLinkedIn(nome="CEO Vibe", cargo="CEO", url_perfil=None, empresa="Empresa Teste")],
+            disponivel=True,
+        )
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
+
+        intel = await svc.enriquecer(_litigante_pj())
+
+        assert intel.linkedin_disponivel is True
+        assert len(intel.contatos_linkedin) == 1
+        assert intel.contatos_linkedin[0]["nome"] == "CEO Vibe"
+
+    @pytest.mark.asyncio
+    async def test_mescla_contatos_linkedin_e_vibe(self):
+        """Contatos de LinkedIn e Vibe são combinados sem duplicatas."""
+        receita = _make_receita_mock(_empresa_dados())
+        linkedin = _make_linkedin_mock([
+            ContatoLinkedIn(nome="Ana LinkedIn", cargo="Diretora", url_perfil=None, empresa="E"),
+        ], disponivel=True)
+        vibe = _make_vibe_mock([
+            ContatoLinkedIn(nome="Rui Vibe", cargo="CEO", url_perfil=None, empresa="E"),
+        ], disponivel=True)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
+
+        intel = await svc.enriquecer(_litigante_pj())
+
+        nomes = [c["nome"] for c in intel.contatos_linkedin]
+        assert "Ana LinkedIn" in nomes
+        assert "Rui Vibe" in nomes
+        assert len(intel.contatos_linkedin) == 2
+
+    @pytest.mark.asyncio
+    async def test_deduplicacao_contato_mesmo_nome(self):
+        """Mesmo nome em LinkedIn e Vibe → aparece uma vez."""
+        receita = _make_receita_mock(_empresa_dados())
+        linkedin = _make_linkedin_mock([
+            ContatoLinkedIn(nome="João Duplicado", cargo="CEO", url_perfil=None, empresa="E"),
+        ], disponivel=True)
+        vibe = _make_vibe_mock([
+            ContatoLinkedIn(nome="João Duplicado", cargo="CEO", url_perfil="https://li.com/joao", empresa="E"),
+        ], disponivel=True)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
+
+        intel = await svc.enriquecer(_litigante_pj())
+
+        nomes = [c["nome"] for c in intel.contatos_linkedin]
+        assert nomes.count("João Duplicado") == 1
+
+    @pytest.mark.asyncio
+    async def test_linkedin_disponivel_retorna_false_quando_ambos_indisponiveis(self):
+        receita = _make_receita_mock(_empresa_dados())
+        linkedin = _make_linkedin_mock([], disponivel=False)
+        vibe = _make_vibe_mock([], disponivel=False)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
+
+        assert await svc.linkedin_disponivel() is False
+
+    @pytest.mark.asyncio
+    async def test_linkedin_disponivel_retorna_true_quando_so_vibe(self):
+        receita = _make_receita_mock(_empresa_dados())
+        linkedin = _make_linkedin_mock([], disponivel=False)
+        vibe = _make_vibe_mock([], disponivel=True)
+        svc = EmpresaIntelligenceService(receita=receita, linkedin=linkedin, vibe=vibe)
+
+        assert await svc.linkedin_disponivel() is True

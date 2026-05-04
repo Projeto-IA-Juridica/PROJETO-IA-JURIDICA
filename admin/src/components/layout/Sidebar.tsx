@@ -1,68 +1,60 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import {
+  Scale, FolderOpen, Handshake, BookOpen, BarChart3,
+  Compass, Settings, LogOut, Sun, Moon,
+} from 'lucide-react'
 
 const NAV = [
-  { to: '/hub', icon: '⚖️', label: 'Hub do Advogado' },
-  { to: '/processos', icon: '📂', label: 'Processos' },
-  { to: '/crm', icon: '🤝', label: 'CRM' },
-  { to: '/rag', icon: '📚', label: 'Base RAG' },
-  { to: '/analytics', icon: '📊', label: 'Analytics' },
-  { to: '/operations', icon: '🧭', label: 'Operações API' },
-  { to: '/settings', icon: '⚙️', label: 'Configurações' },
+  { to: '/hub', icon: Scale, label: 'Hub' },
+  { to: '/processos', icon: FolderOpen, label: 'Processos' },
+  { to: '/crm', icon: Handshake, label: 'CRM' },
+  { to: '/rag', icon: BookOpen, label: 'Base RAG' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/operations', icon: Compass, label: 'Operações' },
+  { to: '/settings', icon: Settings, label: 'Configurações' },
 ]
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const location = useLocation()
-  
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark')
-  
+
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem('theme')
+    if (stored === 'light' || stored === 'dark') return stored
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
+
   useEffect(() => {
-    document.documentElement.className = theme === 'light' ? 'light-theme' : ''
+    document.documentElement.dataset.theme = theme
+    document.documentElement.style.colorScheme = theme
     localStorage.setItem('theme', theme)
   }, [theme])
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
 
   return (
-    <aside style={{
-      width: 220,
-      minWidth: 220,
-      background: 'var(--surface-raised)',
-      borderRight: '1px solid var(--surface-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '0',
-      height: '100vh',
-      position: 'sticky',
-      top: 0,
-    }}>
-      {/* Logo */}
-      <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid var(--surface-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>⚖️</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Hub Jurídico</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Painel Interno</div>
-          </div>
+    <aside className="sidebar-shell">
+      <div className="sidebar-brand">
+        <div className="sidebar-logo" aria-hidden>
+          <Scale size={18} />
+        </div>
+        <div>
+          <div className="sidebar-brand-title">Hub Jurídico</div>
+          <div className="sidebar-brand-subtitle">Painel administrativo</div>
         </div>
       </div>
 
-      {/* Escritório */}
       {user && (
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--surface-border-muted)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Escritório</div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, wordBreak: 'break-all' }}>
-            {user.nome}
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{user.role}</div>
+        <div className="sidebar-user">
+          <div className="sidebar-user-name">{user.nome}</div>
+          <div className="sidebar-user-role">{user.role}</div>
         </div>
       )}
 
-      {/* Nav links */}
-      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
-        {NAV.map(({ to, icon, label }) => {
+      <nav className="sidebar-nav">
+        {NAV.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname.startsWith(to)
           return (
             <NavLink
@@ -70,34 +62,42 @@ export default function Sidebar() {
               to={to}
               className={`sidebar-link ${isActive ? 'active' : ''}`}
             >
-              <span style={{ fontSize: 15 }}>{icon}</span>
+              <Icon size={16} className="icon" />
               <span>{label}</span>
             </NavLink>
           )
         })}
       </nav>
 
-      {/* Footer */}
-      <div style={{ padding: '12px 8px', borderTop: '1px solid var(--surface-border)' }}>
+      <div className="sidebar-footer">
         <button
-          className="sidebar-link btn-ghost"
+          className="theme-switch"
           onClick={toggleTheme}
-          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none', marginBottom: 4 }}
+          type="button"
+          aria-pressed={theme === 'dark'}
+          title={theme === 'light' ? 'Alternar para tema escuro' : 'Alternar para tema claro'}
         >
-          <div style={{ fontSize: 16, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <span className={`theme-icon ${theme === 'light' ? 'active' : ''}`}>☀️</span>
-            <span className={`theme-icon ${theme === 'dark' ? 'active' : ''}`}>🌙</span>
-          </div>
-          <span style={{ fontSize: 13, marginLeft: 4 }}>Modo {theme === 'light' ? 'Claro' : 'Escuro'}</span>
+          <span className="theme-switch-label">Tema</span>
+          <span className={`theme-switch-track ${theme}`}>
+            <span className="theme-switch-thumb" />
+            <span className="theme-switch-option light">
+              <Sun size={14} />
+              <span>Claro</span>
+            </span>
+            <span className="theme-switch-option dark">
+              <Moon size={14} />
+              <span>Escuro</span>
+            </span>
+          </span>
         </button>
 
         <button
-          className="sidebar-link btn-ghost"
+          className="sidebar-link"
           onClick={logout}
-          style={{ width: '100%', cursor: 'pointer', background: 'none', border: 'none' }}
+          type="button"
         >
-          <div style={{ fontSize: 15, width: 20, display: 'flex', justifyContent: 'center' }}>🚪</div>
-          <span style={{ fontSize: 13, marginLeft: 4 }}>Sair</span>
+          <LogOut size={16} className="icon" />
+          <span>Sair</span>
         </button>
       </div>
     </aside>

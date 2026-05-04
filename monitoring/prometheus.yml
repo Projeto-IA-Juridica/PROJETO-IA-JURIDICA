@@ -1,0 +1,70 @@
+# Prometheus — Configuração de Scraping de Métricas
+#
+# Scrape interval: intervalo entre coletas de métricas
+# Evaluation interval: intervalo entre avaliações de rules
+
+global:
+  scrape_interval: 15s      # Coleta métricas a cada 15 segundos
+  evaluation_interval: 15s  # Avalia rules a cada 15 segundos
+  external_labels:
+    monitor: 'concierge-juridico'
+
+# Arquivo com alertas (rules)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Definição de targets para scraping
+scrape_configs:
+  # =========================================================================
+  # Prometheus self-monitoring
+  # =========================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # =========================================================================
+  # FastAPI Application — RAG Metrics
+  # =========================================================================
+  # Mude o target para seu IP/porta onde FastAPI está rodando
+  # Local development: localhost:8000
+  # Docker network: http://host.docker.internal:8000 (no macOS)
+  #                 http://172.17.0.1:8000 (no Linux)
+  # Production: https://seu-api.com
+  - job_name: 'fastapi-rag'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s      # Coleta mais frequente para RAG
+    scrape_timeout: 5s
+
+  # =========================================================================
+  # (Opcional) Celery workers metrics
+  # =========================================================================
+  # - job_name: 'celery-workers'
+  #   static_configs:
+  #     - targets: ['localhost:5555']
+  #   metrics_path: '/metrics'
+
+# ============================================================================
+# NOTAS IMPORTANTES
+# ============================================================================
+#
+# 1. Certifique-se de que FastAPI expõe /metrics
+#    No main.py, adicione:
+#
+#    from prometheus_client import make_wsgi_app
+#    from starlette.middleware.wsgi import WSGIMiddleware
+#    
+#    # Expõe métricas Prometheus
+#    app.add_middleware(WSGIMiddleware, app=make_wsgi_app())
+#
+# 2. Se rodar em Docker, mude targets para:
+#    - Docker Compose na mesma rede: 'fastapi:8000'
+#    - Docker no macOS: 'host.docker.internal:8000'
+#    - Docker no Linux: '172.17.0.1:8000'
+#
+# 3. Em produção, use HTTPS e adicione authentication se necessário
+#
+# ============================================================================

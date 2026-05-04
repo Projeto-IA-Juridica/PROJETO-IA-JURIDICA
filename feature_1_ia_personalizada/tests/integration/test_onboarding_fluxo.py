@@ -162,6 +162,7 @@ class TestWhatsappStatus:
         request = _make_request_state()
 
         mock_resp = MagicMock()
+        mock_resp.status_code = 200
         mock_resp.json = MagicMock(return_value={"instance": {"state": "open"}})
 
         with patch("feature_1_ia_personalizada.api.routes.onboarding.httpx.AsyncClient") as mock_client:

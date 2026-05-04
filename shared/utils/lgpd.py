@@ -27,6 +27,10 @@ from shared.models.processo import Processo
 
 logger = structlog.get_logger(__name__)
 
+
+def _iso_or_none(value):
+    return value.isoformat() if value else None
+
 # ---------------------------------------------------------------------------
 # Audit trail (síncrono — apenas log estruturado)
 # ---------------------------------------------------------------------------
@@ -126,20 +130,16 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
             "cpf_presente": bool(cliente.cpf),  # CPF é criptografado — indica presença sem expor
             "email": cliente.email,
             "telefone_whatsapp": cliente.telefone_whatsapp,
-            "data_nascimento": (
-                cliente.data_nascimento.isoformat() if cliente.data_nascimento else None
-            ),
+            "data_nascimento": _iso_or_none(cliente.data_nascimento),
             "profissao": cliente.profissao,
             "empresa_atual": cliente.empresa_atual,
             "cargo": cliente.cargo,
             "aceite_lgpd": cliente.aceite_lgpd,
-            "data_aceite_lgpd": (
-                cliente.data_aceite_lgpd.isoformat() if cliente.data_aceite_lgpd else None
-            ),
+            "data_aceite_lgpd": _iso_or_none(cliente.data_aceite_lgpd),
             "preferencia_horario_notificacao": cliente.preferencia_horario_notificacao,
             "ativo": cliente.ativo,
-            "criado_em": cliente.created_at.isoformat(),
-            "atualizado_em": cliente.updated_at.isoformat(),
+            "criado_em": _iso_or_none(cliente.created_at),
+            "atualizado_em": _iso_or_none(cliente.updated_at),
         },
         "processos": [
             {
@@ -151,7 +151,7 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
                 "tribunal": p.tribunal,
                 "vara": p.vara,
                 "comarca": p.comarca,
-                "criado_em": p.created_at.isoformat(),
+                "criado_em": _iso_or_none(p.created_at),
             }
             for p in processos
         ],
@@ -163,7 +163,7 @@ async def exportar_dados_cliente(session: AsyncSession, cliente_id: int) -> dict
                 "mensagem_cliente": i.mensagem_cliente,
                 "mensagem_ia": i.mensagem_ia,
                 "satisfacao": i.satisfacao,
-                "criado_em": i.created_at.isoformat(),
+                "criado_em": _iso_or_none(i.created_at),
             }
             for i in interacoes
         ],

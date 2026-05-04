@@ -201,13 +201,38 @@ async def receive_message(
         advogado = (await db.execute(stmt_adv)).scalars().first()
 
         if advogado:
-            processar_resposta_advogado.delay(
-                id_escritorio=escritorio.id,
-                id_advogado=advogado.id,
-                texto_resposta=texto,
-                msg_context=msg_content if isinstance(msg_content, dict) else {},
-            )
-            return {"status": "queued_escalation_reply"}
+            if advogado.escalacao_ativa:
+                # Advogado de plantão — trata como resposta a uma escalação de cliente
+                processar_resposta_advogado.delay(
+                    id_escritorio=escritorio.id,
+                    id_advogado=advogado.id,
+                    texto_resposta=texto,
+                    msg_context=msg_content if isinstance(msg_content, dict) else {},
+                )
+                return {"status": "queued_escalation_reply"}
+
+            # Advogado fora de plantão de escalação — Hub do Advogado (IA pessoal)
+            if escritorio.escalacao_habilitada:
+                from feature_1_ia_personalizada.workers.hub_advogado import (
+                    processar_mensagem_advogado,
+                )
+
+                processar_mensagem_advogado.apply_async(
+                    kwargs={
+                        "payload": msg_content if isinstance(msg_content, dict) else {},
+                        "usuario_id": advogado.id,
+                    },
+                    queue="hub_advogado",
+                )
+                _mensagens_recebidas.labels(
+                    escritorio_id=str(escritorio.id), tipo="hub_advogado"
+                ).inc()
+                logger.info(
+                    "hub_advogado_enfileirado",
+                    usuario_id=advogado.id,
+                    escritorio_id=escritorio.id,
+                )
+                return {"status": "queued_hub_advogado"}
 
         logger.info(
             "webhook_numero_desconhecido",

@@ -1,0 +1,2 @@
+timestamp,duracao_testes_s,total_queries_testadas,rag_contexto_injetado_total,rag_contexto_vazio_total,total_buscas_rag,taxa_sucesso_pct,status
+2026-05-03T21:39:03.430769,0.403,7,4,3,7,57.1,⚠️  REVISAR

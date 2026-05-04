@@ -448,6 +448,46 @@ class TestExportarDadosCliente:
         with pytest.raises(ValueError, match="não encontrado"):
             await exportar_dados_cliente(session, cliente_id=999)
 
+    async def test_exporta_com_timestamps_nulos_sem_quebrar(self):
+        session = AsyncMock()
+        cliente = self._make_cliente_mock()
+        cliente.created_at = None
+        cliente.updated_at = None
+        session.get.return_value = cliente
+
+        processo = MagicMock()
+        processo.id = 10
+        processo.numero_cnj = "0000000-00.2024.8.26.0100"
+        processo.tipo_acao = "Ação trabalhista"
+        processo.polo_cliente = "autor"
+        processo.status = "ativo"
+        processo.tribunal = "TRT15"
+        processo.vara = None
+        processo.comarca = None
+        processo.created_at = None
+
+        interacao = MagicMock()
+        interacao.id = 20
+        interacao.tipo = "sistema"
+        interacao.direcao = "saida"
+        interacao.mensagem_cliente = "Olá"
+        interacao.mensagem_ia = "Tudo certo"
+        interacao.satisfacao = 5
+        interacao.created_at = None
+
+        res_proc = MagicMock()
+        res_proc.scalars.return_value.all.return_value = [processo]
+        res_inter = MagicMock()
+        res_inter.scalars.return_value.all.return_value = [interacao]
+        session.execute.side_effect = [res_proc, res_inter]
+
+        resultado = await exportar_dados_cliente(session, cliente_id=1)
+
+        assert resultado["cliente"]["criado_em"] is None
+        assert resultado["cliente"]["atualizado_em"] is None
+        assert resultado["processos"][0]["criado_em"] is None
+        assert resultado["interacoes"][0]["criado_em"] is None
+
 
 class TestAnonimizarDadosCliente:
     async def test_anonimiza_dados_pessoais(self):

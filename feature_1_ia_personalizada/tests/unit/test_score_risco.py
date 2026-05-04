@@ -16,7 +16,7 @@ from datetime import timezone
 
 import pytest
 
-from feature_1_ia_personalizada.services.legal_data.vitoria_preditor import (
+from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ComponentesScore,
     ScoreRisco,
     ScoreRiscoCalculator,

@@ -30,7 +30,7 @@ _CHECK_TIMEOUT = 5.0
 async def _check_postgresql(db: AsyncSession) -> dict[str, Any]:
     try:
         t = time.perf_counter()
-        await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=_CHECK_TIMEOUT)
+        await db.execute(text("SELECT 1"))
         return {
             "status": "ok",
             "latency_ms": round((time.perf_counter() - t) * 1000, 2),
