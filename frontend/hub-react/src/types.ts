@@ -1,3 +1,14 @@
+export type Section =
+  | 'painel'
+  | 'clientes'
+  | 'crm'
+  | 'hub-ia'
+  | 'captacao'
+  | 'documentos'
+  | 'config'
+
+/* ── Clientes / Processos (existentes) ── */
+
 export interface CRMClienteCard {
   id: number
   nome: string
@@ -64,4 +75,93 @@ export interface ChatMessage {
   escalacao?: boolean
   intencao?: string
   tokens?: number
+}
+
+/* ── Prospecção Inteligente ── */
+
+export type LeadStatus = 'novo' | 'contatado' | 'qualificado' | 'descartado'
+export type TipoLead  = 'empresa' | 'pessoa'
+
+export interface LeadProspeccaoResponse {
+  id: number
+  tipo_lead: TipoLead
+  nome: string
+  score_match: number | null
+  score_motivo: string | null
+  abordagem_sugerida: string | null
+  status: LeadStatus
+  notas_advogado: string | null
+  fonte_descoberta: string | null
+  criado_em: string
+  // empresa
+  cnpj: string | null
+  empresa_setor: string | null
+  empresa_porte: string | null
+  socios: { nome: string; qualificacao: string }[]
+  contatos_linkedin: { nome: string; cargo: string; url_perfil: string }[]
+  linkedin_disponivel: boolean
+  // pessoa (LGPD: nunca CPF/tel/email)
+  polo_processo: string | null
+  tipo_acao_origem: string | null
+  numero_cnj_exemplo: string | null
+  processos_publicos_count: number
+}
+
+export interface DNAEscritorioResponse {
+  dados_insuficientes: boolean
+  especialidades: string[]
+  setores_alvo: string[]
+  tipo_lead_predominante: 'empresa' | 'pessoa' | 'ambos' | null
+  perfil_cliente_ideal: string | null
+  diferenciais: string[]
+  gerado_em: string | null
+}
+
+export interface PipelineResponse {
+  total: number
+  leads: LeadProspeccaoResponse[]
+  dna_disponivel: boolean
+  linkedin_disponivel: boolean
+  aviso_lgpd: string | null
+}
+
+export interface DescobertaRequest {
+  tipo_lead: TipoLead | 'auto'
+  tipo_acao: string
+  tribunal: string | null
+  limite: number
+  score_minimo: number
+}
+
+export interface LeadStatusUpdate {
+  status: LeadStatus
+  notas_advogado?: string | null
+}
+
+/* ── Hub IA — sessão ── */
+
+export interface HubIASessao {
+  id: number
+  intencao: string
+  preview: string
+  resposta: string
+  tokens_input: number
+  tokens_output: number
+  criado_em: string
+}
+
+/* ── Configurações do escritório ── */
+
+export interface Configuracoes {
+  nome: string
+  cnpj: string
+  email: string
+  telefone?: string
+  persona_nome: string
+  persona_tom: 'formal' | 'amigavel' | 'tecnico'
+  horario_inicio: string
+  horario_fim: string
+  template_boas_vindas: string
+  template_atualizacao: string
+  template_sem_novidade: string
 }
