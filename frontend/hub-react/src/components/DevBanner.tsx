@@ -10,7 +10,7 @@ export default function DevBanner() {
   function save() {
     localStorage.setItem(TOKEN_KEY, token.trim())
     setSaved(true)
-    setTimeout(() => { setSaved(false); setOpen(false) }, 800)
+    setTimeout(() => window.location.reload(), 600)
   }
 
   if (!open) {
