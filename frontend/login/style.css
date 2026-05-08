@@ -1,0 +1,281 @@
+/* ── Reset & base ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #F4F8FC;
+  --nevoa:    #EAF2FA;
+  --pasta:    #A8C8E8;
+  --primario: #3A7AB8;
+  --tinta:    #0C1E30;
+  --white:    #FFFFFF;
+  --success:  #2E9E6B;
+  --muted:    #6A849C;
+  --border:   #D4E6F4;
+  --faint:    #B0C8DC;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+}
+
+/* ── Wave canvas ──────────────────────────────────────────────── */
+#wave-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}
+
+/* ── Navbar ───────────────────────────────────────────────────── */
+#navbar {
+  position: relative;
+  z-index: 10;
+  padding: 18px 36px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-wrap {
+  display: flex;
+  align-items: baseline;
+  cursor: default;
+}
+
+.am-letter {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 36px;
+  color: var(--tinta);
+  display: inline-block;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  transition: color 0.3s, transform 0.3s;
+}
+
+.nav-link {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.nav-link-bold {
+  color: var(--primario);
+  font-weight: 600;
+}
+
+/* ── Main ─────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  position: relative;
+  z-index: 10;
+}
+
+.card-wrap {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* ── Hero header ──────────────────────────────────────────────── */
+.hero-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.arch-logo {
+  display: block;
+  margin: 0 auto 20px;
+}
+
+.hero-title {
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--tinta);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+
+.hero-sub {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ── Card ─────────────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 2px 20px rgba(58,122,184,0.10);
+  border: 1px solid rgba(255,255,255,0.95);
+}
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.field-group {
+  margin-bottom: 18px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.forgot-link {
+  font-size: 13px;
+  color: var(--primario);
+  text-decoration: none;
+}
+
+.input-wrap {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  transition: stroke 0.2s;
+}
+
+.input-wrap input {
+  width: 100%;
+  padding: 12px 14px 12px 42px;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--tinta);
+  background: var(--nevoa);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.input-wrap input:focus {
+  background: var(--white);
+  border-color: var(--primario);
+  box-shadow: 0 0 0 3px rgba(58,122,184,0.12);
+}
+
+.input-wrap input:focus + .input-icon,
+.input-wrap input:focus ~ .input-icon {
+  stroke: var(--primario);
+}
+
+#pass-input {
+  padding-right: 44px;
+}
+
+.eye-btn {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.eye-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%;
+  padding: 13px 0;
+  margin-bottom: 12px;
+  background: var(--primario);
+  color: var(--white);
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(58,122,184,0.28);
+  transition: background 0.2s;
+}
+
+.btn-primary:hover { background: #2D6499; }
+
+.btn-secondary {
+  width: 100%;
+  padding: 12px 0;
+  background: var(--nevoa);
+  color: var(--muted);
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover { background: #DDF0FA; }
+
+.btn-link {
+  color: var(--primario);
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+/* ── Badges ───────────────────────────────────────────────────── */
+.badges {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+}
+
+/* ── Animação logo ────────────────────────────────────────────── */
+@keyframes amIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
