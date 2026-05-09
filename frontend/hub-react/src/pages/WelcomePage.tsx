@@ -61,41 +61,16 @@ function PerspectiveGrid() {
         ctx.stroke()
       }
 
-      /* ── 1. Arestas de sala: cantos → sumindo no infinito ── */
-      const corners: [number, number][] = [[0, 0], [W, 0], [W, H], [0, H]]
-      corners.forEach(([cx, cy]) => {
-        /* para antes de chegar ao VP para não formar ponto visível */
-        const ex = cx + (vpx - cx) * 0.80
-        const ey = cy + (vpy - cy) * 0.80
-        gLine(cx, cy, ex, ey, 'rgba(18,72,210,0.22)', 'rgba(18,72,210,0)', 1.0)
-      })
-
-      /* ── 2. Anéis de túnel animados (já somem perto do VP via alpha=s) ── */
-      const N_RINGS = 14
-      const ringAdv = (t * 0.07) % (1 / N_RINGS)
-
-      for (let i = 1; i <= N_RINGS; i++) {
-        const s = ((i / N_RINGS) + ringAdv) % 1.0
-        if (s < 0.02) continue
-        const x1 = vpx * (1 - s)
-        const y1 = vpy * (1 - s)
-        const x2 = vpx + (W - vpx) * s
-        const y2 = vpy + (H - vpy) * s
-        ctx.strokeStyle = `rgba(18,72,210,${s * 0.19})`
-        ctx.lineWidth   = 0.28 + s * 1.1
-        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
-      }
-
-      /* ── 3. Piso: colunas (transparent no VP → opaco embaixo) + fileiras ── */
-      const COLS     = 12
-      const ROWS     = 10
+      /* ── Piso infinito: linhas convergindo ao VP + fileiras animadas ── */
+      const COLS     = 16
+      const ROWS     = 12
       const floorAdv = (t * 0.055) % (1 / ROWS)
 
       for (let i = 0; i <= COLS; i++) {
         const bx    = (i / COLS) * W
         const dist  = Math.abs(bx - vpx) / (W * 0.55)
-        const alpha = Math.max(0.03, 0.16 - dist * 0.07)
-        gLine(vpx, vpy, bx, H + 2, 'rgba(18,72,210,0)', `rgba(18,72,210,${alpha})`, 0.5)
+        const alpha = Math.max(0.02, 0.18 - dist * 0.08)
+        gLine(vpx, vpy, bx, H + 2, 'rgba(18,72,210,0)', `rgba(18,72,210,${alpha})`, 0.6)
       }
 
       for (let i = 0; i < ROWS; i++) {
@@ -103,37 +78,9 @@ function PerspectiveGrid() {
         const perspT = Math.pow(rawT, 2.4)
         const y      = vpy + perspT * (H - vpy + 4)
         if (y > H + 4 || y < vpy - 2) continue
-        ctx.strokeStyle = `rgba(18,72,210,${perspT * 0.26})`
-        ctx.lineWidth   = 0.3 + perspT * 0.85
+        ctx.strokeStyle = `rgba(18,72,210,${perspT * 0.28})`
+        ctx.lineWidth   = 0.3 + perspT * 0.9
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
-      }
-
-      /* ── 4. Teto (transparent no VP → opaco nas bordas) + fileiras ── */
-      const CEIL_ROWS = 7
-      const ceilAdv   = (t * 0.038) % (1 / CEIL_ROWS)
-
-      for (let i = 0; i <= COLS; i++) {
-        const tx = (i / COLS) * W
-        gLine(vpx, vpy, tx, -2, 'rgba(18,72,210,0)', 'rgba(18,72,210,0.07)', 0.4)
-      }
-
-      for (let i = 0; i < CEIL_ROWS; i++) {
-        const rawT   = ((i / CEIL_ROWS) + ceilAdv) % 1.0
-        const perspT = Math.pow(rawT, 2.2)
-        const y      = vpy - perspT * (vpy + 4)
-        if (y > vpy + 2 || y < -4) continue
-        ctx.strokeStyle = `rgba(18,72,210,${perspT * 0.12})`
-        ctx.lineWidth   = 0.25 + perspT * 0.5
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
-      }
-
-      /* ── 5. Paredes laterais (transparent no VP → opaco nas bordas) ── */
-      const WALL = 8
-      for (let i = 1; i <= WALL; i++) {
-        const wy    = (i / (WALL + 1)) * H
-        const alpha = 0.06 + 0.03 * Math.abs(wy / H - 0.5)
-        gLine(vpx, vpy, 0, wy, 'rgba(18,72,210,0)', `rgba(18,72,210,${alpha})`, 0.4)
-        gLine(vpx, vpy, W, wy, 'rgba(18,72,210,0)', `rgba(18,72,210,${alpha})`, 0.4)
       }
 
       rafRef.current = requestAnimationFrame(draw)
@@ -178,7 +125,7 @@ export default function WelcomePage({ onStart }: Props) {
         style={{ zIndex: 10 }}
       >
         {/* Logo mark */}
-        <div className="mb-2">
+        <div className="mb-0">
           <img
             src="/logo.png"
             alt="amicus"

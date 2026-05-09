@@ -147,6 +147,20 @@ function Shell({ onReady }: ShellProps) {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-am-bg">
 
+      {/* Top bar com logo */}
+      <div className="flex-shrink-0 flex items-center px-5 pt-4 pb-1">
+        <img src="/logo.png" alt="amicus" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+        <span className="ml-2 text-base font-black tracking-tight"
+          style={{
+            background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+          amicus
+        </span>
+      </div>
+
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
       <PageTransition id={section} className="flex-1 overflow-hidden pb-24">
         {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}

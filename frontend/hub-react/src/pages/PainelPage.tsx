@@ -1,238 +1,350 @@
+import { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Users, FileText, AlertTriangle, Star, TrendingUp, Clock, ArrowRight, Shield } from 'lucide-react'
-import { fetchClientes } from '../api/crm'
+import { motion } from 'framer-motion'
+import {
+  Users, FileText, AlertTriangle, Star,
+  ArrowRight, Shield, Zap, Clock,
+  TrendingUp, TrendingDown, Minus,
+} from 'lucide-react'
+import { fetchClientes, fetchResumoCRM } from '../api/crm'
 import type { CRMClienteCard } from '../types'
 
-const RISK_COLOR: Record<string, { color: string; bg: string; border: string }> = {
-  baixo:    { color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.22)'  },
-  moderado: { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.22)'  },
-  alto:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)'   },
-  critico:  { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)'   },
+/* ── Paleta de risco ── */
+const RISK: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  baixo:    { color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.20)',  label: 'Baixo'    },
+  moderado: { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.20)',  label: 'Moderado' },
+  alto:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.20)',   label: 'Alto'     },
+  critico:  { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.20)',   label: 'Crítico'  },
 }
 
-const RISK_LABEL: Record<string, string> = {
-  baixo: 'Baixo', moderado: 'Moderado', alto: 'Alto', critico: 'Crítico',
-}
-
-interface Props {
-  onSelectCliente: (id: number) => void
-}
-
-function initials(nome: string) {
+function ini(nome: string) {
   return nome.split(' ').slice(0, 2).map((n) => n[0].toUpperCase()).join('')
 }
 
-function StatCard({ icon, label, value, color, sub }: {
-  icon: React.ReactNode; label: string; value: number | string; color: string; sub?: string
-}) {
+/* ── Barra animada ── */
+function Bar({ pct, color }: { pct: number; color: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    el.style.width = '0%'
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => { el.style.width = `${pct}%` }))
+    return () => cancelAnimationFrame(id)
+  }, [pct])
   return (
-    <div className="bg-white rounded-2xl p-4 sm:p-5 card-shadow border border-am-border flex flex-col gap-3 card-in card-border-hover">
-      <div className="flex items-center justify-between">
-        <div className="text-[10px] font-bold uppercase tracking-widest text-am-muted">{label}</div>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `color-mix(in srgb, ${color} 10%, transparent)`, color }}>
-          {icon}
-        </div>
-      </div>
-      <div className="text-2xl sm:text-3xl font-extrabold leading-none" style={{ color }}>{value}</div>
-      {sub && <div className="text-[10px] text-am-muted font-medium">{sub}</div>}
+    <div className="h-1.5 rounded-full overflow-hidden flex-1" style={{ background: `${color}18` }}>
+      <div ref={ref} className="h-full rounded-full" style={{ background: color, width: '0%', transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)' }} />
     </div>
   )
 }
 
+/* ── KPI card ── */
+function KPI({ icon, label, value, sub, color, delta }: {
+  icon: React.ReactNode; label: string; value: string | number
+  sub?: string; color: string; delta?: number
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-4 flex flex-col gap-3 card-shadow card-border-hover"
+      style={{ border: '1px solid var(--color-am-border)' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-am-muted">{label}</span>
+        <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: `${color}14`, color }}>
+          {icon}
+        </div>
+      </div>
+      <div className="text-2xl font-extrabold leading-none" style={{ color }}>{value}</div>
+      <div className="flex items-center gap-2">
+        {delta !== undefined && (
+          <span className="flex items-center gap-0.5 text-[10px] font-semibold"
+            style={{ color: delta > 0 ? '#1A9E78' : delta < 0 ? '#C83030' : '#A0AEC0' }}>
+            {delta > 0 ? <TrendingUp size={10} /> : delta < 0 ? <TrendingDown size={10} /> : <Minus size={10} />}
+            {delta > 0 ? '+' : ''}{delta}
+          </span>
+        )}
+        {sub && <span className="text-[10px] text-am-muted">{sub}</span>}
+      </div>
+    </div>
+  )
+}
+
+/* ── Section wrapper ── */
+function Section({ title, icon, badge, children }: {
+  title: string; icon: React.ReactNode; badge?: React.ReactNode; children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden card-shadow card-border-hover"
+      style={{ border: '1px solid var(--color-am-border)' }}>
+      <div className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: '1px solid var(--color-am-border)', background: 'rgba(12,30,48,0.02)' }}>
+        <div className="flex items-center gap-2">
+          <span className="text-am-blue">{icon}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">{title}</span>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+interface Props { onSelectCliente: (id: number) => void }
+
 export default function PainelPage({ onSelectCliente }: Props) {
+  const [periodo, setPeriodo] = useState<7 | 30 | 90>(30)
+
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
     queryFn: fetchClientes,
     staleTime: 60_000,
   })
 
-  const total        = clientes?.length ?? 0
-  const totalProc    = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
-  const emRisco      = clientes?.filter((c) => c.crm_nivel === 'alto' || c.crm_nivel === 'critico').length ?? 0
-  const npsArr       = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
-  const npsMedia     = npsArr.length ? Math.round(npsArr.reduce((a, b) => a + b, 0) / npsArr.length) : null
-  const recentes     = [...(clientes ?? [])].sort((a, b) =>
-    (b.ultimo_contato ?? '').localeCompare(a.ultimo_contato ?? '')
-  ).slice(0, 5)
-  const alertas      = clientes?.filter((c) => c.crm_nivel === 'critico' || c.crm_nivel === 'alto') ?? []
+  const { data: resumo } = useQuery({
+    queryKey: ['crm-resumo'],
+    queryFn: fetchResumoCRM,
+    staleTime: 60_000,
+  })
+
+  /* ── Métricas derivadas ── */
+  const total      = clientes?.length ?? 0
+  const totalProc  = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
+  const emRisco    = clientes?.filter((c) => c.crm_nivel === 'alto' || c.crm_nivel === 'critico').length ?? 0
+  const npsArr     = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
+  const npsMedia   = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
+
+  /* Ranking: em risco → sem NPS → ok, ordenado por último contato */
+  const ranking = [...(clientes ?? [])].sort((a, b) => {
+    const rA = a.crm_nivel === 'alto' || a.crm_nivel === 'critico' ? 0 : a.nps_medio === null ? 1 : 2
+    const rB = b.crm_nivel === 'alto' || b.crm_nivel === 'critico' ? 0 : b.nps_medio === null ? 1 : 2
+    if (rA !== rB) return rA - rB
+    return (b.ultimo_contato ?? '').localeCompare(a.ultimo_contato ?? '')
+  })
+
+  /* Eficiência estimada (derivada dos dados disponíveis) */
+  const semAnalise     = resumo?.sem_analise ?? 0
+  const analisados     = total - semAnalise
+  const autonomiaPct   = total > 0 ? Math.round((analisados / total) * 100) : 0
+  const horasEconomiadas = +(analisados * 0.5).toFixed(1)
+
+  /* Distribuição de risco */
+  const niveis = ['baixo', 'moderado', 'alto', 'critico'] as const
+
+  const daysSince = (iso: string | null) => {
+    if (!iso) return null
+    return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6 page-enter">
+      <div className="p-4 max-w-3xl mx-auto space-y-4 page-enter">
 
-        {/* Header */}
-        <div>
-          <h2 className="text-lg font-extrabold text-am-ink tracking-tight">Painel de Resultados</h2>
-          <p className="text-xs text-am-muted mt-0.5">Visão geral do escritório em tempo real</p>
-        </div>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-28 rounded-2xl skeleton" style={{ background: 'rgba(58,122,184,0.06)' }} />
-            ))
-          ) : (
-            <>
-              <StatCard icon={<Users size={15} />}       label="Clientes"       value={total}     color="var(--color-am-blue)"  sub={`${totalProc} processo${totalProc !== 1 ? 's' : ''}`} />
-              <StatCard icon={<FileText size={15} />}    label="Processos"      value={totalProc} color="var(--color-am-secondary)" sub="Total vinculados" />
-              <StatCard icon={<AlertTriangle size={15} />} label="Em risco"     value={emRisco}   color="var(--color-am-red)"   sub="Alto ou crítico" />
-              <StatCard icon={<Star size={15} />}        label="NPS médio"      value={npsMedia !== null ? `${npsMedia}%` : '—'} color="var(--color-am-green)" sub="Satisfação geral" />
-            </>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-
-          {/* Alertas */}
-          <div className="bg-white rounded-2xl card-shadow border border-am-border overflow-hidden card-border-hover">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-am-border bg-am-bg">
-              <div className="flex items-center gap-2">
-                <Shield size={13} className="text-am-red" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-am-secondary">
-                  Alertas de risco
-                </span>
-              </div>
-              {alertas.length > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                  style={{ background: 'rgba(200,48,48,0.1)', color: '#C83030' }}>
-                  {alertas.length}
-                </span>
-              )}
-            </div>
-
-            {alertas.length === 0 ? (
-              <div className="flex flex-col items-center py-10 gap-2 text-am-muted">
-                <Shield size={22} strokeWidth={1.5} />
-                <span className="text-xs">Sem alertas críticos</span>
-              </div>
-            ) : (
-              <div className="divide-y divide-am-border">
-                {alertas.slice(0, 6).map((c) => {
-                  const r = RISK_COLOR[c.crm_nivel ?? ''] ?? RISK_COLOR.moderado
-                  return (
-                    <button key={c.id} onClick={() => onSelectCliente(c.id)}
-                      className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-am-bg row-press row-in group">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 text-white"
-                        style={{ background: r.color }}>
-                        {initials(c.nome)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-am-ink truncate">{c.nome}</div>
-                        <div className="text-[10px] text-am-muted mt-0.5 truncate line-clamp-1">
-                          {c.crm_acao_sugerida ?? 'Requer atenção imediata'}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                          style={{ color: r.color, background: r.bg, border: `1px solid ${r.border}` }}>
-                          {RISK_LABEL[c.crm_nivel ?? ''] ?? c.crm_nivel}
-                        </span>
-                        <ArrowRight size={11} className="text-am-muted opacity-0 group-hover:opacity-100 transition-fast" />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+        {/* ── Header + período ── */}
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-base font-extrabold text-am-ink tracking-tight">Painel de Resultados</h2>
+            <p className="text-[11px] text-am-muted mt-0.5">Visão geral do escritório</p>
           </div>
-
-          {/* Atividade recente */}
-          <div className="bg-white rounded-2xl card-shadow border border-am-border overflow-hidden card-border-hover">
-            <div className="flex items-center gap-2 px-5 py-3.5 border-b border-am-border bg-am-bg">
-              <Clock size={13} className="text-am-blue" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-am-secondary">
-                Contatos recentes
-              </span>
-            </div>
-
-            {isLoading ? (
-              <div className="divide-y divide-am-border">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-5 py-3.5">
-                    <div className="w-7 h-7 rounded-full skeleton flex-shrink-0" style={{ background: 'rgba(58,122,184,0.08)' }} />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-2.5 w-32 rounded skeleton" style={{ background: 'rgba(58,122,184,0.08)' }} />
-                      <div className="h-2 w-20 rounded skeleton" style={{ background: 'rgba(58,122,184,0.06)' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : recentes.length === 0 ? (
-              <div className="flex flex-col items-center py-10 gap-2 text-am-muted">
-                <TrendingUp size={22} strokeWidth={1.5} />
-                <span className="text-xs">Nenhuma atividade registrada</span>
-              </div>
-            ) : (
-              <div className="divide-y divide-am-border">
-                {recentes.map((c: CRMClienteCard) => {
-                  const r = c.crm_nivel ? (RISK_COLOR[c.crm_nivel] ?? null) : null
-                  const data = c.ultimo_contato
-                    ? new Date(c.ultimo_contato).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-                    : null
-                  return (
-                    <button key={c.id} onClick={() => onSelectCliente(c.id)}
-                      className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-am-bg row-press row-in group">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-                        style={{ background: 'var(--color-am-surface)', color: 'var(--color-am-blue)' }}>
-                        {initials(c.nome)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-am-ink truncate">{c.nome}</div>
-                        <div className="text-[10px] text-am-muted mt-0.5">
-                          {c.total_processos} processo{c.total_processos !== 1 ? 's' : ''}
-                          {data && <span className="mx-1">·</span>}
-                          {data && <span>{data}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {r && (
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
-                        )}
-                        <ArrowRight size={11} className="text-am-muted opacity-0 group-hover:opacity-100 transition-fast" />
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+          <div className="flex gap-1 p-0.5 rounded-xl" style={{ background: 'rgba(12,30,48,0.05)' }}>
+            {([7, 30, 90] as const).map((d) => (
+              <motion.button
+                key={d}
+                onClick={() => setPeriodo(d)}
+                whileHover={{ scale: periodo === d ? 1 : 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold press"
+                style={periodo === d
+                  ? { background: 'white', color: 'var(--color-am-blue)', boxShadow: '0 1px 4px rgba(18,72,190,0.12)' }
+                  : { color: 'var(--color-am-muted)' }
+                }>
+                {d}d
+              </motion.button>
+            ))}
           </div>
         </div>
 
-        {/* Mini distribuição de risco */}
+        {/* ── KPIs ── */}
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: 'rgba(12,30,48,0.05)' }} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: <Users size={14} />,         label: 'Clientes ativos', value: total,     color: '#1248BE', sub: `${totalProc} processos` },
+              { icon: <FileText size={14} />,      label: 'Processos',       value: totalProc, color: '#6B7CFF', sub: 'Total vinculados' },
+              { icon: <AlertTriangle size={14} />, label: 'Em risco',        value: emRisco,   color: '#C83030', sub: 'Alto ou crítico', delta: emRisco > 0 ? emRisco : undefined },
+              { icon: <Star size={14} />,          label: 'NPS médio',       value: npsMedia !== null ? `${npsMedia}` : '—', color: '#1A9E78', sub: 'Satisfação' },
+            ].map((kpi, i) => (
+              <motion.div
+                key={kpi.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: i * 0.06, ease: [0.34, 1.1, 0.64, 1] }}
+              >
+                <KPI {...kpi} />
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Eficiência da IA ── */}
+        <Section title="Eficiência da IA" icon={<Zap size={13} />}>
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: 'Clientes analisados', value: `${analisados}/${total}`, color: '#1248BE' },
+                { label: 'Autonomia IA',         value: `${autonomiaPct}%`,       color: autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030' },
+                { label: 'Horas economizadas',   value: `${horasEconomiadas}h`,   color: '#6B7CFF' },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="text-center py-2 px-3 rounded-xl"
+                  style={{ background: `${color}08`, border: `1px solid ${color}18` }}>
+                  <p className="text-base font-extrabold leading-none mb-1" style={{ color }}>{value}</p>
+                  <p className="text-[10px] text-am-muted leading-tight">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Barra de autonomia */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] text-am-secondary">Atendimentos resolvidos pela IA</span>
+                <span className="text-[11px] font-bold" style={{ color: autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030' }}>
+                  {autonomiaPct}%
+                </span>
+              </div>
+              <Bar pct={autonomiaPct} color={autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030'} />
+              <p className="text-[10px] text-am-muted mt-1">
+                {analisados} de {total} clientes analisados sem intervenção manual
+              </p>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Distribuição de risco ── */}
         {!isLoading && clientes && clientes.length > 0 && (
-          <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={13} className="text-am-blue" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-am-secondary">
-                Distribuição por nível de risco
-              </span>
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              {(['baixo', 'moderado', 'alto', 'critico'] as const).map((nivel) => {
-                const count = clientes.filter((c) => c.crm_nivel === nivel).length
+          <Section title="Distribuição de risco" icon={<Shield size={13} />}>
+            <div className="p-4 space-y-3">
+              {niveis.map((nivel) => {
+                const count = resumo ? resumo[nivel] : (clientes.filter((c) => c.crm_nivel === nivel).length)
                 const pct   = total > 0 ? Math.round((count / total) * 100) : 0
-                const r     = RISK_COLOR[nivel]
+                const r     = RISK[nivel]
                 return (
-                  <div key={nivel} className="flex-1 min-w-[80px]">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-semibold" style={{ color: r.color }}>
-                        {RISK_LABEL[nivel]}
-                      </span>
-                      <span className="text-[10px] font-bold text-am-ink">{count}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: r.bg }}>
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, background: r.color }} />
-                    </div>
-                    <div className="text-[9px] text-am-muted mt-1">{pct}%</div>
+                  <div key={nivel} className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold w-16 flex-shrink-0" style={{ color: r.color }}>
+                      {r.label}
+                    </span>
+                    <Bar pct={pct} color={r.color} />
+                    <span className="text-[11px] font-bold text-am-ink w-8 text-right flex-shrink-0">{count}</span>
+                    <span className="text-[10px] text-am-muted w-8 flex-shrink-0">{pct}%</span>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </Section>
         )}
+
+        {/* ── Ranking de clientes ── */}
+        <Section
+          title="Ranking de clientes"
+          icon={<TrendingUp size={13} />}
+          badge={
+            <span className="text-[10px] text-am-muted">Em risco primeiro</span>
+          }
+        >
+          {isLoading ? (
+            <div className="divide-y divide-am-border">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-7 h-7 rounded-full animate-pulse flex-shrink-0"
+                    style={{ background: 'rgba(12,30,48,0.06)' }} />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-2.5 w-32 rounded animate-pulse" style={{ background: 'rgba(12,30,48,0.06)' }} />
+                    <div className="h-2 w-20 rounded animate-pulse" style={{ background: 'rgba(12,30,48,0.04)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : ranking.length === 0 ? (
+            <div className="flex flex-col items-center py-10 gap-2 text-am-muted">
+              <Users size={20} strokeWidth={1.5} />
+              <span className="text-xs">Sem clientes cadastrados</span>
+            </div>
+          ) : (
+            <div className="divide-y divide-am-border">
+              {ranking.map((c: CRMClienteCard) => {
+                const emRiscoC = c.crm_nivel === 'alto' || c.crm_nivel === 'critico'
+                const semNps   = c.nps_medio === null
+                const r        = c.crm_nivel ? RISK[c.crm_nivel] : null
+                const dias     = daysSince(c.ultimo_contato)
+
+                return (
+                  <motion.button
+                    key={c.id}
+                    onClick={() => onSelectCliente(c.id)}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left group row-in row-press">
+
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                      style={{ background: emRiscoC ? '#C83030' : 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>
+                      {ini(c.nome)}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-am-ink truncate">{c.nome}</p>
+                        {r && (
+                          <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                            style={{ color: r.color, background: r.bg, border: `1px solid ${r.border}` }}>
+                            {r.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-am-muted">
+                          {c.total_processos} processo{c.total_processos !== 1 ? 's' : ''}
+                        </span>
+                        {dias !== null && (
+                          <>
+                            <span className="text-am-border">·</span>
+                            <span className="flex items-center gap-0.5 text-[10px]"
+                              style={{ color: dias > 14 ? '#C83030' : dias > 7 ? '#D08010' : 'var(--color-am-muted)' }}>
+                              <Clock size={9} />
+                              {dias === 0 ? 'hoje' : `há ${dias}d`}
+                            </span>
+                          </>
+                        )}
+                        {semNps && (
+                          <>
+                            <span className="text-am-border">·</span>
+                            <span className="text-[10px] text-am-muted">sem NPS</span>
+                          </>
+                        )}
+                        {c.nps_medio !== null && (
+                          <>
+                            <span className="text-am-border">·</span>
+                            <span className="flex items-center gap-0.5 text-[10px] text-am-muted">
+                              <Star size={9} style={{ color: '#D08010' }} />
+                              {c.nps_medio.toFixed(1)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <ArrowRight size={12} className="text-am-muted opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
+                  </motion.button>
+                )
+              })}
+            </div>
+          )}
+        </Section>
+
       </div>
     </div>
   )

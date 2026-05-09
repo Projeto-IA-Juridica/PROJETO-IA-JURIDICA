@@ -1,66 +1,56 @@
 import { useQuery } from '@tanstack/react-query'
-import { Scale, Clock, AlertCircle, User, Phone, Star, Gavel } from 'lucide-react'
+import { Scale, Clock, AlertCircle, Phone, Star, Gavel, User, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState } from 'react'
 import { fetchProcessos } from '../api/processos'
 import type { CRMClienteCard, Processo } from '../types'
 import Skeleton from '../components/Skeleton'
 import RiskChip from '../components/RiskChip'
 
-/* Borda lateral do card muda por status — único elemento que troca de cor */
-const POLO_BORDER: Record<string, string> = {
-  autor: '#1A9E78',  /* favorável */
-  reu:   '#C83030',  /* risco */
-}
-
-function InfoRow({ label, value, mono = false, accent = false }: {
+function Field({ label, value, mono = false }: {
   label: string
   value?: string | null
   mono?: boolean
-  accent?: boolean
 }) {
   return (
-    <div className="space-y-1">
-      <dt className="text-[10px] font-bold uppercase tracking-wider text-am-muted">{label}</dt>
-      <dd
-        className={`text-sm leading-snug font-semibold ${mono ? 'font-mono text-xs' : ''}`}
-        style={{ color: accent ? 'var(--color-am-blue)' : 'var(--color-am-ink)' }}
-      >
-        {value ?? <span className="text-am-muted font-normal text-xs">—</span>}
-      </dd>
+    <div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">{label}</p>
+      {value
+        ? <p className={`text-xs font-semibold text-am-ink leading-snug ${mono ? 'font-mono' : ''}`}>{value}</p>
+        : <p className="text-xs text-am-muted">—</p>
+      }
     </div>
   )
 }
 
-function SectionCard({ title, badge, accentColor, icon, children }: {
-  title: string
-  badge?: React.ReactNode
-  accentColor?: string
-  icon?: React.ReactNode
-  children: React.ReactNode
-}) {
+function Card({ children, accentColor }: { children: React.ReactNode; accentColor?: string }) {
   return (
-    <div
-      className="bg-white rounded-xl overflow-hidden card-shadow"
+    <div className="bg-white rounded-2xl overflow-hidden"
       style={{
         border: '1px solid var(--color-am-border)',
         borderLeft: accentColor ? `3px solid ${accentColor}` : '1px solid var(--color-am-border)',
-      }}
-    >
-      <div
-        className="flex items-center justify-between px-4 sm:px-5 py-3.5"
-        style={{ background: 'var(--color-am-bg)', borderBottom: '1px solid var(--color-am-border)' }}
-      >
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-am-blue">{icon}</span>}
-          <span className="text-[10px] font-bold text-am-secondary uppercase tracking-wider">{title}</span>
-        </div>
-        {badge}
+        boxShadow: '0 1px 4px rgba(12,30,48,0.05)',
+      }}>
+      {children}
+    </div>
+  )
+}
+
+function CardHeader({ icon, title, badge }: { icon: React.ReactNode; title: string; badge?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3"
+      style={{ borderBottom: '1px solid var(--color-am-border)', background: 'rgba(12,30,48,0.02)' }}>
+      <div className="flex items-center gap-2">
+        <span className="text-am-blue">{icon}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">{title}</span>
       </div>
-      <div className="px-4 sm:px-5 py-4 sm:py-5">{children}</div>
+      {badge}
     </div>
   )
 }
 
 export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
+  const [showAndamentos, setShowAndamentos] = useState(false)
+
   const { data, isLoading } = useQuery({
     queryKey: ['processos', cliente.id],
     queryFn: () => fetchProcessos(cliente.id),
@@ -69,190 +59,246 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
   const processo: Processo | null = data?.items[0] ?? null
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
+    <div className="space-y-3 p-4">
 
-      {/* Cliente */}
-      <SectionCard
-        title="Dados do Cliente"
-        icon={<User size={13} />}
-        badge={
-          <span
-            className="text-[10px] font-bold px-2.5 py-1 rounded-lg"
-            style={{ color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.2)' }}
-          >
-            Ativo
-          </span>
-        }
-      >
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-          <InfoRow label="Nome completo" value={cliente.nome} />
-          <div className="space-y-1">
-            <dt className="text-[10px] font-bold uppercase tracking-wider text-am-muted">Telefone</dt>
-            <dd className="flex items-center gap-1.5">
-              <Phone size={11} className="text-am-muted" />
-              <span className="text-xs font-mono font-semibold text-am-ink">
-                {cliente.telefone_whatsapp ?? '—'}
-              </span>
-            </dd>
-          </div>
-          {cliente.nps_medio != null && (
-            <div className="space-y-1">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-am-muted">NPS Médio</dt>
-              <dd className="flex items-center gap-1.5">
-                <Star size={11} style={{ color: '#D08010' }} />
-                <span className="text-sm font-bold text-am-ink">{cliente.nps_medio.toFixed(1)}</span>
-              </dd>
-            </div>
-          )}
-          {cliente.crm_nivel && (
-            <div className="space-y-1">
-              <dt className="text-[10px] font-bold uppercase tracking-wider text-am-muted">Status CRM</dt>
-              <dd><RiskChip nivel={cliente.crm_nivel} size="md" /></dd>
-            </div>
-          )}
-        </dl>
-        {cliente.crm_resumo && (
-          <p className="mt-4 pt-4 text-xs text-am-secondary leading-relaxed"
-            style={{ borderTop: '1px solid var(--color-am-border)' }}>
-            {cliente.crm_resumo}
-          </p>
-        )}
-      </SectionCard>
-
-      {/* Skeleton */}
-      {isLoading && cliente.total_processos > 0 && (
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-1/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-2/3" />
-        </div>
-      )}
-
-      {/* Processo */}
-      {!isLoading && processo && (
-        <SectionCard
-          title="Processo Judicial"
-          icon={<Gavel size={13} />}
-          accentColor={POLO_BORDER[processo.polo_cliente ?? ''] ?? 'var(--color-am-blue)'}
+      {/* ── Cliente ── */}
+      <Card>
+        <CardHeader
+          icon={<User size={13} />}
+          title="Cliente"
           badge={
-            <span
-              className="text-[10px] font-bold px-2.5 py-1 rounded-lg"
-              style={processo.polo_cliente === 'autor'
-                ? { color: '#1A9E78', background: 'rgba(26,158,120,0.08)',  border: '1px solid rgba(26,158,120,0.2)'  }
-                : { color: '#C83030', background: 'rgba(200,48,48,0.08)',   border: '1px solid rgba(200,48,48,0.2)'   }
-              }
-            >
-              {processo.polo_cliente === 'autor' ? 'Autor' : 'Réu'}
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+              style={{ color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }}>
+              Ativo
             </span>
           }
-        >
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-            <div className="sm:col-span-2">
-              <InfoRow label="Número CNJ" value={processo.numero_cnj} mono accent />
+        />
+        <div className="px-4 py-4 space-y-4">
+          {/* Nome em destaque */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Nome completo</p>
+            <p className="text-sm font-bold text-am-ink">{cliente.nome}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            {/* Telefone */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Telefone</p>
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-am-ink font-mono">
+                <Phone size={10} className="text-am-muted" />
+                {cliente.telefone_whatsapp ?? '—'}
+              </p>
             </div>
-            <InfoRow label="Tribunal"    value={processo.tribunal}  />
-            <InfoRow label="Vara"        value={processo.vara}      />
-            <InfoRow label="Comarca"     value={processo.comarca}   />
-            <InfoRow label="Tipo de ação" value={processo.tipo_acao} />
-            <InfoRow label="Status"      value={processo.status}    />
-            {processo.data_distribuicao && (
-              <InfoRow
-                label="Distribuição"
-                value={new Date(processo.data_distribuicao).toLocaleDateString('pt-BR')}
-              />
-            )}
-            {processo.valor_causa && (
-              <div className="space-y-1">
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-am-muted">Valor da causa</dt>
-                <dd className="text-sm font-bold text-am-ink">
-                  R$ {Number(processo.valor_causa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </dd>
+
+            {/* NPS */}
+            {cliente.nps_medio != null && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">NPS</p>
+                <p className="flex items-center gap-1.5 text-xs font-bold text-am-ink">
+                  <Star size={10} style={{ color: '#D08010' }} />
+                  {cliente.nps_medio.toFixed(1)}
+                </p>
               </div>
             )}
-          </dl>
 
-          {processo.score_risco != null && (
-            <div className="mt-5 pt-4 flex flex-wrap items-center gap-3"
-              style={{ borderTop: '1px solid var(--color-am-border)' }}>
-              <RiskChip nivel={processo.score_nivel} score={processo.score_risco} size="md" />
-              {processo.score_interpretacao && (
-                <p className="text-xs text-am-secondary leading-relaxed">{processo.score_interpretacao}</p>
-              )}
+            {/* Total de processos */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Processos</p>
+              <p className="text-xs font-semibold text-am-ink">{cliente.total_processos}</p>
             </div>
+
+            {/* Último contato */}
+            {cliente.ultimo_contato && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Último contato</p>
+                <p className="text-xs font-semibold text-am-ink">
+                  {new Date(cliente.ultimo_contato).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+            )}
+
+            {/* CRM nivel */}
+            {cliente.crm_nivel && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Risco CRM</p>
+                <RiskChip nivel={cliente.crm_nivel} size="sm" />
+              </div>
+            )}
+          </div>
+
+          {/* Resumo CRM */}
+          {cliente.crm_resumo && (
+            <p className="text-xs text-am-secondary leading-relaxed pt-3"
+              style={{ borderTop: '1px solid var(--color-am-border)' }}>
+              {cliente.crm_resumo}
+            </p>
           )}
-        </SectionCard>
+        </div>
+      </Card>
+
+      {/* ── Skeleton enquanto carrega ── */}
+      {isLoading && cliente.total_processos > 0 && (
+        <div className="space-y-2 px-1">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
       )}
 
-      {/* Sem processo */}
-      {!isLoading && !processo && cliente.total_processos === 0 && (
-        <div className="flex flex-col items-center justify-center py-14 gap-4">
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: 'var(--color-am-surface)', border: '1px solid var(--color-am-border)' }}
-          >
-            <Scale size={22} strokeWidth={1.5} className="text-am-blue" />
-          </div>
-          <div className="text-center">
-            <div className="text-sm font-bold text-am-ink mb-1">Sem processo vinculado</div>
-            <div className="text-xs text-am-muted max-w-xs">
-              Este cliente não possui processo judicial cadastrado no sistema.
+      {/* ── Processo ── */}
+      {!isLoading && processo && (() => {
+        const poloCor = processo.polo_cliente === 'autor' ? '#1A9E78' : '#C83030'
+        return (
+          <Card accentColor={poloCor}>
+            <CardHeader
+              icon={<Gavel size={13} />}
+              title="Processo Judicial"
+              badge={
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                  style={processo.polo_cliente === 'autor'
+                    ? { color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }
+                    : { color: '#C83030', background: 'rgba(200,48,48,0.08)',  border: '1px solid rgba(200,48,48,0.18)' }}>
+                  {processo.polo_cliente === 'autor' ? 'Autor' : 'Réu'}
+                </span>
+              }
+            />
+            <div className="px-4 py-4 space-y-4">
+              {/* CNJ em destaque */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Número CNJ</p>
+                <p className="text-xs font-bold font-mono text-am-blue">{processo.numero_cnj}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <Field label="Tribunal"     value={processo.tribunal}  />
+                <Field label="Vara"         value={processo.vara}      />
+                <Field label="Comarca"      value={processo.comarca}   />
+                <Field label="Tipo de ação" value={processo.tipo_acao} />
+                <Field label="Status"       value={processo.status}    />
+                {processo.data_distribuicao && (
+                  <Field
+                    label="Ajuizamento"
+                    value={new Date(processo.data_distribuicao).toLocaleDateString('pt-BR')}
+                  />
+                )}
+                {processo.valor_causa && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Valor da causa</p>
+                    <p className="text-xs font-bold text-am-ink">
+                      R$ {Number(processo.valor_causa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Último andamento */}
+              {processo.ultimo_andamento && (
+                <div className="pt-3" style={{ borderTop: '1px solid var(--color-am-border)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-1">Último andamento</p>
+                  <p className="text-xs text-am-secondary leading-relaxed">{processo.ultimo_andamento}</p>
+                  {processo.data_ultimo_andamento && (
+                    <p className="text-[10px] text-am-muted mt-1 flex items-center gap-1">
+                      <Clock size={9} />
+                      {new Date(processo.data_ultimo_andamento).toLocaleDateString('pt-BR', {
+                        day: '2-digit', month: 'long', year: 'numeric',
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Score embutido */}
+              {processo.score_risco != null && (
+                <div className="flex items-center gap-3 pt-3"
+                  style={{ borderTop: '1px solid var(--color-am-border)' }}>
+                  <RiskChip nivel={processo.score_nivel} score={processo.score_risco} size="md" />
+                  {processo.score_interpretacao && (
+                    <p className="text-xs text-am-secondary leading-relaxed flex-1">{processo.score_interpretacao}</p>
+                  )}
+                </div>
+              )}
             </div>
+          </Card>
+        )
+      })()}
+
+      {/* ── Sem processo ── */}
+      {!isLoading && !processo && cliente.total_processos === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(12,30,48,0.04)', border: '1px solid var(--color-am-border)' }}>
+            <Scale size={20} strokeWidth={1.5} className="text-am-blue" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-am-ink">Sem processo vinculado</p>
+            <p className="text-xs text-am-muted mt-1 max-w-xs leading-relaxed">
+              Este cliente não possui processo judicial cadastrado no sistema.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Andamentos — borda azul (instrução normal) */}
+      {/* ── Andamentos ── */}
       {processo?.andamentos && processo.andamentos.length > 0 && (
-        <SectionCard
-          title="Histórico de Andamentos"
-          icon={<Clock size={13} />}
-          accentColor="var(--color-am-blue)"
-        >
-          <ol className="space-y-0">
-            {processo.andamentos.map((a, i) => (
-              <li key={i} className="flex gap-4 pb-5 last:pb-0">
-                <div className="flex flex-col items-center flex-shrink-0">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full mt-0.5 flex-shrink-0"
-                    style={{
-                      background: i === 0 ? 'var(--color-am-blue)' : 'var(--color-am-blue-light)',
-                      boxShadow: i === 0 ? '0 0 0 3px rgba(58,122,184,0.15)' : 'none',
-                    }}
-                  />
-                  {i < processo.andamentos.length - 1 && (
-                    <div className="w-px flex-1 mt-1.5 bg-am-border" />
-                  )}
-                </div>
-                <div className="pb-1 min-w-0">
-                  <time className="text-[10px] font-bold text-am-muted block mb-1">
-                    {new Date(a.data).toLocaleDateString('pt-BR', {
-                      day: '2-digit', month: 'long', year: 'numeric',
-                    })}
-                  </time>
-                  <p className={`text-xs leading-relaxed ${i === 0 ? 'font-semibold text-am-ink' : 'text-am-secondary'}`}>
-                    {a.descricao}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </SectionCard>
+        <Card accentColor="var(--color-am-blue)">
+          <button
+            onClick={() => setShowAndamentos(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/[0.02] transition-colors"
+            style={{ borderBottom: showAndamentos ? '1px solid var(--color-am-border)' : 'none' }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-am-blue"><Clock size={13} /></span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">
+                Andamentos · {processo.andamentos.length}
+              </span>
+            </div>
+            {showAndamentos
+              ? <ChevronUp size={14} className="text-am-muted" />
+              : <ChevronDown size={14} className="text-am-muted" />
+            }
+          </button>
+
+          {showAndamentos && (
+            <ol className="px-4 py-4 space-y-0">
+              {processo.andamentos.map((a, i) => (
+                <li key={i} className="flex gap-3 pb-4 last:pb-0">
+                  <div className="flex flex-col items-center flex-shrink-0">
+                    <div className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
+                      style={{
+                        background: i === 0 ? 'var(--color-am-blue)' : 'var(--color-am-border)',
+                        boxShadow: i === 0 ? '0 0 0 3px rgba(18,72,190,0.12)' : 'none',
+                      }} />
+                    {i < processo.andamentos.length - 1 && (
+                      <div className="w-px flex-1 mt-1.5 bg-am-border" />
+                    )}
+                  </div>
+                  <div className="pb-1 min-w-0">
+                    <time className="text-[10px] font-bold text-am-muted block mb-0.5">
+                      {new Date(a.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </time>
+                    <p className={`text-xs leading-relaxed ${i === 0 ? 'font-semibold text-am-ink' : 'text-am-secondary'}`}>
+                      {a.descricao}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
       )}
 
-      {/* Ação sugerida — borda âmbar */}
+      {/* ── Ação sugerida ── */}
       {cliente.crm_acao_sugerida && (
-        <div
-          className="flex items-start gap-3 p-4 rounded-xl"
+        <div className="flex items-start gap-3 p-4 rounded-2xl"
           style={{
-            background: 'rgba(208,128,16,0.06)',
-            border: '1px solid rgba(208,128,16,0.22)',
+            background: 'rgba(208,128,16,0.05)',
+            border: '1px solid rgba(208,128,16,0.20)',
             borderLeft: '3px solid #D08010',
-          }}
-        >
-          <AlertCircle size={15} style={{ color: '#D08010' }} className="flex-shrink-0 mt-0.5" />
+          }}>
+          <AlertCircle size={14} style={{ color: '#D08010' }} className="flex-shrink-0 mt-0.5" />
           <div>
-            <div className="text-xs font-bold mb-0.5" style={{ color: '#D08010' }}>Ação sugerida pela IA</div>
-            <div className="text-xs text-am-secondary leading-relaxed">{cliente.crm_acao_sugerida}</div>
+            <p className="text-[10px] font-bold mb-0.5" style={{ color: '#D08010' }}>Ação sugerida pela IA</p>
+            <p className="text-xs text-am-secondary leading-relaxed">{cliente.crm_acao_sugerida}</p>
           </div>
         </div>
       )}
