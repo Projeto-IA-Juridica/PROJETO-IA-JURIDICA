@@ -35,16 +35,23 @@ dependencies = [
 [project.optional-dependencies]
 feature1 = [
     # IA & LLM
-    "langchain==0.1.0",
-    "langgraph==0.0.20",
-    "anthropic==0.18.0",
-    "openai==1.12.0",
+    "langchain==0.2.16",
+    "langchain-text-splitters==0.2.4",
+    "langchain-anthropic==0.1.23",
+    "langchain-openai==0.1.25",
+    "langchain-community==0.2.16",
+    "langgraph==0.2.28",
+    "anthropic==0.100.0",
+    "openai==1.50.2",
+    "tiktoken==0.7.0",
     # Async tasks
     "celery==5.3.6",
     "flower==2.0.1",
     "redbeat==2.2.0",
     # HTTP async
     "aiohttp==3.9.3",
+    # Resiliência
+    "pybreaker==1.2.0",
     # Audio
     "pydub==0.25.1",
 ]
