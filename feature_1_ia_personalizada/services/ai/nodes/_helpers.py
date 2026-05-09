@@ -62,7 +62,7 @@ async def obter_persona(
     try:
         cached = await redis.get(cache_key)
         if cached:
-            return cached  # type: ignore[return-value]
+            return str(cached)
     except Exception:
         pass
 
