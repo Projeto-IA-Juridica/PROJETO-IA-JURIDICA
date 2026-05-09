@@ -316,8 +316,8 @@ class ConversationOrchestrator:
     def _build_graph(self) -> Any:
         d = self._deps  # alias para closures
 
-        def _wrap(fn):  # type: ignore[no-untyped-def]
-            async def _node(state: ConversationState) -> dict:  # type: ignore[type-arg]
+        def _wrap(fn: Any) -> Any:
+            async def _node(state: ConversationState) -> dict[str, Any]:
                 return await fn(state, d)
             return _node
 
@@ -494,9 +494,9 @@ class ConversationOrchestrator:
 
     async def _fluxo_sequencial(self, state: ConversationState) -> ConversationState:
         d = self._deps
-        s = dict(state)  # type: ignore[assignment]
+        s: dict[str, Any] = dict(state)  # type: ignore[assignment]
 
-        async def _run(fn, st):  # type: ignore[no-untyped-def]
+        async def _run(fn: Any, st: Any) -> Any:
             return await fn(st, d)
 
         s.update(await _run(node_classificar_intencao, s))

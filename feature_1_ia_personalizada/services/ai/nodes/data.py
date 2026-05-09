@@ -68,6 +68,7 @@ async def node_buscar_dados(state: ConversationState, deps: NodeDeps) -> dict[st
                     ),
                     timeout=TIMEOUT_DATAJUD_SEGUNDOS,
                 )
+                andamentos = andamentos or []
                 if andamentos:
                     await deps.cache.set_andamentos(numero_cnj, andamentos)
                 log.info("andamentos_do_datajud", cnj=numero_cnj, total=len(andamentos))

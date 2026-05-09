@@ -109,7 +109,7 @@ async def node_preparar_escalacao(state: ConversationState, deps: NodeDeps) -> d
             )
         )
 
-        def _log_error(t: asyncio.Task) -> None:  # type: ignore[type-arg]
+        def _log_error(t: "asyncio.Task[Any]") -> None:
             if not t.cancelled() and (exc := t.exception()):
                 logger.error(
                     "escalacao_background_falhou",
