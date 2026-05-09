@@ -33,6 +33,11 @@ _tokens_consumidos = Counter(
     "Total de tokens consumidos pelo Claude",
     labelnames=["tipo"],  # input | output
 )
+_cache_tokens = Counter(
+    "ia_cache_tokens_total",
+    "Tokens de prompt caching do Claude",
+    labelnames=["tipo"],  # write | read
+)
 _erros = Counter(
     "ia_errors_total",
     "Total de erros nas chamadas ao Claude",
@@ -40,21 +45,31 @@ _erros = Counter(
 )
 
 # ---------------------------------------------------------------------------
-# Custo por token — preços claude-sonnet-4 verificados em 2026-02
-# Referência: https://www.anthropic.com/pricing
+# Custo por token — claude-sonnet-4-20250514 (verificado 2026-05)
+# Prompt caching: write custa 25% a mais que input; read custa 10% do input.
 # ---------------------------------------------------------------------------
 
-_CUSTO_INPUT_POR_MILHAO = Decimal("3.00")  # USD
-_CUSTO_OUTPUT_POR_MILHAO = Decimal("15.00")  # USD
+_CUSTO_INPUT_POR_MILHAO       = Decimal("3.00")
+_CUSTO_OUTPUT_POR_MILHAO      = Decimal("15.00")
+_CUSTO_CACHE_WRITE_POR_MILHAO = Decimal("3.75")   # 125% do input
+_CUSTO_CACHE_READ_POR_MILHAO  = Decimal("0.30")   # 10% do input
 
 _MAX_TENTATIVAS = 3
 _TIMEOUT_SEGUNDOS = 30.0
 
 
-def _calcular_custo(tokens_input: int, tokens_output: int) -> Decimal:
-    custo_in = (Decimal(tokens_input) / Decimal(1_000_000)) * _CUSTO_INPUT_POR_MILHAO
-    custo_out = (Decimal(tokens_output) / Decimal(1_000_000)) * _CUSTO_OUTPUT_POR_MILHAO
-    return custo_in + custo_out
+def _calcular_custo(
+    tokens_input: int,
+    tokens_output: int,
+    tokens_cache_write: int = 0,
+    tokens_cache_read: int = 0,
+) -> Decimal:
+    return (
+        Decimal(tokens_input)       / Decimal(1_000_000) * _CUSTO_INPUT_POR_MILHAO
+        + Decimal(tokens_output)    / Decimal(1_000_000) * _CUSTO_OUTPUT_POR_MILHAO
+        + Decimal(tokens_cache_write) / Decimal(1_000_000) * _CUSTO_CACHE_WRITE_POR_MILHAO
+        + Decimal(tokens_cache_read)  / Decimal(1_000_000) * _CUSTO_CACHE_READ_POR_MILHAO
+    )
 
 
 def _backoff(tentativa: int) -> float:
@@ -73,7 +88,44 @@ def _extrair_texto(response: anthropic.types.Message) -> str:
     return str(text_blocks[0].text)
 
 
-async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
+def _extrair_uso(response: anthropic.types.Message) -> tuple[int, int, int, int]:
+    """Retorna (input, output, cache_write, cache_read) tokens da resposta."""
+    usage = response.usage
+    return (
+        usage.input_tokens,
+        usage.output_tokens,
+        getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        getattr(usage, "cache_read_input_tokens", 0) or 0,
+    )
+
+
+def _registrar_uso(
+    tokens_in: int,
+    tokens_out: int,
+    cache_write: int,
+    cache_read: int,
+    intencao: str,
+    duracao: float,
+) -> None:
+    _latencia.labels(intencao=intencao).observe(duracao)
+    _tokens_consumidos.labels(tipo="input").inc(tokens_in)
+    _tokens_consumidos.labels(tipo="output").inc(tokens_out)
+    if cache_write:
+        _cache_tokens.labels(tipo="write").inc(cache_write)
+    if cache_read:
+        _cache_tokens.labels(tipo="read").inc(cache_read)
+    logger.info(
+        "claude_resposta_ok",
+        intencao=intencao,
+        tokens_input=tokens_in,
+        tokens_output=tokens_out,
+        cache_write=cache_write,
+        cache_read=cache_read,
+        duracao_s=round(duracao, 3),
+    )
+
+
+async def _com_retry(coro_fn: Any, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
     """
     Executa uma coroutine com retry + backoff exponencial com jitter.
     AuthenticationError falha imediatamente (sem retry).
@@ -120,8 +172,41 @@ async def _com_retry(coro_fn, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
     ) from ultimo_erro
 
 
+def _system_com_cache(system_prompt: str) -> list[dict[str, Any]]:
+    """Converte system prompt em bloco cacheável (economiza ~90% nos tokens de input)."""
+    return [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+
+def _historico_com_cache(
+    mensagens_historico: list[dict[str, str]],
+    mensagem_usuario: str,
+) -> list[Any]:
+    """
+    Monta a lista de mensagens para a API com cache_control no último turn do histórico.
+
+    O marcador no último turn do histórico faz com que, na chamada seguinte,
+    toda aquela conversa seja lida do cache — sem recusto de input.
+    """
+    messages: list[Any] = []
+
+    for i, msg in enumerate(mensagens_historico):
+        if i == len(mensagens_historico) - 1:
+            # Último turn do histórico vira checkpoint de cache para a próxima chamada
+            messages.append({
+                "role": msg["role"],
+                "content": [
+                    {"type": "text", "text": msg["content"], "cache_control": {"type": "ephemeral"}}
+                ],
+            })
+        else:
+            messages.append(msg)
+
+    messages.append({"role": "user", "content": mensagem_usuario})
+    return messages
+
+
 class ClaudeClient:
-    """Wrapper assíncrono sobre o SDK do Anthropic com retry, timeout e métricas."""
+    """Wrapper assíncrono sobre o SDK do Anthropic com retry, timeout, métricas e prompt caching."""
 
     def __init__(self, api_key: str) -> None:
         self._client = anthropic.AsyncAnthropic(
@@ -139,24 +224,23 @@ class ClaudeClient:
         """
         Envia uma mensagem ao Claude e retorna a resposta com métricas.
 
-        Args:
-            system_prompt: Prompt de sistema já formatado.
-            mensagens_historico: Lista de dicts [{role, content}] — conversa anterior.
-            mensagem_usuario: Mensagem atual do usuário.
-            intencao: Label para métricas Prometheus (status, duvida_termo, etc.).
+        O system prompt e o histórico de conversa são cacheados automaticamente:
+        - System prompt: cacheado em toda chamada (payback após 1ª requisição).
+        - Histórico: o último turn é marcado para cache — na próxima chamada,
+          toda a conversa anterior vira cache hit (~90% de desconto nesses tokens).
 
         Returns:
             {
                 "resposta": str,
                 "tokens_input": int,
                 "tokens_output": int,
+                "tokens_cache_write": int,
+                "tokens_cache_read": int,
                 "custo": Decimal,
             }
-
-        Raises:
-            RuntimeError: Se todas as tentativas falharem.
         """
-        messages = mensagens_historico + [{"role": "user", "content": mensagem_usuario}]
+        system_blocks = _system_com_cache(system_prompt)
+        messages = _historico_com_cache(mensagens_historico, mensagem_usuario)
         inicio = time.perf_counter()
 
         async def _chamar() -> anthropic.types.Message:
@@ -164,35 +248,23 @@ class ClaudeClient:
                 model=MODELO_CLAUDE,
                 max_tokens=MAX_TOKENS_RESPOSTA,
                 temperature=TEMPERATURA_CLAUDE,
-                system=system_prompt,
-                messages=messages,  # type: ignore[arg-type]
+                system=system_blocks,  # type: ignore[arg-type]
+                messages=messages,
             )
 
         response = await _com_retry(_chamar)
-
         duracao = time.perf_counter() - inicio
-        _latencia.labels(intencao=intencao).observe(duracao)
 
-        tokens_in = response.usage.input_tokens
-        tokens_out = response.usage.output_tokens
-        _tokens_consumidos.labels(tipo="input").inc(tokens_in)
-        _tokens_consumidos.labels(tipo="output").inc(tokens_out)
-
-        resposta_texto = _extrair_texto(response)
-
-        logger.info(
-            "claude_resposta_ok",
-            intencao=intencao,
-            tokens_input=tokens_in,
-            tokens_output=tokens_out,
-            duracao_s=round(duracao, 3),
-        )
+        tokens_in, tokens_out, cache_write, cache_read = _extrair_uso(response)
+        _registrar_uso(tokens_in, tokens_out, cache_write, cache_read, intencao, duracao)
 
         return {
-            "resposta": resposta_texto,
+            "resposta": _extrair_texto(response),
             "tokens_input": tokens_in,
             "tokens_output": tokens_out,
-            "custo": _calcular_custo(tokens_in, tokens_out),
+            "tokens_cache_write": cache_write,
+            "tokens_cache_read": cache_read,
+            "custo": _calcular_custo(tokens_in, tokens_out, cache_write, cache_read),
         }
 
     async def chamar_direto(
@@ -202,31 +274,35 @@ class ClaudeClient:
         modelo: str,
         max_tokens: int,
         temperature: float = 0.3,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
         Chamada com modelo e parâmetros explícitos — usada quando o caller
         precisa de um modelo diferente do padrão (ex: Haiku para CRM).
 
         Returns:
-            {"resposta": str, "tokens_input": int, "tokens_output": int, "custo": Decimal}
+            {"resposta": str, "tokens_input": int, "tokens_output": int,
+             "tokens_cache_write": int, "tokens_cache_read": int, "custo": Decimal}
         """
+        system_blocks = _system_com_cache(system_prompt)
+
         async def _chamar() -> anthropic.types.Message:
             return await self._client.messages.create(
                 model=modelo,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                system=system_prompt,
+                system=system_blocks,  # type: ignore[arg-type]
                 messages=[{"role": "user", "content": mensagem}],
             )
 
         response = await _com_retry(_chamar)
-        tokens_in = response.usage.input_tokens
-        tokens_out = response.usage.output_tokens
+        tokens_in, tokens_out, cache_write, cache_read = _extrair_uso(response)
         return {
             "resposta": _extrair_texto(response),
             "tokens_input": tokens_in,
             "tokens_output": tokens_out,
-            "custo": _calcular_custo(tokens_in, tokens_out),
+            "tokens_cache_write": cache_write,
+            "tokens_cache_read": cache_read,
+            "custo": _calcular_custo(tokens_in, tokens_out, cache_write, cache_read),
         }
 
     async def classificar_intencao(self, system_prompt: str, mensagem: str) -> str:
@@ -235,20 +311,20 @@ class ClaudeClient:
         max_tokens=32 — suficiente para {"intencao": "duvida_termo"} com folga.
         temperature=0.0 — determinístico para classificação.
 
+        O system prompt de classificação é cacheado: como é chamado a cada mensagem,
+        o cache hit paga a diferença já na segunda requisição do dia.
+
         Returns:
             String JSON, ex: '{"intencao": "status"}'.
-            O chamador é responsável por fazer json.loads().
-
-        Raises:
-            RuntimeError: Se todas as tentativas falharem.
         """
+        system_blocks = _system_com_cache(system_prompt)
 
         async def _chamar() -> anthropic.types.Message:
             return await self._client.messages.create(
                 model=MODELO_CLAUDE,
                 max_tokens=32,
                 temperature=0.0,
-                system=system_prompt,
+                system=system_blocks,  # type: ignore[arg-type]
                 messages=[{"role": "user", "content": mensagem}],
             )
 
