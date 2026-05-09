@@ -1,18 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Sparkles, Send, BookOpen, Scale, FileSearch,
-  AlertTriangle, ChevronRight, RotateCcw,
+  Sparkles, Scale, FileSearch,
+  AlertTriangle, RotateCcw,
 } from 'lucide-react'
 import { consultar } from '../api/hub'
 import type { ChatMessage } from '../types'
+import { PlaceholdersAndVanishInput } from '../components/ui/PlaceholdersAndVanishInput'
 
 type Tool = 'chat' | 'peticao' | 'jurisprudencia'
 
-const TOOLS: { id: Tool; icon: React.ReactNode; label: string; desc: string }[] = [
-  { id: 'chat',          icon: <Sparkles size={16} />,   label: 'Assistente Jurídico', desc: 'Consulte a IA sobre qualquer tema do direito' },
-  { id: 'peticao',       icon: <Scale size={16} />,      label: 'Análise de Petição',  desc: 'Gere e refine petições com suporte da IA'     },
-  { id: 'jurisprudencia',icon: <FileSearch size={16} />, label: 'Jurisprudência',       desc: 'Pesquise precedentes e teses jurídicas'       },
+const TOOLS: { id: Tool; icon: React.ReactNode; label: string }[] = [
+  { id: 'chat',          icon: <Sparkles size={13} />,   label: 'Assistente' },
+  { id: 'peticao',       icon: <Scale size={13} />,      label: 'Petição'    },
+  { id: 'jurisprudencia',icon: <FileSearch size={13} />, label: 'Jurisprudência' },
 ]
 
 const QUICK_PROMPTS: Record<Tool, string[]> = {
@@ -23,13 +25,13 @@ const QUICK_PROMPTS: Record<Tool, string[]> = {
     'Diferença entre nulidade e anulabilidade',
   ],
   peticao: [
-    'Modele uma petição inicial para indenização por dano moral',
-    'Redija uma contestação para ação de cobrança',
-    'Crie um recurso de apelação para decisão de improcedência',
-    'Elabore uma réplica rebatendo alegações genéricas',
+    'Petição inicial para indenização por dano moral',
+    'Contestação para ação de cobrança',
+    'Recurso de apelação — decisão de improcedência',
+    'Réplica rebatendo alegações genéricas',
   ],
   jurisprudencia: [
-    'STJ sobre dano moral em atraso de voo',
+    'STJ — dano moral em atraso de voo',
     'Teses STF sobre responsabilidade do Estado',
     'Súmulas do TST sobre horas extras',
     'Precedentes sobre inversão do ônus da prova',
@@ -42,58 +44,63 @@ const INTENT_MAP: Record<Tool, string> = {
   jurisprudencia: 'duvida_juridica',
 }
 
+/* ── Bolha de mensagem ─────────────────────────────────────────────────── */
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user'
   return (
-    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1.5`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className="flex items-center gap-1.5 px-1">
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
-            style={{ background: '#1A9E78' }}>C</div>
-          <span className="text-[10px] font-bold text-am-muted">Dra. Camila · Amicus IA</span>
+        <div className="flex items-end gap-2 max-w-[82%]">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mb-0.5"
+            style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>
+            C
+          </div>
+          <div className="px-4 py-3 rounded-2xl rounded-bl-sm text-sm leading-relaxed whitespace-pre-wrap bg-white border border-am-border text-am-ink"
+            style={{ boxShadow: '0 1px 6px rgba(12,30,48,0.06)' }}>
+            {msg.content}
+          </div>
         </div>
       )}
-      <div className={`max-w-[85%] sm:max-w-[78%] px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap
-        ${isUser
-          ? 'bubble-user text-white'
-          : 'bubble-assistant bg-white border border-am-border text-am-ink card-shadow'}`}
-        style={isUser ? { background: 'var(--color-am-blue)' } : {}}>
-        {msg.content}
-      </div>
+      {isUser && (
+        <div className="max-w-[82%] px-4 py-3 rounded-2xl rounded-br-sm text-sm leading-relaxed whitespace-pre-wrap text-white"
+          style={{ background: 'linear-gradient(135deg,#1248BE,#2D6FD4)' }}>
+          {msg.content}
+        </div>
+      )}
     </div>
   )
 }
 
+/* ── Indicador de digitação ─────────────────────────────────────────────── */
 function TypingIndicator() {
   return (
-    <div className="flex flex-col items-start gap-1.5">
-      <div className="flex items-center gap-1.5 px-1">
-        <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-          style={{ background: '#1A9E78' }}>C</div>
-        <span className="text-[10px] font-bold text-am-muted">Dra. Camila está digitando…</span>
-      </div>
-      <div className="bubble-assistant bg-white border border-am-border card-shadow px-4 py-3">
-        <div className="dot-pulse flex gap-1.5"><span /><span /><span /></div>
+    <div className="flex justify-start">
+      <div className="flex items-end gap-2">
+        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>C</div>
+        <div className="px-4 py-3 rounded-2xl rounded-bl-sm bg-white border border-am-border"
+          style={{ boxShadow: '0 1px 6px rgba(12,30,48,0.06)' }}>
+          <div className="dot-pulse flex gap-1.5"><span /><span /><span /></div>
+        </div>
       </div>
     </div>
   )
 }
 
+/* ── Página principal ────────────────────────────────────────────────────── */
 export default function HubIAPage() {
   const [tool, setTool]         = useState<Tool>('chat')
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: 'assistant',
-    content: 'Olá! Sou a Dra. Camila, sua assistente jurídica. Como posso ajudar hoje? Pode me fazer qualquer pergunta sobre direito, pedir análise de documentos ou pesquisar jurisprudência.',
+    content: 'Olá! Sou a Dra. Camila, sua assistente jurídica. Como posso ajudar hoje?',
     intencao: 'saudacao',
   }])
-  const [input, setInput]       = useState('')
   const messagesRef             = useRef<HTMLDivElement>(null)
-  const textareaRef             = useRef<HTMLTextAreaElement>(null)
 
   const mutation = useMutation({
     mutationFn: (pergunta: string) => consultar({ pergunta }),
     onSuccess: (data) => {
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         role: 'assistant',
         content: data.resposta,
         intencao: INTENT_MAP[tool],
@@ -107,24 +114,11 @@ export default function HubIAPage() {
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, mutation.isPending])
 
-  function handleSend(text?: string) {
-    const t = (text ?? input).trim()
+  function handleSend(text: string) {
+    const t = text.trim()
     if (!t || mutation.isPending) return
-    setInput('')
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    setMessages((prev) => [...prev, { role: 'user', content: t }])
+    setMessages(prev => [...prev, { role: 'user', content: t }])
     mutation.mutate(t)
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
-  }
-
-  function handleInput() {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
 
   function resetChat() {
@@ -133,7 +127,6 @@ export default function HubIAPage() {
       content: 'Nova conversa iniciada. Como posso ajudar?',
       intencao: 'saudacao',
     }])
-    setInput('')
   }
 
   function switchTool(t: Tool) {
@@ -141,118 +134,113 @@ export default function HubIAPage() {
     resetChat()
   }
 
-  const currentTool = TOOLS.find((t) => t.id === tool)!
-  const placeholder =
-    tool === 'peticao'        ? 'Descreva o caso e o tipo de petição desejada…' :
-    tool === 'jurisprudencia' ? 'Pesquise uma tese, súmula ou precedente…' :
-    'Pergunte qualquer coisa sobre direito…'
+  const isEmpty = messages.length === 1
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-am-bg">
 
-      {/* Tool switcher */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-0">
-        <div className="flex gap-2 sm:gap-3 pb-3 border-b border-am-border overflow-x-auto">
-          {TOOLS.map((t) => {
-            const active = tool === t.id
-            return (
-              <button key={t.id} onClick={() => switchTool(t.id)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap press flex-shrink-0"
-                style={active
-                  ? { background: 'var(--color-am-surface)', color: 'var(--color-am-blue)', border: '1px solid var(--color-am-border)', borderBottom: '2px solid var(--color-am-blue)' }
-                  : { background: 'transparent', color: 'var(--color-am-muted)', border: '1px solid transparent' }
-                }>
-                <span style={{ color: active ? 'var(--color-am-blue)' : 'var(--color-am-muted)' }}>{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            )
-          })}
+      {/* ── Container centralizado ── */}
+      <div className="flex flex-col h-full w-full max-w-2xl mx-auto">
+
+        {/* ── Tool switcher ── */}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-5 pb-3">
+          <div className="flex gap-1 p-1 rounded-2xl relative" style={{ background: 'rgba(12,30,48,0.05)' }}>
+            {TOOLS.map((t) => {
+              const active = tool === t.id
+              return (
+                <motion.button
+                  key={t.id}
+                  onClick={() => switchTool(t.id)}
+                  whileHover={{ scale: active ? 1 : 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap z-10"
+                  style={{ color: active ? 'var(--color-am-blue)' : 'var(--color-am-muted)' }}
+                >
+                  {/* sliding pill de fundo */}
+                  <AnimatePresence>
+                    {active && (
+                      <motion.span
+                        layoutId="tool-pill"
+                        className="absolute inset-0 rounded-xl"
+                        style={{
+                          background: 'white',
+                          boxShadow: '0 1px 6px rgba(18,72,190,0.15), 0 0 0 1px rgba(18,72,190,0.08)',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                      />
+                    )}
+                  </AnimatePresence>
+                  <span className="relative">{t.icon}</span>
+                  <span className="relative">{t.label}</span>
+                </motion.button>
+              )
+            })}
+          </div>
 
           <button onClick={resetChat}
-            className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold whitespace-nowrap text-am-muted hover:text-am-secondary press flex-shrink-0"
-            style={{ border: '1px solid var(--color-am-border)' }}>
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-am-muted hover:text-am-secondary transition-colors"
+            style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
             <RotateCcw size={11} />
-            <span className="hidden sm:inline">Nova conversa</span>
+            Limpar
           </button>
         </div>
-      </div>
 
-      {/* Tool description + status */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 sm:px-6 py-2.5"
-        style={{ background: 'rgba(26,158,120,0.05)', borderBottom: '1px solid rgba(26,158,120,0.15)' }}>
-        <span className="w-1.5 h-1.5 rounded-full glow-green flex-shrink-0" style={{ background: '#1A9E78' }} />
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs font-semibold text-am-ink flex-shrink-0">{currentTool.label}</span>
-          <span className="text-am-muted text-xs flex-shrink-0">·</span>
-          <span className="text-xs text-am-muted truncate">{currentTool.desc}</span>
+        {/* ── Área de mensagens ── */}
+        <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+
+          {/* Estado vazio — sugestões rápidas */}
+          {isEmpty && (
+            <div className="flex flex-col items-center justify-center h-full gap-6 pb-4">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 4px 16px rgba(18,72,190,0.25)' }}>
+                  <Sparkles size={22} className="text-white" />
+                </div>
+                <p className="text-sm font-semibold text-am-ink">Dra. Camila</p>
+                <p className="text-xs text-am-muted mt-0.5">Assistente Jurídica · Amicus IA</p>
+              </div>
+
+              <div className="w-full grid grid-cols-2 gap-2">
+                {QUICK_PROMPTS[tool].map((p) => (
+                  <button key={p} onClick={() => handleSend(p)}
+                    className="px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium bg-white border border-am-border hover:border-am-blue hover:text-am-ink transition-all duration-200 leading-relaxed"
+                    style={{ boxShadow: '0 1px 4px rgba(12,30,48,0.05)' }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mensagens */}
+          {!isEmpty && messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+          {mutation.isPending && <TypingIndicator />}
+
+          {mutation.isError && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+              style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.18)', color: '#C83030' }}>
+              <AlertTriangle size={12} />
+              Erro ao enviar. Verifique a conexão e tente novamente.
+            </div>
+          )}
         </div>
-        <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-          style={{ background: 'rgba(26,158,120,0.18)', color: '#1A9E78' }}>ONLINE</span>
-      </div>
 
-      {/* Messages */}
-      <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4 bg-am-bg">
+        {/* ── Input ── */}
+        <div className="flex-shrink-0 px-4 pb-5 pt-2">
+          <PlaceholdersAndVanishInput
+            placeholders={QUICK_PROMPTS[tool]}
+            onSubmit={handleSend}
+            disabled={mutation.isPending}
+          />
+          <p className="text-center text-[10px] text-am-muted mt-2">
+            Amicus IA pode cometer erros. Verifique informações importantes.
+          </p>
+        </div>
 
-        {/* Quick prompts — only when single welcome message */}
-        {messages.length === 1 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 px-1">
-              <BookOpen size={10} className="text-am-muted" />
-              <span className="text-[10px] font-bold text-am-muted uppercase tracking-wider">Sugestões rápidas</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {QUICK_PROMPTS[tool].map((p) => (
-                <button key={p} onClick={() => handleSend(p)}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium
-                    bg-white border border-am-border card-shadow hover:border-am-blue hover:text-am-ink hover-lift group">
-                  <ChevronRight size={11} className="text-am-muted group-hover:text-am-blue transition-fast flex-shrink-0" />
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
-        {mutation.isPending && <TypingIndicator />}
-
-        {mutation.isError && (
-          <div className="flex items-center gap-2 p-3 rounded-xl text-xs"
-            style={{ background: 'rgba(200,48,48,0.07)', border: '1px solid rgba(200,48,48,0.2)', color: '#C83030' }}>
-            <AlertTriangle size={12} />
-            Erro ao enviar. Verifique a conexão e tente novamente.
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="flex items-end gap-2 sm:gap-3 px-3 sm:px-5 py-3 sm:py-4 flex-shrink-0 bg-white border-t border-am-border">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          rows={1}
-          placeholder={placeholder}
-          disabled={mutation.isPending}
-          className="flex-1 px-3.5 py-2.5 text-xs border border-am-border rounded-xl resize-none outline-none
-            font-sans text-am-ink bg-am-bg transition-fast placeholder:text-am-muted
-            disabled:opacity-50 max-h-[120px]"
-          onFocus={(e) => (e.target.style.borderColor = 'var(--color-am-blue)')}
-          onBlur={(e) => (e.target.style.borderColor = 'var(--color-am-border)')}
-        />
-        <button
-          onClick={() => handleSend()}
-          disabled={!input.trim() || mutation.isPending}
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-white flex-shrink-0
-            transition-fast disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: 'var(--color-am-blue)' }}
-          onMouseEnter={(e) => { if (!mutation.isPending && input.trim()) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-am-blue)' }}
-        >
-          <Send size={13} />
-        </button>
       </div>
     </div>
   )

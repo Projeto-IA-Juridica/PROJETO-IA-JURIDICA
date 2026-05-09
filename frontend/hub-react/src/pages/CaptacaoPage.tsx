@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Target, Search, Dna, List, Building2, User, Star,
   RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronUp,
@@ -285,39 +286,59 @@ export default function CaptacaoPage() {
   ]
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-am-bg">
+      <div className="flex flex-col h-full w-full max-w-3xl mx-auto">
 
-      {/* Header + tabs */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-0 bg-white border-b border-am-border">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(58,122,184,0.1)', border: '1px solid rgba(58,122,184,0.2)' }}>
-            <Target size={16} className="text-am-blue" />
+        {/* ── Header ── */}
+        <div className="flex-shrink-0 px-4 pt-5 pb-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 4px 12px rgba(18,72,190,0.22)' }}>
+              <Target size={18} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-am-ink">Captação Inteligente</h2>
+              <p className="text-xs text-am-muted mt-0.5">Descubra leads que combinam com o seu escritório</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-extrabold text-am-ink tracking-tight">Captação Inteligente</h2>
-            <p className="text-[10px] text-am-muted">Descubra empresas e pessoas com processos que combinam com o seu escritório</p>
+
+          {/* Pill switcher */}
+          <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'rgba(12,30,48,0.05)' }}>
+            {TABS.map((t) => {
+              const active = tab === t.id
+              return (
+                <motion.button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  whileHover={{ scale: active ? 1 : 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap flex-1 justify-center"
+                  style={{ color: active ? 'var(--color-am-blue)' : 'var(--color-am-muted)' }}
+                >
+                  <AnimatePresence>
+                    {active && (
+                      <motion.span
+                        layoutId="cap-tab-pill"
+                        className="absolute inset-0 rounded-xl"
+                        style={{ background: 'white', boxShadow: '0 1px 6px rgba(18,72,190,0.12), 0 0 0 1px rgba(18,72,190,0.08)' }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                      />
+                    )}
+                  </AnimatePresence>
+                  <span className="relative">{t.icon}</span>
+                  <span className="relative">{t.label}</span>
+                </motion.button>
+              )
+            })}
           </div>
         </div>
-
-        <div className="flex gap-1">
-          {TABS.map((t) => {
-            const active = tab === t.id
-            return (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className="flex items-center gap-2 px-3 py-2 text-xs font-semibold whitespace-nowrap press flex-shrink-0 rounded-t-lg"
-                style={active
-                  ? { color: 'var(--color-am-blue)', borderBottom: '2px solid var(--color-am-blue)', background: 'var(--color-am-surface)' }
-                  : { color: 'var(--color-am-muted)', borderBottom: '2px solid transparent' }}>
-                {t.icon} {t.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5 page-enter" key={tab}>
+        <div className="px-4 pb-6 space-y-5" key={tab}>
 
           {/* ── TAB DNA ─────────────────────────────────────────────────────── */}
           {tab === 'dna' && (
@@ -682,6 +703,7 @@ export default function CaptacaoPage() {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   )
