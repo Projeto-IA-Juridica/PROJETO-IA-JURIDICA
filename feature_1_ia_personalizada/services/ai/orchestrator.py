@@ -69,7 +69,12 @@ from feature_1_ia_personalizada.services.ai.state import (
     ConversationState,
     NodeDeps,
     QuotaExcedidaError,
+    classificar_por_keywords,
+    erros_total,
 )
+
+# Alias de retrocompatibilidade para testes que importam o nome privado
+_classificar_por_keywords = classificar_por_keywords
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManager
 from feature_1_ia_personalizada.services.legal_data.cache_manager import LegalDataCacheManager
@@ -100,11 +105,6 @@ _ia_requests_total = Counter(
 _ia_fallback_used_total = Counter(
     "ia_fallback_used_total",
     "Total de vezes que o fallback foi ativado",
-)
-_erros_orquestrador = Counter(
-    "ia_orchestrator_errors_total",
-    "Total de erros no orchestrator por nó",
-    labelnames=["no"],
 )
 
 
@@ -239,7 +239,7 @@ class ConversationOrchestrator:
         except TimeoutError:
             log = logger.bind(escritorio_id=escritorio_id, cliente_id=cliente_id)
             log.error("fluxo_timeout", timeout_s=TIMEOUT_FLUXO_SEGUNDOS)
-            _erros_orquestrador.labels(no="timeout_global").inc()
+            erros_total.labels(no="timeout_global").inc()
             return {
                 "resposta": MENSAGENS_FALLBACK.get("timeout", TEMPLATE_ERRO_GENERICO),
                 "intencao": "outro",

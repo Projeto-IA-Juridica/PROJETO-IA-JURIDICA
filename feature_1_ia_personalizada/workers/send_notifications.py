@@ -486,24 +486,25 @@ def processar_resposta_advogado(
             interacao_alvo = None
             if interacao_id:
                 for i in interacoes_recentes:
-                    if i.id == interacao_id and i.metadata_json.get("escalacao", {}).get("status") == "pendente":
+                    meta_i = i.metadata_json or {}
+                    if i.id == interacao_id and meta_i.get("escalacao", {}).get("status") == "pendente":
                         interacao_alvo = i
                         break
-            
+
             if not interacao_alvo:
                 # Fallback: pegar pendente mais recente
                 for i in interacoes_recentes:
-                    meta_esc = i.metadata_json.get("escalacao", {})
+                    meta_esc = (i.metadata_json or {}).get("escalacao", {})
                     if meta_esc.get("status") == "pendente" and id_advogado in meta_esc.get("advogados_notificados", []):
                         interacao_alvo = i
                         break
-            
+
             if not interacao_alvo:
                 logger.warning("nenhuma_escalacao_pendente_encontrada", advogado_id=id_advogado)
                 return
 
             # Atualizar o status da escalação
-            meta = dict(interacao_alvo.metadata_json)
+            meta = dict(interacao_alvo.metadata_json or {})
             esc_meta = dict(meta.get("escalacao", {}))
             esc_meta["status"] = "respondido"
             esc_meta["advogado_responsavel_id"] = id_advogado
