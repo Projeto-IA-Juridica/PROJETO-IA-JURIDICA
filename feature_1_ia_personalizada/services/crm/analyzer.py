@@ -137,7 +137,8 @@ class CRMAnalyzer:
                 messages=[{"role": "user", "content": input_txt}],
             )
 
-            texto = resp.content[0].text
+            bloco = resp.content[0]
+            texto = bloco.text if hasattr(bloco, "text") else ""
             dados = json.loads(texto)
             resumo = dados.get("resumo", "").strip()
             acao = dados.get("acao_sugerida", "Nenhuma ação necessária").strip()

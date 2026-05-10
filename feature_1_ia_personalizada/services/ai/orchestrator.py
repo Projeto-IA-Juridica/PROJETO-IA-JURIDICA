@@ -318,7 +318,7 @@ class ConversationOrchestrator:
 
         def _wrap(fn: Any) -> Any:
             async def _node(state: ConversationState) -> dict[str, Any]:
-                return await fn(state, d)
+                return await fn(state, d)  # type: ignore[no-any-return]
             return _node
 
         graph = StateGraph(ConversationState)
@@ -494,7 +494,7 @@ class ConversationOrchestrator:
 
     async def _fluxo_sequencial(self, state: ConversationState) -> ConversationState:
         d = self._deps
-        s: dict[str, Any] = dict(state)  # type: ignore[assignment]
+        s: dict[str, Any] = dict(state)
 
         async def _run(fn: Any, st: Any) -> Any:
             return await fn(st, d)

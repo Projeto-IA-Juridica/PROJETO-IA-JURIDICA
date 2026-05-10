@@ -192,7 +192,8 @@ class HubAdvogadoClassificador:
             timeout=_TIMEOUT_CLASSIFICACAO,
         )
 
-        texto = resposta.content[0].text.strip()
+        bloco = resposta.content[0]
+        texto = (bloco.text if hasattr(bloco, "text") else "").strip()
         dados = json.loads(texto)
 
         intencao_str = dados.get("intencao", "duvida_juridica")
