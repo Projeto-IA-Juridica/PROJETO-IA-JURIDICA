@@ -22,6 +22,56 @@ var TITLES = [
   { h:"Ativar o escritório",       p:"Revise os dados e ative sua conta para começar a atender." },
 ];
 
+/* ── Wave background ─────────────────────────────────────────── */
+(function() {
+  var cv  = document.getElementById("wave-canvas");
+  var ctx = cv.getContext("2d");
+  var t   = 0;
+
+  var waves = [
+    { color:"#A8C8E8", speed:0.012, amp:18, freq:0.005, offset:0.0, alpha:0.50 },
+    { color:"#3A7AB8", speed:0.018, amp:14, freq:0.007, offset:1.5, alpha:0.40 },
+    { color:"#EAF2FA", speed:0.009, amp:22, freq:0.004, offset:3.0, alpha:0.35 },
+    { color:"#3A7AB8", speed:0.022, amp:11, freq:0.009, offset:0.8, alpha:0.30 },
+    { color:"#A8C8E8", speed:0.015, amp:16, freq:0.006, offset:2.2, alpha:0.45 },
+  ];
+
+  function resize() {
+    cv.width  = window.innerWidth;
+    cv.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  function loop() {
+    var W = cv.width, H = cv.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#F0F5FA";
+    ctx.fillRect(0, 0, W, H);
+
+    waves.forEach(function(w, i) {
+      var yBase = H * (0.30 + i * 0.12);
+      ctx.beginPath();
+      ctx.moveTo(0, yBase);
+      for (var x = 0; x <= W; x += 3) {
+        var y = yBase + w.amp * Math.sin(x * w.freq + t * w.speed + w.offset);
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H * 0.72);
+      ctx.lineTo(0, H * 0.72);
+      ctx.closePath();
+      ctx.globalAlpha = w.alpha;
+      ctx.fillStyle   = w.color;
+      ctx.fill();
+    });
+
+    ctx.globalAlpha = 1;
+    t += 1;
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
 /* ── Logo amicus ─────────────────────────────────────────────── */
 (function() {
   var wrap = document.getElementById("logo-nav");

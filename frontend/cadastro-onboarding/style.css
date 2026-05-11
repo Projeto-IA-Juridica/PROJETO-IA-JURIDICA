@@ -44,8 +44,60 @@ body {
 .done-title { font-family: var(--serif); font-size: 32px; font-weight: 400; color: var(--dark); margin-bottom: 10px; }
 .done-sub   { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
 
-/* ── Header ────────────────────────────────────────────────────── */
-.header { background: var(--bg); }
+/* ── Wave canvas ───────────────────────────────────────────────── */
+#wave-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: block;
+}
+
+/* ── Wizard above canvas ───────────────────────────────────────── */
+#wizard, #done-screen {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Header glassmorphism ──────────────────────────────────────── */
+.header {
+  background: rgba(240,245,250,0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(212,230,244,0.60);
+}
+
+/* ── Card glassmorphism ────────────────────────────────────────── */
+.step-card {
+  background: rgba(255,255,255,0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 32px 36px;
+  box-shadow: 0 4px 32px rgba(58,122,184,0.12);
+  border: 1px solid rgba(255,255,255,0.92);
+  margin-bottom: 24px;
+}
+
+/* ── Info box inside card ──────────────────────────────────────── */
+.info-box {
+  padding: 14px 18px;
+  background: rgba(238,246,255,0.80);
+  border: 1px solid #B8D8F0;
+  border-radius: 10px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ── Input inside glass card ───────────────────────────────────── */
+input[type="text"], input[type="email"],
+input[type="password"], input[type="tel"],
+input[type="time"], select, textarea {
+  background: rgba(255,255,255,0.80);
+}
 .header-inner {
   max-width: 740px; margin: 0 auto;
   padding: 20px 24px 0;
