@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hub do Advogado — Amicus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ────────────────────────────────────────────
+       SIDEBAR ESQUERDA
+  ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Marca -->
+    <div class="sidebar-brand">
+      <div class="brand-mark">a</div>
+      <div class="brand-text">
+        <div class="brand-name">amicus</div>
+        <div class="brand-sub">Hub do Advogado</div>
+      </div>
+    </div>
+
+    <!-- IA Persona ativa -->
+    <div class="ai-card">
+      <div class="ai-dot"></div>
+      <div>
+        <div class="ai-name-text">Dra. Camila</div>
+        <div class="ai-sub-text">IA Ativa · Tom formal · 08h–18h</div>
+      </div>
+    </div>
+
+    <!-- Stats strip -->
+    <div class="stats-strip" id="stats-strip"><!-- JS --></div>
+
+    <!-- Busca -->
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" id="search-input" class="search-input"
+             placeholder="Buscar cliente…" autocomplete="off"/>
+    </div>
+
+    <!-- Lista de clientes -->
+    <div class="client-list" id="client-list"><!-- JS --></div>
+
+  </aside>
+
+  <!-- ────────────────────────────────────────────
+       PAINEL DIREITO
+  ──────────────────────────────────────────── -->
+  <main class="content">
+    <div class="detail-header" id="detail-header"><!-- JS --></div>
+    <div class="detail-tabs"   id="detail-tabs"><!-- JS --></div>
+    <div class="detail-body"   id="detail-body"><!-- JS --></div>
+  </main>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
