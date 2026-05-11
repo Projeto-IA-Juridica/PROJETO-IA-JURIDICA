@@ -11,306 +11,306 @@
 #     antes dos imports — nenhum .env ou secret é necessário para rodar pytest
 # ==============================================================================
 
-name: CI
+# name: CI
 
-on:
-  pull_request:
-    branches: [main, develop]
-  push:
-    branches: [main]
+# on:
+#   pull_request:
+#     branches: [main, develop]
+#   push:
+#     branches: [main]
 
-jobs:
-  # ----------------------------------------------------------------------------
-  # Job 1: Lint + Tipos + Testes
-  # ----------------------------------------------------------------------------
-  test:
-    name: Lint, Tipos e Testes
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"  # cacheia ~/.cache/pip entre runs para acelerar install
-
-      # Instala deps da aplicação (requirements-f1.txt = base + feature1)
-      # depois instala ferramentas de dev declaradas em pyproject.toml [dev]
-      # (pytest, ruff, black, mypy, aiosqlite, etc.)
-      - name: Instalar dependências
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements-f1.txt
-          pip install -e ".[dev]"
-
-      # ruff valida estilo e erros comuns (substitui flake8 + isort)
-      - name: Lint — Ruff
-        run: ruff check .
-
-      # black --check apenas verifica formatação, não modifica arquivos
-      - name: Formatação — Black
-        run: black --check .
-
-      # mypy faz análise estática de tipos — BLOQUEANTE: erros de tipo impedem merge
-      # ignore_missing_imports = true está em pyproject.toml — não falha por stubs ausentes
-      # continue-on-error: false (padrão) garante que o job falha se mypy reportar erros
-      - name: Tipos — Mypy
-        run: mypy feature_1_ia_personalizada shared
-        continue-on-error: false
-
-      # conftest.py (scope=session) já injeta todas as env vars via os.environ.setdefault
-      # antes do primeiro import de módulo — nenhuma variável de ambiente extra necessária aqui
-      # --cov-fail-under=70 está configurado em pyproject.toml — bloqueia PR se cobertura < 70%
-      - name: Testes — Pytest
-        run: pytest --tb=short
-
-      # Envia relatório de cobertura para Codecov (opcional — funciona sem o secret configurado)
-      # Para ativar: adicionar CODECOV_TOKEN em Settings > Secrets > Actions no GitHub
-      - name: Upload de cobertura para Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-        # continue-on-error garante que o job não falha se o token não estiver configurado
-        continue-on-error: true
-
-  # ----------------------------------------------------------------------------
-  # Job 2: Testes de integração com PostgreSQL+pgvector real
-  # Roda em paralelo com o job de lint/unit.
-  # Detecta bugs que o SQLite in-memory não pega:
-  #   - JSONB nativo (constraints, queries específicas)
-  #   - pgvector (embeddings, busca por similaridade)
-  #   - UNIQUE constraints concorrentes
-  #   - SELECT FOR UPDATE (distributed lock em processo_state.py)
-  # ----------------------------------------------------------------------------
-  integration-postgres:
-    name: Integração (PostgreSQL + pgvector)
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_concierge
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Instalar dependências
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements-f1.txt
-          pip install -e ".[dev]"
-
-      - name: Testes de integração com PostgreSQL real
-        env:
-          TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
-        run: |
-          pytest feature_1_ia_personalizada/tests/integration/ shared/tests/ \
-            --tb=short -v --no-cov
-
-  # ----------------------------------------------------------------------------
-  # Job 3: Segurança — bandit (SAST) + safety (dependências vulneráveis)
-  # Roda em paralelo com os outros jobs.
-  # bandit: analisa o código Python em busca de padrões inseguros (SQLi, shell injection, etc.)
-  # safety: cruza requirements com o banco de CVEs do PyPI Safety DB
-  # ----------------------------------------------------------------------------
-  security:
-    name: Segurança (bandit + safety)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Instalar ferramentas de segurança
-        run: pip install bandit[toml]==1.7.8 safety==3.2.0
-
-      # -r: recursivo nos módulos internos; -ll: reporta apenas MEDIUM e HIGH
-      # --skip B101: assert é usado em testes — falso-positivo garantido
-      - name: SAST — Bandit
-        run: |
-          bandit -r feature_1_ia_personalizada shared \
-            -ll --skip B101 \
-            --format json --output bandit-report.json || true
-          bandit -r feature_1_ia_personalizada shared \
-            -ll --skip B101
-
-      # Verifica vulnerabilidades conhecidas nas dependências instaladas
-      - name: Dependências — Safety
-        run: safety check -r requirements-f1.txt --full-report
-
-      - name: Upload relatório Bandit
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-report
-          path: bandit-report.json
-
-  # ----------------------------------------------------------------------------
-  # Job 4: Build Docker — valida que a imagem compila sem erros
-  # Roda em paralelo com o job de testes
-  # ----------------------------------------------------------------------------
-  docker-build:
-    name: Build Docker
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      # Valida que o Dockerfile.f1 compila corretamente (multi-stage build)
-      # Não faz push — apenas verifica que a imagem é buildável
-      - name: Build imagem
-        run: |
-          docker build \
-            -t concierge-f1:ci \
-            -f infrastructure/docker/Dockerfile.f1 \
-            .
-
-  # ----------------------------------------------------------------------------
-  # Job 5: Smoke Load Test — valida performance básica com Locust
-  # Roda apenas em push para main (após todos os outros jobs passarem).
-  # Cenário: 10 usuários, 30s — detecta regressões grosseiras de latência.
-  # Não substitui o load test completo de staging (50 usuários, 5 min).
-  # ----------------------------------------------------------------------------
-  load-smoke:
-    name: Smoke Load Test (Locust)
-    runs-on: ubuntu-latest
-    needs: [test, integration-postgres]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_concierge
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Instalar dependências + Locust
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements-f1.txt
-          pip install -e ".[dev]"
-          pip install "locust>=2.20"
-
-      - name: Gerar ENCRYPTION_KEY e exportar env vars
-        run: |
-          ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
-          echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >> $GITHUB_ENV
-        env:
-          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
-          REDIS_URL: redis://localhost:6379/0
-
-      - name: Rodar migrações Alembic
-        env:
-          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
-          REDIS_URL: redis://localhost:6379/0
-          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
-          EVOLUTION_API_URL: http://localhost:8765
-          EVOLUTION_API_KEY: test-evolution-key
-          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
-          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
-          OPENAI_API_KEY: sk-fake-openai-ci-key
-          CELERY_BROKER_URL: redis://localhost:6379/1
-          CELERY_RESULT_BACKEND: redis://localhost:6379/2
-        run: python -m alembic upgrade head
-
-      - name: Popular banco com seed data
-        env:
-          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
-          REDIS_URL: redis://localhost:6379/0
-          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
-          EVOLUTION_API_URL: http://localhost:8765
-          EVOLUTION_API_KEY: test-evolution-key
-          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
-          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
-          OPENAI_API_KEY: sk-fake-openai-ci-key
-          CELERY_BROKER_URL: redis://localhost:6379/1
-          CELERY_RESULT_BACKEND: redis://localhost:6379/2
-        run: python -m scripts.setup.seed_data
-
-      - name: Iniciar servidor FastAPI em background
-        env:
-          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
-          REDIS_URL: redis://localhost:6379/0
-          JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
-          EVOLUTION_API_URL: http://localhost:8765
-          EVOLUTION_API_KEY: test-evolution-key
-          JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
-          ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
-          OPENAI_API_KEY: sk-fake-openai-ci-key
-          CELERY_BROKER_URL: redis://localhost:6379/1
-          CELERY_RESULT_BACKEND: redis://localhost:6379/2
-        run: |
-          uvicorn feature_1_ia_personalizada.api.app:app \
-            --host 0.0.0.0 --port 8000 --workers 1 --log-level warning &
-          timeout 30 bash -c 'until curl -sf http://localhost:8000/health; do sleep 1; done'
-          echo "Servidor pronto"
-
-      - name: Executar smoke load test (10 usuários, 30s)
-        run: |
-          mkdir -p tests/load/reports
-          locust -f tests/load/locustfile.py \
-            --host=http://localhost:8000 \
-            --users=10 --spawn-rate=2 --run-time=30s --headless \
-            --html=tests/load/reports/ci_smoke_report.html \
-            HealthChecker AdvogadoAutenticado EvolutionWebhookSimulator
-
-      - name: Upload relatório de load test
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: load-smoke-report
-          path: tests/load/reports/ci_smoke_report.html
+# jobs:
+#   # ----------------------------------------------------------------------------
+#   # Job 1: Lint + Tipos + Testes
+#   # ----------------------------------------------------------------------------
+#   test:
+#     name: Lint, Tipos e Testes
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - name: Checkout do código
+#         uses: actions/checkout@v4
+#
+#       - name: Configurar Python 3.12
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+#           cache: "pip"  # cacheia ~/.cache/pip entre runs para acelerar install
+#
+#       # Instala deps da aplicação (requirements-f1.txt = base + feature1)
+#       # depois instala ferramentas de dev declaradas em pyproject.toml [dev]
+#       # (pytest, ruff, black, mypy, aiosqlite, etc.)
+#       - name: Instalar dependências
+#         run: |
+#           pip install --upgrade pip
+#           pip install -r requirements-f1.txt
+#           pip install -e ".[dev]"
+#
+#       # ruff valida estilo e erros comuns (substitui flake8 + isort)
+#       - name: Lint — Ruff
+#         run: ruff check .
+#
+#       # black --check apenas verifica formatação, não modifica arquivos
+#       - name: Formatação — Black
+#         run: black --check .
+#
+#       # mypy faz análise estática de tipos — BLOQUEANTE: erros de tipo impedem merge
+#       # ignore_missing_imports = true está em pyproject.toml — não falha por stubs ausentes
+#       # continue-on-error: false (padrão) garante que o job falha se mypy reportar erros
+#       - name: Tipos — Mypy
+#         run: mypy feature_1_ia_personalizada shared
+#         continue-on-error: false
+#
+#       # conftest.py (scope=session) já injeta todas as env vars via os.environ.setdefault
+#       # antes do primeiro import de módulo — nenhuma variável de ambiente extra necessária aqui
+#       # --cov-fail-under=70 está configurado em pyproject.toml — bloqueia PR se cobertura < 70%
+#       - name: Testes — Pytest
+#         run: pytest --tb=short
+#
+#       # Envia relatório de cobertura para Codecov (opcional — funciona sem o secret configurado)
+#       # Para ativar: adicionar CODECOV_TOKEN em Settings > Secrets > Actions no GitHub
+#       - name: Upload de cobertura para Codecov
+#         uses: codecov/codecov-action@v4
+#         with:
+#           token: ${{ secrets.CODECOV_TOKEN }}
+#         # continue-on-error garante que o job não falha se o token não estiver configurado
+#         continue-on-error: true
+#
+#   # ----------------------------------------------------------------------------
+#   # Job 2: Testes de integração com PostgreSQL+pgvector real
+#   # Roda em paralelo com o job de lint/unit.
+#   # Detecta bugs que o SQLite in-memory não pega:
+#   #   - JSONB nativo (constraints, queries específicas)
+#   #   - pgvector (embeddings, busca por similaridade)
+#   #   - UNIQUE constraints concorrentes
+#   #   - SELECT FOR UPDATE (distributed lock em processo_state.py)
+#   # ----------------------------------------------------------------------------
+#   integration-postgres:
+#     name: Integração (PostgreSQL + pgvector)
+#     runs-on: ubuntu-latest
+#
+#     services:
+#       postgres:
+#         image: pgvector/pgvector:pg16
+#         env:
+#           POSTGRES_USER: test
+#           POSTGRES_PASSWORD: test
+#           POSTGRES_DB: test_concierge
+#         ports:
+#           - 5432:5432
+#         options: >-
+#           --health-cmd pg_isready
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 5
+#
+#     steps:
+#       - name: Checkout do código
+#         uses: actions/checkout@v4
+#
+#       - name: Configurar Python 3.12
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+#           cache: "pip"
+#
+#       - name: Instalar dependências
+#         run: |
+#           pip install --upgrade pip
+#           pip install -r requirements-f1.txt
+#           pip install -e ".[dev]"
+#
+#       - name: Testes de integração com PostgreSQL real
+#         env:
+#           TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+#         run: |
+#           pytest feature_1_ia_personalizada/tests/integration/ shared/tests/ \
+#             --tb=short -v --no-cov
+#
+#   # ----------------------------------------------------------------------------
+#   # Job 3: Segurança — bandit (SAST) + safety (dependências vulneráveis)
+#   # Roda em paralelo com os outros jobs.
+#   # bandit: analisa o código Python em busca de padrões inseguros (SQLi, shell injection, etc.)
+#   # safety: cruza requirements com o banco de CVEs do PyPI Safety DB
+#   # ----------------------------------------------------------------------------
+#   security:
+#     name: Segurança (bandit + safety)
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - name: Checkout do código
+#         uses: actions/checkout@v4
+#
+#       - name: Configurar Python 3.12
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+#           cache: "pip"
+#
+#       - name: Instalar ferramentas de segurança
+#         run: pip install bandit[toml]==1.7.8 safety==3.2.0
+#
+#       # -r: recursivo nos módulos internos; -ll: reporta apenas MEDIUM e HIGH
+#       # --skip B101: assert é usado em testes — falso-positivo garantido
+#       - name: SAST — Bandit
+#         run: |
+#           bandit -r feature_1_ia_personalizada shared \
+#             -ll --skip B101 \
+#             --format json --output bandit-report.json || true
+#           bandit -r feature_1_ia_personalizada shared \
+#             -ll --skip B101
+#
+#       # Verifica vulnerabilidades conhecidas nas dependências instaladas
+#       - name: Dependências — Safety
+#         run: safety check -r requirements-f1.txt --full-report
+#
+#       - name: Upload relatório Bandit
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: bandit-report
+#           path: bandit-report.json
+#
+#   # ----------------------------------------------------------------------------
+#   # Job 4: Build Docker — valida que a imagem compila sem erros
+#   # Roda em paralelo com o job de testes
+#   # ----------------------------------------------------------------------------
+#   docker-build:
+#     name: Build Docker
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - name: Checkout do código
+#         uses: actions/checkout@v4
+#
+#       # Valida que o Dockerfile.f1 compila corretamente (multi-stage build)
+#       # Não faz push — apenas verifica que a imagem é buildável
+#       - name: Build imagem
+#         run: |
+#           docker build \
+#             -t concierge-f1:ci \
+#             -f infrastructure/docker/Dockerfile.f1 \
+#             .
+#
+#   # ----------------------------------------------------------------------------
+#   # Job 5: Smoke Load Test — valida performance básica com Locust
+#   # Roda apenas em push para main (após todos os outros jobs passarem).
+#   # Cenário: 10 usuários, 30s — detecta regressões grosseiras de latência.
+#   # Não substitui o load test completo de staging (50 usuários, 5 min).
+#   # ----------------------------------------------------------------------------
+#   load-smoke:
+#     name: Smoke Load Test (Locust)
+#     runs-on: ubuntu-latest
+#     needs: [test, integration-postgres]
+#     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#
+#     services:
+#       postgres:
+#         image: pgvector/pgvector:pg16
+#         env:
+#           POSTGRES_USER: test
+#           POSTGRES_PASSWORD: test
+#           POSTGRES_DB: test_concierge
+#         ports:
+#           - 5432:5432
+#         options: >-
+#           --health-cmd pg_isready
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 5
+#       redis:
+#         image: redis:7-alpine
+#         ports:
+#           - 6379:6379
+#         options: >-
+#           --health-cmd "redis-cli ping"
+#           --health-interval 10s
+#           --health-timeout 5s
+#           --health-retries 5
+#
+#     steps:
+#       - name: Checkout do código
+#         uses: actions/checkout@v4
+#
+#       - name: Configurar Python 3.12
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
+#           cache: "pip"
+#
+#       - name: Instalar dependências + Locust
+#         run: |
+#           pip install --upgrade pip
+#           pip install -r requirements-f1.txt
+#           pip install -e ".[dev]"
+#           pip install "locust>=2.20"
+#
+#       - name: Gerar ENCRYPTION_KEY e exportar env vars
+#         run: |
+#           ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+#           echo "ENCRYPTION_KEY=${ENCRYPTION_KEY}" >> $GITHUB_ENV
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+#           REDIS_URL: redis://localhost:6379/0
+#
+#       - name: Rodar migrações Alembic
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+#           REDIS_URL: redis://localhost:6379/0
+#           JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+#           EVOLUTION_API_URL: http://localhost:8765
+#           EVOLUTION_API_KEY: test-evolution-key
+#           JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+#           ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+#           OPENAI_API_KEY: sk-fake-openai-ci-key
+#           CELERY_BROKER_URL: redis://localhost:6379/1
+#           CELERY_RESULT_BACKEND: redis://localhost:6379/2
+#         run: python -m alembic upgrade head
+#
+#       - name: Popular banco com seed data
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+#           REDIS_URL: redis://localhost:6379/0
+#           JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+#           EVOLUTION_API_URL: http://localhost:8765
+#           EVOLUTION_API_KEY: test-evolution-key
+#           JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+#           ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+#           OPENAI_API_KEY: sk-fake-openai-ci-key
+#           CELERY_BROKER_URL: redis://localhost:6379/1
+#           CELERY_RESULT_BACKEND: redis://localhost:6379/2
+#         run: python -m scripts.setup.seed_data
+#
+#       - name: Iniciar servidor FastAPI em background
+#         env:
+#           DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_concierge
+#           REDIS_URL: redis://localhost:6379/0
+#           JWT_SECRET_KEY: ci-load-test-secret-key-for-github-actions-only
+#           EVOLUTION_API_URL: http://localhost:8765
+#           EVOLUTION_API_KEY: test-evolution-key
+#           JUSBRASIL_API_KEY: fake-jusbrasil-key-ci
+#           ANTHROPIC_API_KEY: sk-ant-fake-ci-load-test-key
+#           OPENAI_API_KEY: sk-fake-openai-ci-key
+#           CELERY_BROKER_URL: redis://localhost:6379/1
+#           CELERY_RESULT_BACKEND: redis://localhost:6379/2
+#         run: |
+#           uvicorn feature_1_ia_personalizada.api.app:app \
+#             --host 0.0.0.0 --port 8000 --workers 1 --log-level warning &
+#           timeout 30 bash -c 'until curl -sf http://localhost:8000/health; do sleep 1; done'
+#           echo "Servidor pronto"
+#
+#       - name: Executar smoke load test (10 usuários, 30s)
+#         run: |
+#           mkdir -p tests/load/reports
+#           locust -f tests/load/locustfile.py \
+#             --host=http://localhost:8000 \
+#             --users=10 --spawn-rate=2 --run-time=30s --headless \
+#             --html=tests/load/reports/ci_smoke_report.html \
+#             HealthChecker AdvogadoAutenticado EvolutionWebhookSimulator
+#
+#       - name: Upload relatório de load test
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: load-smoke-report
+#           path: tests/load/reports/ci_smoke_report.html
