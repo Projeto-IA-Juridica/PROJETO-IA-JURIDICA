@@ -2,10 +2,9 @@
 
 > Plataforma B2B SaaS de IA conversacional para escritórios de advocacia — monitoramento de processos, comunicação proativa com clientes, prospecção inteligente de leads e hub de análise jurídica para advogados.
 
-![CI](https://github.com/gabrielferreiraabel/concierge-juridico/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)
-![Deploy](https://img.shields.io/badge/deploy-Railway-purple) 
+![Deploy](https://img.shields.io/badge/deploy-Railway-purple)
 ![Cobertura](https://img.shields.io/badge/cobertura-70%25%20mínimo-brightgreen)
 
 ---
@@ -74,17 +73,18 @@ O resultado: mais clientes atendidos, menos tempo operacional, relacionamento ma
 ### Modelo de negócio (SaaS B2B)
 
 - Cobrança mensal por escritório (por número de processos ativos ou por volume de interações)
-- Planos diferenciados por funcionalidade (MVP, Prospecção, Hub)
+- Planos diferenciados por funcionalidade: `basico` (500K tokens/mês) | `profissional` (2M tokens/mês) | `enterprise` (sem limite)
 - Receita recorrente e baixo churn estrutural (dados e personas ficam no sistema)
 
 ---
 
-## Status do Projeto — Abril/2026
+## Status do Projeto — Maio/2026
 
 ```
 MVP (Feature 1 + Infra + Sub-features):  ████████████████████  100%  ← em produção
 Hub do Advogado (Harvey AI):              ███████████████████░   95%  ← funcional
-Feature 3 — Prospecção Inteligente:       ██████████████████░░   90%  ← LinkedIn pendente
+Feature 3 — Prospecção Inteligente:       ██████████████████░░   90%  ← LinkedIn/Explorium pendente
+Refactor Orchestrator (nós LangGraph):    ████████████████████  100%  ← concluído
 Features 2, 4–6 (backlog):               ░░░░░░░░░░░░░░░░░░░░    0%  ← não iniciadas
 
 TOTAL DO PROJETO:  ~50% do roadmap completo.
@@ -103,13 +103,14 @@ TOTAL DO PROJETO:  ~50% do roadmap completo.
 | F1.6 | Escalação para Advogado | **✅ ~95%** | Funcional; ver Problemas Conhecidos |
 | F1.7 | CRM Inteligente | **✅ 100%** | Score + análise narrativa via Claude |
 | F1.8 | Agendamento de mensagens | **✅ 100%** | Dispatcher Celery Beat a cada 5 min |
+| F1.9 | Orquestrador refatorado em nós | **✅ 100%** | intent/data/generation/verification/delivery |
 | **Hub** | Hub do Advogado (Harvey AI) | **✅ ~95%** | Análise de petições + consultas com Claude Opus |
 | **F2** | Controladoria (Projuris) | **❌ 0%** | Aguarda contrato Projuris |
-| **F3** | Prospecção Inteligente | **✅ ~90%** | Motor completo; LinkedIn real pendente |
+| **F3** | Prospecção Inteligente | **✅ ~90%** | Motor completo; LinkedIn/Explorium pendente |
 | F3.1 | DNA do Advogado | **✅ 100%** | Claude Haiku + cache Redis 6h |
 | F3.2 | DataJud — busca de litigantes | **✅ 100%** | Deduplicação automática por tipo de ação |
 | F3.3 | Receita Federal / CNPJ | **✅ 100%** | Enriquecimento B2B (porte, sócios, situação) |
-| F3.4 | LinkedIn enrichment (B2B) | **⚠️ ~70%** | Estrutura pronta; Partner Program pendente |
+| F3.4 | LinkedIn / Vibe Prospecting (B2B) | **⚠️ ~70%** | Estrutura + Explorium MCP prontos; Partner Program pendente |
 | F3.5 | Matching & Score IA (B2B/B2C) | **✅ 100%** | Heurística + refinamento Claude; limiar 30 |
 | F3.6 | Pipeline de leads | **✅ 100%** | CRUD + deduplicação por CNPJ/CNJ |
 | F3.7 | Compliance LGPD/OAB (B2C) | **✅ 100%** | Sem CPF/telefone/email; aviso automático |
@@ -124,17 +125,26 @@ TOTAL DO PROJETO:  ~50% do roadmap completo.
 
 ### IA Conversacional via WhatsApp
 
-O coração do produto. Um orquestrador LangGraph executa um pipeline de 6 nós para cada mensagem recebida:
+O coração do produto. Um orquestrador LangGraph executa um pipeline de nós para cada mensagem recebida, com arquitetura totalmente decomposta em módulos independentes:
 
 ```
-classificar intenção → buscar dados → gerar resposta → fact-check → enviar
+classificar_intencao → buscar_dados → gerar_resposta → avaliar_confianca
+    → verificar_resposta (fact-check) → enviar_resposta
 ```
 
-- **6 intenções detectadas:** status do processo, saudação, reclamação, dúvida jurídica, perspectiva do caso, outros
-- **Anti-alucinação:** o fact-checker valida cada resposta do Claude contra os dados reais do banco antes de enviar ao cliente — se houver divergência, a resposta é corrigida ou descartada
-- **Memória de conversa** por cliente armazenada no Redis — a IA lembra o contexto da sessão
-- **Personas configuráveis** — cada escritório define nome, tom e especialidades da IA
-- **Tradutor jurídico** — termos técnicos são automaticamente convertidos para linguagem acessível
+Intenções que requerem escalação obrigatória (`parecer_juridico`, `estrategia_processual`, `negociacao`, `decisao_judicial_impacto_alto`) são desviadas diretamente para Claude Opus via `EscalacaoClient`.
+
+**Intenções detectadas:** `status`, `perspectivas`, `duvida_termo`, `duvida_geral`, `saudacao`, `reclamacao`, `desabafo`, `parecer_juridico`, `estrategia_processual`, `negociacao`, `decisao_judicial_impacto_alto`, `outro`
+
+**Confidence Router:** cada resposta é avaliada por um score ponderado (intenção 25% + RAG match 35% + tamanho da resposta 20% + contexto de processo 20%). Respostas abaixo do threshold configurado por escritório (padrão: 0.70) são automaticamente roteadas para Claude Opus.
+
+**Anti-alucinação:** o fact-checker valida cada resposta do Claude contra os dados reais do banco antes de enviar ao cliente — se houver divergência, a resposta é corrigida ou descartada.
+
+**Memória de conversa** por cliente armazenada no Redis — a IA lembra o contexto da sessão.
+
+**Personas configuráveis** — cada escritório define nome, tom e especialidades da IA.
+
+**Tradutor jurídico** — termos técnicos são automaticamente convertidos para linguagem acessível.
 
 **Canais suportados:**
 - Texto (WhatsApp via Evolution API)
@@ -145,6 +155,8 @@ classificar intenção → buscar dados → gerar resposta → fact-check → en
 - Respeita janela comercial configurada por cliente (ex: só enviar entre 8h e 18h)
 - Rate limit de 5 mensagens proativas por dia por cliente
 - Mensagens bloqueadas são salvas na tabela `mensagens_agendadas` e despachadas automaticamente pelo `dispatcher_agendadas` a cada 5 minutos via Celery Beat
+
+**Quota de tokens:** cada plano tem limite mensal de tokens Claude (basico=500K | profissional=2M | enterprise=ilimitado). Ao atingir a quota, o fluxo retorna mensagem de limite e não chama a API.
 
 ---
 
@@ -162,6 +174,7 @@ classificar intenção → buscar dados → gerar resposta → fact-check → en
 - Upload de PDFs (petições, jurisprudências, teses, modelos)
 - Pipeline: extração PyMuPDF → chunks de 512 tokens (50 overlap) → embeddings 1024-dim → armazenamento pgvector
 - Busca semântica com MMR re-ranking para diversidade de resultados
+- Warm-up automático no startup: os 6 embeddings de queries mais comuns são pré-aquecidos no Redis (TTL 24h) para reduzir latência na primeira requisição
 - O conteúdo relevante é injetado automaticamente no system prompt de cada resposta
 - Isolado por `escritorio_id` — um escritório nunca acessa os documentos de outro
 
@@ -196,16 +209,17 @@ Pontuação 0–100 por processo, calculada com 5 componentes:
 
 ### Analytics & Dashboard
 
-- NPS com tendências de 30 e 90 dias
+- NPS com tendências de 7, 30 e 90 dias + gráfico semanal
 - Taxa de resposta autônoma (percentual de conversas sem escalação)
 - Custo por interação (calculado por tokens consumidos)
-- Exportação CSV/Excel para relatórios internos
+- Exportação CSV/Excel por mês para relatórios internos
 
 ---
 
 ### Escalação para Advogado
 
 - Detecta automaticamente requisições fora de escopo: pedidos de parecer, análise de estratégia, situações emocionalmente sensíveis
+- Dois caminhos de escalação: automática pelo Confidence Router ou forçada por intenção classificada
 - Notifica o advogado responsável pelo processo via WhatsApp
 - Registra timestamp de abertura, resposta e resolução
 - Configurável por escritório: canal dedicado ou número compartilhado
@@ -229,9 +243,11 @@ Pontuação 0–100 por processo, calculada com 5 componentes:
 
 Interface exclusiva para advogados, sem as restrições do canal de cliente. Powered by Claude Opus.
 
-**Funcionalidades:**
-- `POST /hub/analisar-peticao` — upload de PDF de petição (até 10 MB) + análise estruturada: pontos fortes, fracos, riscos processuais, sugestões de melhoria
+**Endpoints:**
+- `POST /hub/analisar-peticao` — upload de PDF (até 10 MB) + análise estruturada: pontos fortes, fracos, riscos processuais, sugestões de melhoria
 - `POST /hub/consulta` — consulta jurídica livre em linguagem natural
+- `GET /hub/sessoes` — histórico de sessões com tokens e custo estimado
+- `GET /hub/metricas` — métricas agregadas de uso do Hub por escritório
 
 **Classificação de intenção automática:**
 
@@ -243,7 +259,7 @@ Interface exclusiva para advogados, sem as restrições do canal de cliente. Pow
 | `insight_cliente` | Análise do histórico de relacionamento com o cliente |
 | `pergunta_jurídica` | Responde perguntas doutrinárias e procedimentais |
 
-**Rastreabilidade:** cada sessão é salva em `sessoes_advogado` com modelo utilizado, tokens consumidos e custo estimado.
+**Rastreabilidade:** cada sessão é salva em `sessoes_advogado` com modelo utilizado, tokens consumidos e custo estimado. Escalação pode ser desabilitada por escritório via `escalacao_habilitada` e tem quota própria de tokens (`escalacao_quota_tokens_mes`).
 
 ---
 
@@ -260,6 +276,7 @@ Em vez de buscar um CNPJ específico, o sistema busca no DataJud CNJ por `tipo_a
 **Enriquecimento B2B**
 - Receita Federal via ReceitaWS: razão social, situação cadastral, porte, sócios (sem CPF — LGPD)
 - LinkedIn: contatos com cargo e URL de perfil (estrutura pronta, Partner Program pendente)
+- Vibe Prospecting via Explorium AgentSource (protocolo MCP): fallback para LinkedIn sem Partner Program. Busca decisores por CNPJ com cargos-alvo filtrados. Cache Redis 7 dias.
 - Cache Redis 24h por CNPJ
 
 **Enriquecimento B2C — LGPD by Design**
@@ -272,7 +289,7 @@ Apenas dados do processo público: nome, polo, tipo de ação, fase, tribunal. C
 | Especialidade match | +30 | Especialidade match | +35 |
 | Setor CNAE | +20 | Polo compatível | +25 |
 | Demanda ativa 3+ processos | +15 | Fase processual inicial | +20 |
-| Contatos LinkedIn | +15 | Alta recorrência no escritório | +20 |
+| Contatos LinkedIn/Explorium | +15 | Alta recorrência no escritório | +20 |
 | Porte MÉDIA/GRANDE | +10 | — | — |
 | Situação ATIVA | +10 | — | — |
 
@@ -280,6 +297,37 @@ Score ≥ 30 → Claude refina, gera motivo e sugere abordagem. Score < 30 → r
 
 **Pipeline de Leads**
 CRUD completo com deduplicação automática (mesmo CNPJ ou mesmo CNJ → atualiza em vez de duplicar), filtros por tipo/status/score mínimo e paginação. `aviso_lgpd` injetado automaticamente quando o pipeline contém leads B2C.
+
+---
+
+### Painéis Web
+
+**Admin Panel** (`/admin`) — React 19 + TypeScript + TailwindCSS v4 + TanStack Query v5 + React Router v7
+
+| Página | Descrição |
+|--------|-----------|
+| `HubPage` | Lista de clientes com score CRM, nível e iniciais |
+| `ClientDetailPage` | Detalhe completo do cliente: processos, score, histórico |
+| `ProcessosPage` | CRUD de processos com badge de risco e vinculação a cliente |
+| `CRMPage` | Score CRM detalhado com análise narrativa |
+| `AnalyticsPage` | Dashboard com gráfico semanal, NPS, taxa de autonomia e exportação CSV |
+| `OperationsPage` | Saúde do sistema + DNA + motor de prospecção + pipeline de leads |
+| `RAGPage` | Upload e gerenciamento de documentos da base vetorial |
+| `SettingsPage` | Configurações do escritório e persona da IA |
+| `LoginPage` | Autenticação JWT |
+
+**Hub React** (`/frontend/hub-react`) — React 19 + TypeScript + TailwindCSS + Framer Motion
+
+Interface rica para advogados, com animações (`PageTransition`, `DitherShader`), `FloatingDock` e componentes de UI avançados (`EncryptedText`, `PlaceholdersAndVanishInput`).
+
+| Página | Descrição |
+|--------|-----------|
+| `HubIAPage` | Chat com o Hub do Advogado (tabs: Chat, Processos, Documentos, Score) |
+| `CRMPage` | Visão CRM por cliente |
+| `CaptacaoPage` | Motor de prospecção e pipeline de leads |
+| `PainelPage` | Dashboard executivo |
+| `DocumentosPage` | Base RAG — upload e busca |
+| `ConfigPage` | Configurações do escritório |
 
 ---
 
@@ -293,25 +341,29 @@ CRUD completo com deduplicação automática (mesmo CNPJ ou mesmo CNJ → atuali
                      Evolution API
                             │
 ┌───────────────────────────▼──────────────────────────────┐
-│               FastAPI (feature_1_ia_personalizada)        │
+│           FastAPI (feature_1_ia_personalizada)            │
 │  ┌──────────────────────────────────────────────────┐    │
-│  │        LangGraph Orchestrator (6 nós)            │    │
-│  │   classify → fetch → generate → check → send    │    │
+│  │     LangGraph Orchestrator — nós desacoplados    │    │
+│  │  intent → data → generation → confidence_router  │    │
+│  │        → verification (fact-check) → delivery    │    │
 │  └───────────┬────────────────┬─────────────────────┘    │
 │              │                │                           │
 │        Claude API        Jusbrasil / DataJud              │
-│        (Anthropic)       (Redis cache 1h)                 │
-│              │                │                           │
-│        pgvector RAG      PostgreSQL (asyncpg)             │
+│   Sonnet (padrão)        (Redis cache 1h)                 │
+│   Opus (escalação)                                        │
+│        Haiku (DNA)            │                           │
+│              │          pgvector RAG                      │
+│              │          PostgreSQL (asyncpg)               │
 │                                                           │
 │  ┌──────────────────────────────────────────────────┐    │
 │  │  Hub do Advogado — Harvey AI                     │    │
 │  │  /hub/* → Claude Opus → SessaoAdvogado           │    │
+│  │  ConfidenceRouter (threshold por escritório)     │    │
 │  └──────────────────────────────────────────────────┘    │
 │                                                           │
 │  ┌──────────────────────────────────────────────────┐    │
 │  │  Motor de Prospecção (Feature 3)                 │    │
-│  │  DNA → DataJud → Receita/LinkedIn → Match → IA   │    │
+│  │  DNA → DataJud → ReceitaFed/Explorium → Match    │    │
 │  └──────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────┘
                             │
@@ -335,36 +387,39 @@ CRUD completo com deduplicação automática (mesmo CNPJ ou mesmo CNJ → atuali
 | Camada | Tecnologia |
 |--------|-----------|
 | API | FastAPI 0.109 + Uvicorn |
-| IA / LLM | Claude Opus (Hub) + Claude 3.5 Sonnet (orquestrador) + Claude Haiku (DNA/matching) |
-| Orquestração de IA | LangGraph + LangChain |
+| IA / LLM | Claude Opus (Hub + escalação) + Claude Sonnet (orquestrador) + Claude Haiku (DNA/matching) |
+| Orquestração de IA | LangGraph 0.2 + LangChain 0.2 |
+| Confidence Router | Score ponderado por intenção, RAG, contexto — sem dependência de LLM |
 | Transcrição de áudio | OpenAI Whisper |
-| Banco de dados | PostgreSQL 13 + asyncpg |
+| Banco de dados | PostgreSQL 13 + asyncpg 0.29 |
 | Vetores (RAG) | pgvector 0.3 — dim 1024, índice HNSW |
-| Cache | Redis 5 (TTL 1h–24h por contexto) |
+| Cache | Redis 5 (TTL 1h–7d por contexto) |
 | Filas | Celery 5.3 + Redis broker + RedBeat scheduler |
 | Monitoramento de processos | Jusbrasil API + DataJud CNJ |
 | WhatsApp | Evolution API (self-hosted) |
-| Enriquecimento B2B | ReceitaWS (CNPJ) + LinkedIn API (Partner Program pendente) |
+| Enriquecimento B2B | ReceitaWS (CNPJ) + Explorium AgentSource MCP + LinkedIn API (Partner Program pendente) |
 | Google Sheets | google-api-python-client |
 | Segurança | JWT (python-jose) + bcrypt + Fernet AES-256 |
 | Métricas | Prometheus + Grafana Cloud |
-| Logs | structlog (JSON) + Sentry |
+| Logs | structlog (JSON) + Sentry (0.1 traces + 0.1 profiles) |
 | CI/CD | GitHub Actions |
 | Deploy | Railway |
+| Admin Panel | React 19 + TypeScript + TailwindCSS v4 + TanStack Query v5 + React Router v7 |
+| Hub Frontend | React 19 + TypeScript + Framer Motion + TailwindCSS v4 |
 | Testes | pytest + pytest-asyncio + factory-boy |
-| Qualidade | Ruff + Black + mypy |
+| Qualidade | Ruff + Black + mypy + mutmut |
 
 ---
 
 ## Estrutura de Pastas
 
 ```
-PROJETO-IA-JURIDICA-5/
+PROJETO-IA-JURIDICA-2/
 │
 ├── shared/                          # Core compartilhado
 │   ├── models/                      # SQLAlchemy ORM (10 models)
 │   │   ├── base.py                  ✅ TenantMixin, TimestampMixin
-│   │   ├── escritorio.py            ✅ Tenant raiz
+│   │   ├── escritorio.py            ✅ Tenant raiz + quotas + escalação config
 │   │   ├── cliente.py               ✅ Cliente final
 │   │   ├── processo.py              ✅ Processo judicial (score, fase)
 │   │   ├── usuario.py               ✅ Advogados/assistentes
@@ -381,11 +436,12 @@ PROJETO-IA-JURIDICA-5/
 │
 ├── feature_1_ia_personalizada/
 │   ├── api/
-│   │   ├── app.py                   ✅ FastAPI app + lifespan
+│   │   ├── app.py                   ✅ FastAPI app + lifespan + warmup RAG
 │   │   ├── routes/
 │   │   │   ├── auth.py              ✅ Login + registro JWT
 │   │   │   ├── webhook_whatsapp.py  ✅ Receiver Evolution API
 │   │   │   ├── processos.py         ✅ CRUD processos
+│   │   │   ├── clientes.py          ✅ CRUD clientes + exportação LGPD
 │   │   │   ├── chat.py              ✅ Histórico + NPS + analytics
 │   │   │   ├── rag.py               ✅ Upload/busca de documentos
 │   │   │   ├── crm.py               ✅ Score CRM por cliente
@@ -394,18 +450,29 @@ PROJETO-IA-JURIDICA-5/
 │   │   │   ├── health.py            ✅ /health, /health/ready
 │   │   │   ├── metrics.py           ✅ /metrics (Prometheus)
 │   │   │   ├── prospeccao.py        ✅ /prospeccao/* (DNA, pipeline, leads)
-│   │   │   └── hub_advogado.py      ✅ /hub/* (Harvey AI)
-│   │   └── middleware/              ✅ Auth JWT, rate limit, logging
+│   │   │   └── hub_advogado.py      ✅ /hub/* (Harvey AI + métricas)
+│   │   └── middleware/              ✅ Auth JWT, rate limit, CSRF, logging
 │   │
 │   ├── services/
 │   │   ├── ai/
-│   │   │   ├── orchestrator.py      ✅ LangGraph (6 nós)
-│   │   │   ├── claude_client.py     ✅ Wrapper Claude com retries
+│   │   │   ├── orchestrator.py      ✅ LangGraph — monta o grafo de nós
+│   │   │   ├── state.py             ✅ ConversationState, NodeDeps, QuotaExcedidaError
+│   │   │   ├── nodes/
+│   │   │   │   ├── intent.py        ✅ classificar_intencao, avaliar_escalacao
+│   │   │   │   ├── data.py          ✅ buscar_dados (Jusbrasil + DataJud + RAG)
+│   │   │   │   ├── generation.py    ✅ gerar_resposta + gerar_resposta_escalacao
+│   │   │   │   ├── verification.py  ✅ verificar_resposta (fact-check)
+│   │   │   │   ├── delivery.py      ✅ enviar_resposta + tratar_erro
+│   │   │   │   └── _helpers.py      ✅ obter_escritorio_cliente, salvar_interacao
+│   │   │   ├── claude_client.py     ✅ Wrapper Claude com retries + quota
+│   │   │   ├── confidence_router.py ✅ Score ponderado (0.0–1.0) por intenção/RAG/contexto
 │   │   │   ├── escalation_client.py ✅ Claude Opus (Hub + escalação premium)
+│   │   │   ├── hub_advogado_classifier.py ✅ Classificação de intenção para o Hub
 │   │   │   ├── fact_checker.py      ✅ Anti-alucinação
 │   │   │   ├── memory.py            ✅ Memória Redis por cliente
 │   │   │   ├── juridical_translator.py ✅ Tradução jurídico→leigo
 │   │   │   ├── processo_state.py    ✅ Tracking de fase processual
+│   │   │   ├── translator.py        ✅ Tradutor estruturado
 │   │   │   └── prompts.py           ✅ System prompts tipados
 │   │   ├── messaging/               ✅ Evolution API + templates + agendamento
 │   │   ├── legal_data/              ✅ Jusbrasil + DataJud + cache
@@ -421,10 +488,11 @@ PROJETO-IA-JURIDICA-5/
 │   │       ├── pessoa_intelligence.py  ✅ Enriquecimento B2C (LGPD)
 │   │       ├── matching.py          ✅ Heurística + refinamento Claude
 │   │       ├── receita_federal_client.py ✅ CNPJ e sócios
+│   │       ├── vibe_prospecting_client.py ✅ Explorium MCP (fallback LinkedIn)
 │   │       └── linkedin_client.py   ⚠️ Estrutura pronta; Partner Program pendente
 │   │
 │   ├── workers/
-│   │   ├── celery_app.py            ✅ 6 filas + RedBeat scheduler
+│   │   ├── celery_app.py            ✅ Filas + RedBeat scheduler
 │   │   ├── monitor_processos.py     ✅ Polling Jusbrasil (cada 6h)
 │   │   ├── send_notifications.py    ✅ Notificações on-demand
 │   │   ├── dispatcher_agendadas.py  ✅ Despacha mensagens agendadas (cada 5min)
@@ -435,17 +503,23 @@ PROJETO-IA-JURIDICA-5/
 │   │   └── dead_letter.py           ✅ Dead Letter Queue
 │   │
 │   └── tests/
-│       ├── unit/                    ✅ 43 arquivos
-│       └── integration/             ✅ 16 arquivos
+│       ├── unit/                    ✅ 44 arquivos
+│       └── integration/             ✅ 18 arquivos
+│
+├── admin/                           ✅ Admin Panel (React 19 + Vite + TailwindCSS v4)
+│   └── src/pages/                   ✅ Hub, CRM, Analytics, Operations, Processos, RAG, Settings
+│
+├── frontend/
+│   └── hub-react/                   ✅ Hub do Advogado (React 19 + Framer Motion)
+│       └── src/pages/               ✅ HubIA, CRM, Captação, Painel, Documentos, Config
 │
 ├── alembic/versions/                ✅ 21 migrations
-├── frontend/                        ✅ Landing page (HTML/CSS/JS)
 ├── infrastructure/docker/           ✅ Dockerfile + docker-compose (dev + prod)
-├── .github/workflows/               ✅ CI + deploy + backup
-├── docs/guides/                     ✅ development.md, production-readiness.md
+├── monitoring/                      ✅ Prometheus + Grafana + Loki + Promtail
+├── docs/                            ✅ Roadmap, guias de dev e produção
 ├── scripts/setup/                   ✅ init_db.py, seed_data.py, create_admin.py
 ├── Makefile                         ✅ 40+ targets
-└── pyproject.toml                   ✅ Ruff + Black + mypy + pytest
+└── pyproject.toml                   ✅ Ruff + Black + mypy + pytest + mutmut
 ```
 
 ---
@@ -457,7 +531,7 @@ PROJETO-IA-JURIDICA-5/
 ```bash
 # 1. Clonar e configurar ambiente
 git clone <repo>
-cd PROJETO-IA-JURIDICA-5
+cd PROJETO-IA-JURIDICA-2
 make setup              # cria .venv, instala deps, copia .env.example → .env
 
 # 2. Editar .env com as chaves necessárias (ver seção abaixo)
@@ -476,7 +550,11 @@ make worker             # Celery worker (outro terminal)
 make beat               # Celery Beat — dispatcher + todos os crons
 make flower             # Monitor Celery em :5555 (opcional)
 
-# 6. Qualidade
+# 6. Frontends (opcional)
+cd admin && npm install && npm run dev        # Admin panel em :5173
+cd frontend/hub-react && npm install && npm run dev  # Hub advogado em :5174
+
+# 7. Qualidade
 make test               # pytest (cobertura mínima 70%)
 make lint               # Ruff + Black check
 make type-check         # mypy
@@ -503,6 +581,8 @@ make type-check         # mypy
 | `GET` | `/metrics` | Métricas Prometheus | — |
 | `POST` | `/hub/analisar-peticao` | Analisa petição PDF com Claude Opus | JWT (advogado) |
 | `POST` | `/hub/consulta` | Consulta jurídica livre no Hub | JWT (advogado) |
+| `GET` | `/hub/sessoes` | Histórico de sessões do advogado | JWT (advogado) |
+| `GET` | `/hub/metricas` | Métricas agregadas do Hub por escritório | JWT (advogado) |
 | `GET` | `/prospeccao/dna` | DNA atual do escritório | JWT (advogado) |
 | `POST` | `/prospeccao/dna/atualizar` | Regenera DNA via Claude | JWT (advogado) |
 | `POST` | `/prospeccao/descobrir` | Executa motor de prospecção | JWT (advogado) |
@@ -520,7 +600,7 @@ make type-check         # mypy
 - IA nunca emite pareceres jurídicos nem prevê resultado de processos
 - Disclaimer obrigatório na primeira interação de cada cliente
 - Score de risco visível apenas para advogados
-- Escalação automática para humano em situações fora de escopo
+- Escalação automática para humano em situações fora de escopo (`parecer_juridico`, `estrategia_processual`, `negociacao`, `decisao_judicial_impacto_alto`)
 - Prospecção B2C restrita a canais processuais — sem cold call com dados de litígio
 
 ### LGPD (Lei 13.709/2018)
@@ -530,7 +610,9 @@ make type-check         # mypy
 - Mascaramento: CPF → `***.***.***-XX`, telefone → `(**)****-XXXX`
 - Isolamento de dados por `escritorio_id` (row-level multi-tenancy)
 - Retenção: dados de processos arquivados removidos após 5 anos
-- Endpoints de portabilidade e anonimização implementados: `GET /clientes/{id}/exportar` (Art. 18, V) e `DELETE /clientes/{id}` (Art. 18, IV)
+- Lead B2C: campos `cpf`, `telefone`, `email` **não existem no modelo** — proibido por design
+- Endpoints de portabilidade e anonimização: `GET /clientes/{id}/exportar` (Art. 18, V) e `DELETE /clientes/{id}` (Art. 18, IV)
+- Sentry com `send_default_pii=False` — nenhum dado pessoal enviado ao rastreador de erros
 
 ---
 
@@ -550,19 +632,9 @@ A defensibilidade do Concierge não está no código — está nos dados, na red
 | Moat | Tipo | Como funciona | Replicabilidade |
 |------|------|---------------|-----------------|
 | **Persona treinada por uso** | Switching cost | Cada correção do advogado refina a IA via few-shot acumulado. Após meses de uso, a persona é insubstituível — trocar de produto significa recomeçar do zero. | ⬛⬛⬛⬛⬛ Quase impossível |
-| **Dados de experiência jurídica** | Dados | NPS, tempo de resposta, satisfação por fase processual — dados cross-escritório anonimizados que ninguém mais coleta. Nem o CNJ, nem a Jusbrasil. | ⬛⬛⬛⬛⬜ Muito difícil |
-| **Rede processual própria** | Escala | Cada escritório traz processos monitorados. Com 50 escritórios = milhares de processos com contexto que a Jusbrasil não tem (fase real, satisfação, histórico do escritório). Reduz e eventualmente elimina dependência de API terceira. | ⬛⬛⬛⬛⬜ Muito difícil |
-| **Inteligência preditiva por vara/juiz** | Tecnologia | ML de prazos que melhora com cada processo concluído na plataforma. Novos entrantes precisam de 1–2 anos de dados para chegar onde já estamos. | ⬛⬛⬛⬛⬜ Muito difícil |
-| **API aberta para escritórios** | Switching cost | Escritórios integram dados do Concierge nos próprios sites e sistemas internos. Cada integração é uma raiz no stack do cliente — arrancar significa refazer sistemas. | ⬛⬛⬛⬜⬜ Difícil |
-
-### Moats de longo prazo (12–18 meses)
-
-| Moat | Tipo | Como funciona | Replicabilidade |
-|------|------|---------------|-----------------|
-| **Efeito de rede cross-escritório** | Rede | Marketplace de indicações: leads fora da especialidade são encaminhados para outros escritórios da rede com comissão rastreada. Cada novo escritório torna a plataforma mais valiosa para todos os outros. | ⬛⬛⬛⬛⬛ Quase impossível |
-| **Selo "Escritório Digital"** | Marca | Certificação pública de qualidade de atendimento (NPS, tempo de resposta, taxa de autonomia). Inverte a dinâmica comercial: escritórios precisam estar na plataforma para competir, não o contrário. | ⬛⬛⬛⬜⬜ Difícil |
-| **Índice de Experiência Jurídica** | Marca | Relatório público periódico com benchmarks anonimizados do mercado. Posiciona a empresa como autoridade — jornalistas citam, escritórios querem ranking favorável. Glassdoor fez com salários; nós fazemos com atendimento jurídico. | ⬛⬛⬛⬜⬜ Difícil |
-| **Dados para litechs e seguradoras** | Dados | Dados anonimizados e agregados vendidos como análises e APIs de consulta: seguradoras querem prever custo de litígio, litechs querem avaliar risco de financiamento, departamentos jurídicos querem benchmarks. Linha de receita que não depende de SaaS. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **Dados de experiência jurídica** | Dados | NPS, tempo de resposta, satisfação por fase processual — dados cross-escritório anonimizados que ninguém mais coleta. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **Rede processual própria** | Escala | Cada escritório traz processos monitorados. Com 50 escritórios = milhares de processos com contexto que a Jusbrasil não tem. | ⬛⬛⬛⬛⬜ Muito difícil |
+| **Inteligência preditiva por vara/juiz** | Tecnologia | ML de prazos que melhora com cada processo concluído na plataforma. | ⬛⬛⬛⬛⬜ Muito difícil |
 
 ### Tese de defensibilidade
 
@@ -577,8 +649,6 @@ Fase 3 (12+ meses):  Efeito de rede + marca + dados vendáveis
                       → Lock-in de ecossistema: trocar não é perder uma ferramenta,
                         é perder acesso a uma rede e a uma posição de mercado
 ```
-
-> **Insight central:** o ativo mais valioso não é o software — são os dados de experiência jurídica. Nenhum concorrente tem dados estruturados de interação entre escritórios e clientes, cruzados com dados processuais em tempo real e feedback de satisfação. Isso não existe em nenhum lugar do Brasil. O SaaS é o mecanismo de coleta; o valor real está na rede e nos dados.
 
 ---
 
@@ -602,16 +672,20 @@ EVOLUTION_WEBHOOK_SECRET=...    # HMAC validation
 JUSBRASIL_API_KEY=...
 DATAJUD_API_KEY=...             # Gratuito — CNJ
 
+# Prospecção B2B (opcional)
+EXPLORIUM_API_KEY=...           # Vibe Prospecting — fallback LinkedIn
+
 # Google Sheets (opcional)
 GOOGLE_SHEETS_CREDENTIALS=...
 
 # Segurança
-SECRET_KEY=...                  # JWT signing
-ENCRYPTION_KEY=...              # Fernet AES-256
+SECRET_KEY=...                  # JWT signing (mínimo 32 chars)
+ENCRYPTION_KEY=...              # Fernet AES-256 (44 chars base64url)
 
 # Observabilidade (opcional em dev)
 SENTRY_DSN=...
 GRAFANA_CLOUD_API_KEY=...
+CORS_ALLOWED_ORIGINS=https://meudominio.com,https://admin.meudominio.com
 ```
 
 ---
@@ -623,12 +697,14 @@ make test               # todos os testes
 make test-unit          # apenas unitários
 make test-integration   # apenas integração
 make coverage           # relatório HTML de cobertura
+make mutation           # testes de mutação com mutmut
 ```
 
-- **1.158 testes coletados** — 43 arquivos unitários + 16 arquivos de integração
+- **44 arquivos unitários + 18 arquivos de integração**
 - Cobertura mínima: **70%** (enforçado no CI com falha de build)
 - Banco de testes: SQLite in-memory via `aiosqlite` — sem PostgreSQL necessário em dev
 - Feature 3: 89 testes dedicados (heurística de matching componente a componente, LGPD, rotas)
+- Integração: `test_confidence_router.py`, `test_analise_peticao.py`, `test_hub_resumos_insights.py`, `test_whatsapp_flow.py`, `test_e2e_celery_orchestrator.py`, entre outros
 
 ---
 
@@ -644,8 +720,8 @@ make coverage           # relatório HTML de cobertura
 
 | Item | Impacto |
 |------|---------|
-| **LinkedIn API real** (Partner Program) | Enriquecimento B2B retorna dados mock de contato; funcionalidade existe, dado é vazio |
-| **Load testing no CI** | ✅ Job `load-smoke` adicionado ao CI (10 usuários, 30s, push para `main`) — valida SLAs básicos; teste completo (50 usuários, 5 min) permanece para staging |
+| **LinkedIn API real** (Partner Program) | Enriquecimento B2B retorna dados via Explorium/mock de contato; o campo de contatos existe, mas dados reais LinkedIn dependem da aprovação |
+| **Explorium API Key** | `EXPLORIUM_API_KEY` sem valor desativa o Vibe Prospecting silenciosamente (fallback gracioso já implementado) |
 | **Documentação de API** | `docs/api/` vazia — sem Postman collection nem snapshot OpenAPI para integrações externas |
 
 ### Roadmap (não bloqueia, mas são features de valor)
@@ -663,10 +739,11 @@ make coverage           # relatório HTML de cobertura
 
 | # | Problema | Status |
 |---|----------|--------|
-| 1 | Migration `004` com `down_revision` errado | ✅ **Corrigido** — aponta corretamente para `e4bcb5d405fa` |
-| 2 | Dois arquivos com prefixo `008_` | ✅ **Sem conflito** — cadeia sequencial (`008_add_analytics_indexes` → `008_add_onboarding_fields`); sem branches paralelas |
-| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ✅ **Corrigido** — movida para `score_risco.py`; imports atualizados em `monitor_processos`, `hub_juridico_v2`, `hub_advogado_teste`, `test_score_risco` |
-| 4 | RAG usa `vector(1024)` e HNSW (spec pedia 1536 + IVFFlat) | ℹ️ **Intencional** — HNSW funciona em tabela vazia e mantém recall estável com inserts incrementais, sem necessidade de recriar índice |
+| 1 | Migration `004` com `down_revision` errado | ✅ **Corrigido** |
+| 2 | Dois arquivos com prefixo `008_` | ✅ **Sem conflito** — cadeia sequencial sem branches paralelas |
+| 3 | `ScoreRiscoCalculator` acoplada ao módulo `vitoria_preditor.py` | ✅ **Corrigido** — movida para `score_risco.py` |
+| 4 | RAG usa `vector(1024)` e HNSW (spec pedia 1536 + IVFFlat) | ℹ️ **Intencional** — HNSW funciona em tabela vazia e mantém recall estável com inserts incrementais |
+| 5 | Orchestrator como monolito único | ✅ **Corrigido** — decomposto em `nodes/intent.py`, `data.py`, `generation.py`, `verification.py`, `delivery.py` |
 
 ---
 
@@ -676,4 +753,6 @@ make coverage           # relatório HTML de cobertura
 - **Guia de desenvolvimento:** [docs/guides/development.md](docs/guides/development.md)
 - **Checklist de produção:** [docs/guides/production-readiness.md](docs/guides/production-readiness.md)
 - **Gestão de secrets:** [docs/guides/secrets.md](docs/guides/secrets.md)
-- **Documentação do banco:** [bancodedados_api.md](bancodedados_api.md)  
+- **Documentação do banco:** [bancodedados_api.md](bancodedados_api.md)
+- **Roadmap de features:** [docs/ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md)
+- **Monitoramento:** [GRAFANA-SETUP.md](GRAFANA-SETUP.md)
