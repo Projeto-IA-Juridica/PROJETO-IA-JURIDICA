@@ -8,7 +8,7 @@ var state = {
   aceite: false,
 };
 
-var AREAS  = ["Cível","Trabalhista","Família","Previdenciário","Criminal","Tributário","Empresarial","Digital","Consumidor","Imobiliário"];
+var AREAS  = ["Civil","Trabalhista","Família","Previdenciário","Criminal","Tributário","Empresarial","Digital","Consumidor","Imobiliário"];
 var TONS   = ["Formal e técnico","Formal e acessível","Próximo e cordial","Neutro e objetivo"];
 var DAYS   = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
 var LABELS = ["Acesso","Escritório","WhatsApp","Persona","OAB","Ativação"];
