@@ -527,7 +527,7 @@ function CheckIcon({ size = 14, color = 'white' }: { size?: number; color?: stri
 
 function AmicusLogo() {
   return (
-    <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontFamily: 'var(--font-sans)' }}>
+    <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontFamily: 'var(--font-sans)' }}>
       amicus
     </span>
   )

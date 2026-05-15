@@ -165,18 +165,11 @@ function AmicusLogo() {
 
 function ArchLogo() {
   return (
-    <svg style={{ display: 'block', margin: '0 auto 16px' }} width="56" height="60" viewBox="0 0 68 72" fill="none">
-      <rect x="10" y="0" width="48" height="6" rx="1" fill="#1E3A5F"/>
-      <path d="M4 9 L64 9 L60 18 L8 18 Z" fill="#1E3A5F"/>
-      <rect x="0" y="21" width="68" height="26" fill="#1E3A5F"/>
-      <path d="M24 47 L24 36 Q24 27 34 27 Q44 27 44 36 L44 47 Z" fill="white"/>
-      <rect x="7"  y="27" width="12" height="12" fill="white"/>
-      <rect x="10" y="30" width="6"  height="6"  fill="#1E3A5F"/>
-      <rect x="49" y="27" width="12" height="12" fill="white"/>
-      <rect x="52" y="30" width="6"  height="6"  fill="#1E3A5F"/>
-      <rect x="0"  y="47" width="24" height="25" fill="#1E3A5F"/>
-      <rect x="44" y="47" width="24" height="25" fill="#1E3A5F"/>
-    </svg>
+    <img
+      src="/logo.png"
+      alt="amicus"
+      style={{ display: 'block', margin: '0 auto 16px', width: 56, height: 56, objectFit: 'contain' }}
+    />
   )
 }
 
