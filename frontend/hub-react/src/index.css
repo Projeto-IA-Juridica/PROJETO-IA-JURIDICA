@@ -31,8 +31,12 @@
   --color-sidebar-ink:     #EAF2FA;
   --color-sidebar-muted:   #8AAAC0;
 
+  --color-am-blue-accent: #1248BE;
+  --color-am-border-solid: rgba(168, 200, 232, 0.50);
+
   --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
