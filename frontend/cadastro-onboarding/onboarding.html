@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>amicus — Cadastro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@400&display=swap"/>
+  <link rel="stylesheet" href="amicus-design.css"/>
+  <link rel="stylesheet" href="onboarding-style.css"/>
+</head>
+<body>
+
+  <!-- Canvas de ondas -->
+  <canvas id="wave-canvas"></canvas>
+
+  <!-- TELA DE SUCESSO (oculta) -->
+  <div id="done-screen" class="done-screen hidden">
+    <div class="done-card">
+      <div class="done-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2E9E6B" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 12 4 9"/></svg>
+      </div>
+      <h2 class="done-title">Escritório ativado!</h2>
+      <p class="done-sub">Redirecionando para o dashboard…</p>
+      <a href="/dashboard" class="btn-primary">Acessar o dashboard →</a>
+    </div>
+  </div>
+
+  <!-- WIZARD -->
+  <div id="wizard">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-inner">
+        <span class="step-counter">Etapa <strong id="step-num">1</strong> de 6</span>
+        <div id="logo-nav" class="logo-wrap"></div>
+      </div>
+      <div class="header-inner" style="padding-top:0">
+        <div id="step-indicator" class="step-indicator"></div>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="content-inner">
+
+        <div class="step-header">
+          <h1 id="step-title" class="step-title"></h1>
+          <p  id="step-sub"   class="step-sub"></p>
+        </div>
+
+        <div id="step-card" class="step-card"></div>
+
+        <div id="form-error" class="form-error hidden"></div>
+
+        <div class="nav-buttons">
+          <button id="btn-prev" class="btn-ghost hidden" onclick="prevStep()">← Anterior</button>
+          <button id="btn-next" class="btn-primary" onclick="nextStep()">Próximo →</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script src="onboarding-app.js"></script>
+</body>
+</html>
