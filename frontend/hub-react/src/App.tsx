@@ -31,7 +31,7 @@ const queryClient = new QueryClient({
 type Phase = 'login' | 'ajuda' | 'onboarding' | 'welcome' | 'loading' | 'hub'
 
 export default function App() {
-  const [phase, setPhase]           = useState<Phase>('login')
+  const [phase, setPhase]           = useState<Phase>('welcome')
   const [fadeOut, setFadeOut]       = useState(false)
   const [shellReady, setShellReady] = useState(false)
   const [minDone, setMinDone]       = useState(false)
@@ -69,12 +69,21 @@ export default function App() {
     width: '100vw', height: '100vh',
   }
 
+  /* ── Welcome (splash inicial) ── */
+  if (phase === 'welcome') {
+    return (
+      <div style={wrapStyle}>
+        <WelcomePage onStart={() => advanceTo('login')} />
+      </div>
+    )
+  }
+
   /* ── Login ── */
   if (phase === 'login') {
     return (
       <div style={wrapStyle}>
         <LoginPage
-          onLogin={() => advanceTo('welcome')}
+          onLogin={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
           onRegister={() => advanceTo('onboarding')}
           onAjuda={() => advanceTo('ajuda')}
         />
@@ -97,21 +106,6 @@ export default function App() {
       <div style={{ ...wrapStyle, overflow: 'auto', height: 'auto', minHeight: '100vh' }}>
         <OnboardingPage
           onComplete={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
-        />
-      </div>
-    )
-  }
-
-  /* ── Welcome ── */
-  if (phase === 'welcome') {
-    return (
-      <div style={wrapStyle}>
-        <WelcomePage
-          onStart={() => {
-            setShellReady(false)
-            setMinDone(false)
-            advanceTo('loading')
-          }}
         />
       </div>
     )
