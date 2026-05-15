@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, type CSSProperties, type Dispatch, type SetStateAction } from 'react'
+import { useState, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from 'react'
+import { useWaveCanvas } from '../hooks/useWaveCanvas'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -43,10 +44,19 @@ function getStrength(pass: string) {
   return { score, ...map[score] }
 }
 
+/* ── Wave config ─────────────────────────────────────────────────────────── */
+
+const WAVES = [
+  { A: 55, f: 0.0032, s: 0.012, p: 0.0 },
+  { A: 35, f: 0.0058, s: 0.019, p: 1.4 },
+  { A: 22, f: 0.0094, s: 0.027, p: 2.9 },
+  { A: 14, f: 0.0150, s: 0.021, p: 0.8 },
+]
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 
 export default function OnboardingPage({ onComplete }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasRef = useWaveCanvas(WAVES)
 
   const [step, setStep]     = useState(1)
   const [done, setDone]     = useState(false)
@@ -57,41 +67,6 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [s3, setS3] = useState<S3>({ inicio: '08:00', fim: '18:00', dias: ['Seg','Ter','Qua','Qui','Sex'] })
   const [s4, setS4] = useState<S4>({ assistente: '', tom: '' })
   const [aceite, setAceite] = useState(false)
-
-  /* Wave canvas */
-  useEffect(() => {
-    const cv = canvasRef.current
-    if (!cv) return
-    const ctx = cv.getContext('2d')!
-    let t = 0, animId: number
-    const waves = [
-      { color: '#A8C8E8', speed: 0.012, amp: 18, freq: 0.005, offset: 0.0, alpha: 0.50 },
-      { color: '#3A7AB8', speed: 0.018, amp: 14, freq: 0.007, offset: 1.5, alpha: 0.40 },
-      { color: '#EAF2FA', speed: 0.009, amp: 22, freq: 0.004, offset: 3.0, alpha: 0.35 },
-      { color: '#3A7AB8', speed: 0.022, amp: 11, freq: 0.009, offset: 0.8, alpha: 0.30 },
-      { color: '#A8C8E8', speed: 0.015, amp: 16, freq: 0.006, offset: 2.2, alpha: 0.45 },
-    ]
-    const resize = () => { cv.width = window.innerWidth; cv.height = window.innerHeight }
-    resize()
-    window.addEventListener('resize', resize)
-    const loop = () => {
-      const W = cv.width, H = cv.height
-      ctx.clearRect(0, 0, W, H)
-      ctx.fillStyle = '#F0F5FA'; ctx.fillRect(0, 0, W, H)
-      waves.forEach((w, i) => {
-        const yBase = H * (0.30 + i * 0.12)
-        ctx.beginPath(); ctx.moveTo(0, yBase)
-        for (let x = 0; x <= W; x += 3)
-          ctx.lineTo(x, yBase + w.amp * Math.sin(x * w.freq + t * w.speed + w.offset))
-        ctx.lineTo(W, H * 0.72); ctx.lineTo(0, H * 0.72); ctx.closePath()
-        ctx.globalAlpha = w.alpha; ctx.fillStyle = w.color; ctx.fill()
-      })
-      ctx.globalAlpha = 1; t++
-      animId = requestAnimationFrame(loop)
-    }
-    loop()
-    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(animId) }
-  }, [])
 
   /* Enter → next */
   useEffect(() => {
