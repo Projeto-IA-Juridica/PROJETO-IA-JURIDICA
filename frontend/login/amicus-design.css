@@ -1,0 +1,167 @@
+/* ═══════════════════════════════════════════════════════════════
+   amicus-design.css — Design system compartilhado
+   Baseado no hub-react (index.css) do hub-advogado
+   Inclua este arquivo em todas as páginas estáticas
+═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+/* ── Tokens ───────────────────────────────────────────────────── */
+:root {
+  --am-bg:          #F4F8FC;
+  --am-surface:     #EAF2FA;
+  --am-ink:         #0C1E30;
+  --am-secondary:   #4A6A88;
+  --am-muted:       #8AAAC0;
+  --am-blue:        #3A7AB8;
+  --am-blue-accent: #1248BE;
+  --am-blue-hover:  #2A6AA8;
+  --am-blue-light:  #A8C8E8;
+  --am-green:       #1A9E78;
+  --am-amber:       #D08010;
+  --am-red:         #C83030;
+  --am-border:      rgba(168, 200, 232, 0.30);
+  --am-border-solid:#D4E6F4;
+  --am-sans:        'Plus Jakarta Sans', system-ui, sans-serif;
+  --am-serif:       'Cormorant Garamond', Georgia, serif;
+}
+
+/* ── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--am-sans);
+  background:  var(--am-bg);
+  color:       var(--am-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────── */
+::-webkit-scrollbar              { width: 4px; height: 4px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: var(--am-blue-light); border-radius: 99px; }
+
+/* ── Logo gradient ────────────────────────────────────────────── */
+.logo-gradient {
+  background: linear-gradient(135deg, #0C1E30 0%, #1248BE 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Hover lift (card interativo) ─────────────────────────────── */
+.hover-lift {
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.18s ease, background 0.14s ease,
+              border-color 0.16s ease;
+  cursor: pointer;
+}
+.hover-lift:hover {
+  transform: translateY(-2px) scale(1.015);
+  border-color: rgba(58,122,184,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(58,122,184,0.10),
+              0 8px 24px rgba(12,30,48,0.11),
+              0 2px 6px  rgba(12,30,48,0.06);
+}
+.hover-lift:active {
+  transform: translateY(0) scale(0.98);
+  border-color: rgba(58,122,184,0.75) !important;
+}
+
+/* ── Card border hover (sem lift) ─────────────────────────────── */
+.card-border-hover {
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.card-border-hover:hover {
+  border-color: rgba(58,122,184,0.5) !important;
+  box-shadow: 0 0 0 3px rgba(58,122,184,0.09),
+              0 4px 14px rgba(12,30,48,0.08);
+}
+
+/* ── Press (botão com press-down) ─────────────────────────────── */
+.press {
+  transition: transform 0.12s ease, background 0.12s ease,
+              border-color 0.12s ease, color 0.12s ease,
+              box-shadow 0.12s ease;
+  cursor: pointer;
+}
+.press:hover  { transform: translateY(-1px); }
+.press:active { transform: scale(0.95); }
+
+/* ── Card shadows ─────────────────────────────────────────────── */
+.card-shadow    { box-shadow: 0 1px 3px rgba(12,30,48,.06), 0 1px 2px rgba(12,30,48,.04); }
+.card-shadow-md { box-shadow: 0 4px 12px rgba(12,30,48,.08), 0 2px 4px rgba(12,30,48,.04); }
+
+/* ── Btn primary com ripple ───────────────────────────────────── */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.btn-ripple::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 70%);
+  transform: scale(0); opacity: 0;
+  transition: transform 0.4s ease, opacity 0.4s ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.btn-ripple:active::after {
+  transform: scale(2.5); opacity: 1; transition: 0s;
+}
+
+/* ── Animações de entrada ─────────────────────────────────────── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.card-in { animation: card-in 0.3s cubic-bezier(0.34,1.1,0.64,1) both; }
+.card-in:nth-child(1) { animation-delay: 0ms;   }
+.card-in:nth-child(2) { animation-delay: 50ms;  }
+.card-in:nth-child(3) { animation-delay: 100ms; }
+.card-in:nth-child(4) { animation-delay: 150ms; }
+
+@keyframes page-slide-in {
+  from { opacity: 0; transform: translateX(18px) scale(0.985); filter: blur(3px); }
+  to   { opacity: 1; transform: translateX(0)    scale(1);     filter: blur(0);   }
+}
+.page-enter { animation: page-slide-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--am-surface) 25%,
+    rgba(168,200,232,0.18) 50%,
+    var(--am-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 8px;
+}
+
+/* ── Focus ring ───────────────────────────────────────────────── */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--am-blue);
+  outline-offset: 2px;
+}
+
+/* ── Inputs base ──────────────────────────────────────────────── */
+input, textarea, select {
+  font-family: var(--am-sans);
+}
