@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>amicus — Fale conosco</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@300;400&display=swap" />
+  <link rel="stylesheet" href="amicus-design.css" />
+  <link rel="stylesheet" href="ajuda-style.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav id="navbar">
+    <a href="index.html" id="logo-nav" class="logo-wrap"></a>
+    <a href="index.html" class="nav-back">← Voltar ao login</a>
+  </nav>
+
+  <div class="page-wrap">
+
+    <!-- Painel esquerdo -->
+    <aside class="left-panel">
+      <div class="left-content">
+
+        <svg class="arch-logo" width="56" height="60" viewBox="0 0 68 72" fill="none">
+          <rect x="10" y="0" width="48" height="6" rx="1" fill="white"/>
+          <path d="M4 9 L64 9 L60 18 L8 18 Z" fill="white"/>
+          <rect x="0" y="21" width="68" height="26" fill="white"/>
+          <path d="M24 47 L24 36 Q24 27 34 27 Q44 27 44 36 L44 47 Z" fill="transparent"/>
+          <rect x="7"  y="27" width="12" height="12" fill="transparent"/>
+          <rect x="10" y="30" width="6"  height="6"  fill="white"/>
+          <rect x="49" y="27" width="12" height="12" fill="transparent"/>
+          <rect x="52" y="30" width="6"  height="6"  fill="white"/>
+          <rect x="0"  y="47" width="24" height="25" fill="white"/>
+          <rect x="44" y="47" width="24" height="25" fill="white"/>
+        </svg>
+
+        <h1 class="left-title">Fale com<br />a gente.</h1>
+
+        <p class="left-sub">
+          Nossa equipe está pronta para entender o seu escritório e mostrar como o amicus pode transformar seu atendimento.
+        </p>
+
+        <div class="left-divider"></div>
+
+        <div class="left-items">
+          <div class="left-item"><span class="left-dash"></span>Resposta em até 24h</div>
+          <div class="left-item"><span class="left-dash"></span>Demonstração gratuita</div>
+          <div class="left-item"><span class="left-dash"></span>Sem compromisso</div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Painel direito -->
+    <section class="right-panel">
+      <div class="form-wrap">
+
+        <!-- Sucesso (oculto por padrão) -->
+        <div id="success-state" style="display:none; text-align:center; padding: 40px 0;">
+          <div class="success-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2E9E6B" stroke-width="2" stroke-linecap="round">
+              <polyline points="20 6 9 12 4 9"/>
+            </svg>
+          </div>
+          <h2 class="success-title">Mensagem enviada!</h2>
+          <p class="success-sub">Recebemos seu contato e retornaremos em até 24h.</p>
+        </div>
+
+        <!-- Formulário -->
+        <form id="contact-form" novalidate>
+
+          <div class="field-group">
+            <label class="field-label">Nome completo <span class="req">*</span></label>
+            <input type="text" id="f-nome" placeholder="Seu nome completo" />
+          </div>
+
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">E-mail <span class="req">*</span></label>
+              <input type="email" id="f-email" placeholder="seu@escritorio.com.br" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">Telefone <span class="req">*</span></label>
+              <input type="tel" id="f-tel" placeholder="(00) 00000-0000" />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Escritório / Empresa <span class="req">*</span></label>
+            <input type="text" id="f-empresa" placeholder="Nome do seu escritório" />
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Mensagem <span class="req">*</span></label>
+            <textarea id="f-msg" rows="5" placeholder="Como podemos ajudar você?"></textarea>
+          </div>
+
+          <p id="form-error" class="form-error" style="display:none">
+            Por favor preencha todos os campos obrigatórios.
+          </p>
+
+          <button type="submit" class="btn-submit">Enviar pelo WhatsApp</button>
+
+          <p class="form-note">
+            Seus dados são usados apenas para entrar em contato.
+            <a href="/privacidade">Política de privacidade.</a>
+          </p>
+
+        </form>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="ajuda-app.js"></script>
+</body>
+</html>

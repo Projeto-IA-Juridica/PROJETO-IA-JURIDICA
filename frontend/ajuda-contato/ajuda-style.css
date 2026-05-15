@@ -1,0 +1,139 @@
+/* ajuda-style.css — Contact page — amicus design system */
+
+body { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Navbar ───────────────────────────────────────────────────── */
+#navbar {
+  padding: 16px 40px; display: flex;
+  justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--am-border);
+  background: rgba(255,255,255,0.90);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  position: relative; z-index: 10;
+}
+
+.logo-wrap { display: flex; align-items: baseline; cursor: default; text-decoration: none; }
+.am-letter {
+  font-family: var(--am-serif); font-size: 26px; font-weight: 400; color: var(--am-ink);
+  display: inline-block; letter-spacing: -0.5px; line-height: 1;
+  transition: color 0.25s, transform 0.25s;
+}
+.am-letter:hover { color: var(--am-blue-accent); transform: translateY(-2px); }
+
+.nav-back { font-size: 13px; color: var(--am-muted); text-decoration: none; font-weight: 500; transition: color 0.2s; }
+.nav-back:hover { color: var(--am-ink); }
+
+/* ── Layout dividido ──────────────────────────────────────────── */
+.page-wrap {
+  flex: 1; display: grid; grid-template-columns: 1fr 1.2fr;
+  min-height: calc(100vh - 61px);
+}
+
+/* ── Painel esquerdo ──────────────────────────────────────────── */
+.left-panel {
+  background: var(--am-ink);
+  display: flex; align-items: center; justify-content: center; padding: 56px 44px;
+}
+.left-content { max-width: 340px; }
+.arch-logo    { display: block; margin-bottom: 32px; opacity: 0.85; }
+
+.left-title {
+  font-family: var(--am-serif); font-size: 48px; font-weight: 300;
+  color: #fff; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 16px;
+}
+.left-sub { font-size: 14px; color: rgba(255,255,255,0.55); line-height: 1.7; margin-bottom: 32px; }
+.left-divider { width: 36px; height: 1px; background: rgba(255,255,255,0.18); margin-bottom: 24px; }
+.left-items { display: flex; flex-direction: column; gap: 14px; }
+.left-item  { display: flex; align-items: center; gap: 12px; font-size: 13px; color: rgba(255,255,255,0.70); }
+.left-dash  { width: 18px; height: 1.5px; background: var(--am-blue); flex-shrink: 0; display: inline-block; }
+
+/* ── Painel direito ───────────────────────────────────────────── */
+.right-panel {
+  background: var(--am-surface);
+  display: flex; align-items: center; justify-content: center; padding: 56px 52px;
+}
+.form-wrap { width: 100%; max-width: 460px; }
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.field-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+.field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field-label {
+  font-size: 10px; color: var(--am-secondary); text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 700;
+}
+.req { color: var(--am-blue-accent); }
+
+input, textarea {
+  width: 100%; box-sizing: border-box; padding: 12px 16px;
+  font-family: var(--am-sans); font-size: 14px; color: var(--am-ink);
+  background: rgba(255,255,255,0.82);
+  border: 1.5px solid var(--am-border-solid);
+  border-radius: 12px; outline: none; resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+input:focus, textarea:focus {
+  background: #fff; border-color: var(--am-blue-accent);
+  box-shadow: 0 0 0 3px rgba(18,72,190,0.10);
+}
+input::placeholder, textarea::placeholder { color: var(--am-muted); }
+textarea { min-height: 120px; }
+
+/* ── Erro ─────────────────────────────────────────────────────── */
+.form-error { font-size: 13px; color: var(--am-red); margin-bottom: 14px; }
+
+/* ── Botão submit ─────────────────────────────────────────────── */
+.btn-submit {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 13px 0; margin-bottom: 14px;
+  background: linear-gradient(135deg, #1248BE 0%, #3A7AB8 100%);
+  color: #fff; font-family: var(--am-sans); font-weight: 700; font-size: 14px;
+  border: none; border-radius: 12px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(18,72,190,0.28), inset 0 1px 0 rgba(255,255,255,0.15);
+  transition: transform 0.14s, box-shadow 0.14s;
+  position: relative; overflow: hidden;
+}
+.btn-submit:hover  { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(18,72,190,0.35); }
+.btn-submit:active { transform: scale(0.97); }
+.btn-submit::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%);
+  transform: scale(0); opacity: 0; transition: transform 0.4s, opacity 0.4s;
+  pointer-events: none; border-radius: inherit;
+}
+.btn-submit:active::after { transform: scale(2.5); opacity: 1; transition: 0s; }
+
+/* ── Nota ─────────────────────────────────────────────────────── */
+.form-note { font-size: 12px; color: var(--am-muted); text-align: center; line-height: 1.5; }
+.form-note a { color: var(--am-blue-accent); text-decoration: none; }
+
+/* ── Sucesso ──────────────────────────────────────────────────── */
+.success-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(26,158,120,0.10); border: 1.5px solid rgba(26,158,120,0.25);
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+}
+.success-title {
+  font-family: var(--am-serif); font-size: 26px; font-weight: 400;
+  color: var(--am-ink); margin-bottom: 8px; text-align: center;
+}
+.success-sub { font-size: 14px; color: var(--am-muted); line-height: 1.6; text-align: center; margin-bottom: 24px; }
+.resend-wrap {
+  padding: 14px 18px; background: rgba(255,255,255,0.80);
+  backdrop-filter: blur(8px); border: 1px solid var(--am-border);
+  border-radius: 12px; font-family: var(--am-sans); font-size: 13px;
+  color: var(--am-muted); text-align: center;
+}
+.resend-btn {
+  background: none; border: none; color: var(--am-blue-accent);
+  font-weight: 700; cursor: pointer; font-family: var(--am-sans); font-size: 13px;
+}
+
+/* ── Responsivo ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page-wrap { grid-template-columns: 1fr; }
+  .left-panel { padding: 36px 24px; }
+  .left-title { font-size: 36px; }
+  .right-panel { padding: 36px 20px; }
+  .field-row { grid-template-columns: 1fr; }
+  #navbar { padding: 14px 20px; }
+}
