@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  LayoutDashboard, Users, Heart, Sparkles,
+  LayoutDashboard, Users, Heart, Brain,
   Target, FolderOpen, Settings,
 } from 'lucide-react'
 import DevBanner from './components/DevBanner'
 import PageTransition from './components/PageTransition'
 import { FloatingDock } from './components/ui/FloatingDock'
 import type { DockItem } from './components/ui/FloatingDock'
-import WelcomePage from './pages/WelcomePage'
-import LoadingPage  from './pages/LoadingPage'
+import WelcomePage     from './pages/WelcomePage'
+import LoadingPage      from './pages/LoadingPage'
+import LoginPage        from './pages/LoginPage'
+import AjudaPage        from './pages/AjudaPage'
+import OnboardingPage   from './pages/OnboardingPage'
 import type { Section } from './types'
 
 /* ── Pages ── */
@@ -25,7 +28,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
 
-type Phase = 'welcome' | 'loading' | 'hub'
+type Phase = 'login' | 'ajuda' | 'onboarding' | 'welcome' | 'loading' | 'hub'
 
 export default function App() {
   const [phase, setPhase]           = useState<Phase>('welcome')
@@ -60,20 +63,49 @@ export default function App() {
     }
   }, [shellReady, minDone, phase])
 
-  /* ── Welcome ── */
+  const wrapStyle = {
+    opacity: fadeOut ? 0 : 1,
+    transition: 'opacity 0.22s ease',
+    width: '100vw', height: '100vh',
+  }
+
+  /* ── Welcome (splash inicial) ── */
   if (phase === 'welcome') {
     return (
-      <div style={{
-        opacity: fadeOut ? 0 : 1,
-        transition: 'opacity 0.22s ease',
-        width: '100vw', height: '100vh',
-      }}>
-        <WelcomePage
-          onStart={() => {
-            setShellReady(false)
-            setMinDone(false)
-            advanceTo('loading')
-          }}
+      <div style={wrapStyle}>
+        <WelcomePage onStart={() => advanceTo('login')} />
+      </div>
+    )
+  }
+
+  /* ── Login ── */
+  if (phase === 'login') {
+    return (
+      <div style={wrapStyle}>
+        <LoginPage
+          onLogin={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
+          onRegister={() => advanceTo('onboarding')}
+          onAjuda={() => advanceTo('ajuda')}
+        />
+      </div>
+    )
+  }
+
+  /* ── Ajuda / Fale conosco ── */
+  if (phase === 'ajuda') {
+    return (
+      <div style={wrapStyle}>
+        <AjudaPage onBack={() => advanceTo('login')} />
+      </div>
+    )
+  }
+
+  /* ── Onboarding / Cadastro ── */
+  if (phase === 'onboarding') {
+    return (
+      <div style={{ ...wrapStyle, overflow: 'auto', height: 'auto', minHeight: '100vh' }}>
+        <OnboardingPage
+          onComplete={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
         />
       </div>
     )
@@ -114,9 +146,9 @@ interface ShellProps { onReady?: () => void }
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'painel',     label: 'Painel',          icon: <LayoutDashboard size={18} /> },
+  { id: 'hub-ia',     label: 'Hub IA',           icon: <Brain      size={18} /> },
   { id: 'clientes',   label: 'Clientes',         icon: <Users      size={18} /> },
   { id: 'crm',        label: 'Relacionamento',   icon: <Heart      size={18} /> },
-  { id: 'hub-ia',     label: 'Hub IA',           icon: <Sparkles   size={18} /> },
   { id: 'captacao',   label: 'Captação',         icon: <Target     size={18} /> },
   { id: 'documentos', label: 'Documentos',       icon: <FolderOpen size={18} /> },
   { id: 'config',     label: 'Configurações',    icon: <Settings   size={18} /> },

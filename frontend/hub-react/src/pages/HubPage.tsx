@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, BarChart3, MessageSquare, BookOpen, ArrowLeft, Search, Users, Scale, Clock } from 'lucide-react'
+import { FileText, BarChart3, MessageSquare, BookOpen, ArrowLeft, Search, Users, Scale, Clock, Upload } from 'lucide-react'
 import ProcessoTab from '../tabs/ProcessoTab'
 import ScoreTab from '../tabs/ScoreTab'
 import ChatTab from '../tabs/ChatTab'
@@ -9,6 +9,7 @@ import DocumentosTab from '../tabs/DocumentosTab'
 import RiskChip from '../components/RiskChip'
 import { fetchClientes } from '../api/crm'
 import { fetchProcessos } from '../api/processos'
+import CadastroCSVPage from './CadastroCSVPage'
 
 type Tab = 'processo' | 'score' | 'chat' | 'documentos'
 
@@ -28,6 +29,7 @@ interface Props {
 export default function HubPage({ activeId, onSelect, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('processo')
   const [search, setSearch]       = useState('')
+  const [showCSV, setShowCSV]     = useState(false)
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
@@ -43,6 +45,9 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
   const cliente  = clientes?.find((c) => c.id === activeId) ?? null
   const processo = processoData?.items[0] ?? null
+
+  /* ── CSV import ── */
+  if (showCSV) return <CadastroCSVPage onBack={() => setShowCSV(false)} />
 
   /* ── Lista de clientes ── */
   if (!cliente) {
@@ -61,10 +66,16 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 4px 12px rgba(18,72,190,0.22)' }}>
                 <Users size={16} className="text-white" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h1 className="text-sm font-bold text-am-ink">Clientes</h1>
                 <p className="text-[11px] text-am-muted">{clientes?.length ?? 0} cadastrados</p>
               </div>
+              <button
+                onClick={() => setShowCSV(true)}
+                className="press flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                <Upload size={12} /> Importar CSV
+              </button>
             </div>
 
             {/* Search */}
@@ -91,7 +102,29 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
               </div>
             )}
-            {!isLoading && filtered.length === 0 && (
+
+            {/* Sem clientes cadastrados → CTA de importação */}
+            {!isLoading && (clientes ?? []).length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-4 py-12">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'rgba(18,72,190,0.07)', border: '1px solid rgba(18,72,190,0.15)' }}>
+                  <Users size={22} style={{ color: 'var(--color-am-blue)' }} />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-am-ink mb-1">Nenhum cliente ainda</p>
+                  <p className="text-xs text-am-muted leading-relaxed">Importe sua base de clientes via CSV<br/>para começar a usar o amicus.</p>
+                </div>
+                <button
+                  onClick={() => setShowCSV(true)}
+                  className="press flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', boxShadow: '0 4px 14px rgba(18,72,190,0.25)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                  <Upload size={13} /> Importar clientes via CSV
+                </button>
+              </div>
+            )}
+
+            {/* Sem resultado de busca */}
+            {!isLoading && (clientes ?? []).length > 0 && filtered.length === 0 && (
               <div className="flex items-center justify-center h-32">
                 <p className="text-xs text-am-muted">Nenhum cliente encontrado</p>
               </div>
