@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, BarChart3, MessageSquare, BookOpen, ArrowLeft, Search, Users, Scale, Clock, Upload } from 'lucide-react'
+import { FileText, BarChart3, MessageSquare, BookOpen, ArrowLeft, Search, Users, Scale, Clock, Upload, Download, Trash2, AlertTriangle } from 'lucide-react'
 import ProcessoTab from '../tabs/ProcessoTab'
 import ScoreTab from '../tabs/ScoreTab'
 import ChatTab from '../tabs/ChatTab'
@@ -9,6 +9,7 @@ import DocumentosTab from '../tabs/DocumentosTab'
 import RiskChip from '../components/RiskChip'
 import { fetchClientes } from '../api/crm'
 import { fetchProcessos } from '../api/processos'
+import { exportarCliente, deletarClienteLGPD } from '../api/clientes'
 import CadastroCSVPage from './CadastroCSVPage'
 
 type Tab = 'processo' | 'score' | 'chat' | 'documentos'
@@ -27,9 +28,25 @@ interface Props {
 }
 
 export default function HubPage({ activeId, onSelect, onBack }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('processo')
-  const [search, setSearch]       = useState('')
-  const [showCSV, setShowCSV]     = useState(false)
+  const [activeTab, setActiveTab]         = useState<Tab>('processo')
+  const [search, setSearch]               = useState('')
+  const [showCSV, setShowCSV]             = useState(false)
+  const [confirmarDelete, setConfirmarDelete] = useState(false)
+
+  const qc = useQueryClient()
+
+  const exportarMut = useMutation({
+    mutationFn: () => exportarCliente(activeId!),
+  })
+
+  const deletarMut = useMutation({
+    mutationFn: () => deletarClienteLGPD(activeId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] })
+      onBack?.()
+    },
+    onSettled: () => setConfirmarDelete(false),
+  })
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
@@ -248,6 +265,56 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 <RiskChip nivel={processo.score_nivel} score={processo.score_risco} size="md" />
               )}
             </div>
+          </div>
+
+          {/* LGPD */}
+          <div className="flex items-center justify-end gap-2 mt-3">
+            {confirmarDelete ? (
+              <>
+                <span className="flex items-center gap-1 text-[10px] text-am-muted font-medium">
+                  <AlertTriangle size={11} style={{ color: '#C83030' }} />
+                  Confirmar exclusão dos dados?
+                </span>
+                <button
+                  onClick={() => deletarMut.mutate()}
+                  disabled={deletarMut.isPending}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold press"
+                  style={{ background: 'rgba(200,48,48,0.10)', color: '#C83030', border: '1px solid rgba(200,48,48,0.25)', cursor: 'pointer' }}>
+                  {deletarMut.isPending
+                    ? <span className="w-3 h-3 rounded-full border border-current border-t-transparent animate-spin" />
+                    : 'Confirmar'}
+                </button>
+                <button
+                  onClick={() => setConfirmarDelete(false)}
+                  disabled={deletarMut.isPending}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-semibold press"
+                  style={{ background: 'var(--color-am-surface)', color: 'var(--color-am-secondary)', border: '1px solid var(--color-am-border)', cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => exportarMut.mutate()}
+                  disabled={exportarMut.isPending}
+                  title="Exportar dados pessoais (LGPD Art. 18, V)"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold press"
+                  style={{ background: 'rgba(18,72,190,0.06)', color: 'var(--color-am-blue)', border: '1px solid rgba(18,72,190,0.18)', cursor: 'pointer' }}>
+                  {exportarMut.isPending
+                    ? <span className="w-3 h-3 rounded-full border border-current border-t-transparent animate-spin" />
+                    : <Download size={10} />}
+                  Exportar dados
+                </button>
+                <button
+                  onClick={() => setConfirmarDelete(true)}
+                  title="Direito ao esquecimento (LGPD Art. 18, IV)"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold press"
+                  style={{ background: 'rgba(200,48,48,0.06)', color: '#C83030', border: '1px solid rgba(200,48,48,0.18)', cursor: 'pointer' }}>
+                  <Trash2 size={10} />
+                  Apagar dados
+                </button>
+              </>
+            )}
           </div>
 
           {/* Tab switcher */}
