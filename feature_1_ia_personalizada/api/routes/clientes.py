@@ -8,6 +8,10 @@ Implementa os direitos do titular previstos na Lei nº 13.709/2018:
   - Art. 18, IV — Esquecimento:  DELETE /clientes/{id}
 
 Acesso restrito a roles 'advogado' e 'admin' com isolamento por escritório.
+
+Rate limits LGPD (por user_id — não por IP):
+  - Exportar:  10 por hora (prevenção de data dump via token comprometido)
+  - Deletar:    5 por hora (operação irreversível)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -29,6 +33,46 @@ from shared.utils.lgpd import (
 
 router = APIRouter(prefix="/clientes", tags=["Clientes — LGPD"])
 
+
+# ---------------------------------------------------------------------------
+# Rate-limit LGPD — dependency por endpoint, bucket por user_id
+# ---------------------------------------------------------------------------
+
+def _make_lgpd_rate_limit(action: str, limit: int, window_s: int):
+    """
+    Retorna uma FastAPI dependency que aplica rate limit por user_id no Redis.
+    Falha aberta se Redis estiver indisponível (não bloqueia o usuário).
+    """
+    async def _dep(
+        request: Request,
+        user_id: int = Depends(get_advogado_id),
+    ) -> None:
+        r = getattr(request.app.state, "redis_client", None)
+        if r is None:
+            return
+        key = f"rate_limit:lgpd:{action}:{user_id}"
+        count = await r.incr(key)
+        if count == 1:
+            await r.expire(key, window_s)
+        if count > limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Limite LGPD atingido: máximo de {limit} operações "
+                    f"de '{action}' por hora. Tente novamente em breve."
+                ),
+                headers={"Retry-After": str(window_s)},
+            )
+    return _dep
+
+
+_rl_exportar = _make_lgpd_rate_limit("exportar", limit=10, window_s=3600)
+_rl_deletar  = _make_lgpd_rate_limit("deletar",  limit=5,  window_s=3600)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _get_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
@@ -61,6 +105,10 @@ async def _get_cliente_do_escritorio(
     return cliente
 
 
+# ---------------------------------------------------------------------------
+# GET /clientes/{cliente_id}/exportar
+# ---------------------------------------------------------------------------
+
 @router.get(
     "/{cliente_id}/exportar",
     summary="Exportar dados pessoais do cliente (LGPD Art. 18, V)",
@@ -72,6 +120,7 @@ async def exportar_dados(
     db: AsyncSession = Depends(get_db),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     user_id: int = Depends(get_advogado_id),
+    _: None = Depends(_rl_exportar),
 ):
     """
     Retorna todos os dados pessoais armazenados sobre o cliente em formato JSON.
@@ -82,8 +131,8 @@ async def exportar_dados(
     Conforme LGPD Art. 18, V — direito à portabilidade dos dados a outro fornecedor.
 
     **Acesso:** advogado ou admin do mesmo escritório.
+    **Rate limit:** 10 exportações por hora por usuário.
     """
-    # Verifica pertencimento ao escritório antes de exportar
     await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
 
     registrar_acesso(
@@ -101,11 +150,14 @@ async def exportar_dados(
     return JSONResponse(
         content=dados,
         headers={
-            # Sugere download com nome de arquivo baseado no ID do cliente
             "Content-Disposition": f'attachment; filename="lgpd_cliente_{cliente_id}.json"',
         },
     )
 
+
+# ---------------------------------------------------------------------------
+# DELETE /clientes/{cliente_id}
+# ---------------------------------------------------------------------------
 
 @router.delete(
     "/{cliente_id}",
@@ -118,6 +170,7 @@ async def deletar_dados(
     db: AsyncSession = Depends(get_db),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     user_id: int = Depends(get_advogado_id),
+    _: None = Depends(_rl_deletar),
 ):
     """
     Anonimiza todos os dados pessoais do cliente (direito ao esquecimento).
@@ -134,13 +187,12 @@ async def deletar_dados(
     Conforme LGPD Art. 18, IV — direito à eliminação dos dados pessoais tratados.
 
     **Acesso:** advogado ou admin do mesmo escritório.
+    **Rate limit:** 5 anonimizações por hora por usuário.
     """
-    # Verifica pertencimento ao escritório antes de anonimizar
     await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
 
     try:
         await anonimizar_dados_cliente(db, cliente_id, solicitado_por=user_id)
-        # anonimizar_dados_cliente faz flush mas não commit — commit aqui
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
