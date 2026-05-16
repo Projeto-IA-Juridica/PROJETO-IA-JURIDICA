@@ -74,9 +74,14 @@ export async function refreshAccessToken(): Promise<TokenResponse> {
 
 export async function logout(): Promise<void> {
   try {
-    const token = getAccessToken()
-    if (token) {
-      await plain.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } })
+    const accessToken  = getAccessToken()
+    const refreshToken = getRefreshToken()
+    if (accessToken) {
+      await plain.post(
+        '/auth/logout',
+        refreshToken ? { refresh_token: refreshToken } : {},
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
     }
   } finally {
     clearAuth()

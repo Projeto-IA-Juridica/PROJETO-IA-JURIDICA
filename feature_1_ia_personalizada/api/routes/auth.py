@@ -2,6 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,7 @@ from shared.security.jwt import (
     criar_refresh_token,
     criar_token,
     revogar_token,
+    token_esta_revogado,
     validar_token,
 )
 
@@ -116,10 +118,12 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
     token = auth_header.split(" ")[1]
 
     try:
-        # Decodifica o token antigo
+        # Rejeita tokens já revogados (ex: refresh reutilizado após rotação)
+        if token_esta_revogado(token):
+            raise HTTPException(status_code=401, detail="Refresh token revogado. Faça login novamente.")
+
         payload = validar_token(token)
 
-        # O refresh token viaja leve, verificamos explicitamente a flag:
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Token fornecido não é um Refresh Token")
 
@@ -128,17 +132,19 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Token sem identificação de usuário")
         user_id = int(str(user_id_str))
 
-        # Precisamos ler o banco de novo para puxar as roles e escritorio_id atualizadas
+        # Busca roles e escritorio_id atualizados do banco
         usuario = await db.get(Usuario, user_id)
         if not usuario:
             raise HTTPException(status_code=401, detail="Usuário do token não existe mais")
 
-        # Gera novo par (isso invalida a ideia de que o refresh vive pra sempre, entregamos um novo access)
+        # Emite novo par de tokens
         access_token = criar_token(
             user_id=usuario.id, escritorio_id=usuario.escritorio_id, role=usuario.role
         )
-        # Opcional: Rotacionar o refresh token também ou só devolver o mesmo
         new_refresh = criar_refresh_token(user_id=usuario.id)
+
+        # Revoga o refresh token antigo — rotação real: token usado uma única vez
+        revogar_token(token)
 
         return TokenResponse(
             access_token=access_token,
@@ -150,16 +156,21 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail=str(e)) from e
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+
+
 @router.post("/logout", status_code=204)
-async def logout(request: Request):
+async def logout(request: Request, body: LogoutRequest | None = None):
     """
-    Invalida o Access Token atual adicionando-o à blacklist do Redis.
-    O cliente deve descartar o token e o refresh token após o logout.
+    Invalida o Access Token (Authorization header) e o Refresh Token (body).
+    Ambos são adicionados à blacklist do Redis com TTL até a expiração natural.
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        revogar_token(token)
+        revogar_token(auth_header.split(" ")[1])
+    if body and body.refresh_token:
+        revogar_token(body.refresh_token)
     return None
 
 

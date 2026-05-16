@@ -87,12 +87,11 @@ def criar_token(user_id: int, escritorio_id: int, role: str) -> str:
 
 def criar_refresh_token(user_id: int) -> str:
     """
-    Gera um *Refresh Token* JWT de longa duração (ex: 7 dias).
-    Usado quando o token principal expira.
+    Gera um *Refresh Token* JWT de longa duração.
+    TTL configurável via JWT_REFRESH_DAYS (padrão: 7 dias).
     Contém menos dados no payload por segurança.
     """
-    # 7 dias hardcoded para MVP, o ideal é vir de settings
-    expire = datetime.now(UTC) + timedelta(days=7)
+    expire = datetime.now(UTC) + timedelta(days=settings.JWT_REFRESH_DAYS)
 
     payload = {
         "sub": str(user_id),

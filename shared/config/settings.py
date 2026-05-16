@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 60
+    JWT_REFRESH_DAYS: int = 7
 
     # Docs (/docs, /redoc) — Basic Auth
     DOCS_USERNAME: str = "admin"
