@@ -45,7 +45,8 @@ export async function uploadDocumento(
   const { data } = await api.post<UploadJobResult>(
     `/rag/upload?titulo=${encodeURIComponent(titulo)}&tipo=${encodeURIComponent(tipo)}`,
     form,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    // Sem Content-Type manual: browser/axios define multipart com boundary correto
+    { headers: { 'Content-Type': undefined } },
   )
   return data
 }
