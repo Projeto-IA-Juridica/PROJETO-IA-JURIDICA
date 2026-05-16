@@ -113,6 +113,7 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
                   onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  onKeyDown={e => { if (e.key === 'Enter') handleLogin() }}
                   style={{ ...iconInput, paddingRight: 40 }}
                 />
                 <button
