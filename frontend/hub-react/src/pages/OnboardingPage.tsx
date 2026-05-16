@@ -14,7 +14,7 @@ import {
   mapTom,
   type ImportProcessosResult,
 } from '../api/onboarding'
-import { getAccessToken } from '../api/auth'
+import { getAccessToken, fetchCsrfToken } from '../api/auth'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -99,8 +99,9 @@ export default function OnboardingPage({ onComplete }: Props) {
   useEffect(() => {
     if (!getAccessToken()) return
     fetchOnboardingStatus()
-      .then((status) => {
+      .then(async (status) => {
         if (!status.onboarding_completo) {
+          try { await fetchCsrfToken() } catch { /* silently fails */ }
           setRegistered(true)
           setStep(3) // pula registro, começa pelo WhatsApp
         }

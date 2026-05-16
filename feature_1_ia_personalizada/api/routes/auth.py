@@ -189,12 +189,13 @@ async def csrf_token():
     """
     token = gerar_csrf_token()
     response = JSONResponse(content={"csrf_token": token})
+    is_prod = getattr(settings, "ENVIRONMENT", "development") == "production"
     response.set_cookie(
         key=_COOKIE_NAME,
         value=token,
         httponly=False,   # precisa ser lido pelo JS (Double Submit Cookie)
-        samesite="strict",
-        secure=True,
+        samesite="lax",   # "strict" bloqueava o cookie em redirecionamentos OAuth
+        secure=is_prod,   # False em dev (HTTP); True em prod (HTTPS)
         max_age=_COOKIE_MAX_AGE,
     )
     return response
