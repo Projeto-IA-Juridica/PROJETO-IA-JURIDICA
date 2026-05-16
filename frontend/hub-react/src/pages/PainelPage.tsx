@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Users, FileText, AlertTriangle, Star,
   ArrowRight, Shield, Zap, Clock,
-  TrendingUp, TrendingDown, Minus,
+  TrendingUp, TrendingDown, Minus, Download,
 } from 'lucide-react'
 import { fetchClientes, fetchResumoCRM } from '../api/crm'
+import { exportarRelatorio } from '../api/chat'
 import type { CRMClienteCard } from '../types'
 
 /* ── Paleta de risco ── */
@@ -91,6 +92,11 @@ interface Props { onSelectCliente: (id: number) => void }
 
 export default function PainelPage({ onSelectCliente }: Props) {
   const [periodo, setPeriodo] = useState<7 | 30 | 90>(30)
+  const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
+
+  const exportMut = useMutation({
+    mutationFn: () => exportarRelatorio(mes),
+  })
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ['clientes'],
@@ -161,6 +167,36 @@ export default function PainelPage({ onSelectCliente }: Props) {
             ))}
           </div>
         </div>
+
+        {/* ── Exportar relatório ── */}
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={mes}
+            onChange={e => setMes(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-xl text-xs text-am-ink border border-am-border bg-white focus:outline-none focus:border-am-blue"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          />
+          <button
+            onClick={() => exportMut.mutate()}
+            disabled={exportMut.isPending}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white flex-shrink-0 transition-opacity"
+            style={{
+              background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
+              opacity: exportMut.isPending ? 0.6 : 1,
+              cursor: exportMut.isPending ? 'not-allowed' : 'pointer',
+            }}>
+            {exportMut.isPending
+              ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              : <Download size={13} />}
+            {exportMut.isPending ? 'Exportando…' : 'Exportar CSV'}
+          </button>
+        </div>
+        {exportMut.isError && (
+          <p className="text-[11px] text-red-600 -mt-2">
+            Erro ao exportar. Verifique se há dados para o mês selecionado.
+          </p>
+        )}
 
         {/* ── KPIs ── */}
         {isLoading ? (
