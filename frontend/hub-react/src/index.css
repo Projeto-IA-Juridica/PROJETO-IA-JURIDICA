@@ -432,3 +432,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .spkbtn:hover .spkbtn-text    { color: white; }
 .spkbtn:hover .spkbtn-sparkle { color: white; transform: scale(1.2); }
+
+/* App Preview panel — oculto em telas pequenas */
+.app-preview-panel { display: none; }
+@media (min-width: 1080px) { .app-preview-panel { display: block; } }
