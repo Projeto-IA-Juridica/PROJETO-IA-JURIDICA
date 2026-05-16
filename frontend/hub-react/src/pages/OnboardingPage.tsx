@@ -1,5 +1,15 @@
-import { useState, useEffect, type CSSProperties, type Dispatch, type SetStateAction } from 'react'
+import { useState, useEffect, useRef, type CSSProperties, type Dispatch, type SetStateAction } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useWaveCanvas } from '../hooks/useWaveCanvas'
+import {
+  register,
+  configurarIA,
+  conectarWhatsapp,
+  statusWhatsapp,
+  goLive,
+  extractDetail,
+  mapTom,
+} from '../api/onboarding'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -68,6 +78,15 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [s4, setS4] = useState<S4>({ assistente: '', tom: '' })
   const [aceite, setAceite] = useState(false)
 
+  /* ── Estado de integração ─────────────────────────────────────── */
+  const [isLoading, setIsLoading]         = useState(false)
+  const [apiError, setApiError]           = useState<string | null>(null)
+  const [registered, setRegistered]       = useState(false)
+  const [qrCode, setQrCode]               = useState<string | null>(null)
+  const [qrLoading, setQrLoading]         = useState(false)
+  const [waConnected, setWaConnected]     = useState(false)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   /* Enter → next */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -77,6 +96,66 @@ export default function OnboardingPage({ onComplete }: Props) {
     return () => window.removeEventListener('keydown', handler)
   })
 
+  /* Limpeza do polling ao desmontar */
+  useEffect(() => {
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
+  }, [])
+
+  /* ── WhatsApp: inicializa QR e polling ao entrar no step 3 ────── */
+  useEffect(() => {
+    if (step !== 3) return
+
+    let cancelled = false
+
+    async function initWhatsapp() {
+      setQrLoading(true)
+      setApiError(null)
+      try {
+        const result = await conectarWhatsapp()
+        if (!cancelled) {
+          const raw = result.qr_code ?? ''
+          /* Evolution retorna base64 com ou sem prefixo data URL */
+          setQrCode(raw.startsWith('data:') ? raw : raw ? `data:image/png;base64,${raw}` : null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const detail = extractDetail(err)
+          /* Não bloqueia o wizard — Evolution pode não estar configurado ainda */
+          setApiError(
+            detail.includes('EVOLUTION_API_URL') || detail.includes('NoneType')
+              ? 'WhatsApp não configurado neste ambiente. Você pode avançar e conectar depois.'
+              : detail || 'Não foi possível gerar o QR Code. Você pode avançar e conectar depois.'
+          )
+        }
+      } finally {
+        if (!cancelled) setQrLoading(false)
+      }
+    }
+
+    initWhatsapp()
+
+    const interval = setInterval(async () => {
+      if (cancelled) return
+      try {
+        const status = await statusWhatsapp()
+        if (!cancelled && status.connected) {
+          setWaConnected(true)
+          clearInterval(interval)
+          pollingRef.current = null
+        }
+      } catch { /* ignora erros de polling */ }
+    }, 3000)
+
+    pollingRef.current = interval
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      pollingRef.current = null
+    }
+  }, [step])
+
+  /* ── Validação client-side ────────────────────────────────────── */
   function validate(): Record<string, string> {
     const e: Record<string, string> = {}
     if (step === 1) {
@@ -87,26 +166,99 @@ export default function OnboardingPage({ onComplete }: Props) {
     }
     if (step === 2) {
       if (!s2.nome.trim())        e.nome        = 'Nome do escritório obrigatório.'
+      if (!s2.cnpj.trim())        e.cnpj        = 'CNPJ obrigatório.'
       if (!s2.oab.trim())         e.oab         = 'OAB obrigatória.'
       if (!s2.responsavel.trim()) e.responsavel = 'Nome do responsável obrigatório.'
     }
-    if (step === 3 && !s3.dias.length)  e.dias      = 'Selecione ao menos um dia.'
+    if (step === 3) {
+      if (!s3.dias.length) e.dias = 'Selecione ao menos um dia.'
+      if (s3.inicio >= s3.fim)   e.horario = 'Horário de início deve ser anterior ao fim.'
+    }
     if (step === 4 && !s4.assistente.trim()) e.assistente = 'Dê um nome para sua assistente.'
-    if (step === 5 && !aceite)          e.aceite    = 'Aceite os termos para continuar.'
+    if (step === 5 && !aceite)               e.aceite     = 'Aceite os termos para continuar.'
     return e
   }
 
-  function next() {
+  /* ── Navegação com chamadas de API ────────────────────────────── */
+  async function next() {
     const errs = validate()
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
+
+    setApiError(null)
+
+    /* Step 2 → 3: registrar escritório */
+    if (step === 2 && !registered) {
+      setIsLoading(true)
+      try {
+        await register({
+          nome_escritorio: s2.nome,
+          cnpj:            s2.cnpj,
+          email_admin:     s1.email,
+          senha:           s1.pass,
+          nome_responsavel: s2.responsavel,
+          oab_responsavel:  s2.oab,
+        })
+        setRegistered(true)
+        setStep(3)
+      } catch (err) {
+        const detail = extractDetail(err)
+        if (detail.includes('CNPJ já cadastrado')) {
+          setErrors({ cnpj: 'CNPJ já cadastrado. Faça login ou use outro CNPJ.' })
+        } else if (detail.includes('OAB inválida')) {
+          setErrors({ oab: 'OAB inválida — formato esperado: UFNNNNN (ex: SP123456).' })
+        } else if (detail.includes('CNPJ inválido')) {
+          setErrors({ cnpj: 'CNPJ inválido — verifique os dígitos verificadores.' })
+        } else {
+          setApiError(detail || 'Erro ao criar conta. Verifique os dados e tente novamente.')
+        }
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    /* Step 4 → 5: salvar persona + horários */
+    if (step === 4) {
+      setIsLoading(true)
+      try {
+        await configurarIA({
+          persona_nome:    s4.assistente || 'Assistente Jurídico',
+          persona_tom:     mapTom(s4.tom),
+          horario_inicio:  s3.inicio,
+          horario_fim:     s3.fim,
+        })
+        setStep(5)
+      } catch (err) {
+        setApiError(extractDetail(err) || 'Erro ao configurar a IA. Tente novamente.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    /* Step 6: ativar escritório */
+    if (step === 6) {
+      setIsLoading(true)
+      try {
+        await goLive()
+        setDone(true)
+      } catch (err) {
+        setApiError(extractDetail(err) || 'Erro ao ativar o escritório. Tente novamente.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
+    /* Demais steps: só avança localmente */
     if (step < 6) setStep(s => s + 1)
     else setDone(true)
   }
 
-  function prev() { setErrors({}); if (step > 1) setStep(s => s - 1) }
+  function prev() { setErrors({}); setApiError(null); if (step > 1) setStep(s => s - 1) }
 
-  /* Done screen */
+  /* ── Tela de conclusão ────────────────────────────────────────── */
   if (done) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-am-bg)', fontFamily: 'var(--font-sans)' }}>
@@ -125,6 +277,15 @@ export default function OnboardingPage({ onComplete }: Props) {
   }
 
   const progress = ((step - 1) / 5) * 100
+  const btnLabel = step === 6
+    ? (isLoading ? 'Ativando…' : 'Ativar escritório →')
+    : step === 5
+    ? 'Aceitar e continuar →'
+    : step === 2 && !registered
+    ? (isLoading ? 'Criando conta…' : 'Próximo →')
+    : step === 4
+    ? (isLoading ? 'Salvando…' : 'Próximo →')
+    : 'Próximo →'
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
@@ -185,23 +346,36 @@ export default function OnboardingPage({ onComplete }: Props) {
               </p>
             </div>
 
+            {/* Erro de API */}
+            {apiError && (
+              <div style={{ padding: '10px 14px', background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.20)', borderRadius: 12, marginBottom: 14, fontSize: 12, color: '#B02020', lineHeight: 1.5 }}>
+                {apiError}
+              </div>
+            )}
+
             {/* Step card */}
             <div style={{ background: '#fff', borderRadius: 20, padding: '24px 28px', boxShadow: '0 1px 3px rgba(12,30,48,.06), 0 1px 2px rgba(12,30,48,.04)', border: '1px solid var(--color-am-border)', marginBottom: 20 }}>
               {step === 1 && <Step1 s1={s1} setS1={setS1} errors={errors} />}
               {step === 2 && <Step2 s2={s2} setS2={setS2} errors={errors} />}
-              {step === 3 && <Step3 s3={s3} setS3={setS3} errors={errors} />}
-              {step === 4 && <Step4 s4={s4} setS4={setS4} />}
+              {step === 3 && <Step3 s3={s3} setS3={setS3} errors={errors} qrCode={qrCode} qrLoading={qrLoading} waConnected={waConnected} />}
+              {step === 4 && <Step4 s4={s4} setS4={setS4} errors={errors} />}
               {step === 5 && <Step5 aceite={aceite} setAceite={setAceite} errors={errors} />}
-              {step === 6 && <Step6 s1={s1} s2={s2} s3={s3} s4={s4} aceite={aceite} />}
+              {step === 6 && <Step6 s1={s1} s2={s2} s3={s3} s4={s4} aceite={aceite} waConnected={waConnected} />}
             </div>
 
             {/* Nav */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {step > 1
-                ? <button onClick={prev} style={ghostBtn}>← Anterior</button>
+                ? <button onClick={prev} disabled={isLoading} style={{ ...ghostBtn, opacity: isLoading ? 0.5 : 1 }}>← Anterior</button>
                 : <div />}
-              <button onClick={next} className="btn-primary press" style={primaryBtn}>
-                {step === 6 ? 'Ativar escritório →' : step === 5 ? 'Aceitar e continuar →' : 'Próximo →'}
+              <button
+                onClick={next}
+                disabled={isLoading}
+                className="btn-primary press"
+                style={{ ...primaryBtn, opacity: isLoading ? 0.8 : 1, cursor: isLoading ? 'not-allowed' : 'pointer', gap: 8 }}
+              >
+                {isLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                {btnLabel}
               </button>
             </div>
           </div>
@@ -211,7 +385,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   )
 }
 
-/* ── Step 1 ───────────────────────────────────────────────────────────────── */
+/* ── Step 1 — Acesso ─────────────────────────────────────────────────────── */
 
 function Step1({ s1, setS1, errors }: { s1: S1; setS1: Dispatch<SetStateAction<S1>>; errors: Record<string, string> }) {
   const [showPass, setShowPass]       = useState(false)
@@ -252,7 +426,7 @@ function Step1({ s1, setS1, errors }: { s1: S1; setS1: Dispatch<SetStateAction<S
   )
 }
 
-/* ── Step 2 ───────────────────────────────────────────────────────────────── */
+/* ── Step 2 — Escritório ─────────────────────────────────────────────────── */
 
 function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S2>>; errors: Record<string, string> }) {
   return (
@@ -262,11 +436,11 @@ function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S
       </FGroup>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-        <FGroup label="CNPJ">
+        <FGroup label="CNPJ" required error={errors.cnpj}>
           <input type="text" value={s2.cnpj} onChange={e => setS2(v => ({ ...v, cnpj: e.target.value }))} placeholder="00.000.000/0001-81" style={inp} onFocus={focusFn} onBlur={blurFn} />
         </FGroup>
         <FGroup label="OAB do responsável" required error={errors.oab}>
-          <input type="text" value={s2.oab} onChange={e => setS2(v => ({ ...v, oab: e.target.value }))} placeholder="SP 123.456" style={inp} onFocus={focusFn} onBlur={blurFn} />
+          <input type="text" value={s2.oab} onChange={e => setS2(v => ({ ...v, oab: e.target.value }))} placeholder="SP123456" style={inp} onFocus={focusFn} onBlur={blurFn} />
         </FGroup>
       </div>
 
@@ -296,9 +470,18 @@ function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S
   )
 }
 
-/* ── Step 3 ───────────────────────────────────────────────────────────────── */
+/* ── Step 3 — WhatsApp ───────────────────────────────────────────────────── */
 
-function Step3({ s3, setS3, errors }: { s3: S3; setS3: Dispatch<SetStateAction<S3>>; errors: Record<string, string> }) {
+interface Step3Props {
+  s3: S3
+  setS3: Dispatch<SetStateAction<S3>>
+  errors: Record<string, string>
+  qrCode: string | null
+  qrLoading: boolean
+  waConnected: boolean
+}
+
+function Step3({ s3, setS3, errors, qrCode, qrLoading, waConnected }: Step3Props) {
   const [hIni, mIni] = s3.inicio.split(':')
   const [hFim, mFim] = s3.fim.split(':')
   const diasOrdenados = DAYS.filter(d => s3.dias.includes(d)).join(', ')
@@ -307,21 +490,39 @@ function Step3({ s3, setS3, errors }: { s3: S3; setS3: Dispatch<SetStateAction<S
 
   return (
     <>
+      {/* QR Code */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{ display: 'inline-block', padding: 14, background: 'var(--color-am-bg)', borderRadius: 14, border: '1px solid var(--color-am-border)', marginBottom: 10 }}>
-          <svg width="120" height="120" viewBox="0 0 130 130">
-            <rect x="0" y="0" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.8"/><rect x="8" y="8" width="24" height="24" rx="2" fill="white"/><rect x="12" y="12" width="16" height="16" rx="1" fill="var(--color-am-blue)"/>
-            <rect x="90" y="0" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.8"/><rect x="98" y="8" width="24" height="24" rx="2" fill="white"/><rect x="102" y="12" width="16" height="16" rx="1" fill="var(--color-am-blue)"/>
-            <rect x="0" y="90" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.8"/><rect x="8" y="98" width="24" height="24" rx="2" fill="white"/><rect x="12" y="102" width="16" height="16" rx="1" fill="var(--color-am-blue)"/>
-            <rect x="50" y="10" width="8" height="8" rx="1" fill="var(--color-am-blue)" opacity="0.5"/><rect x="62" y="10" width="8" height="8" rx="1" fill="var(--color-am-blue)" opacity="0.5"/>
-            <rect x="10" y="50" width="8" height="8" rx="1" fill="var(--color-am-blue)" opacity="0.5"/><rect x="10" y="62" width="8" height="8" rx="1" fill="var(--color-am-blue)" opacity="0.5"/>
-            <rect x="50" y="50" width="30" height="30" rx="4" fill="var(--color-am-blue)" opacity="0.12"/><rect x="56" y="56" width="18" height="18" rx="2" fill="var(--color-am-blue)" opacity="0.45"/>
-          </svg>
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 148, height: 148, padding: 8, background: 'var(--color-am-bg)', borderRadius: 14, border: '1px solid var(--color-am-border)', marginBottom: 10 }}>
+          {qrLoading ? (
+            <Loader2 size={32} style={{ color: 'var(--color-am-blue)', animation: 'spin 1s linear infinite' }} />
+          ) : qrCode ? (
+            <img src={qrCode} alt="QR Code WhatsApp" style={{ width: 130, height: 130, objectFit: 'contain' }} />
+          ) : (
+            /* QR placeholder quando Evolution não está configurado */
+            <svg width="120" height="120" viewBox="0 0 130 130">
+              <rect x="0" y="0" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.3"/>
+              <rect x="8" y="8" width="24" height="24" rx="2" fill="white"/>
+              <rect x="12" y="12" width="16" height="16" rx="1" fill="var(--color-am-blue)" opacity="0.3"/>
+              <rect x="90" y="0" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.3"/>
+              <rect x="98" y="8" width="24" height="24" rx="2" fill="white"/>
+              <rect x="102" y="12" width="16" height="16" rx="1" fill="var(--color-am-blue)" opacity="0.3"/>
+              <rect x="0" y="90" width="40" height="40" rx="4" fill="var(--color-am-blue)" opacity="0.3"/>
+              <rect x="8" y="98" width="24" height="24" rx="2" fill="white"/>
+              <rect x="12" y="102" width="16" height="16" rx="1" fill="var(--color-am-blue)" opacity="0.3"/>
+              <text x="65" y="70" textAnchor="middle" fontSize="9" fill="var(--color-am-muted)">Indisponível</text>
+            </svg>
+          )}
         </div>
-        <p style={{ fontSize: 12, color: 'var(--color-am-muted)', marginBottom: 8 }}>WhatsApp → Dispositivos vinculados → Vincular dispositivo</p>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.22)', borderRadius: 20 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-am-green)', display: 'inline-block' }} />
-          <span style={{ fontSize: 11, color: 'var(--color-am-green)', fontWeight: 700 }}>Aguardando conexão…</span>
+
+        <p style={{ fontSize: 12, color: 'var(--color-am-muted)', marginBottom: 8 }}>
+          WhatsApp → Dispositivos vinculados → Vincular dispositivo
+        </p>
+
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', background: waConnected ? 'rgba(26,158,120,0.08)' : 'rgba(168,200,232,0.15)', border: `1px solid ${waConnected ? 'rgba(26,158,120,0.22)' : 'var(--color-am-border)'}`, borderRadius: 20 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: waConnected ? 'var(--color-am-green)' : 'var(--color-am-blue)', display: 'inline-block', animation: waConnected ? 'none' : 'pulse 1.5s infinite' }} />
+          <span style={{ fontSize: 11, color: waConnected ? 'var(--color-am-green)' : 'var(--color-am-blue)', fontWeight: 700 }}>
+            {waConnected ? 'WhatsApp conectado ✓' : 'Aguardando conexão…'}
+          </span>
         </div>
       </div>
 
@@ -341,6 +542,8 @@ function Step3({ s3, setS3, errors }: { s3: S3; setS3: Dispatch<SetStateAction<S
           ))}
         </div>
       </FGroup>
+
+      {errors.horario && <p style={{ fontSize: 11, color: '#C83030', marginBottom: 8 }}>{errors.horario}</p>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {([['Início', hIni, mIni, 'inicio'], ['Fim', hFim, mFim, 'fim']] as const).map(([lbl, h, m, field]) => (
@@ -366,15 +569,15 @@ function Step3({ s3, setS3, errors }: { s3: S3; setS3: Dispatch<SetStateAction<S
   )
 }
 
-/* ── Step 4 ───────────────────────────────────────────────────────────────── */
+/* ── Step 4 — Persona ────────────────────────────────────────────────────── */
 
-function Step4({ s4, setS4 }: { s4: S4; setS4: Dispatch<SetStateAction<S4>> }) {
+function Step4({ s4, setS4, errors }: { s4: S4; setS4: Dispatch<SetStateAction<S4>>; errors: Record<string, string> }) {
   const nome    = s4.assistente || 'Sofia'
   const preview = `Olá! Sou ${nome}, assistente virtual do escritório. Em que posso ajudar?`
 
   return (
     <>
-      <FGroup label="Nome da assistente" required>
+      <FGroup label="Nome da assistente" required error={errors.assistente}>
         <input type="text" value={s4.assistente} onChange={e => setS4(v => ({ ...v, assistente: e.target.value }))} placeholder="Ex: Sofia, Laura, Rafael, Bruno…" style={inp} onFocus={focusFn} onBlur={blurFn} />
       </FGroup>
 
@@ -399,7 +602,7 @@ function Step4({ s4, setS4 }: { s4: S4; setS4: Dispatch<SetStateAction<S4>> }) {
   )
 }
 
-/* ── Step 5 ───────────────────────────────────────────────────────────────── */
+/* ── Step 5 — Conformidade ───────────────────────────────────────────────── */
 
 const COMPLIANCE = [
   ['A IA não emite pareceres jurídicos',      'Respostas informativas; estratégias são escaladas ao advogado.'],
@@ -431,20 +634,20 @@ function Step5({ aceite, setAceite, errors }: { aceite: boolean; setAceite: Disp
           <span style={{ color: 'var(--color-am-blue)' }}>*</span>
         </label>
       </div>
-      {errors.aceite && <p style={{ fontSize: 11, color: 'var(--color-am-muted)', marginTop: 5 }}>⚠ Obrigatório para avançar.</p>}
+      {errors.aceite && <p style={{ fontSize: 11, color: '#C83030', marginTop: 5 }}>⚠ Obrigatório para avançar.</p>}
     </>
   )
 }
 
-/* ── Step 6 ───────────────────────────────────────────────────────────────── */
+/* ── Step 6 — Revisão ────────────────────────────────────────────────────── */
 
-function Step6({ s1, s2, s3, s4, aceite }: { s1: S1; s2: S2; s3: S3; s4: S4; aceite: boolean }) {
+function Step6({ s1, s2, s3, s4, aceite, waConnected }: { s1: S1; s2: S2; s3: S3; s4: S4; aceite: boolean; waConnected: boolean }) {
   const diasOrdenados = DAYS.filter(d => s3.dias.includes(d)).join(', ')
   const rows = [
     { label: 'E-mail',          value: s1.email       || '—', filled: !!s1.email,       hi: false },
     { label: 'Escritório',      value: s2.nome         || '—', filled: !!s2.nome,        hi: false },
     { label: 'OAB',             value: s2.oab          || '—', filled: !!s2.oab,         hi: false },
-    { label: 'WhatsApp',        value: 'Conectado ✓',          filled: true,              hi: true  },
+    { label: 'WhatsApp',        value: waConnected ? 'Conectado ✓' : 'Pendente (pode conectar depois)', filled: waConnected, hi: waConnected },
     { label: 'Janela de envio', value: `${s3.inicio}–${s3.fim} · ${diasOrdenados}`, filled: true, hi: false },
     { label: 'Assistente',      value: s4.assistente ? `${s4.assistente}${s4.tom ? ' · ' + s4.tom : ''}` : '—', filled: !!s4.assistente, hi: false },
     { label: 'Conformidade',    value: aceite ? 'OAB + LGPD ✓' : 'Pendente', filled: aceite, hi: aceite },
@@ -480,7 +683,7 @@ function FGroup({ label, required, error, children }: { label: string; required?
       <label style={labelSt}>
         {label}{required && <span style={{ color: 'var(--color-am-blue)', marginLeft: 2 }}>*</span>}
       </label>
-      {error && <p style={{ fontSize: 11, color: 'var(--color-am-red)', marginBottom: 4 }}>{error}</p>}
+      {error && <p style={{ fontSize: 11, color: '#C83030', marginBottom: 4 }}>{error}</p>}
       {children}
     </div>
   )
