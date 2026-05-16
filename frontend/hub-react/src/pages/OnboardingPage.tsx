@@ -8,10 +8,13 @@ import {
   statusWhatsapp,
   goLive,
   importarProcessos,
+  configurarTemplates,
+  fetchOnboardingStatus,
   extractDetail,
   mapTom,
   type ImportProcessosResult,
 } from '../api/onboarding'
+import { getAccessToken } from '../api/auth'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -91,6 +94,20 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [qrLoading, setQrLoading]         = useState(false)
   const [waConnected, setWaConnected]     = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  /* Resume — se token já existe (usuário voltou após registro parcial) */
+  useEffect(() => {
+    if (!getAccessToken()) return
+    fetchOnboardingStatus()
+      .then((status) => {
+        if (!status.onboarding_completo) {
+          setRegistered(true)
+          setStep(3) // pula registro, começa pelo WhatsApp
+        }
+      })
+      .catch(() => { /* token inválido/expirado — segue fluxo normal */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* Enter → next */
   useEffect(() => {
@@ -246,6 +263,8 @@ export default function OnboardingPage({ onComplete }: Props) {
     if (step === 7) {
       setIsLoading(true)
       try {
+        /* Avança onboarding_etapa para 4 (templates com defaults) antes do go-live */
+        await configurarTemplates({}).catch(() => { /* falha silenciosa — não bloqueia */ })
         await goLive()
         setDone(true)
       } catch (err) {

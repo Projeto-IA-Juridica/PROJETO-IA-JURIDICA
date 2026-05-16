@@ -120,8 +120,48 @@ export async function importarProcessos(file: File, preview = false): Promise<Im
   return data
 }
 
+/* ── Etapa 4 — Configurar templates (requer JWT + CSRF) ─────────── */
+export interface ConfigurarTemplatesPayload {
+  template_boas_vindas?:  string
+  template_atualizacao?:  string
+  template_sem_novidade?: string
+}
+
+export async function configurarTemplates(payload: ConfigurarTemplatesPayload = {}): Promise<{ etapa: number; mensagem: string }> {
+  const { data } = await api.post<{ etapa: number; mensagem: string }>('/onboarding/configure-templates', payload)
+  return data
+}
+
 /* ── Etapa 5 — Go Live (requer JWT + CSRF) ───────────────────────── */
 export async function goLive(): Promise<GoLiveResponse> {
   const { data } = await api.post<GoLiveResponse>('/onboarding/go-live')
+  return data
+}
+
+/* ── Status do onboarding ────────────────────────────────────────── */
+export interface OnboardingEtapaItem {
+  numero:    number
+  nome:      string
+  concluida: boolean
+  descricao: string
+}
+
+export interface OnboardingStatus {
+  onboarding_completo:  boolean
+  etapa_atual:          number
+  percentual_completo:  number
+  proxima_etapa:        number | null
+  etapas:               OnboardingEtapaItem[]
+  escritorio: {
+    id:               number
+    nome:             string
+    persona_nome:     string | null
+    persona_tom:      string | null
+    whatsapp_conectado: boolean
+  }
+}
+
+export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
+  const { data } = await api.get<OnboardingStatus>('/onboarding/status')
   return data
 }
