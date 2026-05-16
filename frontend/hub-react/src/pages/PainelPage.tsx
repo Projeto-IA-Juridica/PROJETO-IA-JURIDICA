@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, FileText, AlertTriangle, Star,
   ArrowRight, Shield, Zap, Clock,
   TrendingUp, TrendingDown, Minus, Download,
+  Bell, Check, X, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { fetchClientes, fetchResumoCRM } from '../api/crm'
 import { exportarRelatorio } from '../api/chat'
+import { listarEscalacoes, aprovarEscalacao, rejeitarEscalacao, type EscalacaoItem } from '../api/escalacoes'
 import type { CRMClienteCard } from '../types'
 
 /* ── Paleta de risco ── */
@@ -85,6 +87,153 @@ function Section({ title, icon, badge, children }: {
       </div>
       {children}
     </div>
+  )
+}
+
+/* ── Escalações ─────────────────────────────────────────────────────────── */
+function EscalacoesSection() {
+  const qc = useQueryClient()
+  const [expandido, setExpandido] = useState<number | null>(null)
+  const [respostas, setRespostas] = useState<Record<number, string>>({})
+
+  const { data: escalacoes, isLoading } = useQuery({
+    queryKey: ['escalacoes-pendentes'],
+    queryFn: () => listarEscalacoes('pendente'),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+
+  const aprovarMut = useMutation({
+    mutationFn: ({ id, resposta }: { id: number; resposta?: string }) =>
+      aprovarEscalacao(id, resposta),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['escalacoes-pendentes'] }),
+  })
+
+  const rejeitarMut = useMutation({
+    mutationFn: (id: number) => rejeitarEscalacao(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['escalacoes-pendentes'] }),
+  })
+
+  const pendentes = escalacoes ?? []
+  const count = pendentes.length
+
+  if (!isLoading && count === 0) return null
+
+  return (
+    <Section
+      title="Escalações pendentes"
+      icon={<Bell size={13} />}
+      badge={
+        count > 0
+          ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+              style={{ background: '#C83030' }}>{count}</span>
+          : undefined
+      }
+    >
+      {isLoading ? (
+        <div className="flex items-center justify-center h-16">
+          <div className="w-4 h-4 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
+        </div>
+      ) : (
+        <div className="divide-y divide-am-border">
+          {pendentes.map((esc: EscalacaoItem) => {
+            const aberto = expandido === esc.id
+            const pendingAprovar = aprovarMut.isPending && aprovarMut.variables?.id === esc.id
+            const pendingRejeitar = rejeitarMut.isPending && rejeitarMut.variables === esc.id
+            const respostaEditada = respostas[esc.id] ?? esc.sugestao_resposta ?? ''
+
+            return (
+              <div key={esc.id}>
+                {/* Cabeçalho do item */}
+                <button
+                  onClick={() => setExpandido(aberto ? null : esc.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-am-bg transition-colors">
+                  <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#C83030,#E05050)' }}>
+                    {(esc.cliente_nome ?? '?').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-am-ink truncate">
+                      {esc.cliente_nome ?? `Cliente #${esc.cliente_id}`}
+                    </p>
+                    <p className="text-[10px] text-am-muted truncate mt-0.5">
+                      {esc.mensagem_cliente ?? '—'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-[10px] text-am-muted">
+                      {new Date(esc.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {aberto ? <ChevronUp size={11} className="text-am-muted" /> : <ChevronDown size={11} className="text-am-muted" />}
+                  </div>
+                </button>
+
+                {/* Detalhe expandido */}
+                <AnimatePresence>
+                  {aberto && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden">
+                      <div className="px-4 pb-4 space-y-3">
+                        {/* Mensagem do cliente */}
+                        {esc.mensagem_cliente && (
+                          <div className="rounded-xl p-3" style={{ background: 'rgba(12,30,48,0.04)', border: '1px solid var(--color-am-border)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-1">Mensagem do cliente</p>
+                            <p className="text-xs text-am-ink leading-relaxed">{esc.mensagem_cliente}</p>
+                          </div>
+                        )}
+
+                        {/* Sugestão da IA (editável) */}
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-1">
+                            Resposta sugerida pela IA
+                            <span className="normal-case font-normal ml-1">(editável)</span>
+                          </p>
+                          <textarea
+                            value={respostaEditada}
+                            onChange={e => setRespostas(prev => ({ ...prev, [esc.id]: e.target.value }))}
+                            rows={4}
+                            className="w-full text-xs text-am-ink leading-relaxed rounded-xl px-3 py-2.5 resize-none focus:outline-none"
+                            style={{ border: '1px solid rgba(18,72,190,0.25)', background: 'rgba(18,72,190,0.03)', fontFamily: 'var(--font-sans)' }}
+                          />
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            disabled={pendingAprovar || pendingRejeitar}
+                            onClick={() => aprovarMut.mutate({ id: esc.id, resposta: respostaEditada || undefined })}
+                            className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-xs font-semibold text-white transition-opacity"
+                            style={{ background: 'linear-gradient(135deg,#1A9E78,#25C896)', opacity: pendingAprovar ? 0.6 : 1, cursor: pendingAprovar ? 'not-allowed' : 'pointer' }}>
+                            {pendingAprovar
+                              ? <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                              : <Check size={12} />}
+                            Aprovar e enviar
+                          </button>
+                          <button
+                            disabled={pendingAprovar || pendingRejeitar}
+                            onClick={() => rejeitarMut.mutate(esc.id)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors"
+                            style={{ border: '1px solid rgba(200,48,48,0.3)', color: '#C83030', background: 'rgba(200,48,48,0.05)', cursor: pendingRejeitar ? 'not-allowed' : 'pointer', opacity: pendingRejeitar ? 0.6 : 1 }}>
+                            {pendingRejeitar
+                              ? <div className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+                              : <X size={12} />}
+                            Rejeitar
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Section>
   )
 }
 
@@ -224,6 +373,9 @@ export default function PainelPage({ onSelectCliente }: Props) {
             ))}
           </div>
         )}
+
+        {/* ── Escalações pendentes ── */}
+        <EscalacoesSection />
 
         {/* ── Eficiência da IA ── */}
         <Section title="Eficiência da IA" icon={<Zap size={13} />}>

@@ -133,6 +133,7 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     chat,
     clientes,
     crm,
+    escalacoes,
     escritorios,
     health,
     hub_advogado,
@@ -261,6 +262,7 @@ app.include_router(onboarding)
 app.include_router(escritorios)
 app.include_router(processos)
 app.include_router(clientes.router)
+app.include_router(escalacoes.router)
 app.include_router(prospeccao.router)
 app.include_router(hub_advogado.router)
 app.include_router(crm.router)
