@@ -72,19 +72,21 @@ def _validar_config_no_startup() -> None:
             "44 chars base64url, gerada com Fernet.generate_key())."
         )
 
-    _req(bool(settings.EVOLUTION_API_URL), "EVOLUTION_API_URL ausente.")
-    _req(
-        bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)),
-        "EVOLUTION_API_URL inválida (esperado http:// ou https://).",
-    )
-    _req(bool(settings.EVOLUTION_API_KEY), "EVOLUTION_API_KEY ausente.")
+    # Evolution API — opcional (WhatsApp)
+    if settings.EVOLUTION_API_URL:
+        _req(
+            bool(re.match(r"^https?://", settings.EVOLUTION_API_URL)),
+            "EVOLUTION_API_URL inválida (esperado http:// ou https://).",
+        )
+    if settings.EVOLUTION_API_KEY:
+        pass  # Validação básica: se tem valor, assume estar correto
 
-    # IA (pode ajustar se o MVP permite rodar sem uma delas)
-    _req(bool(settings.OPENAI_API_KEY), "OPENAI_API_KEY ausente.")
-    _req(
-        settings.OPENAI_API_KEY.startswith("sk-"),
-        "OPENAI_API_KEY inválida (esperado iniciar com 'sk-').",
-    )
+    # IA — OpenAI é opcional (usado só para Whisper/transcrição)
+    if settings.OPENAI_API_KEY:
+        _req(
+            settings.OPENAI_API_KEY.startswith("sk-"),
+            "OPENAI_API_KEY inválida (esperado iniciar com 'sk-').",
+        )
 
     _req(bool(settings.ANTHROPIC_API_KEY), "ANTHROPIC_API_KEY ausente.")
     _req(
