@@ -3,24 +3,7 @@ import {
   ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, X, Info,
 } from 'lucide-react'
-import { api } from '../api/client'
-
-/* ── Types ──────────────────────────────────────────────────────────────── */
-
-interface PreviewItem {
-  nome: string; telefone: string; cpf: string
-  data_nascimento: string | null; profissao: string | null
-  empresa: string | null; status: string
-  numero_processo: string; polo_cliente: string | null
-}
-
-interface ImportError { linha: number; dados: string; motivo: string }
-
-interface ApiResult {
-  importados: number; atualizados: number
-  processos_novos: number; processos_atualizados: number
-  ignorados: number; erros: ImportError[]; preview: PreviewItem[]
-}
+import { previewCSV, importarCSV, type ImportResult } from '../api/admin'
 
 type Step = 'upload' | 'preview' | 'done'
 
@@ -49,24 +32,13 @@ export default function CadastroCSVPage({ onBack }: Props) {
   const [step,       setStep]       = useState<Step>('upload')
   const [dragging,   setDragging]   = useState(false)
   const [file,       setFile]       = useState<File | null>(null)
-  const [preview,    setPreview]    = useState<ApiResult | null>(null)
-  const [result,     setResult]     = useState<ApiResult | null>(null)
+  const [preview,    setPreview]    = useState<ImportResult | null>(null)
+  const [result,     setResult]     = useState<ImportResult | null>(null)
   const [loading,    setLoading]    = useState(false)
   const [errorMsg,   setErrorMsg]   = useState('')
   const [showGuide,  setShowGuide]  = useState(false)
   const [showErrors, setShowErrors] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  const sendFile = useCallback(async (f: File, isPreview: boolean): Promise<ApiResult> => {
-    const form = new FormData()
-    form.append('file', f)
-    const { data } = await api.post<ApiResult>(
-      `/admin/import/clientes?preview=${isPreview}`,
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
-    return data
-  }, [])
 
   const handleFile = useCallback(async (f: File) => {
     if (!f.name.toLowerCase().endsWith('.csv')) {
@@ -90,7 +62,7 @@ export default function CadastroCSVPage({ onBack }: Props) {
     setErrorMsg('')
     setLoading(true)
     try {
-      const data = await sendFile(f, true)
+      const data = await previewCSV(f)
       setPreview(data)
       setStep('preview')
     } catch (e: unknown) {
@@ -99,7 +71,7 @@ export default function CadastroCSVPage({ onBack }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [sendFile])
+  }, [])
 
   function onDrop(e: DragEvent) {
     e.preventDefault(); setDragging(false)
@@ -116,7 +88,7 @@ export default function CadastroCSVPage({ onBack }: Props) {
     if (!file) return
     setLoading(true)
     try {
-      const data = await sendFile(file, false)
+      const data = await importarCSV(file)
       setResult(data)
       setStep('done')
     } catch (e: unknown) {
