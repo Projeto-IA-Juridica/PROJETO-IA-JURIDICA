@@ -11,13 +11,14 @@ Acesso: exclusivo para advogado e admin (require_advogado).
 
 from __future__ import annotations
 
-import dataclasses
 import functools
+import json
+import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import structlog
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +31,6 @@ from feature_1_ia_personalizada.api.middleware.auth import (
 from feature_1_ia_personalizada.services.ai.escalation_client import (
     EscalacaoClient,
     EscalacaoIndisponivelError,
-    TipoAnalise,
 )
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_HUB_ADVOGADO_BASE
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
@@ -131,26 +131,23 @@ async def _salvar_sessao(db: AsyncSession, sessao: SessaoAdvogado) -> None:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/analisar-peticao", status_code=status.HTTP_200_OK)
+@router.post("/analisar-peticao", status_code=status.HTTP_202_ACCEPTED)
 async def analisar_peticao(
     arquivo: UploadFile = File(..., description="Arquivo PDF da petição (máx. 10 MB)"),
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
-    db: AsyncSession = Depends(get_db),
-    escalacao_client: EscalacaoClient = Depends(get_escalacao_client),
 ):
     """
-    Analisa uma petição PDF com Claude Opus e retorna insights estruturados.
+    Enfileira análise de petição PDF com Claude Opus.
 
-    - Aceita apenas `application/pdf` (validado por magic bytes, não apenas MIME)
-    - Máximo 10 MB
-    - Retorna: tipo_peca, pontos_fortes, vulnerabilidades, argumentos_ausentes,
-               precedentes_relevantes, sugestoes, score_geral (0-100),
-               texto_truncado (bool), tokens_input, tokens_output, custo_estimado
+    Responde 202 imediatamente com `job_id`. O cliente faz polling em
+    GET /hub/jobs/{job_id} até `status` != "processando".
+
+    Validação de PDF (magic bytes + tamanho + extração de texto) ocorre
+    de forma síncrona antes do enfileiramento — falhas retornam 422 rapidamente.
     """
     conteudo_bytes = await arquivo.read()
 
-    # Validar por magic bytes — MIME type é trivialmente falsificável
     if not conteudo_bytes.startswith(_PDF_MAGIC):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -166,7 +163,6 @@ async def analisar_peticao(
             ),
         )
 
-    # Extrair e limpar texto do PDF
     try:
         texto = LegalDataCleaner.normalizar_espacos(
             _extrair_texto_pdf(conteudo_bytes) or ""
@@ -186,50 +182,59 @@ async def analisar_peticao(
 
     texto_truncado = len(texto) > _MAX_CHARS_ANALISE
     conteudo_envio = texto[:_MAX_CHARS_ANALISE]
-
-    # Analisar com Claude Opus
-    try:
-        analise = await escalacao_client.analisar_peca(
-            conteudo_peca=conteudo_envio,
-            tipo_analise=TipoAnalise.ANALISE_COMPLETA,
-            contexto_processo="Análise solicitada via API REST.",
-        )
-    except EscalacaoIndisponivelError as exc:
-        logger.error("hub_rest_analise_falhou", erro=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Serviço de análise indisponível. Tente novamente.",
-        )
-
-    # Salvar sessão (falha silenciosa — resposta já produzida)
-    await _salvar_sessao(
-        db,
-        SessaoAdvogado(
-            escritorio_id=escritorio_id,
-            usuario_id=advogado_id,
-            mensagem_advogado=f"[PDF] {arquivo.filename or 'peticao.pdf'}",
-            resposta_hub=str(dataclasses.asdict(analise)),
-            intencao="analise_peticao",
-            modelo_ia="claude_opus",
-            tokens_input=analise.tokens_input,
-            tokens_output=analise.tokens_output,
-            custo_estimado=analise.custo_estimado,
-            metadata_json={
-                "filename": arquivo.filename,
-                "tamanho_bytes": len(conteudo_bytes),
-                "texto_truncado": texto_truncado,
-            },
-        ),
+    percentual_analisado = (
+        round(min(_MAX_CHARS_ANALISE, len(texto)) / len(texto) * 100, 1)
+        if texto else 100.0
     )
 
-    return {
-        **dataclasses.asdict(analise),
-        "texto_truncado": texto_truncado,
-        "percentual_analisado": (
-            round(min(_MAX_CHARS_ANALISE, len(texto)) / len(texto) * 100, 1)
-            if texto else 100.0
-        ),
-    }
+    job_id = str(uuid.uuid4())
+
+    from feature_1_ia_personalizada.workers.hub_worker import hub_analisar_peticao_task
+    hub_analisar_peticao_task.delay(
+        job_id=job_id,
+        conteudo_texto=conteudo_envio,
+        texto_truncado=texto_truncado,
+        percentual_analisado=percentual_analisado,
+        filename=arquivo.filename or "peticao.pdf",
+        escritorio_id=escritorio_id,
+        advogado_id=advogado_id,
+    )
+
+    logger.info("hub_rest_peticao_enfileirada", job_id=job_id, escritorio_id=escritorio_id)
+    return {"job_id": job_id, "status": "processando"}
+
+
+# ---------------------------------------------------------------------------
+# GET /hub/jobs/{job_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/jobs/{job_id}", status_code=status.HTTP_200_OK)
+async def status_job_hub(
+    job_id: str,
+    request: Request,
+    advogado_id: int = Depends(get_advogado_id),
+):
+    """
+    Consulta o estado de um job assíncrono de análise de petição.
+
+    Retorna `{"status": "processando"|"concluido"|"erro", "resultado": {...}|null, "erro": "..."|null}`.
+    """
+    redis_client = getattr(request.app.state, "redis_client", None)
+    if redis_client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Redis indisponível.",
+        )
+
+    raw = await redis_client.get(f"hub:job:{job_id}")
+    if raw is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job não encontrado ou expirado.",
+        )
+
+    return json.loads(raw)
 
 
 # ---------------------------------------------------------------------------

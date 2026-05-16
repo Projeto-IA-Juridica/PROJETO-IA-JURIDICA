@@ -151,6 +151,11 @@ celery_app.conf.task_routes = {
         "queue": "hub_advogado",
         "routing_key": "hub_advogado",
     },
+    # hub_worker.py
+    "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
     # dispatcher_agendadas.py
     "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas": {
         "queue": "notificacoes",
@@ -277,6 +282,7 @@ def _init_worker_process(**kwargs):
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
+import feature_1_ia_personalizada.workers.hub_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
 import feature_1_ia_personalizada.workers.dispatcher_agendadas  # noqa: F401
 import feature_1_ia_personalizada.workers.hub_advogado  # noqa: F401

@@ -5,7 +5,7 @@ import {
   Sparkles, Scale, FileSearch, AlertTriangle, RotateCcw,
   Upload, ChevronDown, ChevronUp, Clock, X, ArrowLeft,
 } from 'lucide-react'
-import { consultar, analisarPeticao, listarHistorico, detalharSessao, type PeticaoAnalise, type SessaoListItem, type SessaoDetalhe } from '../api/hub'
+import { consultar, analisarPeticaoAsync, pollHubJob, listarHistorico, detalharSessao, type PeticaoAnalise, type SessaoListItem, type SessaoDetalhe } from '../api/hub'
 import type { ChatMessage } from '../types'
 import { PlaceholdersAndVanishInput } from '../components/ui/PlaceholdersAndVanishInput'
 
@@ -387,6 +387,7 @@ export default function HubIAPage() {
   }])
   const [analise, setAnalise]         = useState<PeticaoAnalise | null>(null)
   const [analiseErro, setAnaliseErro] = useState<string | null>(null)
+  const [peticaoJobId, setPeticaoJobId] = useState<string | null>(null)
   const [showHistorico, setShowHistorico] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
 
@@ -402,14 +403,32 @@ export default function HubIAPage() {
     },
   })
 
-  const analiseMutation = useMutation({
-    mutationFn: analisarPeticao,
-    onSuccess: data => { setAnalise(data); setAnaliseErro(null) },
+  const submitPeticaoMut = useMutation({
+    mutationFn: analisarPeticaoAsync,
+    onSuccess: ({ job_id }) => { setPeticaoJobId(job_id); setAnaliseErro(null) },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setAnaliseErro(msg ?? 'Erro ao analisar. Verifique se o PDF não está protegido.')
+      setAnaliseErro(msg ?? 'Erro ao enviar. Verifique se o PDF não está protegido.')
     },
   })
+
+  const { data: jobStatus } = useQuery({
+    queryKey: ['hub-job', peticaoJobId],
+    queryFn: () => pollHubJob(peticaoJobId!),
+    enabled: peticaoJobId !== null,
+    refetchInterval: (query) => query.state.data?.status === 'processando' ? 2000 : false,
+  })
+
+  useEffect(() => {
+    if (jobStatus?.status === 'concluido' && jobStatus.resultado) {
+      setAnalise(jobStatus.resultado)
+      setAnaliseErro(null)
+      setPeticaoJobId(null)
+    } else if (jobStatus?.status === 'erro') {
+      setAnaliseErro(jobStatus.erro ?? 'Erro ao analisar. Tente novamente.')
+      setPeticaoJobId(null)
+    }
+  }, [jobStatus])
 
   useEffect(() => {
     const el = messagesRef.current
@@ -492,10 +511,10 @@ export default function HubIAPage() {
         {/* Conteúdo central */}
         {tool === 'peticao' ? (
           analise
-            ? <AnalisePeticaoResult analise={analise} onReset={() => { setAnalise(null); setAnaliseErro(null) }} />
+            ? <AnalisePeticaoResult analise={analise} onReset={() => { setAnalise(null); setAnaliseErro(null); setPeticaoJobId(null) }} />
             : <AnalisePeticaoUpload
-                onAnalise={f => analiseMutation.mutate(f)}
-                loading={analiseMutation.isPending}
+                onAnalise={f => submitPeticaoMut.mutate(f)}
+                loading={submitPeticaoMut.isPending || (peticaoJobId !== null && jobStatus?.status === 'processando')}
                 erro={analiseErro}
               />
         ) : (
