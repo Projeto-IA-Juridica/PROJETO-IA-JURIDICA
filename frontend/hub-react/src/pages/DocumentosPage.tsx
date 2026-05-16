@@ -7,7 +7,7 @@ import {
   Sparkles, BookOpen, Scale, AlertTriangle, Loader2, X,
 } from 'lucide-react'
 import {
-  listarDocumentos, uploadDocumento, deletarDocumento, statusJob,
+  listarDocumentos, uploadDocumento, deletarDocumento, statusJob, buscarSemantico,
   type DocItem, type JobStatus,
 } from '../api/rag'
 
@@ -178,10 +178,17 @@ export default function DocumentosPage() {
   const [jobs, setJobs] = useState<PendingJob[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const [buscarQuery, setBuscarQuery] = useState('')
+  const [buscarTipo,  setBuscarTipo]  = useState('')
+
   const { data, isLoading } = useQuery({
     queryKey: ['rag-docs'],
     queryFn: () => listarDocumentos(),
     staleTime: 30_000,
+  })
+
+  const buscarMut = useMutation({
+    mutationFn: () => buscarSemantico(buscarQuery.trim(), buscarTipo || undefined),
   })
 
   const docs: DocItem[] = data?.items ?? []
@@ -411,6 +418,74 @@ export default function DocumentosPage() {
             </motion.button>
           </div>
         </div>
+
+        {/* Testar base de conhecimento */}
+        <Collapsible title="Testar base de conhecimento" icon={<Search size={13} />}>
+          <div className="px-4 py-4 space-y-3">
+            <p className="text-xs text-am-secondary leading-relaxed">
+              Simule uma pergunta para ver quais trechos a IA usaria como contexto.
+            </p>
+            <div className="flex flex-col gap-2">
+              <input
+                value={buscarQuery}
+                onChange={e => setBuscarQuery(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && buscarQuery.trim() && !buscarMut.isPending) buscarMut.mutate() }}
+                placeholder="Ex: quais os argumentos para prescrição trabalhista?"
+                className="w-full px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg placeholder:text-am-muted"
+                style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
+                onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)' }}
+                onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)' }}
+              />
+              <div className="flex gap-2">
+                <select
+                  value={buscarTipo}
+                  onChange={e => setBuscarTipo(e.target.value)}
+                  className="flex-1 px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg"
+                  style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
+                >
+                  <option value="">Todos os tipos</option>
+                  {(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => (
+                    <option key={t} value={t}>{TIPO_CFG[t].label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => buscarMut.mutate()}
+                  disabled={!buscarQuery.trim() || buscarMut.isPending}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-fast disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)' }}
+                >
+                  {buscarMut.isPending
+                    ? <><Loader2 size={12} className="animate-spin" /> Buscando…</>
+                    : <><Search size={12} /> Buscar</>}
+                </button>
+              </div>
+            </div>
+
+            {buscarMut.isError && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+                style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.2)', color: '#C83030' }}>
+                <AlertTriangle size={12} className="flex-shrink-0" />
+                Erro na busca. Verifique se há documentos indexados.
+              </div>
+            )}
+
+            {buscarMut.data && (
+              <div className="rounded-xl overflow-hidden"
+                style={{ border: '1px solid rgba(18,72,190,0.18)', background: 'rgba(18,72,190,0.03)' }}>
+                <div className="flex items-center gap-2 px-3 py-2"
+                  style={{ borderBottom: '1px solid rgba(18,72,190,0.12)', background: 'rgba(18,72,190,0.06)' }}>
+                  <Sparkles size={11} style={{ color: 'var(--color-am-blue)' }} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-am-blue)' }}>
+                    Contexto que a IA receberia
+                  </span>
+                </div>
+                <pre className="px-3 py-3 text-[11px] text-am-secondary leading-relaxed whitespace-pre-wrap font-sans max-h-60 overflow-y-auto">
+                  {buscarMut.data.contexto}
+                </pre>
+              </div>
+            )}
+          </div>
+        </Collapsible>
 
         {/* Lista de documentos */}
         <Card>

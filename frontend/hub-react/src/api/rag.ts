@@ -59,3 +59,21 @@ export async function statusJob(jobId: string): Promise<JobStatus> {
 export async function deletarDocumento(docHash: string): Promise<void> {
   await api.delete(`/rag/documentos/${docHash}`)
 }
+
+export interface BuscarResult {
+  query: string
+  contexto: string
+}
+
+export async function buscarSemantico(
+  query: string,
+  tipo?: string,
+  tribunal?: string,
+): Promise<BuscarResult> {
+  const { data } = await api.post<BuscarResult>('/rag/buscar', {
+    query,
+    tipo:     tipo     || undefined,
+    tribunal: tribunal || undefined,
+  })
+  return data
+}
