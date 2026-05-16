@@ -3,9 +3,9 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, Scale, FileSearch, AlertTriangle, RotateCcw,
-  Upload, ChevronDown, ChevronUp, Clock, X,
+  Upload, ChevronDown, ChevronUp, Clock, X, ArrowLeft,
 } from 'lucide-react'
-import { consultar, analisarPeticao, listarHistorico, type PeticaoAnalise, type SessaoListItem } from '../api/hub'
+import { consultar, analisarPeticao, listarHistorico, detalharSessao, type PeticaoAnalise, type SessaoListItem, type SessaoDetalhe } from '../api/hub'
 import type { ChatMessage } from '../types'
 import { PlaceholdersAndVanishInput } from '../components/ui/PlaceholdersAndVanishInput'
 
@@ -215,12 +215,21 @@ function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
 /* ── Painel de histórico ────────────────────────────────────────────────── */
 function HistoricoPanel({ onClose, onRestaurar }: {
   onClose: () => void
-  onRestaurar: (preview: string) => void
+  onRestaurar: (pergunta: string) => void
 }) {
-  const { data: sessoes, isLoading } = useQuery({
+  const [sessaoId, setSessaoId] = useState<number | null>(null)
+
+  const { data: sessoes, isLoading: loadingLista } = useQuery({
     queryKey: ['hub-historico'],
     queryFn: () => listarHistorico(1, 50),
     staleTime: 30_000,
+  })
+
+  const { data: detalhe, isLoading: loadingDetalhe } = useQuery({
+    queryKey: ['hub-sessao', sessaoId],
+    queryFn: () => detalharSessao(sessaoId!),
+    enabled: sessaoId !== null,
+    staleTime: 5 * 60_000,
   })
 
   function labelIntencao(intencao: string) {
@@ -235,10 +244,21 @@ function HistoricoPanel({ onClose, onRestaurar }: {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className="absolute inset-0 flex flex-col bg-am-bg z-10">
+
+      {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 pt-5 pb-3">
         <div className="flex items-center gap-2">
+          {sessaoId !== null && (
+            <button onClick={() => setSessaoId(null)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
+              style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
+              <ArrowLeft size={12} />
+            </button>
+          )}
           <Clock size={14} style={{ color: 'var(--color-am-blue)' }} />
-          <span className="text-sm font-bold text-am-ink">Histórico</span>
+          <span className="text-sm font-bold text-am-ink">
+            {sessaoId !== null ? 'Detalhe da sessão' : 'Histórico'}
+          </span>
         </div>
         <button onClick={onClose}
           className="w-8 h-8 rounded-xl flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
@@ -247,36 +267,113 @@ function HistoricoPanel({ onClose, onRestaurar }: {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-        {isLoading && (
-          <div className="flex items-center justify-center h-32">
-            <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
-          </div>
-        )}
-        {!isLoading && (!sessoes || sessoes.length === 0) && (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-am-muted">
-            <Clock size={20} strokeWidth={1.5} />
-            <span className="text-xs">Nenhuma consulta ainda</span>
-          </div>
-        )}
-        {sessoes?.map((s: SessaoListItem) => (
-          <button key={s.id} onClick={() => onRestaurar(s.mensagem_preview)}
-            className="w-full text-left px-4 py-3 rounded-2xl hover:bg-white transition-colors"
-            style={{ border: '1px solid var(--color-am-border)', background: 'white', boxShadow: '0 1px 3px rgba(12,30,48,0.04)' }}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-                style={{ background: 'rgba(18,72,190,0.08)', color: 'var(--color-am-blue)' }}>
-                {labelIntencao(s.intencao)}
-              </span>
-              <span className="text-[10px] text-am-muted">
-                {new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </span>
+      {/* Lista */}
+      {sessaoId === null && (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+          {loadingLista && (
+            <div className="flex items-center justify-center h-32">
+              <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
             </div>
-            <p className="text-xs text-am-secondary truncate">{s.mensagem_preview}</p>
-          </button>
-        ))}
-      </div>
+          )}
+          {!loadingLista && (!sessoes || sessoes.length === 0) && (
+            <div className="flex flex-col items-center justify-center h-32 gap-2 text-am-muted">
+              <Clock size={20} strokeWidth={1.5} />
+              <span className="text-xs">Nenhuma consulta ainda</span>
+            </div>
+          )}
+          {sessoes?.map((s: SessaoListItem) => (
+            <button key={s.id} onClick={() => setSessaoId(s.id)}
+              className="w-full text-left px-4 py-3 rounded-2xl transition-colors"
+              style={{ border: '1px solid var(--color-am-border)', background: 'white', boxShadow: '0 1px 3px rgba(12,30,48,0.04)' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                  style={{ background: 'rgba(18,72,190,0.08)', color: 'var(--color-am-blue)' }}>
+                  {labelIntencao(s.intencao)}
+                </span>
+                <span className="text-[10px] text-am-muted">
+                  {new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-xs text-am-secondary truncate">{s.mensagem_preview}</p>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Detalhe */}
+      {sessaoId !== null && (
+        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+          {loadingDetalhe && (
+            <div className="flex items-center justify-center h-32">
+              <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
+            </div>
+          )}
+          {detalhe && <SessaoDetalheView detalhe={detalhe} onRestaurar={pergunta => { onRestaurar(pergunta); onClose() }} />}
+        </div>
+      )}
     </motion.div>
+  )
+}
+
+function SessaoDetalheView({ detalhe, onRestaurar }: {
+  detalhe: SessaoDetalhe
+  onRestaurar: (pergunta: string) => void
+}) {
+  return (
+    <div className="space-y-3">
+      {/* Meta */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+          style={{ background: 'rgba(18,72,190,0.08)', color: 'var(--color-am-blue)' }}>
+          {detalhe.intencao === 'analise_peticao' ? 'Petição' : 'Consulta'}
+        </span>
+        <span className="text-[10px] text-am-muted font-mono">{detalhe.modelo_ia}</span>
+        <span className="text-[10px] text-am-muted">
+          {new Date(detalhe.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+
+      {/* Pergunta */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-am-border)' }}>
+        <div className="px-4 py-2.5 flex items-center gap-2"
+          style={{ background: 'rgba(12,30,48,0.03)', borderBottom: '1px solid var(--color-am-border)' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">Pergunta</span>
+        </div>
+        <div className="px-4 py-3 bg-white">
+          <p className="text-xs text-am-ink leading-relaxed whitespace-pre-wrap">{detalhe.mensagem_advogado}</p>
+        </div>
+      </div>
+
+      {/* Resposta */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(18,72,190,0.18)' }}>
+        <div className="px-4 py-2.5 flex items-center gap-2"
+          style={{ background: 'rgba(18,72,190,0.04)', borderBottom: '1px solid rgba(18,72,190,0.14)' }}>
+          <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>C</div>
+          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-am-blue)' }}>Resposta da IA</span>
+        </div>
+        <div className="px-4 py-3 bg-white">
+          <p className="text-xs text-am-secondary leading-relaxed whitespace-pre-wrap">{detalhe.resposta_hub}</p>
+        </div>
+      </div>
+
+      {/* Tokens + custo */}
+      <div className="flex items-center gap-3 px-1">
+        <span className="text-[10px] text-am-muted">
+          {detalhe.tokens_input.toLocaleString()} + {detalhe.tokens_output.toLocaleString()} tokens
+        </span>
+        <span className="text-[10px] text-am-muted">·</span>
+        <span className="text-[10px] text-am-muted">Custo: {detalhe.custo_estimado}</span>
+      </div>
+
+      {/* CTA */}
+      <button
+        onClick={() => onRestaurar(detalhe.mensagem_advogado)}
+        className="press w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white"
+        style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+        Usar esta pergunta novamente
+      </button>
+    </div>
   )
 }
 

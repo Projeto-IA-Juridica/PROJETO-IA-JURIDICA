@@ -23,6 +23,26 @@ export async function listarHistorico(page = 1, limit = 25): Promise<SessaoListI
   return data
 }
 
+export interface SessaoDetalhe {
+  id: number
+  intencao: string
+  modelo_ia: string
+  mensagem_advogado: string
+  resposta_hub: string
+  tokens_input: number
+  tokens_output: number
+  custo_estimado: string
+  cliente_referenciado_id: number | null
+  processo_referenciado_id: number | null
+  metadata_json: Record<string, unknown>
+  created_at: string
+}
+
+export async function detalharSessao(sessaoId: number): Promise<SessaoDetalhe> {
+  const { data } = await api.get<SessaoDetalhe>(`/hub/historico/${sessaoId}`)
+  return data
+}
+
 export interface PeticaoAnalise {
   tipo_peca: string
   pontos_fortes: string[]
@@ -42,7 +62,7 @@ export async function analisarPeticao(file: File): Promise<PeticaoAnalise> {
   const form = new FormData()
   form.append('arquivo', file)
   const { data } = await api.post<PeticaoAnalise>('/hub/analisar-peticao', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': undefined },
   })
   return data
 }
