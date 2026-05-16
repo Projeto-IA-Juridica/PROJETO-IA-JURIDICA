@@ -10,9 +10,18 @@ Fila: "ia" (definida em celery_app.py)
 Base: DLQTask — em caso de falha após retries, encaminha para dead_letter.
 
 Gerenciamento de arquivo temporário:
-  O arquivo em /tmp é SEMPRE deletado ao final desta task (finally block),
-  independente de sucesso ou erro. Isso garante que não há leak de disco
-  no Railway.
+  O arquivo em /tmp é deletado IMEDIATAMENTE após leitura para memória, antes
+  de qualquer processamento async. Isso garante que o disco é liberado cedo e
+  que retries do Celery não falham por "arquivo não encontrado" (o arquivo já
+  não é necessário após a leitura).
+
+  O finally é um safety-net para o caso em que a leitura falha antes da deleção.
+
+Retry × arquivo:
+  Como o arquivo é deletado antes do asyncio.run(), um retry causado por falha
+  no processamento (ex.: DB timeout) recebe arquivo_path inexistente. O handler
+  detecta isso via self.request.retries > 0 e retorna sem nova tentativa, evitando
+  cascata de FileNotFoundError.
 
 Async em Celery:
   DocumentoIngester usa AsyncSession — executado via asyncio.run() dentro
@@ -63,6 +72,21 @@ def _atualizar_job(job_id: str, updates: dict[str, Any]) -> None:
         logger.warning("ingest_job_update_falhou", job_id=job_id, erro=str(exc))
 
 
+def _deletar_tmp(arquivo_path: str, log) -> bool:
+    """
+    Deleta o arquivo temporário. Retorna True se deletado com sucesso.
+    Falha silenciosa com log para não mascarar outros erros.
+    """
+    try:
+        if os.path.exists(arquivo_path):
+            os.unlink(arquivo_path)
+            log.debug("ingest_tmp_deletado", path=arquivo_path)
+            return True
+    except Exception as exc_del:
+        log.warning("ingest_tmp_delete_falhou", path=arquivo_path, erro=str(exc_del))
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Task principal: ingest_documento
 # ---------------------------------------------------------------------------
@@ -91,24 +115,48 @@ def ingest_documento(
     Ingere um documento jurídico no banco vetorial.
 
     Fluxo:
-      1. Marca job como "processando" no Redis.
-      2. Lê o arquivo de /tmp.
-      3. Chama DocumentoIngester.ingerir_pdf() (async via asyncio.run).
-      4. Marca job como "concluido" ou "erro".
-      5. Deleta o arquivo de /tmp (sempre — sem leak de disco).
+      1. Marca job como "em_andamento" no Redis.
+      2. Lê o arquivo de /tmp para memória.
+      3. Deleta o arquivo de /tmp imediatamente após leitura.
+      4. Chama DocumentoIngester.ingerir_pdf() (async via asyncio.run).
+      5. Marca job como "concluido" ou "erro".
+
+    Em caso de retry após falha no passo 4, o arquivo já não existe.
+    O handler detecta self.request.retries > 0 e retorna sem nova tentativa.
     """
     log = logger.bind(job_id=job_id, escritorio_id=escritorio_id, titulo=titulo)
-    log.info("ingest_documento_iniciado")
+    log.info("ingest_documento_iniciado", tentativa=self.request.retries)
 
-    _atualizar_job(job_id, {"status": "processando"})
+    _atualizar_job(job_id, {"status": "em_andamento"})
+
+    tmp_deletado = False
 
     try:
-        # Lê o arquivo antes de entrar no asyncio.run para evitar I/O dentro do loop
+        # Arquivo ausente num retry significa que foi limpo após a tentativa anterior.
+        # O erro original já foi registrado — encerra sem nova tentativa.
         if not os.path.exists(arquivo_path):
+            if self.request.retries > 0:
+                log.warning(
+                    "ingest_retry_arquivo_ausente",
+                    path=arquivo_path,
+                    tentativa=self.request.retries,
+                )
+                _atualizar_job(
+                    job_id,
+                    {
+                        "status": "erro",
+                        "erro": "Processamento falhou e arquivo temporário já foi removido (retry impossível).",
+                    },
+                )
+                return {"job_id": job_id, "status": "erro"}
             raise FileNotFoundError(f"Arquivo temporário não encontrado: {arquivo_path}")
 
         with open(arquivo_path, "rb") as f:
             arquivo_bytes = f.read()
+
+        # Deleta o arquivo IMEDIATAMENTE após leitura — libera disco cedo
+        # e garante que retries não falhem com FileNotFoundError.
+        tmp_deletado = _deletar_tmp(arquivo_path, log)
 
         resultado = asyncio.run(
             _ingerir_async(
@@ -149,13 +197,9 @@ def ingest_documento(
         raise  # DLQTask / autoretry_for captura e faz retry
 
     finally:
-        # Limpa o arquivo temporário — sempre, independente de sucesso ou erro
-        try:
-            if os.path.exists(arquivo_path):
-                os.unlink(arquivo_path)
-                log.debug("ingest_tmp_deletado", path=arquivo_path)
-        except Exception as exc_del:
-            log.warning("ingest_tmp_delete_falhou", path=arquivo_path, erro=str(exc_del))
+        # Safety-net: deleta o arquivo se a leitura falhou antes de tmp_deletado = True
+        if not tmp_deletado:
+            _deletar_tmp(arquivo_path, log)
 
 
 async def _ingerir_async(
