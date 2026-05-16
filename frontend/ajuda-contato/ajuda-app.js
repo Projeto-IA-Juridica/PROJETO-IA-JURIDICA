@@ -37,8 +37,7 @@
 
 /* ── Envio WhatsApp ──────────────────────────────────────────── */
 (function () {
-  /*   Substitua pelo seu número: DDI + DDD + número sem espaços */
-  var WHATSAPP = "5500000000000";
+  var WHATSAPP = (document.querySelector('meta[name="amicus:whatsapp"]') || {}).content || "5500000000000";
 
   var form    = document.getElementById("contact-form");
   var errorEl = document.getElementById("form-error");
