@@ -8,6 +8,7 @@ sejam incluídos em `api/app.py`.
 from .admin_import import router as admin_import
 from .auth import router as auth
 from .chat import router as chat
+from .escritorios import router as escritorios
 from .health import router as health
 from .metrics import router as metrics
 from .onboarding import router as onboarding
@@ -18,11 +19,12 @@ from .webhook_whatsapp import router as webhook_whatsapp
 __all__ = [
     "admin_import",
     "auth",
+    "chat",
+    "escritorios",
     "health",
     "metrics",
     "onboarding",
     "processos",
-    "chat",
     "rag",
     "webhook_whatsapp",
 ]
