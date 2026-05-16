@@ -58,9 +58,8 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
       </nav>
 
       {/* Main */}
-      <main style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 48 }}>
-        <AppPreview />
-        <div style={{ width: '100%', maxWidth: 400, flexShrink: 0 }}>
+      <main style={{ position: 'relative', zIndex: 10, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
 
           {/* Hero */}
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
@@ -229,106 +228,6 @@ function EyeIcon({ visible }: { visible: boolean }) {
       <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
       <line x1="1" y1="1" x2="23" y2="23"/>
     </svg>
-  )
-}
-
-/* ── App Preview (mock dashboard) ────────────────────────────────────────── */
-
-const MOCK_CLIENTES = [
-  { nome: 'João Pedro Andrade',   processo: '0011223-44.2023.8.26.0001', nivel: 'baixo',    score: 28, status: 'Audiência marcada' },
-  { nome: 'Maria Stella Fontes',  processo: '0022334-55.2022.5.02.0000', nivel: 'moderado', score: 54, status: 'Aguardando perícia' },
-  { nome: 'Carlos Eduardo Mendes',processo: '0033445-66.2021.8.26.0100', nivel: 'alto',     score: 71, status: 'Recurso em análise'  },
-  { nome: 'Luciana Martins Vaz',  processo: '0044556-77.2020.4.03.6100', nivel: 'baixo',    score: 19, status: 'Sentença transitada' },
-]
-
-const RISK_COLOR: Record<string, string> = {
-  baixo: '#1A9E78', moderado: '#D08010', alto: '#C83030',
-}
-const RISK_LABEL: Record<string, string> = {
-  baixo: 'Baixo', moderado: 'Moderado', alto: 'Alto',
-}
-
-const MOCK_MSGS = [
-  { dir: 'in',  text: 'Bom dia! Tem novidade no meu processo?', time: '09:14' },
-  { dir: 'out', text: 'Bom dia, João! Sua audiência foi marcada para 12/06 às 14h na 3ª Vara Cível.', time: '09:14' },
-  { dir: 'in',  text: 'Preciso levar algum documento?', time: '09:15' },
-  { dir: 'out', text: 'Apenas documento de identidade. Qualquer dúvida estou aqui!', time: '09:15' },
-]
-
-function AppPreview() {
-  return (
-    <div className="app-preview-panel" style={{ flex: '1 1 0', maxWidth: 560, minWidth: 0, pointerEvents: 'none', userSelect: 'none' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-am-blue)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-        Prévia do painel
-      </div>
-
-      {/* Métricas topo */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 10 }}>
-        {[
-          { label: 'Clientes ativos', value: '47' },
-          { label: 'Processos',       value: '63' },
-          { label: 'Msgs hoje',       value: '128' },
-        ].map(m => (
-          <div key={m.label} style={{ background: '#fff', borderRadius: 12, padding: '10px 12px', border: '1px solid var(--color-am-border)', boxShadow: '0 1px 3px rgba(12,30,48,.05)' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-am-ink)', lineHeight: 1 }}>{m.value}</div>
-            <div style={{ fontSize: 10, color: 'var(--color-am-muted)', marginTop: 3 }}>{m.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabela clientes */}
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--color-am-border)', boxShadow: '0 1px 3px rgba(12,30,48,.05)', marginBottom: 10, overflow: 'hidden' }}>
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-am-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-am-ink)' }}>CRM — Clientes</span>
-          <span style={{ fontSize: 10, color: 'var(--color-am-muted)' }}>Score de risco</span>
-        </div>
-        {MOCK_CLIENTES.map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: i < MOCK_CLIENTES.length - 1 ? '1px solid var(--color-am-border)' : 'none', background: i % 2 === 0 ? '#fff' : 'rgba(244,248,252,0.6)' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${RISK_COLOR[c.nivel]}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: RISK_COLOR[c.nivel] }}>{c.nome.split(' ').map(w => w[0]).slice(0,2).join('')}</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-am-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nome}</div>
-              <div style={{ fontSize: 10, color: 'var(--color-am-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.status}</div>
-            </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: RISK_COLOR[c.nivel] }}>{c.score}</div>
-              <div style={{ fontSize: 9, fontWeight: 600, color: RISK_COLOR[c.nivel], background: `${RISK_COLOR[c.nivel]}12`, borderRadius: 4, padding: '1px 5px' }}>{RISK_LABEL[c.nivel]}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Chat preview */}
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--color-am-border)', boxShadow: '0 1px 3px rgba(12,30,48,.05)', overflow: 'hidden' }}>
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--color-am-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'rgba(26,158,120,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#1A9E78' }}>JP</span>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-am-ink)' }}>João Pedro Andrade</div>
-            <div style={{ fontSize: 9, color: '#1A9E78', fontWeight: 600 }}>● online</div>
-          </div>
-          <div style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--color-am-muted)' }}>Sofia (IA)</div>
-        </div>
-        <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {MOCK_MSGS.map((m, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: m.dir === 'in' ? 'flex-start' : 'flex-end' }}>
-              <div style={{
-                maxWidth: '78%', padding: '6px 10px', borderRadius: m.dir === 'in' ? '4px 10px 10px 10px' : '10px 4px 10px 10px',
-                background: m.dir === 'in' ? 'var(--color-am-bg)' : 'linear-gradient(135deg,#1248BE,#3A7AB8)',
-                color: m.dir === 'in' ? 'var(--color-am-ink)' : '#fff',
-                fontSize: 10, lineHeight: 1.4,
-                boxShadow: '0 1px 2px rgba(12,30,48,.08)',
-              }}>
-                {m.text}
-                <div style={{ fontSize: 8, opacity: 0.6, textAlign: 'right', marginTop: 2 }}>{m.time}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   )
 }
 
