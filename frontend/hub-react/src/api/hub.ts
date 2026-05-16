@@ -77,3 +77,18 @@ export async function pollHubJob(jobId: string): Promise<HubJobStatus> {
   const { data } = await api.get<HubJobStatus>(`/hub/jobs/${jobId}`)
   return data
 }
+
+export interface MetricasHub {
+  mes_atual: string
+  total_sessoes: number
+  tokens_input_total: number
+  tokens_output_total: number
+  custo_total_usd: string
+  intencoes_top5: { intencao: string; total: number }[]
+  advogados_mais_ativos: { usuario_id: number; total_sessoes: number }[]
+}
+
+export async function fetchMetricasHub(): Promise<MetricasHub> {
+  const { data } = await api.get<MetricasHub>('/hub/metricas')
+  return data
+}

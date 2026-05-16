@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle } from 'lucide-react'
+import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users } from 'lucide-react'
 import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
+import { fetchMe } from '../api/auth'
+import { fetchMetricasHub } from '../api/hub'
 
 const DEFAULT_TEMPLATES = {
   template_boas_vindas:  'Olá {{nome}}, seja bem-vindo(a) ao {{escritorio}}! Sou a {{persona}} e estou aqui para auxiliá-lo(a). Como posso ajudar?',
@@ -29,6 +31,113 @@ const TOM_OPTS: { value: Configuracoes['persona_tom']; label: string; desc: stri
   { value: 'amigavel', label: 'Amigável', desc: 'Tom próximo e acolhedor'         },
   { value: 'neutro',   label: 'Neutro',   desc: 'Equilibrado e imparcial'         },
 ]
+
+/* ── Métricas Hub IA (admin only) ───────────────────────────────────────── */
+function MetricasHubSection() {
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: fetchMe,
+    staleTime: 5 * 60_000,
+  })
+
+  const isAdmin = me?.role === 'admin'
+
+  const { data: metricas, isLoading } = useQuery({
+    queryKey: ['hub-metricas'],
+    queryFn: fetchMetricasHub,
+    enabled: isAdmin,
+    staleTime: 5 * 60_000,
+  })
+
+  if (!isAdmin) return null
+
+  const intencaoLabel = (i: string) =>
+    i === 'analise_peticao' ? 'Análise de Petição' : i === 'duvida_juridica' ? 'Dúvida Jurídica' : i
+
+  const maxSessoes = Math.max(1, ...(metricas?.advogados_mais_ativos ?? []).map(a => a.total_sessoes))
+  const maxTotal   = Math.max(1, ...(metricas?.intencoes_top5 ?? []).map(i => i.total))
+
+  return (
+    <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
+      <SectionTitle
+        icon={<BarChart2 size={14} />}
+        label="Métricas do Hub IA"
+        desc={`Uso do mês ${metricas?.mes_atual ?? '—'} · somente administradores`}
+      />
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-20">
+          <Loader2 size={20} className="animate-spin text-am-muted" />
+        </div>
+      ) : metricas ? (
+        <div className="space-y-5">
+          {/* KPIs */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'Sessões',       value: metricas.total_sessoes.toLocaleString('pt-BR'),                  color: '#1248BE' },
+              { label: 'Tokens total',  value: (metricas.tokens_input_total + metricas.tokens_output_total).toLocaleString('pt-BR'), color: '#6B7CFF' },
+              { label: 'Custo (USD)',   value: `$${Number(metricas.custo_total_usd).toFixed(4)}`,               color: '#1A9E78' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="text-center py-3 px-2 rounded-xl"
+                style={{ background: `${color}08`, border: `1px solid ${color}18` }}>
+                <p className="text-sm font-extrabold leading-none mb-1" style={{ color }}>{value}</p>
+                <p className="text-[10px] text-am-muted">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Top 5 Intenções */}
+          {metricas.intencoes_top5.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Brain size={11} style={{ color: 'var(--color-am-blue)' }} />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">Top intenções</p>
+              </div>
+              <div className="space-y-2">
+                {metricas.intencoes_top5.map(({ intencao, total }) => {
+                  const pct = Math.round((total / maxTotal) * 100)
+                  return (
+                    <div key={intencao} className="flex items-center gap-2">
+                      <span className="text-[11px] text-am-secondary w-36 flex-shrink-0 truncate">{intencaoLabel(intencao)}</span>
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(18,72,190,0.08)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--color-am-blue)', transition: 'width 0.6s ease' }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-am-ink w-6 text-right flex-shrink-0">{total}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Advogados mais ativos */}
+          {metricas.advogados_mais_ativos.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <Users size={11} style={{ color: 'var(--color-am-blue)' }} />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">Advogados mais ativos</p>
+              </div>
+              <div className="space-y-2">
+                {metricas.advogados_mais_ativos.map(({ usuario_id, total_sessoes }) => {
+                  const pct = Math.round((total_sessoes / maxSessoes) * 100)
+                  return (
+                    <div key={usuario_id} className="flex items-center gap-2">
+                      <span className="text-[11px] text-am-secondary w-36 flex-shrink-0">Usuário #{usuario_id}</span>
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(107,124,255,0.08)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#6B7CFF', transition: 'width 0.6s ease' }} />
+                      </div>
+                      <span className="text-[10px] font-bold text-am-ink w-6 text-right flex-shrink-0">{total_sessoes}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 function SectionTitle({ icon, label, desc }: { icon: React.ReactNode; label: string; desc: string }) {
   return (
@@ -281,6 +390,9 @@ export default function ConfigPage() {
               </div>
             </div>
           </div>
+
+          {/* Métricas Hub IA — admin only */}
+          <MetricasHubSection />
 
           {/* Salvar fixo */}
           <div className="flex justify-end pb-2">
