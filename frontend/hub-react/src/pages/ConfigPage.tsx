@@ -1,25 +1,33 @@
-import { useState } from 'react'
-import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle } from 'lucide-react'
 import type { Configuracoes } from '../types'
+import { getConfig, saveConfig } from '../api/config'
 
-const DEFAULT_CFG: Configuracoes = {
-  nome:                 'Escritório Amicus',
+const DEFAULT_TEMPLATES = {
+  template_boas_vindas:  'Olá {{nome}}, seja bem-vindo(a) ao {{escritorio}}! Sou a {{persona}} e estou aqui para auxiliá-lo(a). Como posso ajudar?',
+  template_atualizacao:  'Olá {{nome}}, temos uma atualização importante sobre o seu processo {{processo}}. {{mensagem}}',
+  template_sem_novidade: 'Olá {{nome}}, verificamos o andamento do seu processo {{processo}} e não há novidades para informar no momento. Seguimos acompanhando de perto.',
+}
+
+const EMPTY_CFG: Configuracoes = {
+  nome:                 '',
   cnpj:                 '',
-  email:                'contato@amicus.adv.br',
+  email:                '',
   telefone:             '',
-  persona_nome:         'Dra. Camila',
+  persona_nome:         '',
   persona_tom:          'formal',
   horario_inicio:       '08:00',
   horario_fim:          '18:00',
-  template_boas_vindas: 'Olá {{nome}}, seja bem-vindo(a) ao {{escritorio}}! Sou a {{persona}} e estou aqui para auxiliá-lo(a). Como posso ajudar?',
-  template_atualizacao: 'Olá {{nome}}, temos uma atualização importante sobre o seu processo {{processo}}. {{mensagem}}',
-  template_sem_novidade:'Olá {{nome}}, verificamos o andamento do seu processo {{processo}} e não há novidades para informar no momento. Seguimos acompanhando de perto.',
+  template_boas_vindas: DEFAULT_TEMPLATES.template_boas_vindas,
+  template_atualizacao: DEFAULT_TEMPLATES.template_atualizacao,
+  template_sem_novidade: DEFAULT_TEMPLATES.template_sem_novidade,
 }
 
 const TOM_OPTS: { value: Configuracoes['persona_tom']; label: string; desc: string }[] = [
-  { value: 'formal',   label: 'Formal',   desc: 'Linguagem técnica e protocolar'     },
-  { value: 'amigavel', label: 'Amigável', desc: 'Tom próximo e acolhedor'            },
-  { value: 'tecnico',  label: 'Técnico',  desc: 'Foco em precisão e detalhamento'   },
+  { value: 'formal',   label: 'Formal',   desc: 'Linguagem técnica e protocolar'  },
+  { value: 'amigavel', label: 'Amigável', desc: 'Tom próximo e acolhedor'         },
+  { value: 'neutro',   label: 'Neutro',   desc: 'Equilibrado e imparcial'         },
 ]
 
 function SectionTitle({ icon, label, desc }: { icon: React.ReactNode; label: string; desc: string }) {
@@ -56,18 +64,72 @@ const blurInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | 
   (e.target.style.borderColor = 'var(--color-am-border)')
 
 export default function ConfigPage() {
-  const [cfg, setCfg]       = useState<Configuracoes>(DEFAULT_CFG)
-  const [saved, setSaved]   = useState(false)
+  const qc = useQueryClient()
+  const [cfg, setCfg] = useState<Configuracoes>(EMPTY_CFG)
+  const [saveOk, setSaveOk] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['escritorio-config'],
+    queryFn: getConfig,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (!data) return
+    setCfg({
+      ...data,
+      template_boas_vindas:  data.template_boas_vindas  ?? DEFAULT_TEMPLATES.template_boas_vindas,
+      template_atualizacao:  data.template_atualizacao  ?? DEFAULT_TEMPLATES.template_atualizacao,
+      template_sem_novidade: data.template_sem_novidade ?? DEFAULT_TEMPLATES.template_sem_novidade,
+    })
+  }, [data])
+
+  const mutation = useMutation({
+    mutationFn: (payload: Omit<Configuracoes, 'cnpj'>) => saveConfig(payload),
+    onSuccess: (updated) => {
+      qc.setQueryData(['escritorio-config'], updated)
+      setSaveOk(true)
+      setApiError(null)
+      setTimeout(() => setSaveOk(false), 3000)
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setApiError(detail ?? 'Erro ao salvar configurações. Tente novamente.')
+    },
+  })
 
   function update<K extends keyof Configuracoes>(key: K, value: Configuracoes[K]) {
     setCfg((prev) => ({ ...prev, [key]: value }))
-    setSaved(false)
+    setSaveOk(false)
+    setApiError(null)
   }
 
-  function handleSave(e: React.FormEvent<HTMLFormElement>) {
+  function handleSave(e: React.SyntheticEvent) {
     e.preventDefault()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    const { cnpj: _cnpj, ...payload } = cfg
+    mutation.mutate(payload)
+  }
+
+  const isSaving = mutation.isPending
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-am-muted" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex items-center gap-2 text-xs text-am-secondary">
+          <AlertTriangle size={14} style={{ color: '#C83030' }} />
+          Não foi possível carregar as configurações. Tente recarregar a página.
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -87,14 +149,27 @@ export default function ConfigPage() {
                 <p className="text-xs text-am-muted mt-0.5">Personalize o escritório e a IA</p>
               </div>
             </div>
-            <button type="submit"
+            <button type="submit" disabled={isSaving}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-fast"
-              style={{ background: saved ? '#1A9E78' : 'var(--color-am-blue)' }}
-              onMouseEnter={(e) => { if (!saved) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
-              onMouseLeave={(e) => { if (!saved) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
-              {saved ? <><CheckCircle size={13} /> Salvo</> : <><Save size={13} /> Salvar</>}
+              style={{ background: saveOk ? '#1A9E78' : 'var(--color-am-blue)', opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+              onMouseEnter={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
+              onMouseLeave={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
+              {isSaving
+                ? <><Loader2 size={13} className="animate-spin" /> Salvando…</>
+                : saveOk
+                  ? <><CheckCircle size={13} /> Salvo</>
+                  : <><Save size={13} /> Salvar</>}
             </button>
           </div>
+
+          {/* Erro global de API */}
+          {apiError && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-xs"
+              style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.20)', color: '#C83030' }}>
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              {apiError}
+            </div>
+          )}
 
           {/* Dados do escritório */}
           <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
@@ -108,9 +183,9 @@ export default function ConfigPage() {
                 </Field>
               </div>
               <Field label="CNPJ">
-                <input type="text" value={cfg.cnpj} placeholder="00.000.000/0001-00"
-                  onChange={(e) => update('cnpj', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                <input type="text" value={cfg.cnpj} readOnly
+                  className={`${inputCls} cursor-default`}
+                  style={{ color: 'var(--color-am-muted)', background: 'rgba(12,30,48,0.03)' }} />
               </Field>
               <Field label="E-mail">
                 <input type="email" value={cfg.email}
@@ -127,7 +202,7 @@ export default function ConfigPage() {
 
           {/* Persona da IA */}
           <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
-            <SectionTitle icon={<Bot size={14} />} label="Persona da IA" desc="Como a Dra. Camila se apresentará aos clientes" />
+            <SectionTitle icon={<Bot size={14} />} label="Persona da IA" desc="Como a IA se apresentará aos clientes" />
             <div className="space-y-4">
               <Field label="Nome da persona">
                 <input type="text" value={cfg.persona_nome}
@@ -183,9 +258,9 @@ export default function ConfigPage() {
             <SectionTitle icon={<MessageSquare size={14} />} label="Mensagens Automáticas" desc="Templates enviados via WhatsApp" />
             <div className="space-y-4">
               {([
-                { key: 'template_boas_vindas',  label: 'Boas-vindas',        hint: 'Enviado quando um novo cliente inicia contato.' },
+                { key: 'template_boas_vindas',  label: 'Boas-vindas',             hint: 'Enviado quando um novo cliente inicia contato.' },
                 { key: 'template_atualizacao',  label: 'Atualização de processo', hint: 'Enviado ao detectar novo andamento.' },
-                { key: 'template_sem_novidade', label: 'Sem novidades',      hint: 'Enviado quando o processo não tem andamentos recentes.' },
+                { key: 'template_sem_novidade', label: 'Sem novidades',           hint: 'Enviado quando o processo não tem andamentos recentes.' },
               ] as const).map(({ key, label, hint }) => (
                 <Field key={key} label={label} hint={hint}>
                   <textarea rows={3} value={cfg[key]}
@@ -209,12 +284,16 @@ export default function ConfigPage() {
 
           {/* Salvar fixo */}
           <div className="flex justify-end pb-2">
-            <button type="submit"
+            <button type="submit" disabled={isSaving}
               className="flex items-center gap-2 px-6 py-3 rounded-xl text-white text-xs font-bold transition-fast"
-              style={{ background: saved ? '#1A9E78' : 'var(--color-am-blue)' }}
-              onMouseEnter={(e) => { if (!saved) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
-              onMouseLeave={(e) => { if (!saved) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
-              {saved ? <><CheckCircle size={14} /> Configurações salvas</> : <><Save size={14} /> Salvar configurações</>}
+              style={{ background: saveOk ? '#1A9E78' : 'var(--color-am-blue)', opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+              onMouseEnter={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
+              onMouseLeave={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
+              {isSaving
+                ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
+                : saveOk
+                  ? <><CheckCircle size={14} /> Configurações salvas</>
+                  : <><Save size={14} /> Salvar configurações</>}
             </button>
           </div>
         </div>

@@ -158,7 +158,7 @@ export interface Configuracoes {
   email: string
   telefone?: string
   persona_nome: string
-  persona_tom: 'formal' | 'amigavel' | 'tecnico'
+  persona_tom: 'formal' | 'amigavel' | 'neutro'
   horario_inicio: string
   horario_fim: string
   template_boas_vindas: string
