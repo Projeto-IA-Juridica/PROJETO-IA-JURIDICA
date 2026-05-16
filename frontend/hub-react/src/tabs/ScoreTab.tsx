@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, RefreshCw, Loader2 } from 'lucide-react'
 import { fetchProcessos } from '../api/processos'
+import { analisarCliente, fetchClienteCRM } from '../api/crm'
 import type { CRMClienteCard, Processo } from '../types'
 import Skeleton from '../components/Skeleton'
 
@@ -128,12 +129,25 @@ function ScoreOverview({ processo }: { processo: Processo }) {
 }
 
 export default function ScoreTab({ cliente }: { cliente: CRMClienteCard }) {
+  const qc = useQueryClient()
+
   const { data, isLoading } = useQuery({
     queryKey: ['processos', cliente.id],
     queryFn: () => fetchProcessos(cliente.id),
     enabled: cliente.total_processos > 0,
   })
   const processo: Processo | null = data?.items[0] ?? null
+
+  const analisarMut = useMutation({
+    mutationFn: () => analisarCliente(cliente.id),
+    onSuccess: async () => {
+      const atualizado = await fetchClienteCRM(cliente.id)
+      qc.setQueryData<CRMClienteCard[]>(['clientes'], (prev) =>
+        prev?.map((c) => (c.id === cliente.id ? atualizado : c)) ?? prev
+      )
+      qc.invalidateQueries({ queryKey: ['processos', cliente.id] })
+    },
+  })
 
   if (isLoading) return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -155,6 +169,23 @@ export default function ScoreTab({ cliente }: { cliente: CRMClienteCard }) {
             : 'O score ainda está sendo processado. Aguarde alguns instantes.'}
         </div>
       </div>
+      {cliente.total_processos > 0 && (
+        <button
+          onClick={() => analisarMut.mutate()}
+          disabled={analisarMut.isPending}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-fast disabled:opacity-50"
+          style={{ background: 'var(--color-am-blue)' }}
+        >
+          {analisarMut.isPending
+            ? <><Loader2 size={13} className="animate-spin" /> Analisando…</>
+            : <><RefreshCw size={13} /> Gerar análise de risco</>}
+        </button>
+      )}
+      {analisarMut.isError && (
+        <p className="text-xs" style={{ color: '#C83030' }}>
+          Erro ao gerar análise. Tente novamente.
+        </p>
+      )}
     </div>
   )
 
@@ -200,10 +231,20 @@ export default function ScoreTab({ cliente }: { cliente: CRMClienteCard }) {
                 </div>
               ))}
             </div>
-            <div className="px-4 sm:px-5 py-3 border-t border-am-border bg-am-bg">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-t border-am-border bg-am-bg">
               <p className="text-[10px] text-am-muted leading-relaxed">
                 Esta análise é de uso interno e não representa previsão de resultado processual (OAB Provimento 205/2021).
               </p>
+              <button
+                onClick={() => analisarMut.mutate()}
+                disabled={analisarMut.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold flex-shrink-0 transition-fast disabled:opacity-50"
+                style={{ color: 'var(--color-am-blue)', background: 'rgba(18,72,190,0.07)', border: '1px solid rgba(18,72,190,0.18)' }}
+              >
+                {analisarMut.isPending
+                  ? <><Loader2 size={11} className="animate-spin" /> Analisando…</>
+                  : <><RefreshCw size={11} /> Atualizar</>}
+              </button>
             </div>
           </div>
         </details>

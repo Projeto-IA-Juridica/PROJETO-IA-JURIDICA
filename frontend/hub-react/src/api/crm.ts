@@ -6,6 +6,11 @@ export async function fetchClientes(): Promise<CRMClienteCard[]> {
   return data
 }
 
+export async function fetchClienteCRM(clienteId: number): Promise<CRMClienteCard> {
+  const { data } = await api.get<CRMClienteCard>(`/crm/clientes/${clienteId}`)
+  return data
+}
+
 export interface ResumoCRM {
   baixo: number
   moderado: number
