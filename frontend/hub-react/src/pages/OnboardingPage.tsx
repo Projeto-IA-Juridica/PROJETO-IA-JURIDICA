@@ -7,8 +7,10 @@ import {
   conectarWhatsapp,
   statusWhatsapp,
   goLive,
+  importarProcessos,
   extractDetail,
   mapTom,
+  type ImportProcessosResult,
 } from '../api/onboarding'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
@@ -25,12 +27,13 @@ interface Props { onComplete: () => void }
 const AREAS  = ['Civil','Trabalhista','Família','Previdenciário','Criminal','Tributário','Empresarial','Digital','Consumidor','Imobiliário']
 const TONS   = ['Formal e técnico','Formal e acessível','Próximo e cordial','Neutro e objetivo']
 const DAYS   = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']
-const LABELS = ['Acesso','Escritório','WhatsApp','Persona','OAB','Ativação']
+const LABELS = ['Acesso','Escritório','WhatsApp','Persona','Importar','OAB','Ativação']
 const TITLES = [
   { h: 'Crie seu acesso',           p: 'Defina o e-mail e a senha para acessar a plataforma amicus.' },
   { h: 'Configure seu escritório',  p: 'Em poucos minutos sua IA estará pronta para atender clientes no WhatsApp 24h.' },
   { h: 'Conecte seu WhatsApp',      p: 'Leia o QR Code no WhatsApp do escritório para ativar o canal de atendimento.' },
   { h: 'Configure a persona da IA', p: 'Defina como sua assistente virtual vai se apresentar para os clientes.' },
+  { h: 'Importar dados existentes', p: 'Opcional — envie um CSV com clientes e processos para migrar sua base de dados atual.' },
   { h: 'Conformidade OAB',          p: 'Aceite os termos exigidos pelo Provimento 205/2021 para uso ético da IA.' },
   { h: 'Ativar o escritório',       p: 'Revise os dados e ative sua conta para começar a atender.' },
 ]
@@ -77,6 +80,8 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [s3, setS3] = useState<S3>({ inicio: '08:00', fim: '18:00', dias: ['Seg','Ter','Qua','Qui','Sex'] })
   const [s4, setS4] = useState<S4>({ assistente: '', tom: '' })
   const [aceite, setAceite] = useState(false)
+  const [csvFile,    setCsvFile]    = useState<File | null>(null)
+  const [importDone, setImportDone] = useState(false)
 
   /* ── Estado de integração ─────────────────────────────────────── */
   const [isLoading, setIsLoading]         = useState(false)
@@ -175,7 +180,7 @@ export default function OnboardingPage({ onComplete }: Props) {
       if (s3.inicio >= s3.fim)   e.horario = 'Horário de início deve ser anterior ao fim.'
     }
     if (step === 4 && !s4.assistente.trim()) e.assistente = 'Dê um nome para sua assistente.'
-    if (step === 5 && !aceite)               e.aceite     = 'Aceite os termos para continuar.'
+    if (step === 6 && !aceite)               e.aceite     = 'Aceite os termos para continuar.'
     return e
   }
 
@@ -237,8 +242,8 @@ export default function OnboardingPage({ onComplete }: Props) {
       return
     }
 
-    /* Step 6: ativar escritório */
-    if (step === 6) {
+    /* Step 7: ativar escritório */
+    if (step === 7) {
       setIsLoading(true)
       try {
         await goLive()
@@ -252,7 +257,7 @@ export default function OnboardingPage({ onComplete }: Props) {
     }
 
     /* Demais steps: só avança localmente */
-    if (step < 6) setStep(s => s + 1)
+    if (step < 7) setStep(s => s + 1)
     else setDone(true)
   }
 
@@ -276,11 +281,13 @@ export default function OnboardingPage({ onComplete }: Props) {
     )
   }
 
-  const progress = ((step - 1) / 5) * 100
-  const btnLabel = step === 6
+  const progress = ((step - 1) / 6) * 100
+  const btnLabel = step === 7
     ? (isLoading ? 'Ativando…' : 'Ativar escritório →')
-    : step === 5
+    : step === 6
     ? 'Aceitar e continuar →'
+    : step === 5
+    ? (importDone ? 'Continuar →' : 'Pular esta etapa →')
     : step === 2 && !registered
     ? (isLoading ? 'Criando conta…' : 'Próximo →')
     : step === 4
@@ -297,7 +304,7 @@ export default function OnboardingPage({ onComplete }: Props) {
         <div style={{ background: 'rgba(244,248,252,0.80)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--color-am-border)' }}>
           <div style={{ maxWidth: 740, margin: '0 auto', padding: '14px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--color-am-muted)', fontWeight: 600 }}>
-              Etapa <strong style={{ color: 'var(--color-am-blue)', fontWeight: 800 }}>{step}</strong> de 6
+              Etapa <strong style={{ color: 'var(--color-am-blue)', fontWeight: 800 }}>{step}</strong> de 7
             </span>
             <AmicusLogo />
           </div>
@@ -359,8 +366,9 @@ export default function OnboardingPage({ onComplete }: Props) {
               {step === 2 && <Step2 s2={s2} setS2={setS2} errors={errors} />}
               {step === 3 && <Step3 s3={s3} setS3={setS3} errors={errors} qrCode={qrCode} qrLoading={qrLoading} waConnected={waConnected} />}
               {step === 4 && <Step4 s4={s4} setS4={setS4} errors={errors} />}
-              {step === 5 && <Step5 aceite={aceite} setAceite={setAceite} errors={errors} />}
-              {step === 6 && <Step6 s1={s1} s2={s2} s3={s3} s4={s4} aceite={aceite} waConnected={waConnected} />}
+              {step === 5 && <StepImport csvFile={csvFile} setCsvFile={setCsvFile} importDone={importDone} setImportDone={setImportDone} />}
+              {step === 6 && <Step5 aceite={aceite} setAceite={setAceite} errors={errors} />}
+              {step === 7 && <Step6 s1={s1} s2={s2} s3={s3} s4={s4} aceite={aceite} waConnected={waConnected} importDone={importDone} />}
             </div>
 
             {/* Nav */}
@@ -602,6 +610,162 @@ function Step4({ s4, setS4, errors }: { s4: S4; setS4: Dispatch<SetStateAction<S
   )
 }
 
+/* ── Step 5 — Importar dados (opcional) ─────────────────────────────────── */
+
+interface StepImportProps {
+  csvFile:       File | null
+  setCsvFile:    (f: File | null) => void
+  importDone:    boolean
+  setImportDone: (v: boolean) => void
+}
+
+function StepImport({ csvFile, setCsvFile, importDone, setImportDone }: StepImportProps) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [previewing,   setPreviewing]   = useState(false)
+  const [importing,    setImporting]    = useState(false)
+  const [previewData,  setPreviewData]  = useState<ImportProcessosResult | null>(null)
+  const [importData,   setImportData]   = useState<ImportProcessosResult | null>(null)
+  const [importError,  setImportError]  = useState<string | null>(null)
+
+  async function handlePreview(file: File) {
+    setPreviewing(true)
+    setImportError(null)
+    try {
+      const result = await importarProcessos(file, true)
+      setPreviewData(result)
+    } catch (err) {
+      setImportError(extractDetail(err) || 'Erro ao ler o arquivo. Verifique o formato CSV.')
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  async function handleImport() {
+    if (!csvFile) return
+    setImporting(true)
+    setImportError(null)
+    try {
+      const result = await importarProcessos(csvFile, false)
+      setImportData(result)
+      setImportDone(true)
+    } catch (err) {
+      setImportError(extractDetail(err) || 'Erro ao importar. Verifique o arquivo e tente novamente.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function selectFile(file: File) {
+    if (!file.name.endsWith('.csv')) { setImportError('Selecione um arquivo .csv'); return }
+    setCsvFile(file)
+    setPreviewData(null)
+    setImportData(null)
+    setImportError(null)
+    handlePreview(file)
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: 12, color: 'var(--color-am-muted)', marginBottom: 14, lineHeight: 1.6 }}>
+        Esta etapa é <strong>opcional</strong>. Você pode importar depois em Configurações.
+      </p>
+
+      {!importDone ? (
+        <>
+          {/* Drop zone */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            style={{ border: `2px dashed ${csvFile ? 'var(--color-am-blue)' : 'var(--color-am-border)'}`, borderRadius: 14, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', background: csvFile ? 'rgba(18,72,190,0.03)' : 'var(--color-am-bg)', marginBottom: 12, transition: 'all 0.15s' }}
+          >
+            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) selectFile(f); e.target.value = '' }} />
+            {csvFile ? (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-am-blue)', marginBottom: 2 }}>{csvFile.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-am-muted)' }}>{(csvFile.size / 1024).toFixed(0)} KB · clique para trocar</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-am-secondary)', marginBottom: 4 }}>Arraste o CSV ou clique para selecionar</div>
+                <div style={{ fontSize: 11, color: 'var(--color-am-muted)' }}>Máx. 5 MB · colunas: nome, telefone_whatsapp, numero_processo</div>
+              </>
+            )}
+          </div>
+
+          {previewing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-am-muted)', marginBottom: 10 }}>
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-am-blue)' }} />
+              Lendo arquivo…
+            </div>
+          )}
+
+          {previewData && !previewing && (
+            <div style={{ borderRadius: 12, border: '1px solid rgba(18,72,190,0.20)', background: 'rgba(18,72,190,0.03)', marginBottom: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '8px 12px', background: 'rgba(18,72,190,0.07)', borderBottom: '1px solid rgba(18,72,190,0.15)', fontSize: 11, fontWeight: 700, color: 'var(--color-am-blue)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Pré-visualização
+              </div>
+              <div style={{ padding: '10px 12px', display: 'flex', gap: 20 }}>
+                {[
+                  { label: 'Clientes',  val: previewData.importados + previewData.atualizados },
+                  { label: 'Processos', val: previewData.processos_novos + previewData.processos_atualizados },
+                  { label: 'Erros',     val: previewData.erros.length },
+                ].map(({ label, val }) => (
+                  <div key={label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-am-ink)' }}>{val}</div>
+                    <div style={{ fontSize: 10, color: 'var(--color-am-muted)' }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              {previewData.erros.length > 0 && (
+                <div style={{ padding: '0 12px 10px', fontSize: 11, color: '#C83030' }}>
+                  {previewData.erros.slice(0, 3).map((e, i) => (
+                    <div key={i}>Linha {e.linha}: {e.motivo}</div>
+                  ))}
+                  {previewData.erros.length > 3 && <div>…e mais {previewData.erros.length - 3} erros</div>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {importError && (
+            <div style={{ fontSize: 12, color: '#C83030', marginBottom: 10, padding: '8px 12px', background: 'rgba(200,48,48,0.05)', borderRadius: 10, border: '1px solid rgba(200,48,48,0.18)' }}>
+              {importError}
+            </div>
+          )}
+
+          {previewData && !previewing && (
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={importing}
+              style={{ ...primaryBtn, width: '100%', justifyContent: 'center', marginBottom: 10, opacity: importing ? 0.7 : 1, cursor: importing ? 'not-allowed' : 'pointer' }}
+            >
+              {importing && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+              {importing ? 'Importando…' : `Importar ${previewData.importados + previewData.atualizados} clientes`}
+            </button>
+          )}
+        </>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(26,158,120,0.10)', border: '1.5px solid rgba(26,158,120,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+            <CheckIcon size={22} color="#2E9E6B" />
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-am-ink)', marginBottom: 4 }}>Dados importados!</div>
+          {importData && (
+            <div style={{ fontSize: 12, color: 'var(--color-am-muted)' }}>
+              {importData.importados} clientes · {importData.processos_novos} processos novos
+            </div>
+          )}
+        </div>
+      )}
+
+      <InfoBox>
+        CSV com colunas: <strong>nome</strong>, <strong>telefone_whatsapp</strong> e (opcional) <strong>numero_processo</strong>.
+      </InfoBox>
+    </>
+  )
+}
+
 /* ── Step 5 — Conformidade ───────────────────────────────────────────────── */
 
 const COMPLIANCE = [
@@ -641,7 +805,7 @@ function Step5({ aceite, setAceite, errors }: { aceite: boolean; setAceite: Disp
 
 /* ── Step 6 — Revisão ────────────────────────────────────────────────────── */
 
-function Step6({ s1, s2, s3, s4, aceite, waConnected }: { s1: S1; s2: S2; s3: S3; s4: S4; aceite: boolean; waConnected: boolean }) {
+function Step6({ s1, s2, s3, s4, aceite, waConnected, importDone }: { s1: S1; s2: S2; s3: S3; s4: S4; aceite: boolean; waConnected: boolean; importDone: boolean }) {
   const diasOrdenados = DAYS.filter(d => s3.dias.includes(d)).join(', ')
   const rows = [
     { label: 'E-mail',          value: s1.email       || '—', filled: !!s1.email,       hi: false },
@@ -650,6 +814,7 @@ function Step6({ s1, s2, s3, s4, aceite, waConnected }: { s1: S1; s2: S2; s3: S3
     { label: 'WhatsApp',        value: waConnected ? 'Conectado ✓' : 'Pendente (pode conectar depois)', filled: waConnected, hi: waConnected },
     { label: 'Janela de envio', value: `${s3.inicio}–${s3.fim} · ${diasOrdenados}`, filled: true, hi: false },
     { label: 'Assistente',      value: s4.assistente ? `${s4.assistente}${s4.tom ? ' · ' + s4.tom : ''}` : '—', filled: !!s4.assistente, hi: false },
+    { label: 'Dados importados', value: importDone ? 'Importados ✓' : 'Manual / Após ativação', filled: importDone, hi: importDone },
     { label: 'Conformidade',    value: aceite ? 'OAB + LGPD ✓' : 'Pendente', filled: aceite, hi: aceite },
   ]
 
