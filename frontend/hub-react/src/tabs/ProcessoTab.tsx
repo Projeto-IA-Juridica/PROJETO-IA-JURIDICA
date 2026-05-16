@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Scale, Clock, AlertCircle, Phone, Star, Gavel, User,
-  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check,
+  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search,
 } from 'lucide-react'
-import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, type ProcessoCreate, type ProcessoUpdate } from '../api/processos'
+import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
 import type { CRMClienteCard, Processo } from '../types'
 import Skeleton from '../components/Skeleton'
 import RiskChip from '../components/RiskChip'
@@ -230,23 +230,52 @@ function EditarProcessoModal({ processo, clienteId, onClose }: { processo: Proce
   )
 }
 
+const SCORE_NIVEIS = ['baixo', 'moderado', 'alto', 'critico'] as const
+const SCORE_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  baixo:    { label: 'Baixo',    color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.22)'  },
+  moderado: { label: 'Moderado', color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.22)'  },
+  alto:     { label: 'Alto',     color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)'   },
+  critico:  { label: 'Crítico',  color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)'   },
+}
+
 /* ── ProcessoTab principal ── */
 export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
   const qc = useQueryClient()
-  const [showAndamentos, setShowAndamentos] = useState(false)
+  const [andamentosAbertos, setAndamentosAbertos] = useState<Set<number>>(new Set())
   const [showNovoModal,  setShowNovoModal]  = useState(false)
   const [editandoProc,   setEditandoProc]   = useState<Processo | null>(null)
 
+  // Filtros
+  const [filtroStatus, setFiltroStatus] = useState<'ativo' | 'arquivado' | ''>('')
+  const [filtroCNJ,    setFiltroCNJ]    = useState('')
+  const [filtroScore,  setFiltroScore]  = useState<ProcessoFilters['score_nivel'] | ''>('')
+
+  const searchParam = filtroCNJ.length >= 3 ? filtroCNJ : undefined
+
   const { data, isLoading } = useQuery({
-    queryKey: ['processos', cliente.id],
-    queryFn: () => fetchProcessos(cliente.id),
+    queryKey: ['processos', cliente.id, filtroStatus, searchParam, filtroScore],
+    queryFn: () => fetchProcessos(cliente.id, {
+      status:      filtroStatus  || undefined,
+      search:      searchParam,
+      score_nivel: filtroScore   || undefined,
+    }),
   })
-  const processo: Processo | null = data?.items[0] ?? null
+  const processos: Processo[] = data?.items ?? []
 
   const deleteMut = useMutation({
     mutationFn: deletarProcesso,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['processos', cliente.id] }),
   })
+
+  function toggleAndamentos(id: number) {
+    setAndamentosAbertos(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const temFiltroAtivo = filtroStatus !== '' || filtroScore !== '' || filtroCNJ.length >= 3
 
   return (
     <div className="space-y-3 p-4">
@@ -303,6 +332,57 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
         </div>
       </Card>
 
+      {/* ── Filtros de processos ── */}
+      <div className="space-y-2">
+        {/* Busca por CNJ */}
+        <div className="relative">
+          <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" />
+          <input
+            value={filtroCNJ}
+            onChange={e => setFiltroCNJ(e.target.value)}
+            placeholder="Buscar por CNJ (mín. 3 caracteres)…"
+            className="w-full pl-8 pr-4 py-2 rounded-xl text-xs text-am-ink placeholder:text-am-muted outline-none"
+            style={{ background: 'white', border: '1px solid var(--color-am-border)', boxShadow: '0 1px 4px rgba(12,30,48,0.04)' }}
+            onFocus={e => (e.target.style.borderColor = 'var(--color-am-blue)')}
+            onBlur={e  => (e.target.style.borderColor = 'var(--color-am-border)')}
+          />
+        </div>
+
+        {/* Status + Score */}
+        <div className="flex flex-wrap gap-1.5">
+          {/* Status */}
+          {(['', 'ativo', 'arquivado'] as const).map(s => (
+            <button key={s} onClick={() => setFiltroStatus(s)}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-semibold press"
+              style={filtroStatus === s
+                ? { background: 'rgba(18,72,190,0.10)', color: 'var(--color-am-blue)', border: '1.5px solid rgba(18,72,190,0.28)' }
+                : { background: 'var(--color-am-surface)', color: 'var(--color-am-secondary)', border: '1px solid var(--color-am-border)' }
+              }>
+              {s === '' ? 'Todos' : s === 'ativo' ? 'Ativos' : 'Arquivados'}
+            </button>
+          ))}
+
+          <span className="w-px bg-am-border mx-0.5" />
+
+          {/* Score */}
+          {SCORE_NIVEIS.map(n => {
+            const cfg = SCORE_LABELS[n]
+            const ativo = filtroScore === n
+            return (
+              <button key={n} onClick={() => setFiltroScore(ativo ? '' : n)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold press"
+                style={ativo
+                  ? { background: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.border}` }
+                  : { background: 'var(--color-am-surface)', color: 'var(--color-am-secondary)', border: '1px solid var(--color-am-border)' }
+                }>
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: ativo ? cfg.color : 'var(--color-am-border)' }} />
+                {cfg.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Skeleton */}
       {isLoading && (
         <div className="space-y-2 px-1">
@@ -312,149 +392,162 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
         </div>
       )}
 
-      {/* Processo existente */}
-      {!isLoading && processo && (() => {
+      {/* Lista de processos */}
+      {!isLoading && processos.map(processo => {
         const poloCor = processo.polo_cliente === 'autor' ? '#1A9E78' : '#C83030'
+        const andamentosAberto = andamentosAbertos.has(processo.id)
         return (
-          <Card accentColor={poloCor}>
-            <CardHeader icon={<Gavel size={13} />} title="Processo Judicial"
-              badge={
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
-                    style={processo.polo_cliente === 'autor'
-                      ? { color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }
-                      : { color: '#C83030', background: 'rgba(200,48,48,0.08)',  border: '1px solid rgba(200,48,48,0.18)' }}>
-                    {processo.polo_cliente === 'autor' ? 'Autor' : processo.polo_cliente === 'reu' ? 'Réu' : 'Terceiro'}
-                  </span>
-                  <button onClick={() => setEditandoProc(processo)}
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
-                    title="Editar">
-                    <Edit2 size={11} />
-                  </button>
-                  <button onClick={() => { if (confirm('Arquivar este processo?')) deleteMut.mutate(processo.id) }}
-                    disabled={deleteMut.isPending}
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-red-500 transition-colors"
-                    title="Arquivar">
-                    <Trash2 size={11} />
-                  </button>
+          <div key={processo.id} className="space-y-0">
+            <Card accentColor={poloCor}>
+              <CardHeader icon={<Gavel size={13} />} title="Processo Judicial"
+                badge={
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                      style={processo.polo_cliente === 'autor'
+                        ? { color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }
+                        : { color: '#C83030', background: 'rgba(200,48,48,0.08)',  border: '1px solid rgba(200,48,48,0.18)' }}>
+                      {processo.polo_cliente === 'autor' ? 'Autor' : processo.polo_cliente === 'reu' ? 'Réu' : 'Terceiro'}
+                    </span>
+                    <button onClick={() => setEditandoProc(processo)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
+                      title="Editar">
+                      <Edit2 size={11} />
+                    </button>
+                    <button onClick={() => { if (confirm('Arquivar este processo?')) deleteMut.mutate(processo.id) }}
+                      disabled={deleteMut.isPending}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-red-500 transition-colors"
+                      title="Arquivar">
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                }
+              />
+              <div className="px-4 py-4 space-y-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Número CNJ</p>
+                  <p className="text-xs font-bold font-mono text-am-blue">{processo.numero_cnj}</p>
                 </div>
-              }
-            />
-            <div className="px-4 py-4 space-y-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Número CNJ</p>
-                <p className="text-xs font-bold font-mono text-am-blue">{processo.numero_cnj}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <Field label="Tribunal"     value={processo.tribunal}  />
-                <Field label="Vara"         value={processo.vara}      />
-                <Field label="Comarca"      value={processo.comarca}   />
-                <Field label="Tipo de ação" value={processo.tipo_acao} />
-                <Field label="Status"       value={processo.status}    />
-                {processo.data_distribuicao && (
-                  <Field label="Ajuizamento" value={new Date(processo.data_distribuicao).toLocaleDateString('pt-BR')} />
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                  <Field label="Tribunal"     value={processo.tribunal}  />
+                  <Field label="Vara"         value={processo.vara}      />
+                  <Field label="Comarca"      value={processo.comarca}   />
+                  <Field label="Tipo de ação" value={processo.tipo_acao} />
+                  <Field label="Status"       value={processo.status}    />
+                  {processo.data_distribuicao && (
+                    <Field label="Ajuizamento" value={new Date(processo.data_distribuicao).toLocaleDateString('pt-BR')} />
+                  )}
+                  {processo.valor_causa && (
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Valor da causa</p>
+                      <p className="text-xs font-bold text-am-ink">
+                        R$ {Number(processo.valor_causa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {processo.ultimo_andamento && (
+                  <div className="pt-3" style={{ borderTop: '1px solid var(--color-am-border)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-1">Último andamento</p>
+                    <p className="text-xs text-am-secondary leading-relaxed">{processo.ultimo_andamento}</p>
+                    {processo.data_ultimo_andamento && (
+                      <p className="text-[10px] text-am-muted mt-1 flex items-center gap-1">
+                        <Clock size={9} />
+                        {new Date(processo.data_ultimo_andamento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
                 )}
-                {processo.valor_causa && (
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Valor da causa</p>
-                    <p className="text-xs font-bold text-am-ink">
-                      R$ {Number(processo.valor_causa).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
+                {processo.score_risco != null && (
+                  <div className="flex items-center gap-3 pt-3" style={{ borderTop: '1px solid var(--color-am-border)' }}>
+                    <RiskChip nivel={processo.score_nivel} score={processo.score_risco} size="md" />
+                    {processo.score_interpretacao && (
+                      <p className="text-xs text-am-secondary leading-relaxed flex-1">{processo.score_interpretacao}</p>
+                    )}
                   </div>
                 )}
               </div>
-              {processo.ultimo_andamento && (
-                <div className="pt-3" style={{ borderTop: '1px solid var(--color-am-border)' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-1">Último andamento</p>
-                  <p className="text-xs text-am-secondary leading-relaxed">{processo.ultimo_andamento}</p>
-                  {processo.data_ultimo_andamento && (
-                    <p className="text-[10px] text-am-muted mt-1 flex items-center gap-1">
-                      <Clock size={9} />
-                      {new Date(processo.data_ultimo_andamento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                    </p>
-                  )}
-                </div>
-              )}
-              {processo.score_risco != null && (
-                <div className="flex items-center gap-3 pt-3" style={{ borderTop: '1px solid var(--color-am-border)' }}>
-                  <RiskChip nivel={processo.score_nivel} score={processo.score_risco} size="md" />
-                  {processo.score_interpretacao && (
-                    <p className="text-xs text-am-secondary leading-relaxed flex-1">{processo.score_interpretacao}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </Card>
-        )
-      })()}
+            </Card>
 
-      {/* Empty state com botão de cadastro */}
-      {!isLoading && !processo && (
+            {/* Andamentos por processo */}
+            {processo.andamentos && processo.andamentos.length > 0 && (
+              <Card accentColor="var(--color-am-blue)">
+                <button
+                  onClick={() => toggleAndamentos(processo.id)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/[0.02] transition-colors"
+                  style={{ borderBottom: andamentosAberto ? '1px solid var(--color-am-border)' : 'none' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-am-blue"><Clock size={13} /></span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">
+                      Andamentos · {processo.andamentos.length}
+                    </span>
+                  </div>
+                  {andamentosAberto ? <ChevronUp size={14} className="text-am-muted" /> : <ChevronDown size={14} className="text-am-muted" />}
+                </button>
+                {andamentosAberto && (
+                  <ol className="px-4 py-4 space-y-0">
+                    {processo.andamentos.map((a, i) => (
+                      <li key={i} className="flex gap-3 pb-4 last:pb-0">
+                        <div className="flex flex-col items-center flex-shrink-0">
+                          <div className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
+                            style={{ background: i === 0 ? 'var(--color-am-blue)' : 'var(--color-am-border)', boxShadow: i === 0 ? '0 0 0 3px rgba(18,72,190,0.12)' : 'none' }} />
+                          {i < processo.andamentos.length - 1 && <div className="w-px flex-1 mt-1.5 bg-am-border" />}
+                        </div>
+                        <div className="pb-1 min-w-0">
+                          <time className="text-[10px] font-bold text-am-muted block mb-0.5">
+                            {new Date(a.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </time>
+                          <p className={`text-xs leading-relaxed ${i === 0 ? 'font-semibold text-am-ink' : 'text-am-secondary'}`}>
+                            {a.descricao}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </Card>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Empty state */}
+      {!isLoading && processos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
           <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
             style={{ background: 'rgba(12,30,48,0.04)', border: '1px solid var(--color-am-border)' }}>
             <Scale size={20} strokeWidth={1.5} className="text-am-blue" />
           </div>
           <div>
-            <p className="text-sm font-bold text-am-ink">Sem processo vinculado</p>
-            <p className="text-xs text-am-muted mt-1 max-w-xs leading-relaxed">
-              Cadastre um processo judicial para monitorar andamentos automaticamente.
-            </p>
+            {temFiltroAtivo
+              ? <>
+                  <p className="text-sm font-bold text-am-ink">Nenhum processo encontrado</p>
+                  <p className="text-xs text-am-muted mt-1">Tente ajustar os filtros.</p>
+                </>
+              : <>
+                  <p className="text-sm font-bold text-am-ink">Sem processo vinculado</p>
+                  <p className="text-xs text-am-muted mt-1 max-w-xs leading-relaxed">
+                    Cadastre um processo judicial para monitorar andamentos automaticamente.
+                  </p>
+                </>
+            }
           </div>
-          <button onClick={() => setShowNovoModal(true)}
-            className="press flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white"
-            style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-            <Plus size={13} /> Cadastrar processo
-          </button>
+          {!temFiltroAtivo && (
+            <button onClick={() => setShowNovoModal(true)}
+              className="press flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white"
+              style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+              <Plus size={13} /> Cadastrar processo
+            </button>
+          )}
         </div>
       )}
 
-      {/* Botão adicionar processo secundário (quando já há um) */}
-      {!isLoading && processo && (
+      {/* Botão adicionar processo */}
+      {!isLoading && processos.length > 0 && (
         <button onClick={() => setShowNovoModal(true)}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-xs font-semibold text-am-secondary transition-colors hover:text-am-ink"
           style={{ border: '1px dashed var(--color-am-border)', background: 'transparent', cursor: 'pointer' }}>
           <Plus size={12} /> Adicionar outro processo
         </button>
-      )}
-
-      {/* Andamentos */}
-      {processo?.andamentos && processo.andamentos.length > 0 && (
-        <Card accentColor="var(--color-am-blue)">
-          <button
-            onClick={() => setShowAndamentos(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/[0.02] transition-colors"
-            style={{ borderBottom: showAndamentos ? '1px solid var(--color-am-border)' : 'none' }}>
-            <div className="flex items-center gap-2">
-              <span className="text-am-blue"><Clock size={13} /></span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">
-                Andamentos · {processo.andamentos.length}
-              </span>
-            </div>
-            {showAndamentos ? <ChevronUp size={14} className="text-am-muted" /> : <ChevronDown size={14} className="text-am-muted" />}
-          </button>
-          {showAndamentos && (
-            <ol className="px-4 py-4 space-y-0">
-              {processo.andamentos.map((a, i) => (
-                <li key={i} className="flex gap-3 pb-4 last:pb-0">
-                  <div className="flex flex-col items-center flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
-                      style={{ background: i === 0 ? 'var(--color-am-blue)' : 'var(--color-am-border)', boxShadow: i === 0 ? '0 0 0 3px rgba(18,72,190,0.12)' : 'none' }} />
-                    {i < processo.andamentos.length - 1 && <div className="w-px flex-1 mt-1.5 bg-am-border" />}
-                  </div>
-                  <div className="pb-1 min-w-0">
-                    <time className="text-[10px] font-bold text-am-muted block mb-0.5">
-                      {new Date(a.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </time>
-                    <p className={`text-xs leading-relaxed ${i === 0 ? 'font-semibold text-am-ink' : 'text-am-secondary'}`}>
-                      {a.descricao}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Card>
       )}
 
       {/* Ação sugerida */}

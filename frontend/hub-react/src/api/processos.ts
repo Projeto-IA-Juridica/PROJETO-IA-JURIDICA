@@ -1,9 +1,15 @@
 import { api } from './client'
 import type { ProcessoList, Processo } from '../types'
 
-export async function fetchProcessos(clienteId: number): Promise<ProcessoList> {
+export interface ProcessoFilters {
+  status?: 'ativo' | 'arquivado'
+  search?: string
+  score_nivel?: 'baixo' | 'moderado' | 'alto' | 'critico'
+}
+
+export async function fetchProcessos(clienteId: number, filters?: ProcessoFilters): Promise<ProcessoList> {
   const { data } = await api.get<ProcessoList>('/processos', {
-    params: { cliente_id: clienteId, per_page: 20 },
+    params: { cliente_id: clienteId, per_page: 50, ...filters },
   })
   return data
 }
