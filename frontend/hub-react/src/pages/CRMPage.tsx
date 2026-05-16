@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Heart, Search, ArrowRight, Shield, Clock, Star, Zap, RefreshCw, AlertCircle } from 'lucide-react'
-import { fetchClientes } from '../api/crm'
-import { api } from '../api/client'
+import { fetchClientes, analisarCliente, analisarEscritorioCompleto } from '../api/crm'
 import type { CRMClienteCard } from '../types'
 
 const NIVEIS = ['todos', 'critico', 'alto', 'moderado', 'baixo', 'sem_analise'] as const
@@ -15,12 +14,6 @@ const NIVEL_CFG: Record<string, { color: string; bg: string; border: string; lab
   critico:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Crítico'    },
   em_risco:    { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Em risco'   },
   sem_analise: { color: '#8AAAC0', bg: 'rgba(138,170,192,0.08)', border: 'rgba(138,170,192,0.22)', label: 'Sem análise'},
-}
-
-interface AnaliseSingleResult {
-  nivel: string; score: number; resumo: string
-  acao_sugerida: string; cache_hit: boolean
-  tokens_input: number; tokens_output: number; custo_usd: string
 }
 
 function initials(nome: string) {
@@ -50,8 +43,7 @@ export default function CRMPage({ onSelectCliente }: Props) {
   })
 
   const analisarClienteMut = useMutation({
-    mutationFn: (clienteId: number) =>
-      api.post<AnaliseSingleResult>(`/crm/clientes/${clienteId}/analisar`).then(r => r.data),
+    mutationFn: (clienteId: number) => analisarCliente(clienteId),
     onMutate: (clienteId) => { setAnalisandoId(clienteId); setErroId(null) },
     onSuccess: () => {
       setAnalisandoId(null)
@@ -67,7 +59,7 @@ export default function CRMPage({ onSelectCliente }: Props) {
   })
 
   const analisarEscritoriMut = useMutation({
-    mutationFn: () => api.post('/crm/analisar-escritorio').then(r => r.data),
+    mutationFn: () => analisarEscritorioCompleto(),
     onSuccess: () => {
       setBatchErro(null)
       setBatchMsg('Análise do escritório iniciada! Os resultados aparecem em alguns minutos.')
