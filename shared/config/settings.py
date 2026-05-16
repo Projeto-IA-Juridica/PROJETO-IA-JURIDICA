@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # Ambiente
-    ENVIRONMENT: Literal["development", "staging", "production"] = "development"
+    ENVIRONMENT: Literal["development", "staging", "production"] = "production"
     LOG_LEVEL: str = "INFO"
 
     # Config do BaseSettings
