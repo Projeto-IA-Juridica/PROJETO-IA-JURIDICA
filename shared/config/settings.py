@@ -106,18 +106,40 @@ class Settings(BaseSettings):
     @field_validator("ENCRYPTION_KEY")
     @classmethod
     def validar_fernet_key(cls, v: str) -> str:
-        """Garante que a chave é uma Fernet key válida (base64-urlsafe, 32 bytes)."""
+        """Aceita Fernet key válida ou hex de 32 bytes; converte se necessário.
+        
+        Railway às vezes injeta chaves em formato hex; esse validador as converte
+        para Fernet automaticamente, mantendo compatibilidade.
+        """
+        from cryptography.fernet import Fernet
+        import base64
+        
+        # Tenta usar diretamente como Fernet
         try:
-            from cryptography.fernet import Fernet
-
             Fernet(v.encode())
-        except Exception as exc:
-            raise ValueError(
-                "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe, 32 bytes). "
-                'Gere uma com: python -c "from cryptography.fernet import Fernet; '
-                'print(Fernet.generate_key().decode())"'
-            ) from exc
-        return v
+            return v
+        except Exception:
+            pass
+        
+        # Se for hex de 32 chars, converte para Fernet
+        if len(v) == 32 and all(c in '0123456789abcdefABCDEF' for c in v):
+            try:
+                key_bytes = bytes.fromhex(v)
+                fernet_key = base64.urlsafe_b64encode(key_bytes).decode()
+                # Valida a chave convertida
+                Fernet(fernet_key.encode())
+                return fernet_key
+            except Exception as exc:
+                raise ValueError(
+                    f"ENCRYPTION_KEY em formato hex inválido: {v}"
+                ) from exc
+        
+        raise ValueError(
+            "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe) "
+            "ou hex de 32 caracteres. "
+            'Gere uma com: python -c "from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"'
+        )
 
     @field_validator("ENCRYPTION_KEY_PREVIOUS")
     @classmethod
