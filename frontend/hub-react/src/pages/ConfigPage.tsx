@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users } from 'lucide-react'
+import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut } from 'lucide-react'
 import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
-import { fetchMe } from '../api/auth'
+import { fetchMe, logout } from '../api/auth'
 import { fetchMetricasHub } from '../api/hub'
 
 const DEFAULT_TEMPLATES = {
@@ -222,6 +222,11 @@ export default function ConfigPage() {
 
   const isSaving = mutation.isPending
 
+  async function handleLogout() {
+    await logout()
+    window.dispatchEvent(new Event('amicus:session-expired'))
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -258,17 +263,26 @@ export default function ConfigPage() {
                 <p className="text-xs text-am-muted mt-0.5">Personalize o escritório e a IA</p>
               </div>
             </div>
-            <button type="submit" disabled={isSaving}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-fast"
-              style={{ background: saveOk ? '#1A9E78' : 'var(--color-am-blue)', opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
-              onMouseEnter={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
-              onMouseLeave={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
-              {isSaving
-                ? <><Loader2 size={13} className="animate-spin" /> Salvando…</>
-                : saveOk
-                  ? <><CheckCircle size={13} /> Salvo</>
-                  : <><Save size={13} /> Salvar</>}
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-fast border"
+                style={{ color: 'var(--color-am-secondary)', borderColor: 'var(--color-am-border)', background: 'var(--color-am-bg)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#C83030'; e.currentTarget.style.borderColor = 'rgba(200,48,48,0.35)'; e.currentTarget.style.background = 'rgba(200,48,48,0.05)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-am-secondary)'; e.currentTarget.style.borderColor = 'var(--color-am-border)'; e.currentTarget.style.background = 'var(--color-am-bg)' }}>
+                <LogOut size={13} /> Sair
+              </button>
+              <button type="submit" disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold transition-fast"
+                style={{ background: saveOk ? '#1A9E78' : 'var(--color-am-blue)', opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                onMouseEnter={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
+                onMouseLeave={(e) => { if (!saveOk && !isSaving) e.currentTarget.style.background = 'var(--color-am-blue)' }}>
+                {isSaving
+                  ? <><Loader2 size={13} className="animate-spin" /> Salvando…</>
+                  : saveOk
+                    ? <><CheckCircle size={13} /> Salvo</>
+                    : <><Save size={13} /> Salvar</>}
+              </button>
+            </div>
           </div>
 
           {/* Erro global de API */}

@@ -92,6 +92,34 @@ export async function statusWhatsapp(): Promise<WhatsappStatus> {
   return data
 }
 
+/* ── Etapa 2 — Importar processos via CSV (requer JWT admin) ─────── */
+export interface ImportErro {
+  linha: number
+  dados: string
+  motivo: string
+}
+
+export interface ImportProcessosResult {
+  etapa: number | null
+  importados: number
+  atualizados: number
+  processos_novos: number
+  processos_atualizados: number
+  ignorados: number
+  erros: ImportErro[]
+  preview: Record<string, string>[]
+}
+
+export async function importarProcessos(file: File, preview = false): Promise<ImportProcessosResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await api.post<ImportProcessosResult>('/onboarding/import-processos', form, {
+    headers: { 'Content-Type': undefined },
+    params: { preview },
+  })
+  return data
+}
+
 /* ── Etapa 5 — Go Live (requer JWT + CSRF) ───────────────────────── */
 export async function goLive(): Promise<GoLiveResponse> {
   const { data } = await api.post<GoLiveResponse>('/onboarding/go-live')

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Send, BookOpen, AlertTriangle, FileText } from 'lucide-react'
+import { Send, BookOpen, AlertTriangle, FileText, History, ChevronDown, ChevronUp } from 'lucide-react'
 import { consultar } from '../api/hub'
 import { fetchProcessos } from '../api/processos'
+import { fetchChatHistory, type InteracaoItem } from '../api/chat'
 import type { CRMClienteCard, ChatMessage } from '../types'
 
 const ESCALATION_TERMS = /parecer|estratégia|estrategia|negociação|negociacao|decisão|decisao|impacto|urgente/i
@@ -85,6 +86,66 @@ function TypingIndicator() {
       <div className="bubble-assistant bg-white border border-am-border card-shadow px-4 py-3">
         <div className="dot-pulse flex gap-1.5"><span /><span /><span /></div>
       </div>
+    </div>
+  )
+}
+
+function HistoricoPanel({ clienteId }: { clienteId: number }) {
+  const [open, setOpen] = useState(false)
+
+  const { data: historico, isLoading } = useQuery({
+    queryKey: ['chat-history', clienteId],
+    queryFn: () => fetchChatHistory(clienteId, 30),
+    enabled: open,
+    staleTime: 60_000,
+  })
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+  return (
+    <div className="flex-shrink-0 border-b border-am-border">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-am-bg hover:bg-am-surface transition-fast"
+      >
+        <History size={11} className="text-am-muted" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-am-muted flex-1 text-left">
+          Histórico WhatsApp
+        </span>
+        {open ? <ChevronUp size={11} className="text-am-muted" /> : <ChevronDown size={11} className="text-am-muted" />}
+      </button>
+
+      {open && (
+        <div className="max-h-52 overflow-y-auto bg-white divide-y divide-am-border">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <span className="text-[10px] text-am-muted">Carregando…</span>
+            </div>
+          ) : !historico?.length ? (
+            <div className="py-4 text-center text-[10px] text-am-muted">Nenhuma interação anterior</div>
+          ) : (
+            (historico as InteracaoItem[]).map((item) => (
+              <div key={item.id} className="px-4 py-2.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider"
+                    style={{ color: item.direcao === 'entrada' ? 'var(--color-am-blue)' : '#1A9E78' }}>
+                    {item.direcao === 'entrada' ? 'Cliente' : 'IA'}
+                  </span>
+                  <span className="text-[9px] text-am-muted">{fmt(item.data)}</span>
+                </div>
+                {item.mensagem_cliente && (
+                  <p className="text-[11px] text-am-secondary leading-snug line-clamp-2">{item.mensagem_cliente}</p>
+                )}
+                {item.mensagem_ia && (
+                  <p className="text-[11px] text-am-muted leading-snug line-clamp-2 italic">{item.mensagem_ia}</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -179,6 +240,9 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
           </div>
         </div>
       )}
+
+      {/* ── Histórico WhatsApp ── */}
+      <HistoricoPanel clienteId={cliente.id} />
 
       {/* ── Mensagens ── */}
       <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4 bg-am-bg">
