@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Loader2 } from 'lucide-react'
 import { useWaveCanvas } from '../hooks/useWaveCanvas'
+import { login } from '../api/auth'
 
 const WAVES = [
   { A: 55, f: 0.0032, s: 0.012, p: 0.0 },
@@ -20,6 +21,25 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
   const [email, setEmail]       = useState('')
   const [pass, setPass]         = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+
+  async function handleLogin() {
+    if (!email || !pass) { setError('Preencha e-mail e senha.'); return }
+    setError(null)
+    setIsLoading(true)
+    try {
+      await login(email, pass)
+      onLogin()
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 401) setError('E-mail ou senha incorretos.')
+      else if (status === 429) setError('Conta bloqueada temporariamente. Tente em 15 minutos.')
+      else setError('Erro ao conectar. Verifique sua conexão e tente novamente.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'var(--font-sans)' }}>
@@ -106,10 +126,24 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
               </div>
             </div>
 
+            {/* Erro de autenticação */}
+            {error && (
+              <p style={{ fontSize: 12, color: '#D63B3B', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 10, padding: '8px 12px', marginBottom: 10 }}>
+                {error}
+              </p>
+            )}
+
             {/* Botões */}
-            <button onClick={onLogin} className="spkbtn" style={{ width: '100%', marginBottom: 10 }}>
-              <Sparkles size={16} className="spkbtn-sparkle" />
-              <span className="spkbtn-text">Entrar na plataforma</span>
+            <button
+              onClick={handleLogin}
+              disabled={isLoading}
+              className="spkbtn"
+              style={{ width: '100%', marginBottom: 10, opacity: isLoading ? 0.7 : 1, cursor: isLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {isLoading
+                ? <Loader2 size={16} className="spkbtn-sparkle" style={{ animation: 'spin 1s linear infinite' }} />
+                : <Sparkles size={16} className="spkbtn-sparkle" />}
+              <span className="spkbtn-text">{isLoading ? 'Entrando…' : 'Entrar na plataforma'}</span>
             </button>
 
             <button

@@ -37,6 +37,14 @@ export default function App() {
   const [minDone, setMinDone]       = useState(false)
   const advancing                   = useRef(false)
 
+  /* Sessão expirada (refresh token inválido) — volta para login */
+  useEffect(() => {
+    function onExpired() { advanceTo('login') }
+    window.addEventListener('amicus:session-expired', onExpired)
+    return () => window.removeEventListener('amicus:session-expired', onExpired)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /* Fade-out → troca de fase → fade-in */
   function advanceTo(next: Phase) {
     if (advancing.current) return
