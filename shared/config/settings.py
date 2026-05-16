@@ -19,11 +19,11 @@ class Settings(BaseSettings):
 
     # LLM
     ANTHROPIC_API_KEY: str
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None  # Opcional — usado apenas para Whisper (transcrição de áudio)
 
     # Integrações
-    EVOLUTION_API_URL: str
-    EVOLUTION_API_KEY: str
+    EVOLUTION_API_URL: str | None = None
+    EVOLUTION_API_KEY: str | None = None
     JUSBRASIL_API_KEY: str | None = None  # não utilizado; mantido para compatibilidade de env
     DATAJUD_API_KEY: str | None = None
 
