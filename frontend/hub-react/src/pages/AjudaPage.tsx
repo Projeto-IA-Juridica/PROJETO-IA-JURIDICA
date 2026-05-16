@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 
-const WHATSAPP = '5500000000000'
+const WHATSAPP = import.meta.env.VITE_SUPORTE_WHATSAPP || '5500000000000'
 
 interface Props { onBack: () => void }
 
