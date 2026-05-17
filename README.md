@@ -316,18 +316,33 @@ CRUD completo com deduplicação automática (mesmo CNPJ ou mesmo CNJ → atuali
 | `SettingsPage` | Configurações do escritório e persona da IA |
 | `LoginPage` | Autenticação JWT |
 
-**Hub React** (`/frontend/hub-react`) — React 19 + TypeScript + TailwindCSS + Framer Motion
+**Hub React** (`/frontend/hub-react`) — React 19 + TypeScript + TailwindCSS v4 + Framer Motion v12
 
 Interface rica para advogados, com animações (`PageTransition`, `DitherShader`), `FloatingDock` e componentes de UI avançados (`EncryptedText`, `PlaceholdersAndVanishInput`).
 
 | Página | Descrição |
 |--------|-----------|
+| `LoginPage` | Autenticação JWT |
+| `WelcomePage` | Tela de boas-vindas pós-login |
+| `OnboardingPage` | Wizard de configuração inicial do escritório |
+| `HubPage` | Dashboard principal do advogado |
 | `HubIAPage` | Chat com o Hub do Advogado (tabs: Chat, Processos, Documentos, Score) |
 | `CRMPage` | Visão CRM por cliente |
 | `CaptacaoPage` | Motor de prospecção e pipeline de leads |
 | `PainelPage` | Dashboard executivo |
 | `DocumentosPage` | Base RAG — upload e busca |
+| `CadastroCSVPage` | Importação de clientes via CSV |
+| `AjudaPage` | Central de ajuda e contato |
 | `ConfigPage` | Configurações do escritório |
+| `LoadingPage` | Tela de carregamento/transição |
+
+**Frontends vanilla** (`/frontend/`) — HTML + CSS (amicus-design) + JavaScript puro para fluxos leves
+
+| Pasta | Descrição |
+|-------|-----------|
+| `login/` | Página de login standalone (amicus-design) |
+| `cadastro-onboarding/` | Wizard de cadastro e onboarding (HTML/JS/CSS) |
+| `ajuda-contato/` | Central de ajuda e formulário de contato |
 
 ---
 
@@ -414,7 +429,7 @@ Interface rica para advogados, com animações (`PageTransition`, `DitherShader`
 ## Estrutura de Pastas
 
 ```
-PROJETO-IA-JURIDICA-2/
+PROJETO-IA-JURIDICA-5/
 │
 ├── shared/                          # Core compartilhado
 │   ├── models/                      # SQLAlchemy ORM (10 models)
@@ -432,6 +447,7 @@ PROJETO-IA-JURIDICA-2/
 │   ├── database/                    ✅ AsyncEngine + sessionmaker
 │   ├── security/                    ✅ JWT + AES-256
 │   ├── utils/                       ✅ LGPD, formatadores, validadores
+│   ├── tests/                       ✅ 4 arquivos (encryption, schemas, utils, validators)
 │   └── config/                      ✅ Pydantic Settings + constantes
 │
 ├── feature_1_ia_personalizada/
@@ -447,6 +463,8 @@ PROJETO-IA-JURIDICA-2/
 │   │   │   ├── crm.py               ✅ Score CRM por cliente
 │   │   │   ├── onboarding.py        ✅ Wizard 6 etapas
 │   │   │   ├── admin_import.py      ✅ CSV/Google Sheets
+│   │   │   ├── escalacoes.py        ✅ CRUD escalações para advogado
+│   │   │   ├── escritorios.py       ✅ Configurações de escritório
 │   │   │   ├── health.py            ✅ /health, /health/ready
 │   │   │   ├── metrics.py           ✅ /metrics (Prometheus)
 │   │   │   ├── prospeccao.py        ✅ /prospeccao/* (DNA, pipeline, leads)
@@ -497,27 +515,37 @@ PROJETO-IA-JURIDICA-2/
 │   │   ├── send_notifications.py    ✅ Notificações on-demand
 │   │   ├── dispatcher_agendadas.py  ✅ Despacha mensagens agendadas (cada 5min)
 │   │   ├── crm_worker.py            ✅ Análise CRM (debounce 1h)
-│   │   ├── hub_advogado.py          ✅ Processamento assíncrono do Hub
+│   │   ├── hub_advogado.py          ✅ Tasks Celery do Hub (interface)
+│   │   ├── hub_worker.py            ✅ Processamento assíncrono do Hub (implementação)
 │   │   ├── ingest_documentos.py     ✅ Pipeline RAG
 │   │   ├── mensagens_relacionamento.py ✅ Aniversários, datas comemorativas
 │   │   └── dead_letter.py           ✅ Dead Letter Queue
 │   │
 │   └── tests/
-│       ├── unit/                    ✅ 44 arquivos
-│       └── integration/             ✅ 18 arquivos
+│       ├── unit/                    ✅ 43 arquivos
+│       └── integration/             ✅ 17 arquivos
 │
 ├── admin/                           ✅ Admin Panel (React 19 + Vite + TailwindCSS v4)
-│   └── src/pages/                   ✅ Hub, CRM, Analytics, Operations, Processos, RAG, Settings
+│   └── src/pages/                   ✅ Hub, CRM, Analytics, Operations, Processos, RAG, Settings, Login
 │
 ├── frontend/
-│   └── hub-react/                   ✅ Hub do Advogado (React 19 + Framer Motion)
-│       └── src/pages/               ✅ HubIA, CRM, Captação, Painel, Documentos, Config
+│   ├── hub-react/                   ✅ Hub do Advogado (React 19 + Framer Motion)
+│   │   └── src/pages/               ✅ HubIA, Hub, CRM, Captação, Painel, Documentos, Config,
+│   │                                    Login, Onboarding, Welcome, CadastroCSV, Ajuda, Loading
+│   ├── login/                       ✅ Login page (HTML/CSS/JS — amicus-design)
+│   ├── cadastro-onboarding/         ✅ Onboarding wizard vanilla (HTML/CSS/JS)
+│   └── ajuda-contato/               ✅ Central de ajuda e contato (HTML/CSS/JS)
+│
+├── tests/
+│   ├── unit/                        ✅ test_hub_advogado.py
+│   └── load/                        ✅ Locust — testes de carga (config + locustfile)
 │
 ├── alembic/versions/                ✅ 21 migrations
 ├── infrastructure/docker/           ✅ Dockerfile + docker-compose (dev + prod)
 ├── monitoring/                      ✅ Prometheus + Grafana + Loki + Promtail
 ├── docs/                            ✅ Roadmap, guias de dev e produção
 ├── scripts/setup/                   ✅ init_db.py, seed_data.py, create_admin.py
+├── scripts/monitoring/              ✅ health_check.py
 ├── Makefile                         ✅ 40+ targets
 └── pyproject.toml                   ✅ Ruff + Black + mypy + pytest + mutmut
 ```
@@ -531,7 +559,7 @@ PROJETO-IA-JURIDICA-2/
 ```bash
 # 1. Clonar e configurar ambiente
 git clone <repo>
-cd PROJETO-IA-JURIDICA-2
+cd PROJETO-IA-JURIDICA-5
 make setup              # cria .venv, instala deps, copia .env.example → .env
 
 # 2. Editar .env com as chaves necessárias (ver seção abaixo)
@@ -575,6 +603,10 @@ make type-check         # mypy
 | `DELETE` | `/rag/{id}` | Remove documento do RAG | JWT |
 | `POST` | `/crm/analise` | Dispara análise CRM de cliente | JWT |
 | `GET` | `/crm/cliente/{id}` | Score + diagnóstico CRM | JWT |
+| `GET` | `/escalacoes` | Lista escalações do escritório | JWT |
+| `PATCH` | `/escalacoes/{id}` | Atualiza status de uma escalação | JWT (advogado) |
+| `GET` | `/escritorios/me` | Dados e configurações do escritório | JWT |
+| `PATCH` | `/escritorios/me` | Atualiza configurações do escritório | JWT (admin) |
 | `POST` | `/onboarding/etapa` | Avança etapa do wizard | JWT |
 | `GET` | `/chat/historico` | Histórico de conversas | JWT |
 | `GET` | `/health` | Health check (DB, Redis, Claude) | — |
@@ -698,9 +730,13 @@ make test-unit          # apenas unitários
 make test-integration   # apenas integração
 make coverage           # relatório HTML de cobertura
 make mutation           # testes de mutação com mutmut
+
+# Testes de carga (requer Locust)
+cd tests/load && locust -f locustfile.py   # painel em :8089
 ```
 
-- **44 arquivos unitários + 18 arquivos de integração**
+- **43 arquivos unitários** (`feature_1_ia_personalizada/tests/unit/`) **+ 17 de integração** (`feature_1_ia_personalizada/tests/integration/`)
+- Adicionalmente: **4 testes em `shared/tests/`** (encryption, schemas, utils, validators) e testes de load com **Locust** em `tests/load/`
 - Cobertura mínima: **70%** (enforçado no CI com falha de build)
 - Banco de testes: SQLite in-memory via `aiosqlite` — sem PostgreSQL necessário em dev
 - Feature 3: 89 testes dedicados (heurística de matching componente a componente, LGPD, rotas)
