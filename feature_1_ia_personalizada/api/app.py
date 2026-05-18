@@ -7,6 +7,7 @@ Inicializa o aplicativo, configura middlewares (CORS),
 registra todos os roteadores de domínio e define tratadores de eventos de ciclo de vida.
 """
 
+import asyncio
 import re
 from contextlib import asynccontextmanager
 
@@ -186,17 +187,27 @@ async def lifespan(app: FastAPI):
 
     _validar_config_no_startup()  # valida formato das chaves/URLs
 
-    # Ligando o Redis para o Rate Limit
-    app.state.redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    # Ligando o Redis para o Rate Limit (timeout curto para não travar requests)
+    app.state.redis_client = redis.from_url(
+        settings.REDIS_URL,
+        decode_responses=True,
+        socket_timeout=3,
+        socket_connect_timeout=3,
+    )
 
     try:
-        await app.state.redis_client.ping()
+        await asyncio.wait_for(app.state.redis_client.ping(), timeout=5)
         print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
+    except asyncio.TimeoutError:
+        print("⚠️  Redis: timeout na conexão — rate limiting desativado.")
     except Exception as e:
         print(f"❌ Erro ao conectar no Redis: {e}")
 
-    # Pré-aquece embeddings das queries mais comuns (P4)
-    await _warmup_embeddings(app.state.redis_client)
+    # Pré-aquece embeddings das queries mais comuns (P4) — com timeout para não travar startup
+    try:
+        await asyncio.wait_for(_warmup_embeddings(app.state.redis_client), timeout=15)
+    except asyncio.TimeoutError:
+        print("⚠️  Warm-up de embeddings: timeout (15s) — será gerado sob demanda.")
 
     yield
 
