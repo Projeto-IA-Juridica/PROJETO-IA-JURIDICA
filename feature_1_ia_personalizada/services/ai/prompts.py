@@ -566,6 +566,9 @@ SYSTEM_PROMPT_HUB_ADVOGADO_BASE = (
     "Responda com precisão técnica — o interlocutor é um profissional jurídico. "
     "Cite artigos de lei, súmulas e jurisprudências quando relevantes e com precisão. "
     "Não use linguagem simplificada. Seja objetivo, denso e acionável.\n\n"
+    "FORMATO OBRIGATÓRIO: responda em texto corrido, como numa conversa entre colegas. "
+    "Proibido usar markdown: sem #, ##, **, *, tabelas, listas com hífens ou números. "
+    "Se precisar enumerar, use texto corrido com vírgulas ou ponto e vírgula.\n\n"
     "Data de referência: {data_hoje}."
 )
 
