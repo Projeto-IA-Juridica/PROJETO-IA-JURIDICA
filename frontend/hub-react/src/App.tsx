@@ -14,6 +14,7 @@ import LoginPage        from './pages/LoginPage'
 import AjudaPage        from './pages/AjudaPage'
 import OnboardingPage   from './pages/OnboardingPage'
 import type { Section } from './types'
+import { getAccessToken, refreshAccessToken, fetchMe, clearAuth } from './api/auth'
 
 /* ── Pages ── */
 import PainelPage     from './pages/PainelPage'
@@ -31,11 +32,32 @@ const queryClient = new QueryClient({
 type Phase = 'login' | 'ajuda' | 'onboarding' | 'welcome' | 'loading' | 'hub'
 
 export default function App() {
-  const [phase, setPhase]           = useState<Phase>('welcome')
+  // Se já há token no localStorage, pula direto para loading (restaura sessão)
+  const [phase, setPhase]           = useState<Phase>(() => getAccessToken() ? 'loading' : 'welcome')
   const [fadeOut, setFadeOut]       = useState(false)
   const [shellReady, setShellReady] = useState(false)
   const [minDone, setMinDone]       = useState(false)
   const advancing                   = useRef(false)
+  // false enquanto valida o token existente; true quando validado ou quando não há token
+  const [sessionChecked, setSessionChecked] = useState<boolean>(() => !getAccessToken())
+
+  /* Valida token existente ao recarregar a página */
+  useEffect(() => {
+    if (sessionChecked) return
+    fetchMe()
+      .then(() => setSessionChecked(true))
+      .catch(async () => {
+        try {
+          await refreshAccessToken()
+          setSessionChecked(true)
+        } catch {
+          clearAuth()
+          setSessionChecked(true)
+          setPhase('login')
+        }
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* Sessão expirada (refresh token inválido) — volta para login */
   useEffect(() => {
@@ -64,12 +86,12 @@ export default function App() {
     return () => clearTimeout(t)
   }, [phase])
 
-  /* Avança para 'hub' quando Shell montou E tempo mínimo passou */
+  /* Avança para 'hub' quando Shell montou, tempo mínimo passou E sessão foi validada */
   useEffect(() => {
-    if (phase === 'loading' && shellReady && minDone) {
+    if (phase === 'loading' && shellReady && minDone && sessionChecked) {
       advanceTo('hub')
     }
-  }, [shellReady, minDone, phase])
+  }, [shellReady, minDone, phase, sessionChecked])
 
   const wrapStyle = {
     opacity: fadeOut ? 0 : 1,
@@ -91,7 +113,7 @@ export default function App() {
     return (
       <div style={wrapStyle}>
         <LoginPage
-          onLogin={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
+          onLogin={() => { setShellReady(false); setMinDone(false); setSessionChecked(true); advanceTo('loading') }}
           onRegister={() => advanceTo('onboarding')}
           onAjuda={() => advanceTo('ajuda')}
         />
@@ -113,7 +135,7 @@ export default function App() {
     return (
       <div style={{ ...wrapStyle, overflow: 'auto', height: 'auto', minHeight: '100vh' }}>
         <OnboardingPage
-          onComplete={() => { setShellReady(false); setMinDone(false); advanceTo('loading') }}
+          onComplete={() => { setShellReady(false); setMinDone(false); setSessionChecked(true); advanceTo('loading') }}
         />
       </div>
     )
