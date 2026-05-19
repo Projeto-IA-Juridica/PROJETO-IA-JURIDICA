@@ -104,7 +104,11 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
             return await call_next(request)
 
-        # 2. Rotas públicas — passam direto
+        # 2a. CORS preflight — OPTIONS nunca carrega JWT, deve passar livre
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # 2b. Rotas públicas — passam direto
         if path in ROTAS_PUBLICAS_EXATAS:
             return await call_next(request)
 
