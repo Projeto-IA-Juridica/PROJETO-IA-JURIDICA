@@ -6,8 +6,9 @@ export const TOKEN_KEY = KEYS.access
 
 const MUTATING = new Set(['post', 'put', 'patch', 'delete'])
 
-// Usa /api relativo sempre: o proxy do Vite (dev) e o Railway (prod) roteiam corretamente
-const baseURL = import.meta.env.VITE_API_URL || '/api'
+// Em desenvolvimento: usa /api relativo (Vite proxy redireciona para localhost:8000)
+// Em produção: usa /api relativo (mesmo domínio)
+const baseURL = '/api'
 
 export const api = axios.create({
   baseURL,

@@ -83,6 +83,11 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
 
+        # 0. Preflight CORS (OPTIONS) — sempre autoriza sem JWT
+        #    Browser envia OPTIONS antes de POST/PUT/DELETE para validar CORS
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # 1. Rotas de documentação — controle próprio por ambiente
         if any(path.startswith(rota) for rota in ROTAS_DOCS):
             is_producao = settings.ENVIRONMENT == "production"

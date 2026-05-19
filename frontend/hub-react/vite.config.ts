@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5174,
+    strictPort: false,
     proxy: {
       '/api': {
         target: 'https://projeto-ia-juridica-production-4bb1.up.railway.app',
