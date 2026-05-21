@@ -253,7 +253,7 @@ async def get_chat_stats(
             .group_by(Processo.score_nivel)
         )
         result = await db.execute(stmt_score)
-        score_risco_dist = dict(result.all())
+        score_risco_dist = {nivel: count for nivel, count in result.all()}  # noqa: C416
     except Exception:
         pass  # Feature 2 ainda não migrada — degradação graciosa
 
