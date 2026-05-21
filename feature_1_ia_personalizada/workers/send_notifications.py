@@ -316,7 +316,9 @@ def processar_mensagem_recebida(
                 await evo.close()
 
         try:
-            from feature_1_ia_personalizada.api.routes.metrics import audio_transcritos_total as _ctr_audio
+            from feature_1_ia_personalizada.api.routes.metrics import (
+                audio_transcritos_total as _ctr_audio,
+            )
         except Exception:
             _ctr_audio = None  # métricas opcionais
 
@@ -451,15 +453,16 @@ def processar_resposta_advogado(
     """
     Processa a resposta de um advogado a uma escalação e envia ao cliente final.
     """
-    from shared.database.connection import async_session_factory
     from sqlalchemy import select
+
+    from shared.database.connection import async_session_factory
     from shared.models.interacao import Interacao
 
     async def _processar():
         async with async_session_factory() as session:
             interacao_id = None
             import re
-            
+
             # Buscar no quoted message
             texto_citado = ""
             if "extendedTextMessage" in msg_context:
@@ -479,10 +482,10 @@ def processar_resposta_advogado(
                 Interacao.escritorio_id == id_escritorio,
                 Interacao.tipo == "escalacao",
             ).order_by(Interacao.id.desc()).limit(20)
-            
+
             result = await session.execute(stmt)
             interacoes_recentes = result.scalars().all()
-            
+
             interacao_alvo = None
             if interacao_id:
                 for i in interacoes_recentes:
@@ -510,19 +513,19 @@ def processar_resposta_advogado(
             esc_meta["advogado_responsavel_id"] = id_advogado
             esc_meta["resposta_advogado"] = texto_resposta
             meta["escalacao"] = esc_meta
-            
+
             interacao_alvo.metadata_json = meta
-            
+
             # Analisar a resposta do advogado
             texto_limpo = texto_resposta.strip().lower()
             if texto_limpo in ["ok", "aprovado", "aprovar", "sim", "pode enviar"]:
                 resposta_final = esc_meta.get("sugestao_resposta", "")
             else:
                 resposta_final = texto_resposta
-                
+
             service = _get_whatsapp_service()
             await service.enviar_mensagem(id_escritorio, interacao_alvo.cliente_id, resposta_final)
-            
+
             await session.commit()
             logger.info("escalacao_resolvida", interacao_id=interacao_alvo.id, advogado_id=id_advogado)
             await service.evolution_client.close()

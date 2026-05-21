@@ -11,7 +11,7 @@ Fila dedicada: hub_advogado
 from __future__ import annotations
 
 import asyncio
-from datetime import date, timezone
+from datetime import UTC, date
 from decimal import Decimal
 from typing import Any
 
@@ -30,7 +30,6 @@ from feature_1_ia_personalizada.services.ai.hub_advogado_classifier import (
 )
 from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_HUB_ADVOGADO_BASE,
-    SYSTEM_PROMPT_HUB_ANALISE_PETICAO,
     SYSTEM_PROMPT_HUB_INSIGHT_CLIENTE,
     SYSTEM_PROMPT_HUB_PESQUISA_JURISPRUDENCIA,
     SYSTEM_PROMPT_HUB_RESUMO_PROCESSO,
@@ -304,13 +303,14 @@ async def _handler_status_escritorio(
     session: Any,
 ) -> str:
     """Gera dashboard textual sem chamar IA — dados estruturados do banco."""
-    from sqlalchemy import func
     from datetime import datetime, timedelta
+
+    from sqlalchemy import func
 
     from shared.models.interacao import Interacao
     from shared.models.processo import Processo
 
-    hoje = datetime.now(timezone.utc).date()
+    hoje = datetime.now(UTC).date()
     amanha_7d = hoje + timedelta(days=7)
 
     # Atendimentos hoje
@@ -349,8 +349,8 @@ async def _handler_analise_peticao(
     escalacao_client: EscalacaoClient,
 ) -> tuple[str, str, int, int, Decimal, int | None, int | None]:
     """Baixa PDF do WhatsApp, extrai texto e envia para Claude Opus analisar."""
-    from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
     from feature_1_ia_personalizada.services.ai.escalation_client import TipoAnalise
+    from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
     from feature_1_ia_personalizada.services.rag.ingestion import _extrair_texto_pdf
 
     instance = escritorio.webhook_whatsapp_instance
@@ -587,9 +587,9 @@ async def _handler_resumo_processo(
     Lookup: CNJ do classificador (prioridade) → nome do cliente → processo mais recente.
     Contexto: todos os campos disponíveis no banco + CRM score via CRMDataAggregator.
     """
+    from feature_1_ia_personalizada.services.crm.aggregator import CRMDataAggregator
     from shared.models.cliente import Cliente
     from shared.models.processo import Processo
-    from feature_1_ia_personalizada.services.crm.aggregator import CRMDataAggregator
 
     processo = None
     cliente_id_ref: int | None = None

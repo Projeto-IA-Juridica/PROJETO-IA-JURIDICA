@@ -7,13 +7,20 @@ Cada escritório é um cliente isolado. Todos os outros models
 referenciam escritorio_id para garantir isolamento multi-tenant.
 """
 
+from datetime import datetime, time
 from typing import TYPE_CHECKING
 
-from datetime import time
-from datetime import datetime
-
-from sqlalchemy import Boolean, Integer, SmallInteger, String, Text, Time, UniqueConstraint
-from sqlalchemy import TIMESTAMP, BigInteger
+from sqlalchemy import (
+    TIMESTAMP,
+    BigInteger,
+    Boolean,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    Time,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

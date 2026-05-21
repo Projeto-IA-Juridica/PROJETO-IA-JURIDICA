@@ -16,22 +16,22 @@ Critérios testados:
 
 from __future__ import annotations
 
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
 
 from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import LitiganteEncontrado
-from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
-from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
-from feature_1_ia_personalizada.services.prospeccao.matching import ResultadoMatch
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
+from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
+from feature_1_ia_personalizada.services.prospeccao.matching import ResultadoMatch
+from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
 from shared.schemas.prospeccao import (
     DescobertaRequest,
     LeadStatusUpdate,
     PipelineResponse,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -118,8 +118,8 @@ def _make_lead_mock(id: int = 1, escritorio_id: int = 1, score: int = 75, tipo: 
     lead.tipo_acao_origem = None
     lead.numero_cnj_exemplo = None
     lead.processos_publicos_count = 4
-    from datetime import datetime, timezone
-    lead.created_at = datetime.now(timezone.utc)
+    from datetime import datetime
+    lead.created_at = datetime.now(UTC)
     lead.criado_em = lead.created_at
     return lead
 
@@ -292,9 +292,8 @@ class TestDescobrirLeads:
 
     @pytest.mark.asyncio
     async def test_lead_abaixo_score_minimo_descartado(self):
-        from feature_1_ia_personalizada.api.routes.prospeccao import descobrir_leads
-
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
+        from feature_1_ia_personalizada.api.routes.prospeccao import descobrir_leads
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=_dna())),
             "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[_litigante_pj()])),
@@ -432,8 +431,9 @@ class TestPipelineB2C:
 
     def test_pipeline_response_montar_injeta_aviso_b2c(self):
         """PipelineResponse.montar injeta aviso_lgpd quando há leads pessoa."""
+        from datetime import datetime
+
         from shared.schemas.prospeccao import LeadProspeccaoResponse
-        from datetime import datetime, timezone
 
         def _lead_response(tipo: str) -> LeadProspeccaoResponse:
             return LeadProspeccaoResponse(
@@ -446,7 +446,7 @@ class TestPipelineB2C:
                 status="novo",
                 notas_advogado=None,
                 fonte_descoberta="Reclamação",
-                criado_em=datetime.now(timezone.utc),
+                criado_em=datetime.now(UTC),
             )
 
         # Sem leads B2C → sem aviso
@@ -524,7 +524,6 @@ class TestIsolamentoEscritorios:
 class TestDeduplicacao:
     @pytest.mark.asyncio
     async def test_mesmo_cnpj_atualiza_lead_existente(self):
-        from feature_1_ia_personalizada.api.routes import prospeccao as mod
         from feature_1_ia_personalizada.api.routes.prospeccao import _salvar_lead
 
         lead_existente = _make_lead_mock(score=50)
@@ -539,7 +538,7 @@ class TestDeduplicacao:
         intel = _empresa_intel(cnpj="11222333000181")
         resultado = _resultado(score=85)
 
-        resp = await _salvar_lead(
+        await _salvar_lead(
             escritorio_id=1,
             litigante=_litigante_pj(),
             inteligencia=intel,
@@ -587,7 +586,7 @@ class TestDeduplicacao:
             sem_advogado=False,
         )
 
-        resp = await _salvar_lead(
+        await _salvar_lead(
             escritorio_id=1,
             litigante=litigante,
             inteligencia=intel,

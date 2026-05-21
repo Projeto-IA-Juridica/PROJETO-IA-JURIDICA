@@ -284,7 +284,7 @@ async def test_regex_extrai_numero_cnj():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(1)
 
-    claude_mock = AsyncMock()
+    _claude_mock = AsyncMock()
 
     with (
         patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
@@ -292,7 +292,7 @@ async def test_regex_extrai_numero_cnj():
             "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata_claude",
             new_callable=AsyncMock,
             return_value={},
-        ) as mock_claude,
+        ) as _mock_claude,
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
@@ -300,7 +300,7 @@ async def test_regex_extrai_numero_cnj():
             session_factory=factory,
         )
         # Injeta texto curto que gera 1 chunk apenas
-        resultado = await ingester.ingerir_texto(
+        _resultado = await ingester.ingerir_texto(
             texto=texto,
             escritorio_id=1,
             titulo="Petição",

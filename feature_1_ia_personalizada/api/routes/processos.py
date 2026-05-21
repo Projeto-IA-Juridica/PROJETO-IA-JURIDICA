@@ -9,11 +9,11 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 from shared.database.session import get_db
 from shared.models.processo import Processo
 from shared.schemas.processo import (
+    _NIVEIS_SCORE_VALIDOS,
     ProcessoCreate,
     ProcessoList,
     ProcessoResponse,
     ProcessoUpdate,
-    _NIVEIS_SCORE_VALIDOS,
 )
 from shared.utils.lgpd import registrar_acesso
 

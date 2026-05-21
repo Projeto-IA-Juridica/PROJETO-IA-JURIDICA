@@ -7,13 +7,12 @@ Usa apenas a stdlib (csv, io) — sem dependências extras.
 
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models.interacao import Interacao
-
 
 _CABECALHO_CSV = [
     "id",
@@ -37,10 +36,10 @@ def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
     """
     try:
         dt = datetime.strptime(mes_ano, "%Y-%m")
-    except ValueError:
-        raise ValueError(f"Formato inválido para 'mes': esperado YYYY-MM, recebido {mes_ano!r}")
+    except ValueError as e:
+        raise ValueError(f"Formato inválido para 'mes': esperado YYYY-MM, recebido {mes_ano!r}") from e
 
-    inicio = dt.replace(tzinfo=timezone.utc)
+    inicio = dt.replace(tzinfo=UTC)
     # Avança para o primeiro dia do mês seguinte
     if inicio.month == 12:
         fim = inicio.replace(year=inicio.year + 1, month=1)

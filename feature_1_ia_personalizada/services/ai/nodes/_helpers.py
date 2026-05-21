@@ -16,8 +16,8 @@ from shared.models.interacao import Interacao
 from shared.models.processo import Processo
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
     from redis.asyncio import Redis
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy import select
 

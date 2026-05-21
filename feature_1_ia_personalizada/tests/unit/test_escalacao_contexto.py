@@ -14,15 +14,12 @@ Cobertura:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManager
-
 
 # ---------------------------------------------------------------------------
 # Helpers

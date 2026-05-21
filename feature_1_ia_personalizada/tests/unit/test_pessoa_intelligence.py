@@ -21,7 +21,6 @@ from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import (
     PessoaIntelligenceService,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------

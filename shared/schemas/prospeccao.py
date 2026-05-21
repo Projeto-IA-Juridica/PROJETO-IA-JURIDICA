@@ -11,7 +11,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Request schemas
 # ---------------------------------------------------------------------------
@@ -124,7 +123,7 @@ class PipelineResponse(BaseModel):
         leads: list[LeadProspeccaoResponse],
         dna_disponivel: bool,
         linkedin_disponivel: bool,
-    ) -> "PipelineResponse":
+    ) -> PipelineResponse:
         """
         Factory que injeta aviso_lgpd automaticamente se houver leads B2C.
         Use este método em vez do construtor direto.

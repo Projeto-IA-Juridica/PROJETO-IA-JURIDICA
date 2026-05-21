@@ -1,15 +1,15 @@
 import asyncio
+
 import httpx
-import json
 
 BASE_URL = "http://localhost:8000"
 EVOLUTION_API_KEY = "429683C4C977415CAAFCE10F7D579CE3" # Chave padrao do .env de dev
 
 async def main():
     print("--- INICIANDO TESTE MANUAL DA FEATURE 6 (ESCALAÇÃO) ---")
-    
+
     # IMPORTANTE: Garanta que sua API e o Celery (worker redis) estejam rodando localmente!
-    
+
     # Você vai precisar ajustar estes valores para IDs, telefones e instâncias reais do seu banco local
     telefone_cliente = "5511999999999" # Número do cliente que fará a pergunta
     telefone_advogado = "5511888888888" # Número do advogado que responderá
@@ -21,7 +21,7 @@ async def main():
     }
 
     print("\n[ Passo 1 ] Simulando Cliente fazendo uma pergunta difícil que causa escalação...")
-    
+
     payload_cliente = {
         "event": "messages.upsert",
         "instance": instancia_whatsapp,
@@ -35,7 +35,7 @@ async def main():
             }
         }
     }
-    
+
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(f"{BASE_URL}/webhook/whatsapp", json=payload_cliente, headers=headers)
@@ -47,10 +47,10 @@ async def main():
 
     print("\n⏳ Aguardando alguns segundos para o Celery processar o orquestrador e gerar a escalação...\n")
     await asyncio.sleep(10)
-    
+
     print("\n[ Passo 2 ] Simulando o Advogado respondendo a escalação...")
     print("O advogado pode responder com o ID da interação ou, se for a mais recente, apenas 'ok' ou a resposta completa.")
-    
+
     payload_advogado = {
         "event": "messages.upsert",
         "instance": instancia_whatsapp,
@@ -64,12 +64,12 @@ async def main():
             }
         }
     }
-    
+
     async with httpx.AsyncClient() as client:
         resp = await client.post(f"{BASE_URL}/webhook/whatsapp", json=payload_advogado, headers=headers)
         print(f"Status Webhook Advogado: {resp.status_code}")
         print(f"Resposta Webhook Advogado: {resp.json()}")
-        
+
     print("\n✅ Teste manual disparado com sucesso!")
     print("\nPara verificar os resultados:")
     print("1. Olhe os logs do Celery Worker para garantir que a `processar_mensagem_recebida` e a nova task `processar_resposta_advogado` rodaram sem erros.")

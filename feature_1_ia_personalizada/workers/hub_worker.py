@@ -16,16 +16,17 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
-import structlog
-import redis
 
-from shared.config.settings import settings
-from shared.database.session import get_session_factory
-from shared.models.sessao_advogado import SessaoAdvogado
+import redis
+import structlog
+
 from feature_1_ia_personalizada.services.ai.escalation_client import (
     EscalacaoClient,
     TipoAnalise,
 )
+from shared.config.settings import settings
+from shared.database.session import get_session_factory
+from shared.models.sessao_advogado import SessaoAdvogado
 
 from .celery_app import DLQTask, celery_app
 

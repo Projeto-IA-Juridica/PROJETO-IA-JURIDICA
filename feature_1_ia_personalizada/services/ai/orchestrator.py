@@ -30,8 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -72,9 +71,6 @@ from feature_1_ia_personalizada.services.ai.state import (
     classificar_por_keywords,
     erros_total,
 )
-
-# Alias de retrocompatibilidade para testes que importam o nome privado
-_classificar_por_keywords = classificar_por_keywords
 from feature_1_ia_personalizada.services.ai.translator import JuridicalTranslator
 from feature_1_ia_personalizada.services.escalacao.manager import EscalacaoManager
 from feature_1_ia_personalizada.services.legal_data.cache_manager import LegalDataCacheManager
@@ -85,6 +81,9 @@ from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 from shared.config.constants import MENSAGENS_FALLBACK
 from shared.models.escritorio import Escritorio
 from shared.models.processo import Processo
+
+# Alias de retrocompatibilidade para testes que importam o nome privado
+_classificar_por_keywords = classificar_por_keywords
 
 logger = structlog.get_logger(__name__)
 
@@ -417,7 +416,7 @@ class ConversationOrchestrator:
     # -----------------------------------------------------------------------
 
     async def _verificar_quota_tokens(self, escritorio_id: int) -> None:
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         async with self._session_factory() as session:
             escritorio = await session.get(Escritorio, escritorio_id)
             if escritorio is None or escritorio.quota_tokens_mes is None:

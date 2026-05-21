@@ -17,9 +17,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
-from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
 from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
-
+from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
 
 # ---------------------------------------------------------------------------
 # Builders de fixture

@@ -19,13 +19,10 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 
 from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client import (
     VibeProspectingClient,
 )
-from feature_1_ia_personalizada.services.prospeccao.linkedin_client import ContatoLinkedIn
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -85,7 +85,9 @@ async def node_avaliar_confianca(state: ConversationState, deps: NodeDeps) -> di
 
         if deve_escalar:
             try:
-                from feature_1_ia_personalizada.api.routes.metrics import escalacao_roteamentos_total
+                from feature_1_ia_personalizada.api.routes.metrics import (
+                    escalacao_roteamentos_total,
+                )
                 motivo_label = "forcado" if score.deve_escalar else "score_baixo"
                 escalacao_roteamentos_total.labels(
                     escritorio_id=str(state["escritorio_id"]), motivo=motivo_label

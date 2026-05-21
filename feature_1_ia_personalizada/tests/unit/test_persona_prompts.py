@@ -100,6 +100,7 @@ class TestCarregarTemplates:
     async def test_usa_template_customizado_do_banco(self):
         """Quando escritório tem template customizado, deve usar esse ao invés do default."""
         from unittest.mock import AsyncMock, MagicMock
+
         from feature_1_ia_personalizada.services.messaging.templates import carregar_templates
 
         # Simula DB retornando templates customizados
@@ -126,6 +127,7 @@ class TestCarregarTemplates:
         """Quando há cache Redis, não deve consultar o banco."""
         import json
         from unittest.mock import AsyncMock
+
         from feature_1_ia_personalizada.services.messaging.templates import carregar_templates
 
         cached_templates = {
@@ -152,8 +154,8 @@ class TestCarregarTemplates:
     @pytest.mark.asyncio
     async def test_salva_resultado_no_redis(self):
         """Após consultar o banco, deve salvar resultado no Redis."""
-        import json
         from unittest.mock import AsyncMock, MagicMock
+
         from feature_1_ia_personalizada.services.messaging.templates import carregar_templates
 
         redis_client = AsyncMock()

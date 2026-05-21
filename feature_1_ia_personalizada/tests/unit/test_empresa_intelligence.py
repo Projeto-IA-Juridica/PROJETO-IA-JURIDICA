@@ -20,13 +20,14 @@ from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
     LitiganteEncontrado,
 )
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import (
-    EmpresaIntelligenceService,
     EmpresaInteligencia,
+    EmpresaIntelligenceService,
 )
-from feature_1_ia_personalizada.services.prospeccao.receita_federal_client import EmpresaDados
 from feature_1_ia_personalizada.services.prospeccao.linkedin_client import ContatoLinkedIn
-from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client import VibeProspectingClient
-
+from feature_1_ia_personalizada.services.prospeccao.receita_federal_client import EmpresaDados
+from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client import (
+    VibeProspectingClient,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

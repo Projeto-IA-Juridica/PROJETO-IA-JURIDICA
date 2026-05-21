@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from feature_1_ia_personalizada.services.crm.aggregator import CRMContexto
 from shared.config.constants import (
     CRM_CONTATO_PONTOS,
     CRM_ENGAJAMENTO_PONTOS,
@@ -20,7 +21,6 @@ from shared.config.constants import (
     CRM_RISCO_PONTOS,
     CRM_SCORE_PESOS,
 )
-from feature_1_ia_personalizada.services.crm.aggregator import CRMContexto
 
 
 @dataclass

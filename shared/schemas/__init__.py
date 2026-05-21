@@ -20,26 +20,11 @@ from shared.schemas.cliente import (
     ClienteResponse,
     ClienteUpdate,
 )
-from shared.schemas.prospeccao import (
-    LeadProspeccaoResponse,
-    DescobertaRequest,
-    LeadStatusUpdate,
-    PipelineResponse,
-    DNAEscritorioResponse,
-)
 from shared.schemas.escritorio import (
     EscritorioCreate,
     EscritorioList,
     EscritorioResponse,
     EscritorioUpdate,
-)
-from shared.schemas.processo import (
-    AndamentoSchema,
-    ProcessoComAndamentos,
-    ProcessoCreate,
-    ProcessoList,
-    ProcessoResponse,
-    ProcessoUpdate,
 )
 from shared.schemas.hub_advogado import (
     AdvogadoAtivo,
@@ -49,6 +34,14 @@ from shared.schemas.hub_advogado import (
     MetricasHubResponse,
     SessaoAdvogadoListItem,
     SessaoAdvogadoResponse,
+)
+from shared.schemas.processo import (
+    AndamentoSchema,
+    ProcessoComAndamentos,
+    ProcessoCreate,
+    ProcessoList,
+    ProcessoResponse,
+    ProcessoUpdate,
 )
 from shared.schemas.response import ErrorResponse, PaginatedResponse, SuccessResponse
 from shared.schemas.usuario import (

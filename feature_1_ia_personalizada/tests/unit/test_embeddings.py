@@ -55,7 +55,7 @@ class _FakePipeline:
         return self
 
     async def execute(self) -> None:
-        for key, ttl, value in self._ops:
+        for key, _ttl, value in self._ops:
             self._redis._store[key] = value
 
 

@@ -211,7 +211,7 @@ class DataJudProspeccaoClient:
         resultados = await asyncio.gather(*tasks, return_exceptions=True)
 
         brutos: list[dict] = []
-        for indice, res in zip(indices, resultados):
+        for indice, res in zip(indices, resultados, strict=False):
             if isinstance(res, Exception):
                 logger.warning(
                     "datajud_prosp.indice_erro",

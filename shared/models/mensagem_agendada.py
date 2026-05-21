@@ -80,8 +80,8 @@ class MensagemAgendada(Base, TimestampMixin, TenantMixin):
     )
 
     # Relacionamentos
-    cliente: Mapped["Cliente"] = relationship("Cliente")
-    processo: Mapped["Processo | None"] = relationship("Processo")
+    cliente: Mapped[Cliente] = relationship("Cliente")
+    processo: Mapped[Processo | None] = relationship("Processo")
 
     __table_args__ = (
         # Índice principal do dispatcher: pendentes ordenadas por enviar_em

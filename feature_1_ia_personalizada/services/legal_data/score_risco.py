@@ -18,8 +18,8 @@ Performance: cálculo em memória <50ms. DataJud já cacheado pelo cache_manager
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +55,7 @@ def _normalizar_score(valor: float, minimo: float, maximo: float) -> int:
     return int(round(max(0.0, min(1.0, norm)) * 100))
 
 
-def _componente_complexidade(tipo_acao: Optional[str]) -> int:
+def _componente_complexidade(tipo_acao: str | None) -> int:
     if not tipo_acao:
         return 50
     chave = tipo_acao.lower().strip()
@@ -68,7 +68,7 @@ def _componente_complexidade(tipo_acao: Optional[str]) -> int:
     return 50
 
 
-def _componente_duracao(datajud_data: Optional[dict]) -> int:
+def _componente_duracao(datajud_data: dict | None) -> int:
     if not datajud_data:
         return 50
     media_dias = datajud_data.get("tempo_medio_tramitacao_dias")
@@ -77,7 +77,7 @@ def _componente_duracao(datajud_data: Optional[dict]) -> int:
     return _normalizar_score(float(media_dias), 0, SCORE_RISCO_PRAZO_MAX_REFERENCIA)
 
 
-def _componente_historico_vara(datajud_data: Optional[dict], polo_cliente: Optional[str]) -> int:
+def _componente_historico_vara(datajud_data: dict | None, polo_cliente: str | None) -> int:
     if not datajud_data:
         return 50
     taxa = datajud_data.get("taxa_procedencia_autor")
@@ -90,7 +90,7 @@ def _componente_historico_vara(datajud_data: Optional[dict], polo_cliente: Optio
     return int(round((1.0 - float(taxa)) * 100))
 
 
-def _componente_valor_causa(valor_causa: Optional[float]) -> int:
+def _componente_valor_causa(valor_causa: float | None) -> int:
     if not valor_causa or valor_causa <= 0:
         return 50
     sm = valor_causa / SCORE_RISCO_SALARIO_MINIMO_REF
@@ -105,7 +105,7 @@ def _componente_valor_causa(valor_causa: Optional[float]) -> int:
     return 95
 
 
-def _componente_fase(fase_processual: Optional[str]) -> int:
+def _componente_fase(fase_processual: str | None) -> int:
     if not fase_processual:
         return SCORE_RISCO_POR_FASE.get("conhecimento", 80)
     return SCORE_RISCO_POR_FASE.get(fase_processual.lower(), 50)
@@ -115,7 +115,7 @@ def _gerar_interpretacao_score(
     score: int,
     nivel: str,
     componentes: ComponentesScore,
-    tipo_acao: Optional[str],
+    tipo_acao: str | None,
 ) -> str:
     """
     Texto explicativo para o advogado baseado nos componentes mais altos.
@@ -172,7 +172,7 @@ class ScoreRiscoCalculator:
         tempo_medio_tramitacao_dias, taxa_procedencia_autor
     """
 
-    def calcular(self, processo: Any, datajud_data: Optional[dict] = None) -> ScoreRisco:
+    def calcular(self, processo: Any, datajud_data: dict | None = None) -> ScoreRisco:
         tipo_acao       = getattr(processo, "tipo_acao", None)
         valor_causa     = getattr(processo, "valor_causa", None)
         fase_processual = getattr(processo, "fase_processual", None)
@@ -214,5 +214,5 @@ class ScoreRiscoCalculator:
             nivel=nivel,
             componentes=componentes,
             interpretacao=_gerar_interpretacao_score(score, nivel, componentes, tipo_acao),
-            atualizado_em=datetime.now(timezone.utc),
+            atualizado_em=datetime.now(UTC),
         )

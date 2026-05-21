@@ -21,7 +21,6 @@ from feature_1_ia_personalizada.services.ai.confidence_router import (
     ConfidenceScore,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

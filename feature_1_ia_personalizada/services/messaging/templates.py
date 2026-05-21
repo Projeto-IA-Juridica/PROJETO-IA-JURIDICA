@@ -119,8 +119,8 @@ _DEFAULT_SEM_NOVIDADE = TEMPLATE_SEM_MOVIMENTACAO
 
 async def carregar_templates(
     escritorio_id: int,
-    redis_client: "Any | None" = None,
-    db: "Any | None" = None,
+    redis_client: Any | None = None,
+    db: Any | None = None,
 ) -> dict[str, str]:
     """
     Retorna os templates ativos do escritório.
@@ -161,6 +161,7 @@ async def carregar_templates(
     if db is not None:
         try:
             from sqlalchemy import select
+
             from shared.models.escritorio import Escritorio
 
             result = await db.execute(

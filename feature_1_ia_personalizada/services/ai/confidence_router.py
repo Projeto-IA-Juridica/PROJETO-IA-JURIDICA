@@ -16,7 +16,7 @@ e retorna um ConfidenceScore imutável.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -197,7 +197,7 @@ class ConfidenceRouter:
             motivo="score_calculado",
         )
 
-    def rotear(self, score: ConfidenceScore, escritorio: "Escritorio") -> str:
+    def rotear(self, score: ConfidenceScore, escritorio: Escritorio) -> str:
         """
         Decide o destino da mensagem: "claude" ou "escalacao".
 

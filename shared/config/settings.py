@@ -109,20 +109,21 @@ class Settings(BaseSettings):
     @classmethod
     def validar_fernet_key(cls, v: str) -> str:
         """Aceita Fernet key válida ou hex de 32 bytes; converte se necessário.
-        
+
         Railway às vezes injeta chaves em formato hex; esse validador as converte
         para Fernet automaticamente, mantendo compatibilidade.
         """
-        from cryptography.fernet import Fernet
         import base64
-        
+
+        from cryptography.fernet import Fernet
+
         # Tenta usar diretamente como Fernet
         try:
             Fernet(v.encode())
             return v
         except Exception:
             pass
-        
+
         # Se for hex de 32 chars, converte para Fernet
         if len(v) == 32 and all(c in '0123456789abcdefABCDEF' for c in v):
             try:
@@ -135,7 +136,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"ENCRYPTION_KEY em formato hex inválido: {v}"
                 ) from exc
-        
+
         raise ValueError(
             "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe) "
             "ou hex de 32 caracteres. "

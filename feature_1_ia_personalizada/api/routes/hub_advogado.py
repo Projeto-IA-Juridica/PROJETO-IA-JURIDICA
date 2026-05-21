@@ -14,7 +14,7 @@ from __future__ import annotations
 import functools
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import structlog
@@ -172,7 +172,7 @@ async def analisar_peticao(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Não foi possível extrair texto do PDF. Verifique se não está protegido ou corrompido.",
-        )
+        ) from exc
 
     if len(texto.strip()) < 50:
         raise HTTPException(
@@ -304,7 +304,7 @@ async def consultar(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serviço de consulta indisponível. Tente novamente.",
-        )
+        ) from exc
 
     await _salvar_sessao(
         db,
@@ -470,7 +470,7 @@ async def metricas_hub(
     Agrega por `escritorio_id` do token — nunca retorna dados de outros escritórios.
     """
     escritorio_id: int = int(payload["escritorio_id"])
-    agora = datetime.now(timezone.utc)
+    agora = datetime.now(UTC)
     inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     base = (

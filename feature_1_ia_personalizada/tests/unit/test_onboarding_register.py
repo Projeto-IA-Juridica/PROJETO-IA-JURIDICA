@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import status
-from httpx import AsyncClient
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -36,8 +35,9 @@ _VALID_REGISTER_PAYLOAD = {
 class TestCNPJValidation:
     def test_cnpj_invalido_rejeitado(self):
         """CNPJ com dígitos verificadores errados deve falhar na validação Pydantic."""
-        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
         from pydantic import ValidationError
+
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
 
         payload = {**_VALID_REGISTER_PAYLOAD, "cnpj": "00.000.000/0000-00"}
         with pytest.raises(ValidationError) as exc_info:
@@ -63,8 +63,9 @@ class TestCNPJValidation:
 
     def test_oab_invalida_rejeitada(self):
         """OAB fora do formato UFNNNNN deve falhar."""
-        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
         from pydantic import ValidationError
+
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
 
         payload = {**_VALID_REGISTER_PAYLOAD, "oab_responsavel": "123456"}
         with pytest.raises(ValidationError):
@@ -72,8 +73,9 @@ class TestCNPJValidation:
 
     def test_senha_curta_rejeitada(self):
         """Senha com menos de 8 caracteres deve falhar."""
-        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
         from pydantic import ValidationError
+
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest
 
         payload = {**_VALID_REGISTER_PAYLOAD, "senha": "abc"}
         with pytest.raises(ValidationError):
@@ -89,10 +91,11 @@ class TestRegisterEndpoint:
     @pytest.mark.asyncio
     async def test_register_cria_escritorio_e_admin(self):
         """POST /onboarding/register cria escritório + admin e retorna JWT."""
-        from feature_1_ia_personalizada.api.routes.onboarding import register, RegisterRequest
+        from datetime import datetime
+
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        from datetime import datetime
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest, register
         from shared.models.escritorio import Escritorio as EscritorioModel
 
         db = AsyncMock(spec=AsyncSession)
@@ -133,8 +136,9 @@ class TestRegisterEndpoint:
     async def test_register_cnpj_duplicado_retorna_409(self):
         """Segundo cadastro com mesmo CNPJ deve retornar 409 Conflict."""
         from fastapi import HTTPException
-        from feature_1_ia_personalizada.api.routes.onboarding import register, RegisterRequest
         from sqlalchemy.ext.asyncio import AsyncSession
+
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest, register
 
         db = AsyncMock(spec=AsyncSession)
 
@@ -158,10 +162,11 @@ class TestRegisterEndpoint:
     @pytest.mark.asyncio
     async def test_usuario_admin_criado_com_role_correto(self):
         """Usuário criado no register deve ter role='admin'."""
-        from feature_1_ia_personalizada.api.routes.onboarding import register, RegisterRequest
+        from datetime import datetime
+
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        from datetime import datetime
+        from feature_1_ia_personalizada.api.routes.onboarding import RegisterRequest, register
         from shared.models.escritorio import Escritorio as EscritorioModel
 
         db = AsyncMock(spec=AsyncSession)

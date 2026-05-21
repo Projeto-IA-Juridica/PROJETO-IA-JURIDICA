@@ -22,34 +22,33 @@ import pytest
 from feature_1_ia_personalizada.services.crm.aggregator import CRMContexto, NPSRegistro
 from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer, _validar_output
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _ctx_base(**kwargs) -> CRMContexto:
-    defaults = dict(
-        cliente_id=1,
-        escritorio_id=1,
-        nome="João Silva",
-        profissao="Engenheiro",
-        empresa="Tech Corp",
-        data_nascimento=None,
-        nps_historico=[NPSRegistro(data=datetime.now(UTC), nota=4)],
-        nps_medio_3m=4.0,
-        total_interacoes_30d=8,
-        total_interacoes_90d=20,
-        dias_desde_ultimo_contato=5,
-        ultimo_contato_at=datetime.now(UTC) - timedelta(days=5),
-        processos_ativos=[],
-        pior_score_risco=None,
-        escalacoes_pendentes=0,
-        escalacoes_rejeitadas_30d=0,
-        crm_score_anterior=None,
-        crm_analisado_em_anterior=None,
-        crm_resumo_anterior=None,
-        crm_acao_sugerida_anterior=None,
-    )
+    defaults = {
+        "cliente_id": 1,
+        "escritorio_id": 1,
+        "nome": "João Silva",
+        "profissao": "Engenheiro",
+        "empresa": "Tech Corp",
+        "data_nascimento": None,
+        "nps_historico": [NPSRegistro(data=datetime.now(UTC), nota=4)],
+        "nps_medio_3m": 4.0,
+        "total_interacoes_30d": 8,
+        "total_interacoes_90d": 20,
+        "dias_desde_ultimo_contato": 5,
+        "ultimo_contato_at": datetime.now(UTC) - timedelta(days=5),
+        "processos_ativos": [],
+        "pior_score_risco": None,
+        "escalacoes_pendentes": 0,
+        "escalacoes_rejeitadas_30d": 0,
+        "crm_score_anterior": None,
+        "crm_analisado_em_anterior": None,
+        "crm_resumo_anterior": None,
+        "crm_acao_sugerida_anterior": None,
+    }
     defaults.update(kwargs)
     return CRMContexto(**defaults)
 

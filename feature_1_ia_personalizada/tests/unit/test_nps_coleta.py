@@ -18,7 +18,6 @@ import pytest
 
 from feature_1_ia_personalizada.api.routes.webhook_whatsapp import _processar_resposta_nps
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

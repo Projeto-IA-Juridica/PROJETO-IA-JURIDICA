@@ -20,7 +20,6 @@ from httpx import ASGITransport, AsyncClient
 from feature_1_ia_personalizada.api.routes.chat import get_redis
 from shared.database.session import get_db
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

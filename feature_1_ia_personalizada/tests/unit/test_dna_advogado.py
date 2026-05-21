@@ -11,8 +11,8 @@ Verifica que:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -20,7 +20,6 @@ from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
     DNAAdvogadoService,
     DNAEscritorio,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers de fixture
@@ -256,7 +255,7 @@ class TestDNACache:
             diferenciais=["Parcelamento"],
             top_tipos_acao=[{"tipo": "Execução Fiscal", "contagem": 20, "percentual": 100.0}],
             dados_insuficientes=False,
-            gerado_em=datetime.now(timezone.utc),
+            gerado_em=datetime.now(UTC),
         )
         redis = _make_redis_mock(json.dumps(dna_cached.to_dict()))
         claude = _make_claude_mock("{}")

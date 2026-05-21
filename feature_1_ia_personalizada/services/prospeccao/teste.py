@@ -2,8 +2,9 @@
 
 
 
-from dataclasses import dataclass
 import asyncio
+from dataclasses import dataclass
+
 
 @dataclass
 class LitiganteEncontrado:
@@ -33,15 +34,15 @@ _ACOES_SENSIVEIS = frozenset({
 })
 
 class PessoaIntelligenceService:
-    async def enriquecer(self, l):
-        if not self.validar_compliance(l):
-            raise ValueError(f"Lead descartado: '{l.tipo_acao}' dado sensível LGPD art.11")
-        return PessoaInteligencia(l.nome, l.polo, l.tipo_acao, l.tribunal, l.fase_processual, l.numero_cnj)
+    async def enriquecer(self, lead):
+        if not self.validar_compliance(lead):
+            raise ValueError(f"Lead descartado: '{lead.tipo_acao}' dado sensível LGPD art.11")
+        return PessoaInteligencia(lead.nome, lead.polo, lead.tipo_acao, lead.tribunal, lead.fase_processual, lead.numero_cnj)
 
-    def is_lead_valido(self, l):
-        if l.representado:
+    def is_lead_valido(self, lead):
+        if lead.representado:
             return False
-        t, p = l.tipo_acao.lower(), l.polo.lower()
+        t, p = lead.tipo_acao.lower(), lead.polo.lower()
         if any(x in t for x in ("trabalhista", "horas extras", "fgts")) and p == "ativo":
             return True
         if any(x in t for x in ("consumidor", "negativação indevida", "cobrança indevida")) and p == "ativo":
@@ -51,8 +52,8 @@ class PessoaIntelligenceService:
         return False
 
     @staticmethod
-    def validar_compliance(l):
-        return not any(p in l.tipo_acao.lower() for p in _ACOES_SENSIVEIS)
+    def validar_compliance(lead):
+        return not any(p in lead.tipo_acao.lower() for p in _ACOES_SENSIVEIS)
 
 
 class EmpresaInteligencia:

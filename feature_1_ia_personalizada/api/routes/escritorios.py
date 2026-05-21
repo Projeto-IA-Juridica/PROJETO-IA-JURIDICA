@@ -160,12 +160,12 @@ async def put_config(
         try:
             escritorio.horario_inicio = _dt.strptime(body.horario_inicio, "%H:%M").time()
         except ValueError:
-            raise HTTPException(status_code=400, detail="horario_inicio inválido.")
+            raise HTTPException(status_code=400, detail="horario_inicio inválido.") from None
     if body.horario_fim is not None:
         try:
             escritorio.horario_fim = _dt.strptime(body.horario_fim, "%H:%M").time()
         except ValueError:
-            raise HTTPException(status_code=400, detail="horario_fim inválido.")
+            raise HTTPException(status_code=400, detail="horario_fim inválido.") from None
 
     h_inicio = escritorio.horario_inicio
     h_fim = escritorio.horario_fim

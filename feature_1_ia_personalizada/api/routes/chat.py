@@ -250,7 +250,7 @@ async def get_chat_stats(
             .group_by(Processo.score_nivel)
         )
         result = await db.execute(stmt_score)
-        score_risco_dist = {nivel: count for nivel, count in result.all()}
+        score_risco_dist = dict(result.all())
     except Exception:
         pass  # Feature 2 ainda não migrada — degradação graciosa
 
@@ -367,7 +367,7 @@ async def exportar_relatorio(
     try:
         conteudo = await exportador.gerar_csv(mes)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     nome_arquivo = f"relatorio_interacoes_{mes}.csv"
     return Response(

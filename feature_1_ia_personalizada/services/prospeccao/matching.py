@@ -16,15 +16,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
-from typing import Union
+from dataclasses import asdict, dataclass, field
 
 import httpx
 
+from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
 from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaInteligencia
-from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscritorio
-
 
 # ---------------------------------------------------------------------------
 # Dataclass de saída
@@ -111,7 +109,7 @@ class MatchingService:
     async def calcular_score(
         self,
         dna: DNAEscritorio,
-        inteligencia: Union[EmpresaInteligencia, PessoaInteligencia],
+        inteligencia: EmpresaInteligencia | PessoaInteligencia,
     ) -> ResultadoMatch:
         """
         Detecta o tipo do lead e delega para o método privado correto.
@@ -244,7 +242,7 @@ class MatchingService:
     async def _refinar_com_claude(
         self,
         dna: DNAEscritorio,
-        inteligencia: Union[EmpresaInteligencia, PessoaInteligencia],
+        inteligencia: EmpresaInteligencia | PessoaInteligencia,
         score_heuristico: int,
         componentes: dict,
         tipo_lead: str,

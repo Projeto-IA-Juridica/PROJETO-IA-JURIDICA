@@ -8,7 +8,9 @@ from celery import Celery, Task
 from celery.schedules import crontab
 from celery.signals import worker_process_init
 from kombu import Queue
-from redbeat import RedBeatScheduler  # noqa: F401 — importação necessária para registro do scheduler
+from redbeat import (
+    RedBeatScheduler,  # noqa: F401 — importação necessária para registro do scheduler
+)
 
 _dlq_logger = structlog.get_logger("workers.dlq")
 
@@ -282,10 +284,10 @@ def _init_worker_process(**kwargs):
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
-import feature_1_ia_personalizada.workers.hub_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
 import feature_1_ia_personalizada.workers.dispatcher_agendadas  # noqa: F401
 import feature_1_ia_personalizada.workers.hub_advogado  # noqa: F401
+import feature_1_ia_personalizada.workers.hub_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.ingest_documentos  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401

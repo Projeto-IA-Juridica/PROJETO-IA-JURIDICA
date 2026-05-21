@@ -121,7 +121,7 @@ class CRMDataAggregator:
         ).where(
             Cliente.id == cliente_id,
             Cliente.escritorio_id == escritorio_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         cliente = (await self._db.execute(stmt_cliente)).one_or_none()
 

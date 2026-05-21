@@ -1,8 +1,8 @@
-import structlog
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -53,9 +53,9 @@ class EscalacaoManager:
             # Busca advogados legíveis
             stmt = select(Usuario).where(
                 Usuario.escritorio_id == escritorio_id,
-                Usuario.escalacao_ativa == True,
+                Usuario.escalacao_ativa.is_(True),
                 Usuario.whatsapp_numero.isnot(None),
-                Usuario.ativo == True,
+                Usuario.ativo.is_(True),
             )
             advogados = (await session.execute(stmt)).scalars().all()
 

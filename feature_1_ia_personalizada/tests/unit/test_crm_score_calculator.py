@@ -17,44 +17,47 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from feature_1_ia_personalizada.services.crm.aggregator import CRMContexto, NPSRegistro, ProcessoResumo
+from feature_1_ia_personalizada.services.crm.aggregator import (
+    CRMContexto,
+    NPSRegistro,
+    ProcessoResumo,
+)
 from feature_1_ia_personalizada.services.crm.score_calculator import (
-    calcular_score_crm,
-    _pontos_nps,
     _pontos_contato,
     _pontos_engajamento,
     _pontos_escalacoes,
+    _pontos_nps,
+    calcular_score_crm,
 )
 from shared.config.constants import CRM_SCORE_PESOS
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _ctx(**kwargs) -> CRMContexto:
-    defaults = dict(
-        cliente_id=1,
-        escritorio_id=1,
-        nome="Teste",
-        profissao=None,
-        empresa=None,
-        data_nascimento=None,
-        nps_historico=[],
-        nps_medio_3m=None,
-        total_interacoes_30d=5,
-        total_interacoes_90d=15,
-        dias_desde_ultimo_contato=10,
-        ultimo_contato_at=datetime.now(UTC) - timedelta(days=10),
-        processos_ativos=[],
-        pior_score_risco=None,
-        escalacoes_pendentes=0,
-        escalacoes_rejeitadas_30d=0,
-        crm_score_anterior=None,
-        crm_analisado_em_anterior=None,
-        crm_resumo_anterior=None,
-        crm_acao_sugerida_anterior=None,
-    )
+    defaults = {
+        "cliente_id": 1,
+        "escritorio_id": 1,
+        "nome": "Teste",
+        "profissao": None,
+        "empresa": None,
+        "data_nascimento": None,
+        "nps_historico": [],
+        "nps_medio_3m": None,
+        "total_interacoes_30d": 5,
+        "total_interacoes_90d": 15,
+        "dias_desde_ultimo_contato": 10,
+        "ultimo_contato_at": datetime.now(UTC) - timedelta(days=10),
+        "processos_ativos": [],
+        "pior_score_risco": None,
+        "escalacoes_pendentes": 0,
+        "escalacoes_rejeitadas_30d": 0,
+        "crm_score_anterior": None,
+        "crm_analisado_em_anterior": None,
+        "crm_resumo_anterior": None,
+        "crm_acao_sugerida_anterior": None,
+    }
     defaults.update(kwargs)
     return CRMContexto(**defaults)
 
@@ -172,7 +175,6 @@ def test_pendente_tem_prioridade_sobre_rejeitada():
 ])
 def test_nivel_por_faixa_de_score(score, nivel_esperado):
     # Monta um contexto que produza exatamente o score desejado via mock do cálculo
-    from unittest.mock import patch
     from feature_1_ia_personalizada.services.crm.score_calculator import _nivel
     assert _nivel(score) == nivel_esperado
 

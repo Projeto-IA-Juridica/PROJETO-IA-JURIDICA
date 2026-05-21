@@ -22,7 +22,6 @@ from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
     LitiganteEncontrado,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

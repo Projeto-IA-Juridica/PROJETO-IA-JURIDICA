@@ -10,8 +10,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import status
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -59,8 +57,8 @@ class TestConfigureIA:
     async def test_salva_persona_e_avanca_etapa(self):
         """configure-ia deve salvar persona e avançar onboarding_etapa para 1."""
         from feature_1_ia_personalizada.api.routes.onboarding import (
-            configure_ia,
             ConfigurarIARequest,
+            configure_ia,
         )
 
         escritorio = _make_escritorio(etapa=0)
@@ -88,9 +86,10 @@ class TestConfigureIA:
     async def test_horario_inicio_maior_que_fim_retorna_400(self):
         """horario_inicio >= horario_fim deve retornar 400."""
         from fastapi import HTTPException
+
         from feature_1_ia_personalizada.api.routes.onboarding import (
-            configure_ia,
             ConfigurarIARequest,
+            configure_ia,
         )
 
         escritorio = _make_escritorio()
@@ -114,6 +113,7 @@ class TestConfigureIA:
     async def test_tom_invalido_rejeitado(self):
         """Tom inválido na Pydantic deve falhar antes de chegar ao endpoint."""
         from pydantic import ValidationError
+
         from feature_1_ia_personalizada.api.routes.onboarding import ConfigurarIARequest
 
         with pytest.raises(ValidationError):
@@ -253,6 +253,7 @@ class TestGoLive:
     async def test_nao_admin_retorna_403(self):
         """Usuário não-admin tentando go-live deve receber 403."""
         from fastapi import HTTPException
+
         from feature_1_ia_personalizada.api.routes.onboarding import go_live
 
         db = AsyncMock()

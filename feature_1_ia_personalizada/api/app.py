@@ -146,7 +146,6 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     webhook_whatsapp,
 )
 
-
 _QUERIES_FREQUENTES = [
     "qual o status do meu processo",
     "quando vai terminar meu processo",
@@ -163,8 +162,9 @@ async def _warmup_embeddings(redis_client) -> None:
     Falha silenciosamente — nunca deve travar o startup.
     """
     try:
-        from feature_1_ia_personalizada.services.rag.embeddings import EmbeddingGenerator
         import redis.asyncio as aioredis
+
+        from feature_1_ia_personalizada.services.rag.embeddings import EmbeddingGenerator
 
         # Cria cliente Redis separado com decode_responses=False (embeddings são bytes JSON)
         redis_bytes = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
@@ -198,7 +198,7 @@ async def lifespan(app: FastAPI):
     try:
         await asyncio.wait_for(app.state.redis_client.ping(), timeout=5)
         print("✅ Redis conectado com sucesso (Rate Limit Ativo).")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("⚠️  Redis: timeout na conexão — rate limiting desativado.")
     except Exception as e:
         print(f"❌ Erro ao conectar no Redis: {e}")
@@ -206,7 +206,7 @@ async def lifespan(app: FastAPI):
     # Pré-aquece embeddings das queries mais comuns (P4) — com timeout para não travar startup
     try:
         await asyncio.wait_for(_warmup_embeddings(app.state.redis_client), timeout=15)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("⚠️  Warm-up de embeddings: timeout (15s) — será gerado sob demanda.")
 
     yield

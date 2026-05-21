@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any
 
@@ -271,8 +271,9 @@ def monitorar_processos() -> dict[str, Any]:
     # Gauge por nível de risco e escritório — conta antes do ciclo de atualização
     # para refletir o estado persistido no banco (scores calculados no ciclo anterior).
     try:
-        from feature_1_ia_personalizada.api.routes.metrics import processos_por_risco_gauge
         from collections import defaultdict
+
+        from feature_1_ia_personalizada.api.routes.metrics import processos_por_risco_gauge
         _dist: dict[tuple[str, str], int] = defaultdict(int)
         for _p in processos:
             _esc = str(_p.get("escritorio_id", "desconhecido"))

@@ -109,7 +109,7 @@ def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
         async with factory() as db:
             stmt = select(Cliente.id).where(
                 Cliente.escritorio_id == escritorio_id,
-                Cliente.ativo == True,
+                Cliente.ativo.is_(True),
             )
             rows = (await db.execute(stmt)).all()
             return [r.id for r in rows]

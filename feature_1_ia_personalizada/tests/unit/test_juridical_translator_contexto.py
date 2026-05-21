@@ -50,15 +50,15 @@ def _patch_anthropic(texto: str = "Resumo ok"):
 # Argumentos padrão reutilizados nos testes
 # ---------------------------------------------------------------------------
 
-_ARGS = dict(
-    andamento="Despacho ordinatório foi proferido pelo juiz da 3ª Vara Cível.",
-    fase_atual="instrucao",
-    historico="1. Petição inicial distribuída\n2. Citação realizada",
-    tipo_acao="Ação de Cobrança",
-    polo_cliente="autor",
-    nome_escritorio="Escritório Silva Advogados",
-    nome_cliente="João",
-)
+_ARGS = {
+    "andamento": "Despacho ordinatório foi proferido pelo juiz da 3ª Vara Cível.",
+    "fase_atual": "instrucao",
+    "historico": "1. Petição inicial distribuída\n2. Citação realizada",
+    "tipo_acao": "Ação de Cobrança",
+    "polo_cliente": "autor",
+    "nome_escritorio": "Escritório Silva Advogados",
+    "nome_cliente": "João",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ class TestTraduzirComContextoRetorno:
     def test_andamento_apenas_espacos_retorna_sem_chamar_claude(self):
         ctx, mock_client = _patch_anthropic()
         with ctx:
-            resultado = JuridicalTranslator.traduzir_com_contexto(
+            _resultado = JuridicalTranslator.traduzir_com_contexto(
                 andamento="   ",
                 fase_atual="instrucao",
                 historico="",
@@ -206,7 +206,7 @@ class TestTraduzirComContextoPrompt:
         """Sem nome_escritorio e nome_cliente explícitos, usa defaults sem erro."""
         ctx, mock_client = _patch_anthropic()
         with ctx:
-            resultado = JuridicalTranslator.traduzir_com_contexto(
+            _resultado = JuridicalTranslator.traduzir_com_contexto(
                 andamento="despacho",
                 fase_atual="conhecimento",
                 historico="Nenhum andamento anterior.",

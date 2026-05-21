@@ -4,8 +4,6 @@ Teste de conectividade e status do stack Prometheus + Grafana
 """
 
 import subprocess
-import sys
-from datetime import datetime
 
 print(f"\n{'='*70}")
 print(f"{'VERIFICAÇÃO DO STACK GRAFANA + PROMETHEUS':^70}")
@@ -15,7 +13,7 @@ checks = []
 
 # 1. Docker containers
 print("🐳 Verificando Docker Containers...")
-result = subprocess.run(["sudo", "docker", "ps", "--format", "{{.Names}}", "--filter", "name=prometheus|grafana"], 
+result = subprocess.run(["sudo", "docker", "ps", "--format", "{{.Names}}", "--filter", "name=prometheus|grafana"],
                        capture_output=True, text=True)
 prometheus_running = "prometheus-rag" in result.stdout
 grafana_running = "grafana-rag" in result.stdout

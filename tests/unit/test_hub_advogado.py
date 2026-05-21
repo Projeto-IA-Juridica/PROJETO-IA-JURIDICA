@@ -22,7 +22,6 @@ from feature_1_ia_personalizada.services.ai.hub_advogado_classifier import (
     IntencaoAdvogado,
 )
 
-
 # ---------------------------------------------------------------------------
 # HubAdvogadoClassificador — heurísticas (sem I/O)
 # ---------------------------------------------------------------------------
@@ -236,7 +235,7 @@ async def test_webhook_advogado_sem_escalacao_ativa_vai_para_hub():
     """
     Advogado com escalacao_ativa=False e hub habilitado → hub_advogado enfileirado.
     """
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import MagicMock, patch
 
     advogado = _make_usuario(escalacao_ativa=False)
     escritorio = _make_escritorio(escalacao_habilitada=True)
@@ -269,7 +268,7 @@ async def test_webhook_advogado_sem_escalacao_ativa_vai_para_hub():
 async def test_webhook_advogado_escalacao_ativa_vai_para_resposta_advogado():
     """Advogado com escalacao_ativa=True → processar_resposta_advogado (não hub)."""
     advogado = _make_usuario(escalacao_ativa=True)
-    escritorio = _make_escritorio(escalacao_habilitada=True)
+    _escritorio = _make_escritorio(escalacao_habilitada=True)
 
     routed_to = "escalation_reply" if advogado.escalacao_ativa else "hub_advogado"
     assert routed_to == "escalation_reply"

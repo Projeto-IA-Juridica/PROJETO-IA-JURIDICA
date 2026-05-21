@@ -312,6 +312,7 @@ async def node_gerar_resposta_escalacao(state: ConversationState, deps: NodeDeps
             pass
 
         from sqlalchemy import update
+
         from shared.models.escritorio import Escritorio
         try:
             async with deps.session_factory() as session:

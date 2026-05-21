@@ -20,7 +20,6 @@ from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAEscri
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaInteligencia
 from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
 
-
 # ---------------------------------------------------------------------------
 # Builders de fixture
 # ---------------------------------------------------------------------------

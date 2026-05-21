@@ -11,6 +11,21 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.api.middleware.auth import (
+    get_escritorio_id_advogado,
+    require_advogado,
+)
+from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
+    DataJudProspeccaoClient,
+)
+from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAAdvogadoService
+from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import (
+    EmpresaIntelligenceService,
+)
+from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
+from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import (
+    PessoaIntelligenceService,
+)
 from shared.database.session import get_db
 from shared.schemas.prospeccao import (
     DescobertaRequest,
@@ -19,16 +34,6 @@ from shared.schemas.prospeccao import (
     LeadStatusUpdate,
     PipelineResponse,
 )
-from feature_1_ia_personalizada.api.middleware.auth import (
-    get_advogado_id,
-    get_escritorio_id_advogado,
-    require_advogado,
-)
-from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAAdvogadoService
-from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import DataJudProspeccaoClient
-from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import EmpresaIntelligenceService
-from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import PessoaIntelligenceService
-from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
 
 router = APIRouter(
     prefix="/prospeccao",
@@ -185,8 +190,9 @@ async def listar_pipeline(
     db: AsyncSession = Depends(get_db),
 ):
     """Lista leads salvos com filtros opcionais."""
+    from sqlalchemy import select
+
     from shared.models.lead_prospeccao import LeadProspeccao
-    from sqlalchemy import select, and_
 
     query = select(LeadProspeccao).where(
         LeadProspeccao.escritorio_id == escritorio_id
@@ -204,7 +210,7 @@ async def listar_pipeline(
 
     result = await db.execute(query)
     leads_db = result.scalars().all()
-    leads = [LeadProspeccaoResponse.model_validate(l) for l in leads_db]
+    leads = [LeadProspeccaoResponse.model_validate(lead) for lead in leads_db]
 
     dna = await _dna_service.obter_dna_salvo(escritorio_id=escritorio_id, db=db)
     linkedin_disponivel = await _empresa_svc.linkedin_disponivel()
@@ -259,8 +265,9 @@ async def deletar_lead(
 
 async def _get_lead_ou_403(lead_id: int, escritorio_id: int, db: AsyncSession):
     """Busca o lead e verifica propriedade. Levanta 403 se não pertencer ao escritório."""
-    from shared.models.lead_prospeccao import LeadProspeccao
     from sqlalchemy import select
+
+    from shared.models.lead_prospeccao import LeadProspeccao
 
     result = await db.execute(
         select(LeadProspeccao).where(LeadProspeccao.id == lead_id)
@@ -288,8 +295,9 @@ async def _salvar_lead(
     Salva ou atualiza um lead no banco.
     Deduplicação: mesmo CNPJ (empresa) ou mesmo número CNJ (pessoa) → atualiza.
     """
-    from shared.models.lead_prospeccao import LeadProspeccao
     from sqlalchemy import select
+
+    from shared.models.lead_prospeccao import LeadProspeccao
 
     # Chave de deduplicação
     if tipo_lead == "empresa":

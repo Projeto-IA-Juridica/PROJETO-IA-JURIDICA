@@ -22,7 +22,7 @@ Cobertura:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -32,7 +32,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from feature_1_ia_personalizada.services.analytics.calculadora import CalculadoraAnalytics
 from shared.models.cliente import Cliente
 from shared.models.interacao import Interacao
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -254,7 +253,7 @@ async def test_ranking_clientes_em_risco_real(async_db: AsyncSession, escritorio
     # Simula contato antigo: 45 dias atrás
     await async_db.execute(
         text("UPDATE interacoes SET created_at = :dt WHERE id = :id"),
-        {"dt": datetime.now(timezone.utc) - timedelta(days=45), "id": interacao.id},
+        {"dt": datetime.now(UTC) - timedelta(days=45), "id": interacao.id},
     )
     await async_db.commit()
 

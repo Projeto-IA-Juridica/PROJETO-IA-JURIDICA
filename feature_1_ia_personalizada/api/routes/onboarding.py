@@ -17,13 +17,13 @@ Fluxo de 5 etapas:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from pydantic import BaseModel, EmailStr, Field, field_validator
 from jose import JWTError
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -316,7 +316,7 @@ async def configure_ia(
         h_inicio = _dt.strptime(body.horario_inicio, "%H:%M").time()
         h_fim = _dt.strptime(body.horario_fim, "%H:%M").time()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Horários inválidos — use o formato HH:MM.")
+        raise HTTPException(status_code=400, detail="Horários inválidos — use o formato HH:MM.") from None
 
     if h_inicio >= h_fim:
         raise HTTPException(
@@ -687,7 +687,7 @@ async def go_live(
     # Conclui onboarding
     escritorio.onboarding_etapa = 5
     escritorio.onboarding_completo = True
-    escritorio.onboarding_at = datetime.now(timezone.utc)
+    escritorio.onboarding_at = datetime.now(UTC)
     await db.commit()
 
     # Dispara ingestão RAG de jurisprudência pública (Feature 1)

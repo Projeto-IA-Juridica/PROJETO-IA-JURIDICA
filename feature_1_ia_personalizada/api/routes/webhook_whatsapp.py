@@ -14,7 +14,6 @@ from feature_1_ia_personalizada.api.schemas.webhook import (
     WebhookEvolutionPayload,
     WebhookMessageContent,
 )
-
 from feature_1_ia_personalizada.workers.crm_worker import disparar_analise_com_debounce
 from feature_1_ia_personalizada.workers.send_notifications import (
     enviar_boas_vindas_escritorio,
@@ -195,8 +194,8 @@ async def receive_message(
         stmt_adv = select(Usuario).where(
             Usuario.whatsapp_numero == telefone_digitos,
             Usuario.escritorio_id == escritorio.id,
-            Usuario.ativo == True,
-            Usuario.escalacao_ativa == True,
+            Usuario.ativo.is_(True),
+            Usuario.escalacao_ativa.is_(True),
         )
         advogado = (await db.execute(stmt_adv)).scalars().first()
 

@@ -10,13 +10,12 @@ nunca do body — para garantir isolamento multi-tenant.
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
-from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer, CRMAnaliseResult
+from feature_1_ia_personalizada.services.crm.analyzer import CRMAnaliseResult, CRMAnalyzer
 from feature_1_ia_personalizada.workers.crm_worker import crm_analisar_escritorio
 from shared.config.settings import settings
 from shared.database.session import get_db
@@ -67,7 +66,7 @@ async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -
         .where(
             Cliente.id == cliente_id,
             Cliente.escritorio_id == escritorio_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         .group_by(
             Cliente.id,
@@ -144,7 +143,7 @@ async def listar_clientes_crm(
             func.max(Interacao.created_at).label("ultimo_contato"),
         )
         .outerjoin(Interacao, Interacao.cliente_id == Cliente.id)
-        .where(Cliente.escritorio_id == eid, Cliente.ativo == True)
+        .where(Cliente.escritorio_id == eid, Cliente.ativo.is_(True))
         .group_by(
             Cliente.id, Cliente.nome, Cliente.telefone_whatsapp,
             Cliente.crm_nivel, Cliente.crm_score, Cliente.crm_resumo,
@@ -245,7 +244,7 @@ async def analisar_cliente(
         # Libera o lock se o cliente não existir (não faz sentido bloquear)
         if r:
             await r.delete(chave)
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {
         "nivel": result.nivel,
@@ -301,7 +300,7 @@ async def resumo_crm(
         func.avg(Cliente.crm_score).label("score_medio"),
     ).where(
         Cliente.escritorio_id == eid,
-        Cliente.ativo == True,
+        Cliente.ativo.is_(True),
     ).group_by(Cliente.crm_nivel)
 
     rows = (await db.execute(stmt_niveis)).all()

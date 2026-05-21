@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -21,7 +21,7 @@ class CalculadoraAnalytics:
         self.escritorio_id = escritorio_id
         self.dias = dias
 
-        agora = datetime.now(timezone.utc)
+        agora = datetime.now(UTC)
         self.dt_inicio = agora - timedelta(days=dias)
         self.dt_inicio_anterior = agora - timedelta(days=dias * 2)
 
@@ -120,7 +120,7 @@ class CalculadoraAnalytics:
         Agrega interações por semana ISO para os últimos N semanas.
         Query única com date_trunc — performance garantida pelos índices de 5.1.
         """
-        dt_inicio = datetime.now(timezone.utc) - timedelta(weeks=semanas)
+        dt_inicio = datetime.now(UTC) - timedelta(weeks=semanas)
 
         from sqlalchemy import text
 
@@ -161,7 +161,7 @@ class CalculadoraAnalytics:
         Top N clientes por NPS (piores primeiro) com identificação de risco.
         Clientes em risco: sem interação há > 30 dias E NPS <= 3.
         """
-        dt_30_dias = datetime.now(timezone.utc) - timedelta(days=30)
+        dt_30_dias = datetime.now(UTC) - timedelta(days=30)
 
         stmt = (
             select(
@@ -188,7 +188,7 @@ class CalculadoraAnalytics:
             nps = round(float(row.nps_medio), 1) if row.nps_medio else None
             ultimo = row.ultimo_contato
             if ultimo is not None and ultimo.tzinfo is None:
-                ultimo = ultimo.replace(tzinfo=timezone.utc)
+                ultimo = ultimo.replace(tzinfo=UTC)
             sem_contato_recente = (ultimo is None) or (ultimo < dt_30_dias)
             # em_risco: avaliou mal E está sem contato recente
             em_risco = sem_contato_recente and nps is not None and nps <= 3

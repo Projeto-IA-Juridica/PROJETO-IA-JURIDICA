@@ -16,16 +16,13 @@ Critérios testados:
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.api.routes.hub_advogado import get_escalacao_client
-from feature_1_ia_personalizada.services.ai.escalation_client import (
-    EscalacaoIndisponivelError,
-)
 from shared.models.processo import Processo
 from shared.models.sessao_advogado import SessaoAdvogado
 

@@ -19,7 +19,7 @@ Política de retentativas:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from celery import shared_task
@@ -58,7 +58,7 @@ def despachar_mensagens_agendadas() -> dict:
 
 
 async def _processar_lote() -> tuple[int, int]:
-    agora = datetime.now(tz=timezone.utc)
+    agora = datetime.now(tz=UTC)
     enviadas = 0
     falhas = 0
 
@@ -99,7 +99,7 @@ async def _processar_lote() -> tuple[int, int]:
                         .where(MensagemAgendada.id == msg.id)
                         .values(
                             status="enviada",
-                            enviada_em=datetime.now(tz=timezone.utc),
+                            enviada_em=datetime.now(tz=UTC),
                             tentativas=msg.tentativas + 1,
                         )
                     )

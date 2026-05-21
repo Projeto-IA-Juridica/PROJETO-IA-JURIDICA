@@ -15,15 +15,14 @@ O DNA determina:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import os
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_DNA_ADVOGADO
@@ -267,7 +266,7 @@ class DNAAdvogadoService:
                 escritorio_id=escritorio_id,
                 top_tipos_acao=stats,
                 dados_insuficientes=False,
-                gerado_em=datetime.now(timezone.utc),
+                gerado_em=datetime.now(UTC),
             )
 
         logger.info(
@@ -286,7 +285,7 @@ class DNAAdvogadoService:
             diferenciais=dados.get("diferenciais", []),
             top_tipos_acao=stats,
             dados_insuficientes=False,
-            gerado_em=datetime.now(timezone.utc),
+            gerado_em=datetime.now(UTC),
         )
 
     # ------------------------------------------------------------------

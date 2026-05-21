@@ -1,6 +1,9 @@
 """Nós do orquestrador LangGraph — cada módulo agrupa nós por responsabilidade."""
 from feature_1_ia_personalizada.services.ai.nodes.data import node_buscar_dados
-from feature_1_ia_personalizada.services.ai.nodes.delivery import node_enviar_resposta, node_tratar_erro
+from feature_1_ia_personalizada.services.ai.nodes.delivery import (
+    node_enviar_resposta,
+    node_tratar_erro,
+)
 from feature_1_ia_personalizada.services.ai.nodes.generation import (
     node_gerar_resposta,
     node_gerar_resposta_escalacao,
