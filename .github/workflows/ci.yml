@@ -40,9 +40,17 @@ jobs:
       # Instala deps da aplicação (requirements-f1.txt = base + feature1)
       # depois instala ferramentas de dev declaradas em pyproject.toml [dev]
       # (pytest, ruff, black, mypy, aiosqlite, etc.)
+      #
+      # Ordem importa para o openai-whisper:
+      #   1. setuptools<70 é necessário porque o setup.py do whisper usa pkg_resources,
+      #      removido no setuptools 70+. requirements-base.txt já pina setuptools<70,
+      #      mas precisamos garantir a versão certa ANTES de tentar instalar o wheel.
+      #   2. --no-build-isolation: usa o setuptools do ambiente (< 70) em vez de criar
+      #      um env de build isolado que baixaria o setuptools mais recente.
       - name: Instalar dependências
         run: |
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip
+          pip install "setuptools<70" wheel
           pip install --no-build-isolation openai-whisper==20231117
           pip install -r requirements-f1.txt
           pip install -e ".[dev]"
@@ -117,7 +125,8 @@ jobs:
 
       - name: Instalar dependências
         run: |
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip
+          pip install "setuptools<70" wheel
           pip install --no-build-isolation openai-whisper==20231117
           pip install -r requirements-f1.txt
           pip install -e ".[dev]"
@@ -243,7 +252,8 @@ jobs:
 
       - name: Instalar dependências + Locust
         run: |
-          pip install --upgrade pip setuptools wheel
+          pip install --upgrade pip
+          pip install "setuptools<70" wheel
           pip install --no-build-isolation openai-whisper==20231117
           pip install -r requirements-f1.txt
           pip install -e ".[dev]"
