@@ -186,17 +186,26 @@ async def analisar_peticao(
 
     job_id = str(uuid.uuid4())
 
+    from kombu.exceptions import OperationalError
+
     from feature_1_ia_personalizada.workers.hub_worker import hub_analisar_peticao_task
 
-    hub_analisar_peticao_task.delay(
-        job_id=job_id,
-        conteudo_texto=conteudo_envio,
-        texto_truncado=texto_truncado,
-        percentual_analisado=percentual_analisado,
-        filename=arquivo.filename or "peticao.pdf",
-        escritorio_id=escritorio_id,
-        advogado_id=advogado_id,
-    )
+    try:
+        hub_analisar_peticao_task.delay(
+            job_id=job_id,
+            conteudo_texto=conteudo_envio,
+            texto_truncado=texto_truncado,
+            percentual_analisado=percentual_analisado,
+            filename=arquivo.filename or "peticao.pdf",
+            escritorio_id=escritorio_id,
+            advogado_id=advogado_id,
+        )
+    except OperationalError as exc:
+        logger.error("hub_rest_broker_indisponivel", erro=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço temporariamente indisponível. Tente novamente em instantes.",
+        ) from exc
 
     logger.info("hub_rest_peticao_enfileirada", job_id=job_id, escritorio_id=escritorio_id)
     return {"job_id": job_id, "status": "processando"}
