@@ -184,123 +184,86 @@ async def test_analisar_peticao_falha_extracao_retorna_422(async_client, advogad
     assert "extrair" in resp.json()["detail"].lower()
 
 
-async def test_analisar_peticao_escalacao_indisponivel_retorna_503(async_client, advogado_setup):
-    """EscalacaoIndisponivelError deve retornar 503."""
-    from feature_1_ia_personalizada.api.app import app
+async def test_analisar_peticao_broker_indisponivel_retorna_503(async_client, advogado_setup):
+    """OperationalError do broker Celery deve retornar 503."""
+    from kombu.exceptions import OperationalError
 
     _, _, headers = advogado_setup
-    mock_client = MagicMock()
-    mock_client.analisar_peca = AsyncMock(
-        side_effect=EscalacaoIndisponivelError("timeout após 3 tentativas")
-    )
 
     with patch(
         "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=_FAKE_TEXT,
-    ):
-        _override(app, mock_client)
-        try:
-            resp = await async_client.post(
-                "/hub/analisar-peticao",
-                headers=headers,
-                files={"arquivo": ("peticao.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
-            )
-        finally:
-            _clear(app)
+    ), patch(
+        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+    ) as mock_task:
+        mock_task.delay.side_effect = OperationalError("Redis connection refused")
+        resp = await async_client.post(
+            "/hub/analisar-peticao",
+            headers=headers,
+            files={"arquivo": ("peticao.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
+        )
 
     assert resp.status_code == 503
     assert "indisponível" in resp.json()["detail"].lower()
 
 
-async def test_analisar_peticao_sucesso_chama_escalacao_e_salva_sessao(
+async def test_analisar_peticao_sucesso_retorna_202_com_job_id(
     async_client,
     advogado_setup,
-    db_session: AsyncSession,
 ):
-    """PDF válido: EscalacaoClient.analisar_peca é chamado e SessaoAdvogado é salva."""
-    from feature_1_ia_personalizada.api.app import app
-
-    _, advogado, headers = advogado_setup
-    mock_client = _mock_escalacao_client()
+    """PDF válido: endpoint enfileira task e retorna 202 com job_id."""
+    _, _, headers = advogado_setup
 
     with patch(
         "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=_FAKE_TEXT,
-    ):
-        _override(app, mock_client)
-        try:
-            resp = await async_client.post(
-                "/hub/analisar-peticao",
-                headers=headers,
-                files={"arquivo": ("peticao.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
-            )
-        finally:
-            _clear(app)
+    ), patch(
+        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+    ) as mock_task:
+        mock_task.delay.return_value = None
+        resp = await async_client.post(
+            "/hub/analisar-peticao",
+            headers=headers,
+            files={"arquivo": ("peticao.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
+        )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     body = resp.json()
+    assert "job_id" in body
+    assert body["status"] == "processando"
 
-    # Campos estruturados da análise
-    assert body["tipo_peca"] == "Petição Inicial"
-    assert body["score_geral"] == 72
-    assert len(body["pontos_fortes"]) == 1
-
-    # Campos de rastreamento de custo propagados do EscalacaoClient
-    assert body["tokens_input"] == 500
-    assert body["tokens_output"] == 800
-
-    # Campos de transparência sobre truncamento
-    assert body["texto_truncado"] is False
-    assert body["percentual_analisado"] == 100.0
-
-    # EscalacaoClient foi chamado com o texto extraído
-    mock_client.analisar_peca.assert_called_once()
-    assert _FAKE_TEXT in mock_client.analisar_peca.call_args.kwargs["conteudo_peca"]
-
-    # SessaoAdvogado salva com tokens e custo corretos
-    result = await db_session.execute(
-        select(SessaoAdvogado).where(SessaoAdvogado.usuario_id == advogado.id)
-    )
-    sessao = result.scalar_one_or_none()
-    assert sessao is not None
-    assert sessao.intencao == "analise_peticao"
-    assert sessao.modelo_ia == "claude_opus"
-    assert sessao.tokens_input == 500
-    assert sessao.tokens_output == 800
-    assert sessao.custo_estimado == Decimal("0.002")
-    assert sessao.metadata_json["texto_truncado"] is False
+    # Task foi enfileirada com o texto extraído e sem truncamento
+    mock_task.delay.assert_called_once()
+    call_kwargs = mock_task.delay.call_args.kwargs
+    assert call_kwargs["conteudo_texto"] == _FAKE_TEXT
+    assert call_kwargs["texto_truncado"] is False
+    assert call_kwargs["percentual_analisado"] == 100.0
 
 
 async def test_analisar_peticao_texto_longo_truncado(async_client, advogado_setup):
-    """Texto com > 15 000 chars retorna texto_truncado=True e texto enviado à IA ≤ 15 000."""
-    from feature_1_ia_personalizada.api.app import app
-
+    """Texto com > 15 000 chars: task enfileirada com texto_truncado=True e conteudo ≤ 15 000."""
     _, _, headers = advogado_setup
     texto_longo = "Considerando que " * 1_000  # ~17 000 chars
-    mock_client = _mock_escalacao_client()
 
     with patch(
         "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
         return_value=texto_longo,
-    ):
-        _override(app, mock_client)
-        try:
-            resp = await async_client.post(
-                "/hub/analisar-peticao",
-                headers=headers,
-                files={"arquivo": ("longa.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
-            )
-        finally:
-            _clear(app)
+    ), patch(
+        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+    ) as mock_task:
+        mock_task.delay.return_value = None
+        resp = await async_client.post(
+            "/hub/analisar-peticao",
+            headers=headers,
+            files={"arquivo": ("longa.pdf", BytesIO(_FAKE_PDF), "application/pdf")},
+        )
 
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["texto_truncado"] is True
-    assert body["percentual_analisado"] < 100.0
+    assert resp.status_code == 202
 
-    # Texto passado à IA foi truncado
-    conteudo_enviado = mock_client.analisar_peca.call_args.kwargs["conteudo_peca"]
-    assert len(conteudo_enviado) <= 15_000
+    call_kwargs = mock_task.delay.call_args.kwargs
+    assert call_kwargs["texto_truncado"] is True
+    assert call_kwargs["percentual_analisado"] < 100.0
+    assert len(call_kwargs["conteudo_texto"]) <= 15_000
 
 
 # ---------------------------------------------------------------------------
