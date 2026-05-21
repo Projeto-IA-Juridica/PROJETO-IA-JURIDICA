@@ -8,6 +8,7 @@ Uso em runtime:
     tmpl = await carregar_templates(escritorio_id, redis_client, db)
     msg = tmpl["boas_vindas"].format(nome_cliente="João")
 """
+
 from __future__ import annotations
 
 # -----------------------------------------------------------

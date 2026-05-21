@@ -31,6 +31,7 @@ logger = structlog.get_logger(__name__)
 def _iso_or_none(value):
     return value.isoformat() if value else None
 
+
 # ---------------------------------------------------------------------------
 # Audit trail (síncrono — apenas log estruturado)
 # ---------------------------------------------------------------------------

@@ -170,6 +170,7 @@ _is_sqlite = TEST_DATABASE_URL.startswith("sqlite")
 # JSONB → JSON apenas no SQLite. PostgreSQL suporta JSONB nativamente.
 if _is_sqlite:
     from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+
     if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
         SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
 
@@ -189,6 +190,7 @@ fake = Faker("pt_BR")
 def engine():
     if _is_sqlite:
         from sqlalchemy.pool import StaticPool
+
         _engine = create_async_engine(
             TEST_DATABASE_URL,
             echo=False,
@@ -198,6 +200,7 @@ def engine():
     else:
         # PostgreSQL: NullPool evita conflito de event loop no pytest-asyncio
         from sqlalchemy.pool import NullPool
+
         _engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
     yield _engine
     _engine.sync_engine.dispose()
@@ -209,6 +212,7 @@ async def init_db(engine):
         if not _is_sqlite:
             # Ativa pgvector para testes com PostgreSQL real
             from sqlalchemy import text
+
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
     yield

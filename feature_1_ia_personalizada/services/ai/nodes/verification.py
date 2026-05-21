@@ -1,6 +1,7 @@
 """
 Nós de verificação: avaliar_confianca e verificar_resposta.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,6 +22,7 @@ logger = structlog.get_logger(__name__)
 
 class _InteracaoStub:
     """Stub passado ao FactChecker quando não há interação persistida ainda."""
+
     metadata_json: dict[str, Any] | None = None
 
 
@@ -81,13 +83,16 @@ async def node_avaliar_confianca(state: ConversationState, deps: NodeDeps) -> di
         destino = deps.confidence_router.rotear(score, escritorio)
         deve_escalar = destino == "escalacao"
 
-        log.info("confidence_avaliado", score=score.valor, deve_escalar=deve_escalar, motivo=score.motivo)
+        log.info(
+            "confidence_avaliado", score=score.valor, deve_escalar=deve_escalar, motivo=score.motivo
+        )
 
         if deve_escalar:
             try:
                 from feature_1_ia_personalizada.api.routes.metrics import (
                     escalacao_roteamentos_total,
                 )
+
                 motivo_label = "forcado" if score.deve_escalar else "score_baixo"
                 escalacao_roteamentos_total.labels(
                     escritorio_id=str(state["escritorio_id"]), motivo=motivo_label
@@ -146,7 +151,9 @@ async def node_verificar_resposta(state: ConversationState, deps: NodeDeps) -> d
                     )
                 else:
                     log.error("fact_check_max_tentativas_atingidas")
-                    resposta_filtrada = MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO)
+                    resposta_filtrada = MENSAGENS_FALLBACK.get(
+                        "indisponivel", TEMPLATE_ERRO_GENERICO
+                    )
 
         updates: dict[str, Any] = {
             "resposta_verificada": resposta_filtrada,

@@ -364,6 +364,7 @@ async def test_metricas_com_role_admin_retorna_200(
 
     # Formato do mês: YYYY-MM
     import re
+
     assert re.match(r"^\d{4}-\d{2}$", body["mes_atual"])
 
 

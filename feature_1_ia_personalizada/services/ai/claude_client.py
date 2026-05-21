@@ -49,10 +49,10 @@ _erros = Counter(
 # Prompt caching: write custa 25% a mais que input; read custa 10% do input.
 # ---------------------------------------------------------------------------
 
-_CUSTO_INPUT_POR_MILHAO       = Decimal("3.00")
-_CUSTO_OUTPUT_POR_MILHAO      = Decimal("15.00")
-_CUSTO_CACHE_WRITE_POR_MILHAO = Decimal("3.75")   # 125% do input
-_CUSTO_CACHE_READ_POR_MILHAO  = Decimal("0.30")   # 10% do input
+_CUSTO_INPUT_POR_MILHAO = Decimal("3.00")
+_CUSTO_OUTPUT_POR_MILHAO = Decimal("15.00")
+_CUSTO_CACHE_WRITE_POR_MILHAO = Decimal("3.75")  # 125% do input
+_CUSTO_CACHE_READ_POR_MILHAO = Decimal("0.30")  # 10% do input
 
 _MAX_TENTATIVAS = 3
 _TIMEOUT_SEGUNDOS = 30.0
@@ -65,10 +65,10 @@ def _calcular_custo(
     tokens_cache_read: int = 0,
 ) -> Decimal:
     return (
-        Decimal(tokens_input)       / Decimal(1_000_000) * _CUSTO_INPUT_POR_MILHAO
-        + Decimal(tokens_output)    / Decimal(1_000_000) * _CUSTO_OUTPUT_POR_MILHAO
+        Decimal(tokens_input) / Decimal(1_000_000) * _CUSTO_INPUT_POR_MILHAO
+        + Decimal(tokens_output) / Decimal(1_000_000) * _CUSTO_OUTPUT_POR_MILHAO
         + Decimal(tokens_cache_write) / Decimal(1_000_000) * _CUSTO_CACHE_WRITE_POR_MILHAO
-        + Decimal(tokens_cache_read)  / Decimal(1_000_000) * _CUSTO_CACHE_READ_POR_MILHAO
+        + Decimal(tokens_cache_read) / Decimal(1_000_000) * _CUSTO_CACHE_READ_POR_MILHAO
     )
 
 
@@ -192,12 +192,18 @@ def _historico_com_cache(
     for i, msg in enumerate(mensagens_historico):
         if i == len(mensagens_historico) - 1:
             # Último turn do histórico vira checkpoint de cache para a próxima chamada
-            messages.append({
-                "role": msg["role"],
-                "content": [
-                    {"type": "text", "text": msg["content"], "cache_control": {"type": "ephemeral"}}
-                ],
-            })
+            messages.append(
+                {
+                    "role": msg["role"],
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": msg["content"],
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                }
+            )
         else:
             messages.append(msg)
 

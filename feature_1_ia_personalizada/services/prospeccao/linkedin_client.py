@@ -32,16 +32,35 @@ _TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 _SEARCH_URL = "https://api.linkedin.com/v2/search"
 _TIMEOUT_S = 15
 _CACHE_TTL_FUNCIONARIOS_S = 60 * 60 * 24 * 7  # 7 dias
-_CACHE_TTL_TOKEN_S = 60 * 60 * 23              # 23h (token válido por 24h)
+_CACHE_TTL_TOKEN_S = 60 * 60 * 23  # 23h (token válido por 24h)
 _MAX_CONTATOS_POR_EMPRESA = 10
 
 # Cargos com maior probabilidade de decisão jurídica ou interesse em contratar advocacia
-_CARGOS_RELEVANTES = frozenset({
-    "ceo", "cfo", "coo", "presidente", "vice-presidente", "diretor", "diretora",
-    "gerente jurídico", "gerente juridico", "compliance", "general counsel",
-    "advogado", "advogada", "jurídico", "juridico", "sócio", "socio", "partner",
-    "head of legal", "legal", "counsel",
-})
+_CARGOS_RELEVANTES = frozenset(
+    {
+        "ceo",
+        "cfo",
+        "coo",
+        "presidente",
+        "vice-presidente",
+        "diretor",
+        "diretora",
+        "gerente jurídico",
+        "gerente juridico",
+        "compliance",
+        "general counsel",
+        "advogado",
+        "advogada",
+        "jurídico",
+        "juridico",
+        "sócio",
+        "socio",
+        "partner",
+        "head of legal",
+        "legal",
+        "counsel",
+    }
+)
 
 
 @dataclass
@@ -67,9 +86,7 @@ class LinkedInClient:
 
     def __init__(self, redis: Any) -> None:
         self._redis = redis
-        self._disponivel = bool(
-            settings.LINKEDIN_CLIENT_ID and settings.LINKEDIN_CLIENT_SECRET
-        )
+        self._disponivel = bool(settings.LINKEDIN_CLIENT_ID and settings.LINKEDIN_CLIENT_SECRET)
         self._http = httpx.AsyncClient(timeout=_TIMEOUT_S)
 
         if not self._disponivel:

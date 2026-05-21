@@ -55,6 +55,7 @@ _matching_svc = MatchingService()
 # GET /prospeccao/dna
 # ---------------------------------------------------------------------------
 
+
 @router.get("/dna", response_model=DNAEscritorioResponse)
 async def get_dna(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
@@ -74,6 +75,7 @@ async def get_dna(
 # POST /prospeccao/dna/atualizar
 # ---------------------------------------------------------------------------
 
+
 @router.post("/dna/atualizar", response_model=DNAEscritorioResponse)
 async def atualizar_dna(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
@@ -91,6 +93,7 @@ async def atualizar_dna(
 # ---------------------------------------------------------------------------
 # POST /prospeccao/descobrir
 # ---------------------------------------------------------------------------
+
 
 @router.post("/descobrir", response_model=PipelineResponse, status_code=status.HTTP_201_CREATED)
 async def descobrir_leads(
@@ -179,10 +182,13 @@ async def descobrir_leads(
 # GET /prospeccao/pipeline
 # ---------------------------------------------------------------------------
 
+
 @router.get("/pipeline", response_model=PipelineResponse)
 async def listar_pipeline(
     tipo_lead: str | None = Query(default=None, description="Filtrar por 'empresa' ou 'pessoa'"),
-    status_filtro: str | None = Query(default=None, alias="status", description="Filtrar por status"),
+    status_filtro: str | None = Query(
+        default=None, alias="status", description="Filtrar por status"
+    ),
     score_minimo: int = Query(default=0, ge=0, le=100),
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=20, ge=1, le=100),
@@ -194,9 +200,7 @@ async def listar_pipeline(
 
     from shared.models.lead_prospeccao import LeadProspeccao
 
-    query = select(LeadProspeccao).where(
-        LeadProspeccao.escritorio_id == escritorio_id
-    )
+    query = select(LeadProspeccao).where(LeadProspeccao.escritorio_id == escritorio_id)
 
     if tipo_lead:
         query = query.where(LeadProspeccao.tipo_lead == tipo_lead)
@@ -226,6 +230,7 @@ async def listar_pipeline(
 # PATCH /prospeccao/{id}/status
 # ---------------------------------------------------------------------------
 
+
 @router.patch("/{lead_id}/status", response_model=LeadProspeccaoResponse)
 async def atualizar_status(
     lead_id: int,
@@ -247,6 +252,7 @@ async def atualizar_status(
 # DELETE /prospeccao/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deletar_lead(
     lead_id: int,
@@ -263,15 +269,14 @@ async def deletar_lead(
 # Helpers privados
 # ---------------------------------------------------------------------------
 
+
 async def _get_lead_ou_403(lead_id: int, escritorio_id: int, db: AsyncSession):
     """Busca o lead e verifica propriedade. Levanta 403 se não pertencer ao escritório."""
     from sqlalchemy import select
 
     from shared.models.lead_prospeccao import LeadProspeccao
 
-    result = await db.execute(
-        select(LeadProspeccao).where(LeadProspeccao.id == lead_id)
-    )
+    result = await db.execute(select(LeadProspeccao).where(LeadProspeccao.id == lead_id))
     lead = result.scalar_one_or_none()
 
     if lead is None:

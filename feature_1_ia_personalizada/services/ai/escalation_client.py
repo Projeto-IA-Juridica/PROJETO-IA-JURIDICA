@@ -27,7 +27,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Custo estimado Claude Opus 4.6 (verificar em anthropic.com/pricing)
 # ---------------------------------------------------------------------------
-_CUSTO_INPUT_POR_MILHAO = Decimal("15.00")   # USD
+_CUSTO_INPUT_POR_MILHAO = Decimal("15.00")  # USD
 _CUSTO_OUTPUT_POR_MILHAO = Decimal("75.00")  # USD
 
 
@@ -40,6 +40,7 @@ def _calcular_custo(tokens_input: int, tokens_output: int) -> Decimal:
 # ---------------------------------------------------------------------------
 # Enums e dataclasses públicos
 # ---------------------------------------------------------------------------
+
 
 class TipoAnalise(str, Enum):
     ANALISE_COMPLETA = "analise_completa"
@@ -66,7 +67,7 @@ class AnalisePecaResponse:
     vulnerabilidades: list[str]
     argumentos_ausentes: list[str]
     precedentes_relevantes: list[str]
-    score_geral: int                    # 0-100
+    score_geral: int  # 0-100
     sugestoes: list[str] = field(default_factory=list)
     tokens_input: int = 0
     tokens_output: int = 0
@@ -79,13 +80,14 @@ class Jurisprudencia:
     tribunal: str
     numero_processo: str
     data_julgamento: str
-    aplicabilidade: str                 # "FAVORAVEL" | "DESFAVORAVEL" | "NEUTRO"
+    aplicabilidade: str  # "FAVORAVEL" | "DESFAVORAVEL" | "NEUTRO"
     relevancia_score: float
 
 
 # ---------------------------------------------------------------------------
 # Exceção pública
 # ---------------------------------------------------------------------------
+
 
 class EscalacaoIndisponivelError(RuntimeError):
     """Levantada quando o modelo de escalação falha — caller usa Claude padrão como fallback."""
@@ -94,6 +96,7 @@ class EscalacaoIndisponivelError(RuntimeError):
 # ---------------------------------------------------------------------------
 # Cliente principal
 # ---------------------------------------------------------------------------
+
 
 class EscalacaoClient:
     """
@@ -130,9 +133,7 @@ class EscalacaoClient:
             EscalacaoIndisponivelError: Se todas as tentativas falharem.
         """
         conteudo_usuario = (
-            f"{contexto_rag}\n\n{mensagem_usuario}".strip()
-            if contexto_rag
-            else mensagem_usuario
+            f"{contexto_rag}\n\n{mensagem_usuario}".strip() if contexto_rag else mensagem_usuario
         )
 
         inicio = time.perf_counter()

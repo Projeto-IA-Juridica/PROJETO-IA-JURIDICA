@@ -251,7 +251,10 @@ async def test_gerar_sugestao_chamada_com_historico():
     manager, session_mock, evolution = _make_manager(advogados=[adv])
     evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "W1"}})
 
-    historico = [{"role": "user", "content": "Olá"}, {"role": "assistant", "content": "Como posso ajudar?"}]
+    historico = [
+        {"role": "user", "content": "Olá"},
+        {"role": "assistant", "content": "Como posso ajudar?"},
+    ]
 
     await manager.avaliar_e_notificar_advogados(
         escritorio_id=10,

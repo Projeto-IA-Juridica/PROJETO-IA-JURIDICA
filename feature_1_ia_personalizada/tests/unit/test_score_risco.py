@@ -291,7 +291,13 @@ def test_calcular_componentes_dentro_do_range():
     resultado = calc.calcular(_Processo(polo_cliente="autor"), _DATAJUD_TIPICO)
 
     c = resultado.componentes
-    for campo in ("complexidade_juridica", "duracao_estimada", "historico_vara", "valor_causa", "fase_processual"):
+    for campo in (
+        "complexidade_juridica",
+        "duracao_estimada",
+        "historico_vara",
+        "valor_causa",
+        "fase_processual",
+    ):
         valor = getattr(c, campo)
         assert 0 <= valor <= 100, f"{campo}={valor} fora do range 0–100"
 

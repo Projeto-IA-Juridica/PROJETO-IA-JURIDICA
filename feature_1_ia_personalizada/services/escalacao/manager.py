@@ -125,9 +125,7 @@ class EscalacaoManager:
                     log.info("whatsapp_escalacao_enviado", advogado_id=adv.id)
                     advogados_alertados += 1
                 except Exception as exc:
-                    log.error(
-                        "whatsapp_escalacao_falha", advogado_id=adv.id, erro=str(exc)
-                    )
+                    log.error("whatsapp_escalacao_falha", advogado_id=adv.id, erro=str(exc))
 
             return {
                 "enviado": advogados_alertados > 0,

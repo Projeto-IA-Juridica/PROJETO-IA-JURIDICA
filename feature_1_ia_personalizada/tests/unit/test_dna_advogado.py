@@ -25,6 +25,7 @@ from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
 # Helpers de fixture
 # ---------------------------------------------------------------------------
 
+
 def _make_claude_mock(resposta_json: str) -> MagicMock:
     """Cria um ClaudeClient mock que retorna o JSON especificado."""
     mock = MagicMock()
@@ -63,6 +64,7 @@ def _make_db_mock(rows: list | None = None) -> MagicMock:
 # Testes: dados insuficientes (< 5 processos)
 # ---------------------------------------------------------------------------
 
+
 class TestDNADadosInsuficientes:
     @pytest.mark.asyncio
     async def test_menos_de_5_processos_retorna_dados_insuficientes(self):
@@ -79,9 +81,9 @@ class TestDNADadosInsuficientes:
         escritorio_row.nome = "Escritório Teste"
 
         result_seq = [MagicMock(), MagicMock()]
-        result_seq[0].all.return_value = []           # query de stats
+        result_seq[0].all.return_value = []  # query de stats
         result_seq[0].one_or_none.return_value = escritorio_row
-        result_seq[1].all.return_value = []           # query de polo (não deve ser chamada)
+        result_seq[1].all.return_value = []  # query de polo (não deve ser chamada)
 
         call_count = 0
 
@@ -128,6 +130,7 @@ class TestDNADadosInsuficientes:
 # ---------------------------------------------------------------------------
 # Testes: especialidades B2B (empresa)
 # ---------------------------------------------------------------------------
+
 
 class TestDNATipoLeadEmpresa:
     @pytest.mark.asyncio
@@ -187,6 +190,7 @@ class TestDNATipoLeadEmpresa:
 # Testes: especialidades B2C (pessoa)
 # ---------------------------------------------------------------------------
 
+
 class TestDNATipoLeadPessoa:
     @pytest.mark.asyncio
     async def test_familia_retorna_tipo_pessoa(self):
@@ -228,9 +232,7 @@ class TestDNATipoLeadPessoa:
         db.commit = AsyncMock()
 
         svc = DNAAdvogadoService(claude=claude, redis=redis)
-        dna = await svc.gerar_dna(
-            escritorio_id=2, db=db, nome_escritorio="Escritório Família"
-        )
+        dna = await svc.gerar_dna(escritorio_id=2, db=db, nome_escritorio="Escritório Família")
 
         assert dna.tipo_lead_predominante == "pessoa"
         assert not dna.dados_insuficientes
@@ -239,6 +241,7 @@ class TestDNATipoLeadPessoa:
 # ---------------------------------------------------------------------------
 # Testes: cache Redis
 # ---------------------------------------------------------------------------
+
 
 class TestDNACache:
     @pytest.mark.asyncio

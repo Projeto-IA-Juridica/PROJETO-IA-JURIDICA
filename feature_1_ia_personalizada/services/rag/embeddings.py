@@ -245,8 +245,7 @@ class EmbeddingGenerator:
 def _validar_batch(vetores: list[list[float]], provedor: str, esperado: int) -> None:
     if len(vetores) != esperado:
         raise ValueError(
-            f"Provedor '{provedor}' retornou {len(vetores)} embeddings, "
-            f"esperado {esperado}."
+            f"Provedor '{provedor}' retornou {len(vetores)} embeddings, " f"esperado {esperado}."
         )
     for vetor in vetores:
         if len(vetor) != EMBEDDING_DIM:

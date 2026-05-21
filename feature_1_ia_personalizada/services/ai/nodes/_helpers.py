@@ -1,6 +1,7 @@
 """
 Helpers de banco de dados reutilizados por múltiplos nós do orquestrador.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal

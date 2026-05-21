@@ -58,8 +58,8 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 _MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB
-_MAX_CHARS_ANALISE = 15_000         # ~5 000 tokens — limite seguro para Opus
-_PDF_MAGIC = b"%PDF-"               # primeiros bytes de qualquer PDF válido
+_MAX_CHARS_ANALISE = 15_000  # ~5 000 tokens — limite seguro para Opus
+_PDF_MAGIC = b"%PDF-"  # primeiros bytes de qualquer PDF válido
 
 # ---------------------------------------------------------------------------
 # Dependency: EscalacaoClient como singleton injetável
@@ -164,9 +164,7 @@ async def analisar_peticao(
         )
 
     try:
-        texto = LegalDataCleaner.normalizar_espacos(
-            _extrair_texto_pdf(conteudo_bytes) or ""
-        )
+        texto = LegalDataCleaner.normalizar_espacos(_extrair_texto_pdf(conteudo_bytes) or "")
     except Exception as exc:
         logger.warning("hub_rest_extracao_falhou", erro=str(exc))
         raise HTTPException(
@@ -183,13 +181,13 @@ async def analisar_peticao(
     texto_truncado = len(texto) > _MAX_CHARS_ANALISE
     conteudo_envio = texto[:_MAX_CHARS_ANALISE]
     percentual_analisado = (
-        round(min(_MAX_CHARS_ANALISE, len(texto)) / len(texto) * 100, 1)
-        if texto else 100.0
+        round(min(_MAX_CHARS_ANALISE, len(texto)) / len(texto) * 100, 1) if texto else 100.0
     )
 
     job_id = str(uuid.uuid4())
 
     from feature_1_ia_personalizada.workers.hub_worker import hub_analisar_peticao_task
+
     hub_analisar_peticao_task.delay(
         job_id=job_id,
         conteudo_texto=conteudo_envio,
@@ -513,10 +511,7 @@ async def metricas_hub(
         tokens_input_total=row_totais.tokens_input_total,
         tokens_output_total=row_totais.tokens_output_total,
         custo_total_usd=Decimal(str(row_totais.custo_total)),
-        intencoes_top5=[
-            IntencaoCount(intencao=r.intencao, total=r.total)
-            for r in rows_intencoes
-        ],
+        intencoes_top5=[IntencaoCount(intencao=r.intencao, total=r.total) for r in rows_intencoes],
         advogados_mais_ativos=[
             AdvogadoAtivo(usuario_id=r.usuario_id, total_sessoes=r.total_sessoes)
             for r in rows_advogados

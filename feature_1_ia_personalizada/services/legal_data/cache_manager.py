@@ -95,7 +95,9 @@ class LegalDataCacheManager:
         """Salva a Capa no Redis pelo TTL designado."""
         try:
             payload = json.dumps(capa_data, ensure_ascii=False)
-            await self._redis.setex(self._key_capa(cnj), _com_jitter(self.TTL_CAPA_PROCESSO), payload)
+            await self._redis.setex(
+                self._key_capa(cnj), _com_jitter(self.TTL_CAPA_PROCESSO), payload
+            )
             logger.debug("cache_capa_salva", cnj=cnj)
         except Exception as e:
             logger.error("cache_write_error", error=str(e), key=self._key_capa(cnj))
@@ -118,7 +120,9 @@ class LegalDataCacheManager:
         """Salva os andamentos judiciais no Redis."""
         try:
             payload = json.dumps(andamentos_list, ensure_ascii=False)
-            await self._redis.setex(self._key_andamentos(cnj), _com_jitter(self.TTL_ANDAMENTOS), payload)
+            await self._redis.setex(
+                self._key_andamentos(cnj), _com_jitter(self.TTL_ANDAMENTOS), payload
+            )
             logger.debug("cache_andamentos_salvo", cnj=cnj, qtd=len(andamentos_list))
         except Exception as e:
             logger.error("cache_write_error", error=str(e), key=self._key_andamentos(cnj))
@@ -260,4 +264,6 @@ async def invalidar_cache_dna_async(redis_client: Redis, escritorio_id: int) -> 
         await redis_client.delete(f"dna:{escritorio_id}")
         logger.info("cache_dna_invalidado_async", escritorio_id=escritorio_id)
     except Exception as exc:
-        logger.warning("cache_dna_invalidate_async_error", escritorio_id=escritorio_id, error=str(exc))
+        logger.warning(
+            "cache_dna_invalidate_async_error", escritorio_id=escritorio_id, error=str(exc)
+        )

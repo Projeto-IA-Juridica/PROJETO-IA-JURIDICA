@@ -152,8 +152,7 @@ async def seed_data():
         clientes = []
         for data in clientes_data:
             stmt = select(Cliente).where(
-                Cliente.escritorio_id == escritorio.id,
-                Cliente.cpf == criptografar(data["cpf"])
+                Cliente.escritorio_id == escritorio.id, Cliente.cpf == criptografar(data["cpf"])
             )
             result = await db.execute(stmt)
             cliente = result.scalars().first()
@@ -256,8 +255,7 @@ async def seed_data():
         for data in processos_data:
             cliente = clientes[data["cliente_idx"]]
             stmt = select(Processo).where(
-                Processo.escritorio_id == escritorio.id,
-                Processo.numero_cnj == data["numero_cnj"]
+                Processo.escritorio_id == escritorio.id, Processo.numero_cnj == data["numero_cnj"]
             )
             result = await db.execute(stmt)
             processo = result.scalars().first()
@@ -365,9 +363,9 @@ async def seed_data():
 
         await db.commit()
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✅ SEED COMPLETO!")
-        print("="*60)
+        print("=" * 60)
         print("\n📧 CREDENCIAIS DE ACESSO:")
         print(f"   Email: marcos@admin.com")
         print(f"   Senha: admin123")
@@ -377,7 +375,7 @@ async def seed_data():
         print(f"   - {len(clientes)} Clientes")
         print(f"   - {len(processos)} Processos")
         print(f"   - {len(interacoes_data)} Interações WhatsApp")
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
 
 
 if __name__ == "__main__":

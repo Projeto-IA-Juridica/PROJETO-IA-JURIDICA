@@ -594,9 +594,14 @@ def verificar_escalacoes_pendentes(self) -> dict:
 
     async def _processar():
         async with async_session_factory() as session:
-            stmt = select(Interacao).where(
-                Interacao.tipo == "escalacao",
-            ).order_by(Interacao.id.desc()).limit(100)
+            stmt = (
+                select(Interacao)
+                .where(
+                    Interacao.tipo == "escalacao",
+                )
+                .order_by(Interacao.id.desc())
+                .limit(100)
+            )
 
             result = await session.execute(stmt)
             interacoes = result.scalars().all()
@@ -618,6 +623,7 @@ def verificar_escalacoes_pendentes(self) -> dict:
                 try:
                     # ts_criacao tem o formato ISO. Pode ter Z no final.
                     from dateutil.parser import isoparse
+
                     ts_criacao = isoparse(criacao_str)
                     if ts_criacao.tzinfo is None:
                         ts_criacao = ts_criacao.replace(tzinfo=UTC)
@@ -626,8 +632,14 @@ def verificar_escalacoes_pendentes(self) -> dict:
 
                 tempo_decorrido = agora - ts_criacao
 
-                if tempo_decorrido > timedelta(hours=24) and not esc_meta.get("alerta_critico_emitido"):
-                    logger.error("escalacao_sla_estourado", interacao_id=interacao.id, horas=tempo_decorrido.total_seconds() / 3600)
+                if tempo_decorrido > timedelta(hours=24) and not esc_meta.get(
+                    "alerta_critico_emitido"
+                ):
+                    logger.error(
+                        "escalacao_sla_estourado",
+                        interacao_id=interacao.id,
+                        horas=tempo_decorrido.total_seconds() / 3600,
+                    )
                     esc_meta["alerta_critico_emitido"] = True
                     alertas_criticos += 1
 
@@ -636,7 +648,9 @@ def verificar_escalacoes_pendentes(self) -> dict:
                     if not advogados_ids:
                         continue
 
-                    stmt_adv = select(Usuario).where(Usuario.id.in_(advogados_ids), Usuario.whatsapp_numero.isnot(None))
+                    stmt_adv = select(Usuario).where(
+                        Usuario.id.in_(advogados_ids), Usuario.whatsapp_numero.isnot(None)
+                    )
                     advogados = (await session.execute(stmt_adv)).scalars().all()
 
                     for adv in advogados:
@@ -650,9 +664,13 @@ def verificar_escalacoes_pendentes(self) -> dict:
                         WhatsAppService.enviar_mensagem(
                             id_cliente=interacao.cliente_id,
                             telefone=adv.whatsapp_numero,
-                            texto=texto_lembrete
+                            texto=texto_lembrete,
                         )
-                        logger.info("lembrete_escalacao_enviado", advogado_id=adv.id, interacao_id=interacao.id)
+                        logger.info(
+                            "lembrete_escalacao_enviado",
+                            advogado_id=adv.id,
+                            interacao_id=interacao.id,
+                        )
 
                     esc_meta["lembrete_enviado"] = True
                     lembretes_enviados += 1
@@ -665,4 +683,3 @@ def verificar_escalacoes_pendentes(self) -> dict:
 
     resultado = asyncio.run(_processar())
     return {"status": "ok", **resultado}
-

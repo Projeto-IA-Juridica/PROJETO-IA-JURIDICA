@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 # Request schemas
 # ---------------------------------------------------------------------------
 
+
 class DescobertaRequest(BaseModel):
     """Body do POST /prospeccao/descobrir."""
 
@@ -25,8 +26,7 @@ class DescobertaRequest(BaseModel):
         description="Tipo de ação a buscar no DataJud. Ex: 'reclamação trabalhista'"
     )
     tribunal: str | None = Field(
-        default=None,
-        description="Tribunal alvo. Ex: 'TRT15'. None = todos os tribunais"
+        default=None, description="Tribunal alvo. Ex: 'TRT15'. None = todos os tribunais"
     )
     limite: int = Field(default=20, ge=1, le=100)
     score_minimo: int = Field(default=40, ge=0, le=100)
@@ -43,6 +43,7 @@ class LeadStatusUpdate(BaseModel):
 # Response schemas
 # ---------------------------------------------------------------------------
 
+
 class LeadProspeccaoResponse(BaseModel):
     """
     Representa um lead no pipeline — empresa ou pessoa física.
@@ -53,7 +54,7 @@ class LeadProspeccaoResponse(BaseModel):
     # Campos comuns
     id: int
     tipo_lead: Literal["empresa", "pessoa"]
-    nome: str                           # razao_social ou nome da pessoa
+    nome: str  # razao_social ou nome da pessoa
     score_match: int | None
     score_motivo: str | None
     abordagem_sugerida: str | None
@@ -113,8 +114,7 @@ class PipelineResponse(BaseModel):
     dna_disponivel: bool
     linkedin_disponivel: bool
     aviso_lgpd: str | None = Field(
-        default=None,
-        description="Preenchido automaticamente quando o pipeline contém leads B2C"
+        default=None, description="Preenchido automaticamente quando o pipeline contém leads B2C"
     )
 
     @classmethod

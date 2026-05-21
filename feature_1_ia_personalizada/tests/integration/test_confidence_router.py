@@ -97,7 +97,7 @@ class TestRoteamentoPorScore:
         score = _avaliar(
             router,
             tipo_intencao="perspectiva_caso",
-            rag_docs=[],                               # sem docs RAG → rag = 0.0
+            rag_docs=[],  # sem docs RAG → rag = 0.0
             fact_check_result={"hallucination_score": 0.2},
             historico=[],
         )
@@ -110,7 +110,7 @@ class TestRoteamentoPorScore:
         """Escritório com threshold reduzido a 0.40 — score médio já satisfaz."""
         score = _avaliar(
             router,
-            tipo_intencao="duvida_termo",              # score base 0.70
+            tipo_intencao="duvida_termo",  # score base 0.70
             rag_docs=[{"score": 0.75}],
             fact_check_result={"hallucination_score": 0.05},
         )
@@ -122,7 +122,7 @@ class TestRoteamentoPorScore:
         """Escritório exigente (threshold=0.85) — score normal não passa."""
         score = _avaliar(
             router,
-            tipo_intencao="outro",                     # score base 0.65
+            tipo_intencao="outro",  # score base 0.65
             rag_docs=[{"score": 0.60}],
             fact_check_result={"hallucination_score": 0.1},
         )
@@ -142,7 +142,7 @@ class TestForcamentosEscalacao:
         score = _avaliar(
             router,
             mensagem="O STJ tem alguma súmula sobre isso?",
-            tipo_intencao="status",                    # seria claude pelo score
+            tipo_intencao="status",  # seria claude pelo score
             rag_docs=[{"score": 0.95}],
             fact_check_result={"hallucination_score": 0.0},
         )
@@ -174,7 +174,7 @@ class TestForcamentosEscalacao:
         """hallucination_score > 0.30 força escalação independente da intenção."""
         score = _avaliar(
             router,
-            tipo_intencao="status",                    # normalmente seria claude
+            tipo_intencao="status",  # normalmente seria claude
             fact_check_result={"hallucination_score": 0.40},
         )
 
@@ -254,7 +254,7 @@ class TestControleEscritorioEscalacao:
         """Quota mensal atingida → forçar Claude independente de score."""
         score = _avaliar(
             router,
-            mensagem="O STJ decidiu sobre isso?",   # forçamento ativo
+            mensagem="O STJ decidiu sobre isso?",  # forçamento ativo
             tipo_intencao="juridica_complexa",
         )
 
@@ -290,7 +290,7 @@ class TestComponentesScore:
         score = _avaliar(
             router,
             tipo_intencao="status",
-            rag_docs=[{"conteudo": "texto"}],           # sem campo 'score'
+            rag_docs=[{"conteudo": "texto"}],  # sem campo 'score'
         )
         assert score.componentes["rag"] == 0.5
 

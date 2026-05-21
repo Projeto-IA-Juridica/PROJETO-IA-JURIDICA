@@ -31,7 +31,7 @@ from .celery_app import DLQTask, celery_app
 logger = structlog.get_logger(__name__)
 
 _DEBOUNCE_TTL_SEGUNDOS = 3600  # 1 hora
-_MAX_SIMULTANEAS = 10          # máx análises paralelas por escritório (chord)
+_MAX_SIMULTANEAS = 10  # máx análises paralelas por escritório (chord)
 
 
 def _redis_client() -> redis.Redis:
@@ -41,6 +41,7 @@ def _redis_client() -> redis.Redis:
 # ---------------------------------------------------------------------------
 # Task 1 — análise de um único cliente
 # ---------------------------------------------------------------------------
+
 
 @celery_app.task(
     name="feature_1_ia_personalizada.workers.crm_worker.crm_analisar_cliente",
@@ -80,6 +81,7 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
     # Emite contador por nível — permite ver distribuição de risco da carteira no Prometheus
     try:
         from feature_1_ia_personalizada.api.routes.metrics import clientes_crm_analisados_total
+
         clientes_crm_analisados_total.labels(
             escritorio_id=str(escritorio_id),
             nivel=resultado.get("nivel", "desconhecido"),
@@ -93,6 +95,7 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Task 2 — análise de todos os clientes ativos de um escritório
 # ---------------------------------------------------------------------------
+
 
 @celery_app.task(
     name="feature_1_ia_personalizada.workers.crm_worker.crm_analisar_escritorio",
@@ -133,9 +136,7 @@ def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
             )
             for cid in lote
         ]
-        resultado = chord(tasks)(
-            celery_app.signature("celery.chord_unlock", queue="ia")
-        )
+        resultado = chord(tasks)(celery_app.signature("celery.chord_unlock", queue="ia"))
         job_ids.append(str(resultado.id) if resultado else f"lote_{i}")
 
     return {"total_clientes": total, "job_ids": job_ids}
@@ -144,6 +145,7 @@ def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Função utilitária — debounce para trigger do webhook
 # ---------------------------------------------------------------------------
+
 
 def disparar_analise_com_debounce(cliente_id: int, escritorio_id: int) -> bool:
     """

@@ -36,9 +36,26 @@ logger = structlog.get_logger(__name__)
 _MAPA_FASES: list[tuple[str, list[str]]] = [
     ("encerrado", ["arquivado", "extinto", "baixa definitiva", "trânsito em julgado"]),
     ("execucao", ["execução", "cumprimento de sentença", "penhora", "arresto", "leilão", "hasta"]),
-    ("recurso", ["apelação", "recurso", "agravo", "embargos de declaração", "especial", "extraordinário"]),
-    ("julgamento", ["sentença", "acórdão", "julgamento", "improcedente", "procedente", "provido", "desprovido"]),
-    ("saneamento", ["saneamento", "saneado", "audiência de instrução", "prova pericial", "laudo", "perícia"]),
+    (
+        "recurso",
+        ["apelação", "recurso", "agravo", "embargos de declaração", "especial", "extraordinário"],
+    ),
+    (
+        "julgamento",
+        [
+            "sentença",
+            "acórdão",
+            "julgamento",
+            "improcedente",
+            "procedente",
+            "provido",
+            "desprovido",
+        ],
+    ),
+    (
+        "saneamento",
+        ["saneamento", "saneado", "audiência de instrução", "prova pericial", "laudo", "perícia"],
+    ),
     ("instrucao", ["audiência", "designada", "intimação", "intimado", "testemunha", "depoimento"]),
     ("conhecimento", []),  # fase padrão (fallback)
 ]
@@ -84,8 +101,9 @@ def _run(coro) -> Any:
 async def _get_state(processo_id: int) -> dict[str, Any]:
     async with async_session_factory() as session:
         result = await session.execute(
-            select(ProcessoModel.estado_atual, ProcessoModel.fase_processual)
-            .where(ProcessoModel.id == processo_id)
+            select(ProcessoModel.estado_atual, ProcessoModel.fase_processual).where(
+                ProcessoModel.id == processo_id
+            )
         )
         row = result.one_or_none()
 

@@ -1,6 +1,7 @@
 """
 Nós de entrega: enviar_resposta e tratar_erro.
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -969,7 +969,9 @@ class TestRotas:
 
     def test_classificacao_duvida_termo_vai_para_buscar_dados(self):
         assert (
-            self._orq()._rota_apos_avaliar_escalacao(_base_state(intencao="duvida_termo", erro=None))
+            self._orq()._rota_apos_avaliar_escalacao(
+                _base_state(intencao="duvida_termo", erro=None)
+            )
             == "buscar_dados"
         )
 
@@ -993,13 +995,16 @@ class TestRotas:
 
     def test_escalacao_vai_para_preparar(self):
         assert (
-            self._orq()._rota_apos_avaliar_escalacao(_base_state(intencao="parecer_juridico", requer_escalacao=True, erro=None))
+            self._orq()._rota_apos_avaliar_escalacao(
+                _base_state(intencao="parecer_juridico", requer_escalacao=True, erro=None)
+            )
             == "preparar_escalacao"
         )
 
     def test_classificacao_com_erro_vai_para_tratar_erro(self):
         assert (
-            self._orq()._rota_apos_avaliar_escalacao(_base_state(erro="falha_claude")) == "tratar_erro"
+            self._orq()._rota_apos_avaliar_escalacao(_base_state(erro="falha_claude"))
+            == "tratar_erro"
         )
 
     # _rota_apos_busca_dados

@@ -181,13 +181,13 @@ def _exigir_admin(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token JWT inválido.")
 
     if payload.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Apenas administradores podem realizar o onboarding.")
+        raise HTTPException(
+            status_code=403, detail="Apenas administradores podem realizar o onboarding."
+        )
     return payload
 
 
-async def _obter_escritorio_do_token(
-    request: Request, db: AsyncSession
-) -> Escritorio:
+async def _obter_escritorio_do_token(request: Request, db: AsyncSession) -> Escritorio:
     """Retorna o escritório do admin autenticado."""
     payload = _exigir_admin(request)
     escritorio_id = payload.get("escritorio_id")
@@ -316,7 +316,9 @@ async def configure_ia(
         h_inicio = _dt.strptime(body.horario_inicio, "%H:%M").time()
         h_fim = _dt.strptime(body.horario_fim, "%H:%M").time()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Horários inválidos — use o formato HH:MM.") from None
+        raise HTTPException(
+            status_code=400, detail="Horários inválidos — use o formato HH:MM."
+        ) from None
 
     if h_inicio >= h_fim:
         raise HTTPException(
@@ -443,17 +445,26 @@ async def connect_whatsapp(
     def _tem_qr(payload: dict | None) -> bool:
         if not isinstance(payload, dict):
             return False
-        if payload.get("qrcode") or payload.get("qr_code") or payload.get("base64") or payload.get("qr"):
+        if (
+            payload.get("qrcode")
+            or payload.get("qr_code")
+            or payload.get("base64")
+            or payload.get("qr")
+        ):
             return True
         instance = payload.get("instance")
         if isinstance(instance, dict) and (
-            instance.get("qrcode") or instance.get("qr_code") or instance.get("base64") or instance.get("qr")
+            instance.get("qrcode")
+            or instance.get("qr_code")
+            or instance.get("base64")
+            or instance.get("qr")
         ):
             return True
         return False
 
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
+
             async def _reconectar_instancia() -> dict:
                 ultima_resposta = None
                 for metodo in ("GET", "POST"):
@@ -511,7 +522,9 @@ async def connect_whatsapp(
                             )
                 except Exception:
                     pass
-                logger.warning("evolution_create_erro", status=resp.status_code, escritorio_id=escritorio.id)
+                logger.warning(
+                    "evolution_create_erro", status=resp.status_code, escritorio_id=escritorio.id
+                )
                 raise HTTPException(
                     status_code=502,
                     detail=detail,
@@ -522,9 +535,7 @@ async def connect_whatsapp(
         raise
     except httpx.TimeoutException as exc:
         logger.warning("evolution_timeout", escritorio_id=escritorio.id)
-        raise HTTPException(
-            status_code=504, detail="Evolution API não respondeu a tempo."
-        ) from exc
+        raise HTTPException(status_code=504, detail="Evolution API não respondeu a tempo.") from exc
     except httpx.HTTPError as exc:
         logger.error("evolution_connect_http_error", erro=str(exc), escritorio_id=escritorio.id)
         raise HTTPException(
@@ -532,8 +543,12 @@ async def connect_whatsapp(
             detail=f"Falha de comunicação com Evolution API: {str(exc)[:300]}",
         ) from exc
     except Exception as exc:
-        logger.error("evolution_connect_error", erro=str(exc), escritorio_id=escritorio.id, exc_info=True)
-        raise HTTPException(status_code=502, detail="Erro ao conectar com a Evolution API.") from exc
+        logger.error(
+            "evolution_connect_error", erro=str(exc), escritorio_id=escritorio.id, exc_info=True
+        )
+        raise HTTPException(
+            status_code=502, detail="Erro ao conectar com a Evolution API."
+        ) from exc
 
     try:
         # Persiste o nome da instância no escritório
@@ -545,7 +560,12 @@ async def connect_whatsapp(
         qr_code = data.get("qrcode") or data.get("qr_code") or data.get("base64") or data.get("qr")
         if not qr_code and isinstance(data.get("instance"), dict):
             inst_data = data.get("instance")
-            qr_code = inst_data.get("qrcode") or inst_data.get("qr_code") or inst_data.get("base64") or inst_data.get("qr")
+            qr_code = (
+                inst_data.get("qrcode")
+                or inst_data.get("qr_code")
+                or inst_data.get("base64")
+                or inst_data.get("qr")
+            )
         logger.info("onboarding_connect_whatsapp", escritorio_id=escritorio.id)
 
         return {
@@ -555,8 +575,15 @@ async def connect_whatsapp(
             "status": data.get("instance", {}).get("state", "qr"),
         }
     except Exception as exc:
-        logger.error("connect_whatsapp_persist_erro", erro=str(exc), escritorio_id=escritorio.id, exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro ao salvar configuração do WhatsApp.") from exc
+        logger.error(
+            "connect_whatsapp_persist_erro",
+            erro=str(exc),
+            escritorio_id=escritorio.id,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Erro ao salvar configuração do WhatsApp."
+        ) from exc
 
 
 @router.get(
@@ -590,11 +617,15 @@ async def whatsapp_status(
             )
 
             if resp.status_code >= 500:
-                logger.warning("evolution_api_5xx", status=resp.status_code, escritorio_id=escritorio.id)
+                logger.warning(
+                    "evolution_api_5xx", status=resp.status_code, escritorio_id=escritorio.id
+                )
                 return {"connected": False, "state": "evolution_offline"}
 
             if resp.status_code >= 400:
-                logger.warning("evolution_api_error", status=resp.status_code, escritorio_id=escritorio.id)
+                logger.warning(
+                    "evolution_api_error", status=resp.status_code, escritorio_id=escritorio.id
+                )
                 return {"connected": False, "state": "error"}
 
             data = resp.json()
@@ -695,10 +726,11 @@ async def go_live(
         from feature_1_ia_personalizada.workers.ingest_documentos import (
             ingest_jurisprudencia_publica,
         )
+
         # Coleta tipos de ação únicos dos processos
-        tipos_acao = list({
-            p.tipo_acao for p in processos if p.tipo_acao
-        })[:5]  # máx 5 tipos para não sobrecarregar
+        tipos_acao = list({p.tipo_acao for p in processos if p.tipo_acao})[
+            :5
+        ]  # máx 5 tipos para não sobrecarregar
         for tipo in tipos_acao:
             ingest_jurisprudencia_publica.delay(tipo, None, escritorio.id)
     except Exception as exc:
@@ -744,7 +776,9 @@ async def onboarding_status(
         raise
     except Exception as exc:
         logger.error("onboarding_status_erro", erro=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro ao carregar status do onboarding.") from exc
+        raise HTTPException(
+            status_code=500, detail="Erro ao carregar status do onboarding."
+        ) from exc
 
     try:
         etapa = escritorio.onboarding_etapa or 0
@@ -807,4 +841,6 @@ async def onboarding_status(
         }
     except Exception as exc:
         logger.error("onboarding_status_processamento", erro=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="Erro ao processar status do onboarding.") from exc
+        raise HTTPException(
+            status_code=500, detail="Erro ao processar status do onboarding."
+        ) from exc

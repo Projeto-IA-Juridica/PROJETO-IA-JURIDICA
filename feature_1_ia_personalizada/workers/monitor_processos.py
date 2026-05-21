@@ -1,4 +1,3 @@
-
 # feature_1_ia_personalizada/workers/monitor_processos.py
 
 from __future__ import annotations
@@ -224,14 +223,15 @@ def _atualizar_score(
     try:
         # Cria objeto leve com atributos esperados pelo ScoreRiscoCalculator
         class _ProcessoProxy:
-            tipo_acao       = dados_processo.get("tipo_acao")
-            valor_causa     = dados_processo.get("valor_causa")
+            tipo_acao = dados_processo.get("tipo_acao")
+            valor_causa = dados_processo.get("valor_causa")
             fase_processual = dados_processo.get("fase_processual")
-            polo_cliente    = dados_processo.get("polo_cliente") or "autor"
+            polo_cliente = dados_processo.get("polo_cliente") or "autor"
 
         score_obj = _score_calculator.calcular(_ProcessoProxy(), datajud_data)
 
         from shared.database.worker_queries import update_score_risco
+
         update_score_risco(
             processo_id=int(dados_processo["id"]),
             score=score_obj.score,
@@ -274,6 +274,7 @@ def monitorar_processos() -> dict[str, Any]:
         from collections import defaultdict
 
         from feature_1_ia_personalizada.api.routes.metrics import processos_por_risco_gauge
+
         _dist: dict[tuple[str, str], int] = defaultdict(int)
         for _p in processos:
             _esc = str(_p.get("escritorio_id", "desconhecido"))

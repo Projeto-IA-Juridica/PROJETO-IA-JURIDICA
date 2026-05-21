@@ -1,6 +1,7 @@
 """
 Nós de geração: gerar_resposta (Claude padrão) e gerar_resposta_escalacao (Opus).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -83,11 +84,7 @@ def _montar_system_prompt(
         andamentos_lista = dados.get("andamentos_recentes") or []
         andamentos_str = (
             "\n".join(
-                (
-                    f"- {a['data']}: {a['descricao']}"
-                    if a.get("data")
-                    else f"- {a['descricao']}"
-                )
+                (f"- {a['data']}: {a['descricao']}" if a.get("data") else f"- {a['descricao']}")
                 for a in andamentos_lista
             )
             or "Histórico não disponível"
@@ -230,14 +227,22 @@ async def node_gerar_resposta(state: ConversationState, deps: NodeDeps) -> dict[
         erros_total.labels(no="gerar_resposta").inc()
         _is_timeout = isinstance(exc, TimeoutError)
         log.error(
-            "claude_timeout_ativando_fallback" if _is_timeout else "claude_indisponivel_ativando_fallback",
+            (
+                "claude_timeout_ativando_fallback"
+                if _is_timeout
+                else "claude_indisponivel_ativando_fallback"
+            ),
             erro=str(exc),
             timeout_s=TIMEOUT_CLAUDE_SEGUNDOS if _is_timeout else None,
         )
         intencao = state.get("intencao", "outro")
         dados = state.get("dados_processo") or {}
-        tpl = _FALLBACKS.get(intencao, MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO))
-        fallback_msg = tpl.format(numero=dados.get("numero_cnj", "seu processo")) if "{numero}" in tpl else tpl
+        tpl = _FALLBACKS.get(
+            intencao, MENSAGENS_FALLBACK.get("indisponivel", TEMPLATE_ERRO_GENERICO)
+        )
+        fallback_msg = (
+            tpl.format(numero=dados.get("numero_cnj", "seu processo")) if "{numero}" in tpl else tpl
+        )
         return {"resposta_ia": fallback_msg, "usando_fallback": True, "precisa_regenerar": False}
 
     except Exception as exc:
@@ -298,6 +303,7 @@ async def node_gerar_resposta_escalacao(state: ConversationState, deps: NodeDeps
                 escalacao_requests_total,
                 escalacao_tokens_total,
             )
+
             escalacao_latencia_ms.observe(latencia)
             escalacao_requests_total.labels(
                 escritorio_id=str(state["escritorio_id"]), resultado="sucesso"
@@ -314,6 +320,7 @@ async def node_gerar_resposta_escalacao(state: ConversationState, deps: NodeDeps
         from sqlalchemy import update
 
         from shared.models.escritorio import Escritorio
+
         try:
             async with deps.session_factory() as session:
                 await session.execute(
@@ -347,6 +354,7 @@ async def node_gerar_resposta_escalacao(state: ConversationState, deps: NodeDeps
     except (EscalacaoIndisponivelError, TimeoutError) as exc:
         try:
             from feature_1_ia_personalizada.api.routes.metrics import escalacao_requests_total
+
             escalacao_requests_total.labels(
                 escritorio_id=str(state["escritorio_id"]), resultado="fallback_claude"
             ).inc()

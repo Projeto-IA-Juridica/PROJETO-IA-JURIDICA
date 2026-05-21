@@ -173,8 +173,12 @@ class Escritorio(Base, TimestampMixin):
     # escalacao_confidence_threshold: score mínimo do ConfidenceRouter para não escalar (0.0–1.0).
     escalacao_habilitada: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     escalacao_canal_advogado_numero: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    escalacao_quota_tokens_mes: Mapped[int] = mapped_column(Integer, default=500_000, nullable=False)
-    escalacao_tokens_usados_mes: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    escalacao_quota_tokens_mes: Mapped[int] = mapped_column(
+        Integer, default=500_000, nullable=False
+    )
+    escalacao_tokens_usados_mes: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False
+    )
     escalacao_confidence_threshold: Mapped[float] = mapped_column(default=0.70, nullable=False)
 
     # --- Relacionamentos ---

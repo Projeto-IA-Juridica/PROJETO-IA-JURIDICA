@@ -24,6 +24,7 @@ from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import P
 # Builders de fixture
 # ---------------------------------------------------------------------------
 
+
 def _dna_pessoa(
     especialidades: list[str] | None = None,
     top_tipos_acao: list[dict] | None = None,
@@ -35,7 +36,8 @@ def _dna_pessoa(
         tipo_lead_predominante="pessoa",
         perfil_cliente_ideal="Pessoas em processos de família",
         diferenciais=["Mediação"],
-        top_tipos_acao=top_tipos_acao or [
+        top_tipos_acao=top_tipos_acao
+        or [
             {"tipo": "Divórcio", "contagem": 40, "percentual": 40.0},
             {"tipo": "Alimentos", "contagem": 30, "percentual": 30.0},
             {"tipo": "Guarda", "contagem": 30, "percentual": 30.0},
@@ -62,6 +64,7 @@ def _pessoa(
 # ---------------------------------------------------------------------------
 # Heurística por componente
 # ---------------------------------------------------------------------------
+
 
 class TestHeuristicaPessoa:
     def test_especialidade_match_pontua_35(self):
@@ -98,9 +101,11 @@ class TestHeuristicaPessoa:
 
     def test_alta_recorrencia_pontua_20(self):
         """Tipo de ação com > 30% nos processos do escritório → alta_recorrencia."""
-        dna = _dna_pessoa(top_tipos_acao=[
-            {"tipo": "Divórcio", "contagem": 50, "percentual": 50.0},
-        ])
+        dna = _dna_pessoa(
+            top_tipos_acao=[
+                {"tipo": "Divórcio", "contagem": 50, "percentual": 50.0},
+            ]
+        )
         pessoa = _pessoa(tipo_acao="Divórcio Litigioso")
         svc = MatchingService(anthropic_api_key="sk-test")
         _, comp = svc._score_heuristico_pessoa(dna, pessoa)
@@ -109,9 +114,11 @@ class TestHeuristicaPessoa:
 
     def test_tipo_acao_sem_recorrencia_nao_pontua(self):
         """Tipo de ação com percentual ≤ 30% não pontua alta_recorrencia."""
-        dna = _dna_pessoa(top_tipos_acao=[
-            {"tipo": "Divórcio", "contagem": 20, "percentual": 20.0},
-        ])
+        dna = _dna_pessoa(
+            top_tipos_acao=[
+                {"tipo": "Divórcio", "contagem": 20, "percentual": 20.0},
+            ]
+        )
         pessoa = _pessoa(tipo_acao="Divórcio Consensual")
         svc = MatchingService(anthropic_api_key="sk-test")
         _, comp = svc._score_heuristico_pessoa(dna, pessoa)
@@ -136,6 +143,7 @@ class TestHeuristicaPessoa:
 # Score abaixo do limiar: sem Claude
 # ---------------------------------------------------------------------------
 
+
 class TestB2CScoreAbaixoLimiar:
     @pytest.mark.asyncio
     async def test_score_zero_nao_chama_claude(self):
@@ -158,6 +166,7 @@ class TestB2CScoreAbaixoLimiar:
 # abordagem_sugerida B2C — restrições de compliance
 # ---------------------------------------------------------------------------
 
+
 class TestAbordagemB2C:
     @pytest.mark.asyncio
     async def test_abordagem_nao_menciona_cold_call(self):
@@ -165,14 +174,16 @@ class TestAbordagemB2C:
         dna = _dna_pessoa()
         pessoa = _pessoa(tipo_acao="Divórcio", polo="ativo", fase="Conhecimento")
 
-        resposta_ia = json.dumps({
-            "score": 75,
-            "motivo": "Pessoa em fase inicial de divórcio — especialidade do escritório.",
-            "abordagem_sugerida": (
-                "Publicar no processo uma petição de apresentação profissional, "
-                "indicando experiência em mediação familiar."
-            ),
-        })
+        resposta_ia = json.dumps(
+            {
+                "score": 75,
+                "motivo": "Pessoa em fase inicial de divórcio — especialidade do escritório.",
+                "abordagem_sugerida": (
+                    "Publicar no processo uma petição de apresentação profissional, "
+                    "indicando experiência em mediação familiar."
+                ),
+            }
+        )
 
         resposta_mock = MagicMock()
         resposta_mock.status_code = 200
@@ -186,7 +197,10 @@ class TestAbordagemB2C:
 
         svc = MatchingService(anthropic_api_key="sk-test")
 
-        with patch("feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient", return_value=http_mock):
+        with patch(
+            "feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient",
+            return_value=http_mock,
+        ):
             resultado = await svc.calcular_score(dna, pessoa)
 
         abordagem = resultado.abordagem_sugerida.lower()
@@ -202,6 +216,7 @@ class TestAbordagemB2C:
 # ---------------------------------------------------------------------------
 # TypeError para tipo inválido
 # ---------------------------------------------------------------------------
+
 
 class TestTipoInvalido:
     @pytest.mark.asyncio

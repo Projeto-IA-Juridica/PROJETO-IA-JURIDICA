@@ -44,7 +44,9 @@ class TestCNPJValidation:
             RegisterRequest(**payload)
 
         errors = exc_info.value.errors()
-        assert any("cnpj" in str(e["loc"]).lower() or "CNPJ" in str(e.get("msg", "")) for e in errors)
+        assert any(
+            "cnpj" in str(e["loc"]).lower() or "CNPJ" in str(e.get("msg", "")) for e in errors
+        )
 
     def test_cnpj_formato_sem_pontuacao_aceito(self):
         """CNPJ sem pontuação deve ser normalizado e aceito."""
@@ -99,12 +101,17 @@ class TestRegisterEndpoint:
         from shared.models.escritorio import Escritorio as EscritorioModel
 
         db = AsyncMock(spec=AsyncSession)
-        db.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))))
+        db.execute = AsyncMock(
+            return_value=MagicMock(
+                scalars=MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))
+            )
+        )
         db.flush = AsyncMock()
         db.commit = AsyncMock()
 
         # Simula DB populando defaults após flush/commit
         _ids = iter([1, 10])
+
         async def _refresh(obj):
             obj.id = next(_ids)
             if isinstance(obj, EscritorioModel):
@@ -113,6 +120,7 @@ class TestRegisterEndpoint:
                 obj.max_clientes = 200
                 obj.created_at = datetime(2026, 3, 19)
                 obj.updated_at = datetime(2026, 3, 19)
+
         db.refresh = AsyncMock(side_effect=_refresh)
 
         mock_usuario = MagicMock()
@@ -121,10 +129,21 @@ class TestRegisterEndpoint:
         mock_usuario.role = "admin"
 
         with (
-            patch("feature_1_ia_personalizada.api.routes.onboarding.hash_senha", return_value="hashed"),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.criar_token", return_value="access_token_mock"),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.criar_refresh_token", return_value="refresh_token_mock"),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.Usuario", return_value=mock_usuario),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.hash_senha", return_value="hashed"
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.criar_token",
+                return_value="access_token_mock",
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.criar_refresh_token",
+                return_value="refresh_token_mock",
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.Usuario",
+                return_value=mock_usuario,
+            ),
         ):
             body = RegisterRequest(**_VALID_REGISTER_PAYLOAD)
             response = await register(body=body, db=db)
@@ -179,6 +198,7 @@ class TestRegisterEndpoint:
         db.commit = AsyncMock()
 
         _counter = [0]
+
         async def _refresh(obj):
             _counter[0] += 1
             obj.id = _counter[0]
@@ -188,6 +208,7 @@ class TestRegisterEndpoint:
                 obj.max_clientes = 200
                 obj.created_at = datetime(2026, 3, 19)
                 obj.updated_at = datetime(2026, 3, 19)
+
         db.refresh = AsyncMock(side_effect=_refresh)
 
         usuarios_criados = []
@@ -199,10 +220,20 @@ class TestRegisterEndpoint:
                     setattr(self, k, v)
 
         with (
-            patch("feature_1_ia_personalizada.api.routes.onboarding.Usuario", side_effect=_CapturadorUsuario),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.hash_senha", return_value="hashed"),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.criar_token", return_value="tok"),
-            patch("feature_1_ia_personalizada.api.routes.onboarding.criar_refresh_token", return_value="ref"),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.Usuario",
+                side_effect=_CapturadorUsuario,
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.hash_senha", return_value="hashed"
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.criar_token", return_value="tok"
+            ),
+            patch(
+                "feature_1_ia_personalizada.api.routes.onboarding.criar_refresh_token",
+                return_value="ref",
+            ),
         ):
             body = RegisterRequest(**_VALID_REGISTER_PAYLOAD)
             await register(body=body, db=db)

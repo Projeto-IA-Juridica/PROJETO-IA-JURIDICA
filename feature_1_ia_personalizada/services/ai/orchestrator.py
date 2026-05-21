@@ -26,6 +26,7 @@ Fluxo LangGraph:
 
   tratar_erro ◄─── qualquer nó com exceção não recuperável → END
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 try:
     from langgraph.graph import END, StateGraph
+
     _LANGGRAPH_OK = True
 except Exception:
     _LANGGRAPH_OK = False
@@ -276,6 +278,7 @@ class ConversationOrchestrator:
                 ia_tokens_input_total,
                 ia_tokens_output_total,
             )
+
             ia_latencia_ms.labels(intencao=_intencao_final).observe(_elapsed_ms)
             _tok_in = int(_tokens_finais.get("input", 0))
             _tok_out = int(_tokens_finais.get("output", 0))
@@ -318,19 +321,20 @@ class ConversationOrchestrator:
         def _wrap(fn: Any) -> Any:
             async def _node(state: ConversationState) -> dict[str, Any]:
                 return await fn(state, d)  # type: ignore[no-any-return]
+
             return _node
 
         graph = StateGraph(ConversationState)
-        graph.add_node("classificar_intencao",      _wrap(node_classificar_intencao))
-        graph.add_node("avaliar_escalacao",          _wrap(node_avaliar_escalacao))
-        graph.add_node("preparar_escalacao",         _wrap(node_preparar_escalacao))
-        graph.add_node("buscar_dados",               _wrap(node_buscar_dados))
-        graph.add_node("gerar_resposta",             _wrap(node_gerar_resposta))
-        graph.add_node("avaliar_confianca",          _wrap(node_avaliar_confianca))
-        graph.add_node("gerar_resposta_escalacao",   _wrap(node_gerar_resposta_escalacao))
-        graph.add_node("verificar_resposta",         _wrap(node_verificar_resposta))
-        graph.add_node("enviar_resposta",            _wrap(node_enviar_resposta))
-        graph.add_node("tratar_erro",                _wrap(node_tratar_erro))
+        graph.add_node("classificar_intencao", _wrap(node_classificar_intencao))
+        graph.add_node("avaliar_escalacao", _wrap(node_avaliar_escalacao))
+        graph.add_node("preparar_escalacao", _wrap(node_preparar_escalacao))
+        graph.add_node("buscar_dados", _wrap(node_buscar_dados))
+        graph.add_node("gerar_resposta", _wrap(node_gerar_resposta))
+        graph.add_node("avaliar_confianca", _wrap(node_avaliar_confianca))
+        graph.add_node("gerar_resposta_escalacao", _wrap(node_gerar_resposta_escalacao))
+        graph.add_node("verificar_resposta", _wrap(node_verificar_resposta))
+        graph.add_node("enviar_resposta", _wrap(node_enviar_resposta))
+        graph.add_node("tratar_erro", _wrap(node_tratar_erro))
 
         graph.set_entry_point("classificar_intencao")
         graph.add_edge("classificar_intencao", "avaliar_escalacao")
@@ -348,7 +352,11 @@ class ConversationOrchestrator:
         graph.add_conditional_edges(
             "buscar_dados",
             self._rota_apos_busca_dados,
-            {"gerar_resposta": "gerar_resposta", "enviar_resposta": "enviar_resposta", "tratar_erro": "tratar_erro"},
+            {
+                "gerar_resposta": "gerar_resposta",
+                "enviar_resposta": "enviar_resposta",
+                "tratar_erro": "tratar_erro",
+            },
         )
         graph.add_conditional_edges(
             "gerar_resposta",
@@ -368,7 +376,11 @@ class ConversationOrchestrator:
         graph.add_conditional_edges(
             "verificar_resposta",
             self._rota_apos_verificacao,
-            {"enviar_resposta": "enviar_resposta", "gerar_resposta": "gerar_resposta", "tratar_erro": "tratar_erro"},
+            {
+                "enviar_resposta": "enviar_resposta",
+                "gerar_resposta": "gerar_resposta",
+                "tratar_erro": "tratar_erro",
+            },
         )
         graph.add_edge("enviar_resposta", END)
         graph.add_edge("tratar_erro", END)
@@ -383,7 +395,14 @@ class ConversationOrchestrator:
             return "tratar_erro"
         if state.get("requer_escalacao"):
             return "preparar_escalacao"
-        if state.get("intencao") in ("status", "duvida_termo", "duvida_geral", "reclamacao", "perspectivas", "saudacao"):
+        if state.get("intencao") in (
+            "status",
+            "duvida_termo",
+            "duvida_geral",
+            "reclamacao",
+            "perspectivas",
+            "saudacao",
+        ):
             return "buscar_dados"
         return "gerar_resposta"
 
@@ -518,7 +537,14 @@ class ConversationOrchestrator:
                 await _run(node_tratar_erro, s)
             return s  # type: ignore[return-value]
 
-        if s["intencao"] in ("status", "duvida_termo", "duvida_geral", "reclamacao", "perspectivas", "saudacao"):
+        if s["intencao"] in (
+            "status",
+            "duvida_termo",
+            "duvida_geral",
+            "reclamacao",
+            "perspectivas",
+            "saudacao",
+        ):
             s.update(await _run(node_buscar_dados, s))
             if s.get("erro"):
                 await _run(node_tratar_erro, s)

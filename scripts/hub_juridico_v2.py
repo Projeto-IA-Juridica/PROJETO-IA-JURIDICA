@@ -45,6 +45,7 @@ sys.path.insert(0, _ROOT)
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(os.path.join(_ROOT, ".env"), override=False)
 except ImportError:
     pass
@@ -86,6 +87,7 @@ from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import P
 
 try:
     import fitz as _fitz  # type: ignore
+
     _FITZ_OK = True
 except ImportError:
     _fitz = None
@@ -98,15 +100,33 @@ _CNJ_RAW = re.compile(r"^\d{20}$")
 _DATAJUD_BASE = "https://api-publica.datajud.cnj.jus.br"
 
 _TJ_INDICES: dict[str, str] = {
-    "01": "api_publica_tjac", "02": "api_publica_tjal", "03": "api_publica_tjap",
-    "04": "api_publica_tjam", "05": "api_publica_tjba", "06": "api_publica_tjce",
-    "07": "api_publica_tjdf", "08": "api_publica_tjes", "09": "api_publica_tjgo",
-    "10": "api_publica_tjma", "11": "api_publica_tjmt", "12": "api_publica_tjms",
-    "13": "api_publica_tjmg", "14": "api_publica_tjpa", "15": "api_publica_tjpb",
-    "16": "api_publica_tjpr", "17": "api_publica_tjpe", "18": "api_publica_tjpi",
-    "19": "api_publica_tjrj", "20": "api_publica_tjrn", "21": "api_publica_tjrs",
-    "22": "api_publica_tjro", "23": "api_publica_tjrr", "24": "api_publica_tjsc",
-    "25": "api_publica_tjse", "26": "api_publica_tjsp", "27": "api_publica_tjto",
+    "01": "api_publica_tjac",
+    "02": "api_publica_tjal",
+    "03": "api_publica_tjap",
+    "04": "api_publica_tjam",
+    "05": "api_publica_tjba",
+    "06": "api_publica_tjce",
+    "07": "api_publica_tjdf",
+    "08": "api_publica_tjes",
+    "09": "api_publica_tjgo",
+    "10": "api_publica_tjma",
+    "11": "api_publica_tjmt",
+    "12": "api_publica_tjms",
+    "13": "api_publica_tjmg",
+    "14": "api_publica_tjpa",
+    "15": "api_publica_tjpb",
+    "16": "api_publica_tjpr",
+    "17": "api_publica_tjpe",
+    "18": "api_publica_tjpi",
+    "19": "api_publica_tjrj",
+    "20": "api_publica_tjrn",
+    "21": "api_publica_tjrs",
+    "22": "api_publica_tjro",
+    "23": "api_publica_tjrr",
+    "24": "api_publica_tjsc",
+    "25": "api_publica_tjse",
+    "26": "api_publica_tjsp",
+    "27": "api_publica_tjto",
 }
 
 # ── Modelo barato para demo (troca por claude-opus-4-6 em produção) ───────────
@@ -184,6 +204,7 @@ class _EscalacaoDemo:
             conteudo = conteudo.split("```")[1].split("```")[0].strip()
         try:
             import json as _json
+
             dados = _json.loads(conteudo)
         except Exception:
             dados = {
@@ -224,17 +245,19 @@ class _SessoesEmRam:
         tokens_in: int,
         tokens_out: int,
     ) -> None:
-        self._sessoes.append({
-            "id": len(self._sessoes) + 1,
-            "intencao": intencao,
-            "mensagem_preview": mensagem[:100],
-            "mensagem_completa": mensagem,
-            "resposta": resposta,
-            "tokens_input": tokens_in,
-            "tokens_output": tokens_out,
-            "custo_usd": round((tokens_in * 0.8 + tokens_out * 4.0) / 1_000_000, 6),
-            "criado_em": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        })
+        self._sessoes.append(
+            {
+                "id": len(self._sessoes) + 1,
+                "intencao": intencao,
+                "mensagem_preview": mensagem[:100],
+                "mensagem_completa": mensagem,
+                "resposta": resposta,
+                "tokens_input": tokens_in,
+                "tokens_output": tokens_out,
+                "custo_usd": round((tokens_in * 0.8 + tokens_out * 4.0) / 1_000_000, 6),
+                "criado_em": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            }
+        )
 
     @property
     def todas(self) -> list[dict]:
@@ -257,6 +280,7 @@ class _SessoesEmRam:
             contagem[s["intencao"]] = contagem.get(s["intencao"], 0) + 1
         return contagem
 
+
 # =============================================================================
 # SEÇÃO 1 — Helpers CNJ / DataJud
 # =============================================================================
@@ -275,7 +299,9 @@ def _normalizar_cnj(numero: str) -> str | None:
         return numero
     digits = re.sub(r"[.\-/]", "", numero)
     if _CNJ_RAW.match(digits):
-        return f"{digits[:7]}-{digits[7:9]}.{digits[9:13]}.{digits[13]}.{digits[14:16]}.{digits[16:]}"
+        return (
+            f"{digits[:7]}-{digits[7:9]}.{digits[9:13]}.{digits[13]}.{digits[14:16]}.{digits[16:]}"
+        )
     return None
 
 
@@ -312,7 +338,9 @@ async def _buscar_datajud_async(numero_cnj: str) -> dict[str, Any] | None:
         headers["Authorization"] = f"ApiKey {DATAJUD_API_KEY}"
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(url, json={"query": {"match": {"numeroProcesso": digits}}}, headers=headers)
+            resp = await client.post(
+                url, json={"query": {"match": {"numeroProcesso": digits}}}, headers=headers
+            )
         if resp.status_code == 200:
             hits = resp.json().get("hits", {}).get("hits", [])
             return hits[0].get("_source") if hits else None
@@ -360,18 +388,20 @@ def parsear_csv(conteudo: bytes) -> tuple[list[dict], list[dict]]:
                 continue
         polo_raw = row_norm.get("polo_cliente", "autor").lower().strip()
         polo = polo_raw if polo_raw in ("autor", "reu", "terceiro") else "autor"
-        clientes.append({
-            "id": len(clientes),
-            "nome": nome,
-            "telefone": telefone,
-            "cpf": row_norm.get("cpf", "") or "(não informado)",
-            "data_nascimento": row_norm.get("data_nascimento") or None,
-            "profissao": row_norm.get("profissao") or None,
-            "empresa": row_norm.get("empresa") or None,
-            "status": (row_norm.get("status") or "ativo").lower(),
-            "numero_cnj": numero_cnj,
-            "polo_cliente": polo if numero_cnj else None,
-        })
+        clientes.append(
+            {
+                "id": len(clientes),
+                "nome": nome,
+                "telefone": telefone,
+                "cpf": row_norm.get("cpf", "") or "(não informado)",
+                "data_nascimento": row_norm.get("data_nascimento") or None,
+                "profissao": row_norm.get("profissao") or None,
+                "empresa": row_norm.get("empresa") or None,
+                "status": (row_norm.get("status") or "ativo").lower(),
+                "numero_cnj": numero_cnj,
+                "polo_cliente": polo if numero_cnj else None,
+            }
+        )
     return clientes, erros
 
 
@@ -397,7 +427,9 @@ def _calcular_score(cliente: dict, dados_dj: dict | None) -> dict | None:
     else:
         p.tipo_acao = None
     datajud_data = {
-        "tempo_medio_tramitacao_dias": dados_dj.get("tempo_medio_tramitacao_dias") if dados_dj else None,
+        "tempo_medio_tramitacao_dias": (
+            dados_dj.get("tempo_medio_tramitacao_dias") if dados_dj else None
+        ),
         "taxa_procedencia_autor": dados_dj.get("taxa_procedencia_autor") if dados_dj else None,
     }
     try:
@@ -413,7 +445,9 @@ def _calcular_score(cliente: dict, dados_dj: dict | None) -> dict | None:
 
 
 def _cor_nivel(nivel: str) -> str:
-    return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(nivel, "#555")
+    return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(
+        nivel, "#555"
+    )
 
 
 def _explicacao_nivel(nivel: str) -> str:
@@ -477,17 +511,31 @@ def _render_score_card(score_data: dict) -> None:
     st.markdown(_explicacao_nivel(nivel))
     with st.expander("Como chegamos a esta análise? Ver detalhes"):
         nomes = {
-            "complexidade_juridica": ("Complexidade da Ação", "Quão complexo é este tipo de processo juridicamente"),
-            "duracao_estimada": ("Tempo Estimado", "Quanto tempo processos similares costumam durar neste tribunal"),
-            "historico_vara": ("Histórico da Vara", "Como este juízo costuma decidir casos parecidos"),
+            "complexidade_juridica": (
+                "Complexidade da Ação",
+                "Quão complexo é este tipo de processo juridicamente",
+            ),
+            "duracao_estimada": (
+                "Tempo Estimado",
+                "Quanto tempo processos similares costumam durar neste tribunal",
+            ),
+            "historico_vara": (
+                "Histórico da Vara",
+                "Como este juízo costuma decidir casos parecidos",
+            ),
             "valor_causa": ("Valor em Disputa", "O impacto financeiro da causa no resultado"),
-            "fase_processual": ("Fase do Processo", "Em que momento o processo se encontra atualmente"),
+            "fase_processual": (
+                "Fase do Processo",
+                "Em que momento o processo se encontra atualmente",
+            ),
         }
         for chave, valor in comp.items():
             label, descricao = nomes.get(chave, (chave, ""))
             bc = _cor_nivel("alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo")
             nivel_fator = "alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo"
-            texto_nivel = {"baixo": "favorável", "moderado": "atenção", "alto": "desfavorável"}.get(nivel_fator, "")
+            texto_nivel = {"baixo": "favorável", "moderado": "atenção", "alto": "desfavorável"}.get(
+                nivel_fator, ""
+            )
             st.markdown(
                 f"""<div style="margin-bottom:10px;">
                     <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
@@ -501,7 +549,9 @@ def _render_score_card(score_data: dict) -> None:
                     </div>""",
                 unsafe_allow_html=True,
             )
-        st.caption("⚠️ Esta análise é de uso interno do advogado e não representa previsão de resultado (OAB Provimento 205/2021).")
+        st.caption(
+            "⚠️ Esta análise é de uso interno do advogado e não representa previsão de resultado (OAB Provimento 205/2021)."
+        )
 
 
 # =============================================================================
@@ -533,13 +583,15 @@ class _MockRAGBase:
         texto_limpo = self._limpar(texto)
         chunks = self._chunkar(texto_limpo)
         for i, chunk in enumerate(chunks):
-            self._chunks.append({
-                "id": f"{hashlib.md5(chunk.encode()).hexdigest()[:8]}",
-                "titulo": titulo,
-                "tipo": tipo,
-                "texto": chunk,
-                "keywords": self._keywords(chunk),
-            })
+            self._chunks.append(
+                {
+                    "id": f"{hashlib.md5(chunk.encode()).hexdigest()[:8]}",
+                    "titulo": titulo,
+                    "tipo": tipo,
+                    "texto": chunk,
+                    "keywords": self._keywords(chunk),
+                }
+            )
         return len(chunks)
 
     def buscar(self, query: str, top_k: int = 3) -> list[dict]:
@@ -564,11 +616,7 @@ class _MockRAGBase:
         partes = []
         for c in chunks:
             partes.append(f"[{c['tipo'].upper()} — {c['titulo']}]\n{c['texto']}")
-        return (
-            "<contexto_juridico>\n"
-            + "\n\n---\n\n".join(partes)
-            + "\n</contexto_juridico>"
-        )
+        return "<contexto_juridico>\n" + "\n\n---\n\n".join(partes) + "\n</contexto_juridico>"
 
     def listar_documentos(self) -> list[dict]:
         """Retorna lista de documentos únicos com estatísticas."""
@@ -751,7 +799,8 @@ def _fake_datajud(dados_dj: dict | None) -> DataJudClient:
         movimentos = dados_dj.get("movimentos", [])
         andamentos = [
             {"descricao": m.get("nome", ""), "data": (m.get("dataHora") or "")[:10]}
-            for m in movimentos if isinstance(m, dict) and m.get("nome")
+            for m in movimentos
+            if isinstance(m, dict) and m.get("nome")
         ]
     else:
         andamentos = []
@@ -762,7 +811,7 @@ def _fake_datajud(dados_dj: dict | None) -> DataJudClient:
 def _fake_cache() -> MagicMock:
     cache = AsyncMock()
     cache._redis = AsyncMock()
-    cache._redis.get = AsyncMock(return_value=None)   # cache miss → gera persona do escritorio
+    cache._redis.get = AsyncMock(return_value=None)  # cache miss → gera persona do escritorio
     cache._redis.set = AsyncMock()
     cache.get_andamentos = AsyncMock(return_value=None)
     cache.set_andamentos = AsyncMock()
@@ -847,7 +896,9 @@ def criar_orchestrator(
     memoria = _MemoriaEmRam()
 
     # RAG: envolve a base in-memory com a interface que o orchestrator espera
-    rag_retriever = _MockRAGRetriever(rag_base) if (rag_base and rag_base.total_chunks > 0) else None
+    rag_retriever = (
+        _MockRAGRetriever(rag_base) if (rag_base and rag_base.total_chunks > 0) else None
+    )
 
     orchestrator = ConversationOrchestrator(
         claude_client=ClaudeClient(api_key=ANTHROPIC_API_KEY),
@@ -939,7 +990,9 @@ def _render_andamentos(dados_dj: dict, max_items: int = 8) -> None:
         complementos = mov.get("complementosTabelados", [])
         desc_extra = ""
         if complementos and isinstance(complementos, list):
-            nomes_comp = [c.get("nome", "") for c in complementos if isinstance(c, dict) and c.get("nome")]
+            nomes_comp = [
+                c.get("nome", "") for c in complementos if isinstance(c, dict) and c.get("nome")
+            ]
             if nomes_comp:
                 desc_extra = f" — {', '.join(nomes_comp[:2])}"
         st.markdown(f"- **{data}** — {nome}{desc_extra}")
@@ -951,26 +1004,42 @@ def _render_andamentos(dados_dj: dict, max_items: int = 8) -> None:
 
 
 def page_onboarding() -> None:
-    ob = st.session_state.setdefault("onboarding", {
-        "etapa": 0, "onboarding_completo": False,
-        "nome_escritorio": "", "cnpj": "", "email_admin": "",
-        "nome_responsavel": "", "oab_responsavel": "",
-        "persona_nome": "Assistente Jurídico", "persona_tom": "formal",
-        "horario_inicio": "08:00", "horario_fim": "18:00",
-        "clientes_importados": [], "erros_importacao": [],
-        "whatsapp_ok": False,
-        "template_boas_vindas": "Olá {nome_cliente}! Seja bem-vindo(a) ao nosso escritório. Como posso ajudar?",
-        "template_atualizacao": "Olá {nome_cliente}! Há novidades no seu processo: {resumo_andamento}",
-        "template_sem_novidade": "Olá {nome_cliente}, consultamos seu processo e não há novidades por enquanto.",
-    })
+    ob = st.session_state.setdefault(
+        "onboarding",
+        {
+            "etapa": 0,
+            "onboarding_completo": False,
+            "nome_escritorio": "",
+            "cnpj": "",
+            "email_admin": "",
+            "nome_responsavel": "",
+            "oab_responsavel": "",
+            "persona_nome": "Assistente Jurídico",
+            "persona_tom": "formal",
+            "horario_inicio": "08:00",
+            "horario_fim": "18:00",
+            "clientes_importados": [],
+            "erros_importacao": [],
+            "whatsapp_ok": False,
+            "template_boas_vindas": "Olá {nome_cliente}! Seja bem-vindo(a) ao nosso escritório. Como posso ajudar?",
+            "template_atualizacao": "Olá {nome_cliente}! Há novidades no seu processo: {resumo_andamento}",
+            "template_sem_novidade": "Olá {nome_cliente}, consultamos seu processo e não há novidades por enquanto.",
+        },
+    )
 
     st.title("🚀 Configure seu Escritório")
-    st.caption("Siga as 5 etapas abaixo e em 30 minutos sua IA estará pronta para atender seus clientes.")
+    st.caption(
+        "Siga as 5 etapas abaixo e em 30 minutos sua IA estará pronta para atender seus clientes."
+    )
 
     etapa = ob["etapa"]
     nomes_etapas = [
-        "📋 Cadastro", "🤖 Configurar IA", "📂 Importar Clientes",
-        "💬 WhatsApp", "📝 Templates", "🚀 Go-Live",
+        "📋 Cadastro",
+        "🤖 Configurar IA",
+        "📂 Importar Clientes",
+        "💬 WhatsApp",
+        "📝 Templates",
+        "🚀 Go-Live",
     ]
     progress = etapa / 5.0
     st.progress(progress, text=f"Etapa {etapa}/5 — {nomes_etapas[min(etapa, 5)]}")
@@ -979,20 +1048,34 @@ def page_onboarding() -> None:
     # ── Etapa 0: Cadastro do Escritório ──────────────────────────────────────
     if etapa == 0:
         st.subheader("📋 Etapa 1 — Dados do Escritório")
-        st.caption("Crie a conta do seu escritório. Esta etapa é pública — nenhum token necessário.")
+        st.caption(
+            "Crie a conta do seu escritório. Esta etapa é pública — nenhum token necessário."
+        )
         with st.form("form_register"):
             col1, col2 = st.columns(2)
             with col1:
-                nome_esc = st.text_input("Nome do Escritório *", value=ob.get("nome_escritorio", ""))
-                cnpj = st.text_input("CNPJ *", value=ob.get("cnpj", ""), placeholder="11.222.333/0001-81")
+                nome_esc = st.text_input(
+                    "Nome do Escritório *", value=ob.get("nome_escritorio", "")
+                )
+                cnpj = st.text_input(
+                    "CNPJ *", value=ob.get("cnpj", ""), placeholder="11.222.333/0001-81"
+                )
                 email = st.text_input("E-mail do Administrador *", value=ob.get("email_admin", ""))
             with col2:
-                nome_resp = st.text_input("Nome do Responsável *", value=ob.get("nome_responsavel", ""))
-                oab = st.text_input("OAB do Responsável *", value=ob.get("oab_responsavel", ""), placeholder="SP123456")
+                nome_resp = st.text_input(
+                    "Nome do Responsável *", value=ob.get("nome_responsavel", "")
+                )
+                oab = st.text_input(
+                    "OAB do Responsável *",
+                    value=ob.get("oab_responsavel", ""),
+                    placeholder="SP123456",
+                )
                 senha = st.text_input("Senha *", type="password", help="Mínimo 8 caracteres")
 
             st.caption("(*) Campos obrigatórios")
-            submitted = st.form_submit_button("Registrar Escritório →", use_container_width=True, type="primary")
+            submitted = st.form_submit_button(
+                "Registrar Escritório →", use_container_width=True, type="primary"
+            )
 
         if submitted:
             erros = []
@@ -1009,14 +1092,16 @@ def page_onboarding() -> None:
                 for e in erros:
                     st.error(e)
             else:
-                ob.update({
-                    "etapa": 1,
-                    "nome_escritorio": nome_esc.strip(),
-                    "cnpj": cnpj_digits,
-                    "email_admin": email.strip(),
-                    "nome_responsavel": nome_resp.strip(),
-                    "oab_responsavel": oab.upper().strip(),
-                })
+                ob.update(
+                    {
+                        "etapa": 1,
+                        "nome_escritorio": nome_esc.strip(),
+                        "cnpj": cnpj_digits,
+                        "email_admin": email.strip(),
+                        "nome_responsavel": nome_resp.strip(),
+                        "oab_responsavel": oab.upper().strip(),
+                    }
+                )
                 st.success("✅ Escritório cadastrado! Avançando para configuração da IA...")
                 time.sleep(0.5)
                 st.rerun()
@@ -1042,13 +1127,23 @@ def page_onboarding() -> None:
                     "Tom de voz",
                     ["formal", "amigavel", "neutro"],
                     index=["formal", "amigavel", "neutro"].index(ob.get("persona_tom", "formal")),
-                    format_func=lambda x: {"formal": "Formal (protocolar, distante)", "amigavel": "Amigável (próximo, acolhedor)", "neutro": "Neutro (equilibrado)"}.get(x, x),
+                    format_func=lambda x: {
+                        "formal": "Formal (protocolar, distante)",
+                        "amigavel": "Amigável (próximo, acolhedor)",
+                        "neutro": "Neutro (equilibrado)",
+                    }.get(x, x),
                 )
             with col2:
                 st.markdown("**Horário de Atendimento Automático**")
-                h_ini = st.text_input("A partir de", value=ob.get("horario_inicio", "08:00"), placeholder="HH:MM")
-                h_fim = st.text_input("Até", value=ob.get("horario_fim", "18:00"), placeholder="HH:MM")
-                st.caption("Fora deste horário, a IA informa o cliente que o escritório está fechado.")
+                h_ini = st.text_input(
+                    "A partir de", value=ob.get("horario_inicio", "08:00"), placeholder="HH:MM"
+                )
+                h_fim = st.text_input(
+                    "Até", value=ob.get("horario_fim", "18:00"), placeholder="HH:MM"
+                )
+                st.caption(
+                    "Fora deste horário, a IA informa o cliente que o escritório está fechado."
+                )
 
         # Preview humano da persona
         _preview_tom = {
@@ -1059,7 +1154,7 @@ def page_onboarding() -> None:
         st.markdown("**Como a IA vai se comportar:**")
         st.info(
             f'A IA vai se apresentar como **"{prev_nome}"**, atender {_preview_tom} '
-            f'e responder mensagens entre **{h_ini}** e **{h_fim}**.'
+            f"e responder mensagens entre **{h_ini}** e **{h_fim}**."
         )
 
         col_back, col_next = st.columns(2)
@@ -1078,13 +1173,15 @@ def page_onboarding() -> None:
                     for e in erros:
                         st.error(e)
                 else:
-                    ob.update({
-                        "etapa": 2,
-                        "persona_nome": prev_nome.strip(),
-                        "persona_tom": prev_tom,
-                        "horario_inicio": h_ini,
-                        "horario_fim": h_fim,
-                    })
+                    ob.update(
+                        {
+                            "etapa": 2,
+                            "persona_nome": prev_nome.strip(),
+                            "persona_tom": prev_tom,
+                            "horario_inicio": h_ini,
+                            "horario_fim": h_fim,
+                        }
+                    )
                     st.success(f"✅ IA '{prev_nome}' configurada (tom: {prev_tom})")
                     time.sleep(0.5)
                     st.rerun()
@@ -1092,9 +1189,7 @@ def page_onboarding() -> None:
     # ── Etapa 2: Importar Clientes / Processos ────────────────────────────────
     elif etapa == 2:
         st.subheader("📂 Etapa 3 — Importar Clientes e Processos")
-        st.caption(
-            "Faça upload do CSV. O sistema valida o CNJ e consulta o DataJud em tempo real."
-        )
+        st.caption("Faça upload do CSV. O sistema valida o CNJ e consulta o DataJud em tempo real.")
 
         st.download_button(
             "📥 Baixar CSV de exemplo",
@@ -1128,7 +1223,9 @@ def page_onboarding() -> None:
             if clientes:
                 st.success(f"✅ {len(clientes)} cliente(s) válidos")
                 com_cnj = [c for c in clientes if c.get("numero_cnj")]
-                st.info(f"📋 {len(com_cnj)} com número de processo (CNJ) — serão consultados no DataJud")
+                st.info(
+                    f"📋 {len(com_cnj)} com número de processo (CNJ) — serão consultados no DataJud"
+                )
 
                 with st.expander("Preview dos clientes + consulta DataJud", expanded=True):
                     for c in clientes[:5]:
@@ -1141,12 +1238,22 @@ def page_onboarding() -> None:
                                 dados = st.session_state[dj_key]
                             if dados:
                                 classe = dados.get("classe", {})
-                                nome_classe = classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
+                                nome_classe = (
+                                    classe.get("nome", "—")
+                                    if isinstance(classe, dict)
+                                    else str(classe)
+                                )
                                 tribunal = dados.get("tribunal", {})
-                                nome_trib = tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
+                                nome_trib = (
+                                    tribunal.get("nome", "—")
+                                    if isinstance(tribunal, dict)
+                                    else str(tribunal)
+                                )
                                 st.caption(f"   ✅ DataJud: {nome_classe} — {nome_trib}")
                             else:
-                                st.caption(f"   ⚠️ DataJud: processo `{c['numero_cnj']}` não encontrado")
+                                st.caption(
+                                    f"   ⚠️ DataJud: processo `{c['numero_cnj']}` não encontrado"
+                                )
                         st.divider()
                     if len(clientes) > 5:
                         st.caption(f"+ {len(clientes) - 5} cliente(s) omitidos no preview")
@@ -1158,7 +1265,12 @@ def page_onboarding() -> None:
                 st.rerun()
         with col_next:
             pode_avancar = bool(ob.get("clientes_importados"))
-            if st.button("Salvar e Avançar →", use_container_width=True, type="primary", disabled=not pode_avancar):
+            if st.button(
+                "Salvar e Avançar →",
+                use_container_width=True,
+                type="primary",
+                disabled=not pode_avancar,
+            ):
                 ob["etapa"] = 3
                 st.rerun()
             if not pode_avancar:
@@ -1188,7 +1300,8 @@ def page_onboarding() -> None:
                     unsafe_allow_html=True,
                 )
             with col_info:
-                st.markdown("""
+                st.markdown(
+                    """
                 **Em produção:**
                 1. Abra o WhatsApp Business no celular
                 2. Acesse Configurações → Dispositivos Vinculados
@@ -1196,7 +1309,8 @@ def page_onboarding() -> None:
                 4. Aguarde a conexão (≈ 10 segundos)
 
                 **Tecnologia:** Evolution API v2 + webhook para recebimento de mensagens
-                """)
+                """
+                )
                 if st.button("Simular Conexão (Demo)", type="primary"):
                     with st.spinner("Conectando instância Evolution API..."):
                         time.sleep(1.5)
@@ -1216,7 +1330,9 @@ def page_onboarding() -> None:
     # ── Etapa 4: Templates de Mensagem ───────────────────────────────────────
     elif etapa == 4:
         st.subheader("📝 Etapa 5 — Templates de Mensagem")
-        st.caption("Personalize as mensagens automáticas. Use `{nome_cliente}` e `{resumo_andamento}` como placeholders.")
+        st.caption(
+            "Personalize as mensagens automáticas. Use `{nome_cliente}` e `{resumo_andamento}` como placeholders."
+        )
 
         with st.form("form_templates"):
             t_bv = st.text_area(
@@ -1234,26 +1350,32 @@ def page_onboarding() -> None:
                 value=ob.get("template_sem_novidade", ""),
                 height=80,
             )
-            submitted = st.form_submit_button("Salvar Templates →", type="primary", use_container_width=True)
+            submitted = st.form_submit_button(
+                "Salvar Templates →", type="primary", use_container_width=True
+            )
 
         if submitted:
             erros = []
             if "{nome_cliente}" not in t_bv:
                 erros.append("Template de boas-vindas deve conter {nome_cliente}")
             if "{nome_cliente}" not in t_at or "{resumo_andamento}" not in t_at:
-                erros.append("Template de atualização deve conter {nome_cliente} e {resumo_andamento}")
+                erros.append(
+                    "Template de atualização deve conter {nome_cliente} e {resumo_andamento}"
+                )
             if "{nome_cliente}" not in t_sn:
                 erros.append("Template 'sem novidade' deve conter {nome_cliente}")
             if erros:
                 for e in erros:
                     st.error(e)
             else:
-                ob.update({
-                    "etapa": 5,
-                    "template_boas_vindas": t_bv,
-                    "template_atualizacao": t_at,
-                    "template_sem_novidade": t_sn,
-                })
+                ob.update(
+                    {
+                        "etapa": 5,
+                        "template_boas_vindas": t_bv,
+                        "template_atualizacao": t_at,
+                        "template_sem_novidade": t_sn,
+                    }
+                )
                 st.rerun()
 
         if st.button("← Voltar", use_container_width=True):
@@ -1274,7 +1396,8 @@ def page_onboarding() -> None:
         col3.metric("WhatsApp", "✅ Ativo" if ob.get("whatsapp_ok") else "⚠️ Pendente")
         col4.metric("Etapa", "5/5 ✅")
 
-        st.markdown("""
+        st.markdown(
+            """
         ### Seu escritório está pronto!
 
         | O que foi configurado | Status |
@@ -1283,7 +1406,8 @@ def page_onboarding() -> None:
         | Análise automática de risco dos processos | ✅ Ativa |
         | Personalização com documentos do escritório | ✅ Pronta para receber documentos |
         | Cadastro e configuração do escritório | ✅ Concluído |
-        """)
+        """
+        )
 
         st.info(
             f"**Persona:** {ob.get('persona_nome')} · Tom: {ob.get('persona_tom')} · "
@@ -1368,7 +1492,10 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
 
     # Reinicia o orchestrator se o número de chunks RAG mudou desde a última criação
     # (garante que novos documentos são imediatamente usados no pipeline do Claude)
-    if orch_key not in st.session_state or st.session_state.get(rag_chunks_key, -1) != rag_chunks_agora:
+    if (
+        orch_key not in st.session_state
+        or st.session_state.get(rag_chunks_key, -1) != rag_chunks_agora
+    ):
         if ANTHROPIC_API_KEY:
             orchestrator, memoria = criar_orchestrator(ob, cliente, dados_dj, rag_base=rag_base)
             st.session_state[orch_key] = orchestrator
@@ -1376,7 +1503,10 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
             st.session_state[rag_chunks_key] = rag_chunks_agora
         else:
             st.session_state[orch_key] = None
-        if orch_key not in st.session_state or st.session_state.get(rag_chunks_key, -1) != rag_chunks_agora:
+        if (
+            orch_key not in st.session_state
+            or st.session_state.get(rag_chunks_key, -1) != rag_chunks_agora
+        ):
             st.session_state[f"chat_{cid}"] = []
             st.session_state[f"tokens_{cid}"] = {"in": 0, "out": 0, "intencoes": {}}
             st.session_state[f"welcome_{cid}"] = False
@@ -1393,15 +1523,19 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
 
     with col_cli:
         st.markdown("#### 👤 Cliente")
-        st.markdown(_tabela_md([
-            ("Nome", cliente["nome"]),
-            ("Telefone", f"`{cliente['telefone']}`"),
-            ("CPF", cliente["cpf"]),
-            ("Nascimento", cliente.get("data_nascimento") or "—"),
-            ("Profissão", cliente.get("profissao") or "—"),
-            ("Empresa", cliente.get("empresa") or "—"),
-            ("Status", "🟢 Ativo" if cliente.get("status") != "inativo" else "🔴 Inativo"),
-        ]))
+        st.markdown(
+            _tabela_md(
+                [
+                    ("Nome", cliente["nome"]),
+                    ("Telefone", f"`{cliente['telefone']}`"),
+                    ("CPF", cliente["cpf"]),
+                    ("Nascimento", cliente.get("data_nascimento") or "—"),
+                    ("Profissão", cliente.get("profissao") or "—"),
+                    ("Empresa", cliente.get("empresa") or "—"),
+                    ("Status", "🟢 Ativo" if cliente.get("status") != "inativo" else "🔴 Inativo"),
+                ]
+            )
+        )
 
     with col_proc:
         st.markdown("#### 📋 Processo Judicial")
@@ -1413,34 +1547,58 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
             classe = dados_dj.get("classe", {})
             nome_classe = classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
             assuntos = dados_dj.get("assuntos", [])
-            assunto_str = ", ".join(
-                a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]
-            ) or "—"
+            assunto_str = (
+                ", ".join(
+                    a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]
+                )
+                or "—"
+            )
             movimentos = dados_dj.get("movimentos", [])
             ultimo = movimentos[0] if movimentos else {}
             data_ajuiz = (dados_dj.get("dataAjuizamento") or "")[:10] or "—"
-            st.markdown(_tabela_md([
-                ("CNJ", f"`{cliente['numero_cnj']}`"),
-                ("Tribunal", nome_trib),
-                ("Classe", nome_classe),
-                ("Assunto(s)", assunto_str),
-                ("Polo", (cliente.get("polo_cliente") or "—").upper()),
-                ("Ajuizamento", data_ajuiz),
-                ("Último Andamento", (ultimo.get("nome", "—") if isinstance(ultimo, dict) else "—")),
-                ("Data", ((ultimo.get("dataHora") or "")[:10] if isinstance(ultimo, dict) else "—")),
-            ]))
+            st.markdown(
+                _tabela_md(
+                    [
+                        ("CNJ", f"`{cliente['numero_cnj']}`"),
+                        ("Tribunal", nome_trib),
+                        ("Classe", nome_classe),
+                        ("Assunto(s)", assunto_str),
+                        ("Polo", (cliente.get("polo_cliente") or "—").upper()),
+                        ("Ajuizamento", data_ajuiz),
+                        (
+                            "Último Andamento",
+                            (ultimo.get("nome", "—") if isinstance(ultimo, dict) else "—"),
+                        ),
+                        (
+                            "Data",
+                            (
+                                (ultimo.get("dataHora") or "")[:10]
+                                if isinstance(ultimo, dict)
+                                else "—"
+                            ),
+                        ),
+                    ]
+                )
+            )
             st.success("Dados do processo consultados no tribunal com sucesso.", icon="✅")
 
             if len(movimentos) > 1:
                 with st.expander("📜 Ver andamentos anteriores do processo"):
                     _render_andamentos(dados_dj)
         else:
-            st.markdown(_tabela_md([
-                ("CNJ", f"`{cliente['numero_cnj']}`"),
-                ("Polo", (cliente.get("polo_cliente") or "—").upper()),
-                ("DataJud", "Processo não encontrado"),
-            ]))
-            st.warning("Processo não encontrado no DataJud. O orchestrator responde com dados do cadastro.", icon="⚠️")
+            st.markdown(
+                _tabela_md(
+                    [
+                        ("CNJ", f"`{cliente['numero_cnj']}`"),
+                        ("Polo", (cliente.get("polo_cliente") or "—").upper()),
+                        ("DataJud", "Processo não encontrado"),
+                    ]
+                )
+            )
+            st.warning(
+                "Processo não encontrado no DataJud. O orchestrator responde com dados do cadastro.",
+                icon="⚠️",
+            )
 
     # ── Score de Risco ────────────────────────────────────────────────────────
     if cliente.get("numero_cnj"):
@@ -1457,21 +1615,30 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
         chunks_preview = rag_base.buscar(query_preview.strip() or "jurídico", top_k=3)
         if chunks_preview:
             _TIPO_LABEL_HUB = {
-                "peticao": "Petição", "sentenca": "Sentença",
-                "jurisprudencia": "Jurisprudência", "tese": "Tese / Argumento", "parecer": "Parecer / FAQ",
+                "peticao": "Petição",
+                "sentenca": "Sentença",
+                "jurisprudencia": "Jurisprudência",
+                "tese": "Tese / Argumento",
+                "parecer": "Parecer / FAQ",
             }
             with st.expander(
                 f"📚 IA personalizada com {rag_base.total_docs} documento(s) do seu escritório — clique para ver quais serão usados"
             ):
-                st.caption("Estes são os documentos que a IA vai consultar ao responder perguntas sobre este cliente:")
+                st.caption(
+                    "Estes são os documentos que a IA vai consultar ao responder perguntas sobre este cliente:"
+                )
                 for ch in chunks_preview:
                     tipo_nome = _TIPO_LABEL_HUB.get(ch["tipo"], ch["tipo"])
                     st.markdown(f"**{tipo_nome}: {ch['titulo']}**")
                     st.caption(ch["texto"][:250] + "..." if len(ch["texto"]) > 250 else ch["texto"])
         else:
-            st.info(f"📚 {rag_base.total_docs} documento(s) do escritório disponíveis — nenhum específico para este processo ainda.")
+            st.info(
+                f"📚 {rag_base.total_docs} documento(s) do escritório disponíveis — nenhum específico para este processo ainda."
+            )
     elif rag_base is not None:
-        st.caption("📚 Nenhum documento enviado ainda — acesse **Documentos do Escritório** para personalizar a IA.")
+        st.caption(
+            "📚 Nenhum documento enviado ainda — acesse **Documentos do Escritório** para personalizar a IA."
+        )
 
     st.divider()
 
@@ -1506,11 +1673,13 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
                     "Como posso ajudar?"
                 )
                 intencao_bv, fallback_bv = "erro", True
-        st.session_state[chat_key].append({
-            "role": "assistant",
-            "content": boas_vindas,
-            "meta": {"intencao": intencao_bv, "fallback": fallback_bv},
-        })
+        st.session_state[chat_key].append(
+            {
+                "role": "assistant",
+                "content": boas_vindas,
+                "meta": {"intencao": intencao_bv, "fallback": fallback_bv},
+            }
+        )
         st.session_state[welcome_key] = True
 
     # Header do chat
@@ -1541,7 +1710,11 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
             # Partes de continuação (bolhas 2+) não mostram badges
-            if msg["role"] == "assistant" and msg.get("meta") and not msg["meta"].get("continuation"):
+            if (
+                msg["role"] == "assistant"
+                and msg.get("meta")
+                and not msg["meta"].get("continuation")
+            ):
                 meta = msg["meta"]
                 badges = []
                 intencao = meta.get("intencao", "")
@@ -1550,7 +1723,12 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
                     badges.append(f"_{rotulo}_")
                 if meta.get("rag_ativo"):
                     badges.append("📚 Usando documentos do escritório")
-                _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
+                _ESCALACAO_INTENCOES = {
+                    "parecer_juridico",
+                    "estrategia_processual",
+                    "negociacao",
+                    "decisao_judicial_impacto_alto",
+                }
                 if intencao in _ESCALACAO_INTENCOES:
                     badges.append("🚨 Questão importante — advogado notificado")
                 if badges:
@@ -1631,7 +1809,12 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
             _ph_digitando.empty()
 
         # ── 5. Divide resposta em partes e exibe com delay de digitação ───────
-        _ESCALACAO_INTENCOES = {"parecer_juridico", "estrategia_processual", "negociacao", "decisao_judicial_impacto_alto"}
+        _ESCALACAO_INTENCOES = {
+            "parecer_juridico",
+            "estrategia_processual",
+            "negociacao",
+            "decisao_judicial_impacto_alto",
+        }
         partes_resposta = _fragmentar_resposta(resposta)
 
         for i, parte in enumerate(partes_resposta):
@@ -1660,18 +1843,20 @@ def _render_cliente_tab(cid: int, cliente: dict, ob: dict) -> None:
                         st.caption(" · ".join(badges))
 
             # Salva cada parte no histórico
-            st.session_state[chat_key].append({
-                "role": "assistant",
-                "content": parte,
-                "meta": {
-                    "intencao": intencao if i == 0 else None,
-                    "tokens_in": ti if i == 0 else 0,
-                    "tokens_out": to if i == 0 else 0,
-                    "fallback": fallback if i == 0 else False,
-                    "rag_ativo": rag_ativo if i == 0 else False,
-                    "continuation": i > 0,
-                },
-            })
+            st.session_state[chat_key].append(
+                {
+                    "role": "assistant",
+                    "content": parte,
+                    "meta": {
+                        "intencao": intencao if i == 0 else None,
+                        "tokens_in": ti if i == 0 else 0,
+                        "tokens_out": to if i == 0 else 0,
+                        "fallback": fallback if i == 0 else False,
+                        "rag_ativo": rag_ativo if i == 0 else False,
+                        "continuation": i > 0,
+                    },
+                }
+            )
 
         st.rerun()
 
@@ -1743,7 +1928,8 @@ def page_rag() -> None:
 
     with col_config:
         st.subheader("💡 Como funciona?")
-        st.markdown("""
+        st.markdown(
+            """
         Quando o advogado ou o cliente faz uma pergunta, a IA:
 
         1. **Identifica** quais documentos do seu escritório são relevantes para aquela pergunta
@@ -1751,22 +1937,28 @@ def page_rag() -> None:
         3. **Responde** usando o raciocínio e a linguagem desses documentos
 
         Quanto mais documentos do seu escritório você enviar, mais a IA vai soar como **você**.
-        """)
+        """
+        )
 
     st.divider()
 
     # ── Guia: O que colocar na base ───────────────────────────────────────────
-    with st.expander("📋 O que enviar para a IA aprender? (recomendações práticas)", expanded=rag.total_docs == 0):
-        st.markdown("""
+    with st.expander(
+        "📋 O que enviar para a IA aprender? (recomendações práticas)", expanded=rag.total_docs == 0
+    ):
+        st.markdown(
+            """
         A IA identifica automaticamente a área jurídica do processo do cliente e busca os documentos
         mais relevantes. Por isso, quanto mais focados forem os documentos, melhor ela responde.
-        """)
+        """
+        )
 
         col_g1, col_g2 = st.columns(2)
 
         with col_g1:
             st.markdown("#### Por tipo de documento")
-            st.markdown("""
+            st.markdown(
+                """
 🟡 **Jurisprudência** — maior impacto nas respostas
 - Acórdãos do TJSP/TRT/STJ da sua área de atuação
 - Súmulas aplicáveis aos seus casos
@@ -1790,11 +1982,13 @@ def page_rag() -> None:
 🔵 **Petição** — linguagem do escritório
 - Petições iniciais com os seus argumentos
 - Contestações nas suas áreas principais
-            """)
+            """
+            )
 
         with col_g2:
             st.markdown("#### Por área de atuação")
-            st.markdown("""
+            st.markdown(
+                """
 ⚖️ **Trabalhista**
 → Súmulas do TST · Teses de rescisão indireta e dano moral
 
@@ -1809,29 +2003,36 @@ def page_rag() -> None:
 
 🛒 **Consumidor**
 → Súmulas do STJ aplicadas · Decisões da sua região
-            """)
+            """
+            )
 
             st.markdown("#### Tamanho ideal")
-            st.markdown("""
+            st.markdown(
+                """
 Documentos entre **1 e 10 páginas** funcionam melhor.
 
 Para sentenças longas (mais de 40 páginas): envie apenas
 os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
-            """)
+            """
+            )
 
         st.markdown("---")
         st.markdown("#### ❌ O que **não** enviar")
         col_n1, col_n2 = st.columns(2)
         with col_n1:
-            st.markdown("""
+            st.markdown(
+                """
 - Documentos com CPF, RG ou dados pessoais identificáveis (anonimize antes)
 - Artigos genéricos da internet sem aplicação prática
-            """)
+            """
+            )
         with col_n2:
-            st.markdown("""
+            st.markdown(
+                """
 - Texto puro de lei — a IA já conhece a legislação; envie a **aplicação** dela nos seus casos
 - Jurisprudências muito antigas (mais de 5 anos) sem revisão — o entendimento muda
-            """)
+            """
+            )
 
     st.divider()
 
@@ -1839,8 +2040,11 @@ os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
     st.subheader("📂 Documentos que a IA já aprendeu")
     docs = rag.listar_documentos()
     _TIPO_LABEL = {
-        "peticao": "Petição", "sentenca": "Sentença",
-        "jurisprudencia": "Jurisprudência", "tese": "Tese / Argumento", "parecer": "Parecer / FAQ",
+        "peticao": "Petição",
+        "sentenca": "Sentença",
+        "jurisprudencia": "Jurisprudência",
+        "tese": "Tese / Argumento",
+        "parecer": "Parecer / FAQ",
     }
     if not docs:
         st.info("Nenhum documento enviado ainda. Clique em 'Enviar Documento' acima para começar.")
@@ -1849,8 +2053,11 @@ os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
             col_doc, col_del = st.columns([5, 1])
             with col_doc:
                 tipo_badge = {
-                    "peticao": "🔵", "sentenca": "🟢", "jurisprudencia": "🟡",
-                    "tese": "🟠", "parecer": "🟣",
+                    "peticao": "🔵",
+                    "sentenca": "🟢",
+                    "jurisprudencia": "🟡",
+                    "tese": "🟠",
+                    "parecer": "🟣",
                 }.get(doc["tipo"], "⚪")
                 tipo_nome = _TIPO_LABEL.get(doc["tipo"], doc["tipo"])
                 st.markdown(f"{tipo_badge} **{doc['titulo']}** · {tipo_nome}")
@@ -1864,9 +2071,14 @@ os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
 
     # ── Teste de Busca ────────────────────────────────────────────────────────
     st.subheader("🔍 Testar o Conhecimento da IA")
-    st.caption("Digite uma pergunta para ver quais documentos do seu escritório a IA usaria para responder.")
+    st.caption(
+        "Digite uma pergunta para ver quais documentos do seu escritório a IA usaria para responder."
+    )
 
-    query = st.text_input("Pergunta de teste", placeholder="ex: prescrição trabalhista, rescisão indireta, pensão alimentícia...")
+    query = st.text_input(
+        "Pergunta de teste",
+        placeholder="ex: prescrição trabalhista, rescisão indireta, pensão alimentícia...",
+    )
 
     if query and rag.total_chunks > 0:
         chunks = rag.buscar(query, top_k=3)
@@ -1877,9 +2089,13 @@ os **fundamentos da decisão** (3 a 5 páginas). Isso é suficiente.
                 with st.expander(f"Documento {i} — {tipo_nome}: {c['titulo']}"):
                     st.write(c["texto"])
         else:
-            st.warning("Nenhum documento relevante encontrado para esta pergunta. Tente outros termos.")
+            st.warning(
+                "Nenhum documento relevante encontrado para esta pergunta. Tente outros termos."
+            )
     elif query and rag.total_chunks == 0:
-        st.warning("Você ainda não enviou nenhum documento. Adicione documentos acima para começar.")
+        st.warning(
+            "Você ainda não enviou nenhum documento. Adicione documentos acima para começar."
+        )
 
 
 # =============================================================================
@@ -1894,20 +2110,33 @@ def page_configuracoes() -> None:
         st.warning("Complete o Onboarding primeiro.")
         return
 
-    tab_persona, tab_templates, tab_status = st.tabs(["🤖 Persona IA", "📝 Templates", "📊 Status do Sistema"])
+    tab_persona, tab_templates, tab_status = st.tabs(
+        ["🤖 Persona IA", "📝 Templates", "📊 Status do Sistema"]
+    )
 
     with tab_persona:
         st.subheader("Configurar Persona da IA")
         st.caption("Alterações aqui reinicializam os orchestrators existentes.")
         with st.form("form_persona"):
-            novo_nome = st.text_input("Nome da IA", value=ob.get("persona_nome", "Assistente Jurídico"))
-            novo_tom = st.selectbox("Tom de voz", ["formal", "amigavel", "neutro"],
-                                    index=["formal", "amigavel", "neutro"].index(ob.get("persona_tom", "formal")))
+            novo_nome = st.text_input(
+                "Nome da IA", value=ob.get("persona_nome", "Assistente Jurídico")
+            )
+            novo_tom = st.selectbox(
+                "Tom de voz",
+                ["formal", "amigavel", "neutro"],
+                index=["formal", "amigavel", "neutro"].index(ob.get("persona_tom", "formal")),
+            )
             novo_ini = st.text_input("Horário Início", value=ob.get("horario_inicio", "08:00"))
             novo_fim = st.text_input("Horário Fim", value=ob.get("horario_fim", "18:00"))
             if st.form_submit_button("Salvar Persona", type="primary"):
-                ob.update({"persona_nome": novo_nome, "persona_tom": novo_tom,
-                           "horario_inicio": novo_ini, "horario_fim": novo_fim})
+                ob.update(
+                    {
+                        "persona_nome": novo_nome,
+                        "persona_tom": novo_tom,
+                        "horario_inicio": novo_ini,
+                        "horario_fim": novo_fim,
+                    }
+                )
                 # Reinicializa orchestrators para pegar nova persona
                 for key in list(st.session_state.keys()):
                     if key.startswith(("orch_", "welcome_")):
@@ -1916,16 +2145,29 @@ def page_configuracoes() -> None:
                 st.rerun()
 
         st.markdown("**Preview da instrução atual:**")
-        st.code(gerar_instrucao_persona(ob.get("persona_nome", "Assistente"), ob.get("persona_tom", "formal")), language="xml")
+        st.code(
+            gerar_instrucao_persona(
+                ob.get("persona_nome", "Assistente"), ob.get("persona_tom", "formal")
+            ),
+            language="xml",
+        )
 
     with tab_templates:
         st.subheader("Templates de Mensagem WhatsApp")
         with st.form("form_templates_config"):
             t_bv = st.text_area("Boas-Vindas", value=ob.get("template_boas_vindas", ""), height=80)
             t_at = st.text_area("Atualização", value=ob.get("template_atualizacao", ""), height=80)
-            t_sn = st.text_area("Sem Novidade", value=ob.get("template_sem_novidade", ""), height=80)
+            t_sn = st.text_area(
+                "Sem Novidade", value=ob.get("template_sem_novidade", ""), height=80
+            )
             if st.form_submit_button("Salvar Templates", type="primary"):
-                ob.update({"template_boas_vindas": t_bv, "template_atualizacao": t_at, "template_sem_novidade": t_sn})
+                ob.update(
+                    {
+                        "template_boas_vindas": t_bv,
+                        "template_atualizacao": t_at,
+                        "template_sem_novidade": t_sn,
+                    }
+                )
                 st.success("✅ Templates salvos")
 
         # Preview com dados reais do cliente
@@ -1934,8 +2176,13 @@ def page_configuracoes() -> None:
         if clientes:
             c = clientes[0]
             preview_bv = ob.get("template_boas_vindas", "").replace("{nome_cliente}", c["nome"])
-            preview_at = ob.get("template_atualizacao", "").replace("{nome_cliente}", c["nome"]).replace(
-                "{resumo_andamento}", "Despacho publicado em 18/03/2026 — aguardando designação de audiência"
+            preview_at = (
+                ob.get("template_atualizacao", "")
+                .replace("{nome_cliente}", c["nome"])
+                .replace(
+                    "{resumo_andamento}",
+                    "Despacho publicado em 18/03/2026 — aguardando designação de audiência",
+                )
             )
             st.markdown(f"**Boas-vindas:** {preview_bv}")
             st.markdown(f"**Atualização:** {preview_at}")
@@ -1988,17 +2235,17 @@ def page_configuracoes() -> None:
 _CRM_CORES = {
     "excelente": "#2ecc71",
     "satisfeito": "#27ae60",
-    "neutro":     "#f39c12",
-    "em_risco":   "#e67e22",
-    "critico":    "#e74c3c",
+    "neutro": "#f39c12",
+    "em_risco": "#e67e22",
+    "critico": "#e74c3c",
 }
 
 _CRM_ICONES = {
     "excelente": "🟢",
     "satisfeito": "🟢",
-    "neutro":     "🟡",
-    "em_risco":   "🟠",
-    "critico":    "🔴",
+    "neutro": "🟡",
+    "em_risco": "🟠",
+    "critico": "🔴",
 }
 
 
@@ -2008,7 +2255,9 @@ def _calcular_crm_mock(cliente: dict) -> dict:
     Usa o CRMScoreCalculator real com um CRMContexto sintético.
     """
     from feature_1_ia_personalizada.services.crm.aggregator import (
-        CRMContexto, NPSRegistro, ProcessoResumo,
+        CRMContexto,
+        NPSRegistro,
+        ProcessoResumo,
     )
     from feature_1_ia_personalizada.services.crm.score_calculator import calcular_score_crm
     from datetime import UTC, datetime, timedelta
@@ -2023,14 +2272,17 @@ def _calcular_crm_mock(cliente: dict) -> dict:
 
     tem_processo = bool(cliente.get("numero_cnj"))
     processos = (
-        [ProcessoResumo(
-            numero_cnj=cliente["numero_cnj"],
-            tipo_acao=cliente.get("tipo_acao"),
-            fase_processual=None,
-            score_nivel=rng.choice(["baixo", "moderado", "alto"]),
-            score_interpretacao=None,
-        )]
-        if tem_processo else []
+        [
+            ProcessoResumo(
+                numero_cnj=cliente["numero_cnj"],
+                tipo_acao=cliente.get("tipo_acao"),
+                fase_processual=None,
+                score_nivel=rng.choice(["baixo", "moderado", "alto"]),
+                score_interpretacao=None,
+            )
+        ]
+        if tem_processo
+        else []
     )
 
     ctx = CRMContexto(
@@ -2106,7 +2358,9 @@ def page_crm() -> None:
             format_func=lambda x: "Todos" if x == "Todos" else _CRM_NIVEL_LABEL.get(x, x),
         )
     with col_busca:
-        busca = st.text_input("Buscar por nome", placeholder="Digite o nome...", label_visibility="collapsed")
+        busca = st.text_input(
+            "Buscar por nome", placeholder="Digite o nome...", label_visibility="collapsed"
+        )
 
     # Dispara ou carrega análises
     if analisar or "crm_resultados" not in st.session_state:
@@ -2134,7 +2388,7 @@ def page_crm() -> None:
                 f'<div style="border-left:4px solid {cor};padding-left:8px">'
                 f'<div style="font-size:1.6em;font-weight:bold">{total}</div>'
                 f'<div style="color:{cor};font-size:0.85em">{label_nivel}</div>'
-                f'</div>',
+                f"</div>",
                 unsafe_allow_html=True,
             )
 
@@ -2142,7 +2396,8 @@ def page_crm() -> None:
 
     # ── Tabela de clientes ─────────────────────────────────────────────────────
     clientes_filtrados = [
-        c for c in clientes
+        c
+        for c in clientes
         if c["id"] in resultados
         and (filtro_nivel == "Todos" or resultados[c["id"]]["nivel"] == filtro_nivel)
         and (not busca or busca.lower() in c["nome"].lower())
@@ -2175,7 +2430,9 @@ def page_crm() -> None:
             with col_score:
                 label_nivel_card = _CRM_NIVEL_LABEL.get(nivel, nivel)
                 st.metric("Situação", label_nivel_card)
-                st.caption(f"⏱ {r['dias_contato']} dias sem contato · 💬 {r['interacoes_30d']} mensagens/mês")
+                st.caption(
+                    f"⏱ {r['dias_contato']} dias sem contato · 💬 {r['interacoes_30d']} mensagens/mês"
+                )
 
             with col_detalhe:
                 with st.expander("Por que esta classificação?"):
@@ -2187,7 +2444,9 @@ def page_crm() -> None:
                         "escalacoes": "Escalações pendentes",
                     }
                     for nome_fator, dados in r["fatores"].items():
-                        label_fator = _FATOR_LABEL.get(nome_fator, nome_fator.replace("_", " ").title())
+                        label_fator = _FATOR_LABEL.get(
+                            nome_fator, nome_fator.replace("_", " ").title()
+                        )
                         st.progress(
                             min(dados["pontos"] / 100, 1.0),
                             text=label_fator,
@@ -2222,19 +2481,21 @@ def _gerar_dados_analytics(clientes: list[dict]) -> dict:
     n = max(len(clientes), 1)
 
     # ── Resumo ────────────────────────────────────────────────────────────────
-    total_interacoes = sum(
-        max(1, st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) // 500)
-        + rng.randint(4, 18)
-        for c in clientes
-    ) if clientes else rng.randint(40, 120)
+    total_interacoes = (
+        sum(
+            max(1, st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) // 500)
+            + rng.randint(4, 18)
+            for c in clientes
+        )
+        if clientes
+        else rng.randint(40, 120)
+    )
 
     clientes_ativos = max(1, n - rng.randint(0, max(0, n - 1)))
 
     # NPS: usa notas reais coletadas na sessão; completa com sintéticas
     nps_reais = [
-        st.session_state[f"nps_{c['id']}"]
-        for c in clientes
-        if f"nps_{c['id']}" in st.session_state
+        st.session_state[f"nps_{c['id']}"] for c in clientes if f"nps_{c['id']}" in st.session_state
     ]
     if nps_reais:
         nps_medio = round(sum(nps_reais) / len(nps_reais), 1)
@@ -2247,19 +2508,26 @@ def _gerar_dados_analytics(clientes: list[dict]) -> dict:
     # ── Eficiência ────────────────────────────────────────────────────────────
     tempo_ms = rng.randint(800, 2000)
     interacoes_sem_humano = int(total_interacoes * rng.uniform(0.55, 0.85))
-    pct_autonomia = round(interacoes_sem_humano / total_interacoes * 100, 1) if total_interacoes else 0.0
+    pct_autonomia = (
+        round(interacoes_sem_humano / total_interacoes * 100, 1) if total_interacoes else 0.0
+    )
     horas_eco = round(interacoes_sem_humano * 8 / 60, 1)
     custo_total = round(
         sum(
-            (st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) * 3 +
-             st.session_state.get(f"tokens_{c['id']}", {}).get("out", 0) * 15) / 1_000_000
+            (
+                st.session_state.get(f"tokens_{c['id']}", {}).get("in", 0) * 3
+                + st.session_state.get(f"tokens_{c['id']}", {}).get("out", 0) * 15
+            )
+            / 1_000_000
             for c in clientes
-        ) or rng.uniform(0.10, 2.50),
+        )
+        or rng.uniform(0.10, 2.50),
         4,
     )
 
     # ── Tendência semanal (8 semanas) ─────────────────────────────────────────
     from datetime import timedelta
+
     tendencia = []
     semana_base = datetime(2026, 1, 19)
     for i in range(8):
@@ -2267,12 +2535,14 @@ def _gerar_dados_analytics(clientes: list[dict]) -> dict:
         label = f"{semana_dt.year}-{semana_dt.strftime('W%W')}"
         tot = rng.randint(8, 35)
         saidas = rng.randint(int(tot * 0.5), tot)
-        tendencia.append({
-            "semana": label,
-            "total_interacoes": tot,
-            "nps_medio": round(rng.uniform(3.0, 5.0), 1),
-            "autonomia_pct": round(saidas / tot * 100, 1),
-        })
+        tendencia.append(
+            {
+                "semana": label,
+                "total_interacoes": tot,
+                "nps_medio": round(rng.uniform(3.0, 5.0), 1),
+                "autonomia_pct": round(saidas / tot * 100, 1),
+            }
+        )
 
     # ── Ranking de clientes ───────────────────────────────────────────────────
     ranking = []
@@ -2283,20 +2553,24 @@ def _gerar_dados_analytics(clientes: list[dict]) -> dict:
         ultimo_contato_dias = rng.randint(1, 60)
         sem_contato_recente = ultimo_contato_dias > 30
         em_risco = sem_contato_recente and nps_cli is not None and nps_cli <= 3
-        ranking.append({
-            "cliente_id": c["id"],
-            "nome": c["nome"],
-            "nps_medio": nps_cli,
-            "total_interacoes": rng.randint(3, 25),
-            "ultimo_contato_dias": ultimo_contato_dias,
-            "em_risco": em_risco,
-            "sem_avaliacao": nps_cli is None,
-        })
-    ranking.sort(key=lambda r: (
-        not r["em_risco"],
-        not r["sem_avaliacao"],
-        r["nps_medio"] if r["nps_medio"] is not None else 999,
-    ))
+        ranking.append(
+            {
+                "cliente_id": c["id"],
+                "nome": c["nome"],
+                "nps_medio": nps_cli,
+                "total_interacoes": rng.randint(3, 25),
+                "ultimo_contato_dias": ultimo_contato_dias,
+                "em_risco": em_risco,
+                "sem_avaliacao": nps_cli is None,
+            }
+        )
+    ranking.sort(
+        key=lambda r: (
+            not r["em_risco"],
+            not r["sem_avaliacao"],
+            r["nps_medio"] if r["nps_medio"] is not None else 999,
+        )
+    )
 
     return {
         "resumo": {
@@ -2341,9 +2615,9 @@ def _render_tendencia_chart(tendencia: list[dict]) -> None:
             f'<span style="font-size:9px;color:#666;">{t["total_interacoes"]}</span>'
             f'<div style="width:100%;height:{pct:.0f}%;background:{cor};border-radius:3px 3px 0 0;min-height:4px;"'
             f' title="{t["semana"]}: {t["total_interacoes"]} interações, NPS {nps}, {t["autonomia_pct"]}% autonomia">'
-            f'</div>'
+            f"</div>"
             f'<span style="font-size:8px;color:#888;">W{semana_label}</span>'
-            f'</div>'
+            f"</div>"
         )
     bars += "</div>"
     bars += '<div style="font-size:10px;color:#888;margin-top:4px;">🟢 NPS≥4 · 🟠 NPS≥3 · 🔴 NPS&lt;3 — altura = volume de interações</div>'
@@ -2372,9 +2646,13 @@ def page_analytics() -> None:
     tendencia = dados["tendencia_semanal"]
     ranking = dados["por_cliente"]
 
-    tab_dash, tab_nps, tab_export = st.tabs([
-        "📈 Painel Geral", "⭐ Satisfação dos Clientes", "📥 Exportar Relatório",
-    ])
+    tab_dash, tab_nps, tab_export = st.tabs(
+        [
+            "📈 Painel Geral",
+            "⭐ Satisfação dos Clientes",
+            "📥 Exportar Relatório",
+        ]
+    )
 
     # =========================================================================
     # Tab 1 — Dashboard
@@ -2406,10 +2684,26 @@ def page_analytics() -> None:
         # Eficiência
         st.subheader("⚡ Quanto tempo a IA está economizando")
         ce1, ce2, ce3, ce4 = st.columns(4)
-        ce1.metric("Tempo médio de resposta", f"{eficiencia['tempo_resposta_medio_ms']} ms", help="Tempo que a IA leva para responder um cliente")
-        ce2.metric("Atendimentos feitos pela IA", eficiencia["interacoes_sem_humano"], help="Mensagens respondidas sem precisar do advogado")
-        ce3.metric("IA respondeu sozinha", f"{eficiencia['percentual_autonomia']:.1f}%", help="Porcentagem dos atendimentos resolvidos automaticamente")
-        ce4.metric("Horas economizadas", f"{eficiencia['horas_economizadas_estimadas']:.1f}h", help="Estimativa de horas do advogado poupadas pela IA")
+        ce1.metric(
+            "Tempo médio de resposta",
+            f"{eficiencia['tempo_resposta_medio_ms']} ms",
+            help="Tempo que a IA leva para responder um cliente",
+        )
+        ce2.metric(
+            "Atendimentos feitos pela IA",
+            eficiencia["interacoes_sem_humano"],
+            help="Mensagens respondidas sem precisar do advogado",
+        )
+        ce3.metric(
+            "IA respondeu sozinha",
+            f"{eficiencia['percentual_autonomia']:.1f}%",
+            help="Porcentagem dos atendimentos resolvidos automaticamente",
+        )
+        ce4.metric(
+            "Horas economizadas",
+            f"{eficiencia['horas_economizadas_estimadas']:.1f}h",
+            help="Estimativa de horas do advogado poupadas pela IA",
+        )
 
         pct = eficiencia["percentual_autonomia"]
         cor_auto = "#4CAF50" if pct >= 70 else "#FF9800" if pct >= 50 else "#f44336"
@@ -2437,7 +2731,9 @@ def page_analytics() -> None:
         _render_tendencia_chart(tendencia[-8:])
         with st.expander("Ver dados tabulados"):
             for t in tendencia:
-                emoji_nps = "🟢" if t["nps_medio"] >= 4.0 else "🟠" if t["nps_medio"] >= 3.0 else "🔴"
+                emoji_nps = (
+                    "🟢" if t["nps_medio"] >= 4.0 else "🟠" if t["nps_medio"] >= 3.0 else "🔴"
+                )
                 st.caption(
                     f"**{t['semana']}** — {t['total_interacoes']} interações · "
                     f"NPS {emoji_nps} {t['nps_medio']:.1f} · Autonomia {t['autonomia_pct']:.1f}%"
@@ -2447,11 +2743,19 @@ def page_analytics() -> None:
 
         # Ranking de clientes
         st.subheader("👥 Ranking de Clientes")
-        st.caption("Em risco (NPS baixo + sem contato recente) aparece primeiro; sem avaliação em segundo.")
+        st.caption(
+            "Em risco (NPS baixo + sem contato recente) aparece primeiro; sem avaliação em segundo."
+        )
         for r in ranking:
-            cor_card = "#ffebee" if r["em_risco"] else "#fff8e1" if r["sem_avaliacao"] else "#f1f8e9"
+            cor_card = (
+                "#ffebee" if r["em_risco"] else "#fff8e1" if r["sem_avaliacao"] else "#f1f8e9"
+            )
             borda = "#ef9a9a" if r["em_risco"] else "#ffe082" if r["sem_avaliacao"] else "#a5d6a7"
-            status_icon = "🔴 Em Risco" if r["em_risco"] else ("⚪ Sem Avaliação" if r["sem_avaliacao"] else "🟢 Ok")
+            status_icon = (
+                "🔴 Em Risco"
+                if r["em_risco"]
+                else ("⚪ Sem Avaliação" if r["sem_avaliacao"] else "🟢 Ok")
+            )
             nps_str = f"{r['nps_medio']:.1f} ⭐" if r["nps_medio"] is not None else "—"
             st.markdown(
                 f"""<div style="border:1px solid {borda};border-radius:8px;padding:10px 14px;
@@ -2476,24 +2780,32 @@ def page_analytics() -> None:
         score_dist = dados["score_risco_distribuicao"]
         total_score = sum(score_dist.values()) or 1
         niveis = [
-            ("baixo", "🟢"), ("moderado", "🟡"), ("alto", "🔴"), ("critico", "🟣"),
+            ("baixo", "🟢"),
+            ("moderado", "🟡"),
+            ("alto", "🔴"),
+            ("critico", "🟣"),
         ]
         for col, (nivel, emoji) in zip(st.columns(4), niveis):
             qtd = score_dist.get(nivel, 0)
-            col.metric(f"{emoji} {nivel.capitalize()}", qtd,
-                       help=f"{qtd / total_score * 100:.0f}% dos processos")
+            col.metric(
+                f"{emoji} {nivel.capitalize()}",
+                qtd,
+                help=f"{qtd / total_score * 100:.0f}% dos processos",
+            )
 
     # =========================================================================
     # Tab 2 — Pesquisa NPS
     # =========================================================================
     with tab_nps:
         st.subheader("⭐ Pesquisa de Satisfação NPS")
-        st.markdown("""
+        st.markdown(
+            """
         Simula o fluxo completo de coleta NPS via WhatsApp (Feature 5):
         1. Advogado dispara pesquisa → `solicitar_nps_cliente` (Celery) envia mensagem
         2. Cliente responde 1–5 → webhook detecta, salva `satisfacao`, remove `aguardando_nps`
         3. Nota ≤ 3 → alerta automático enviado a advogados com `escalacao_ativa=True`
-        """)
+        """
+        )
         st.divider()
 
         if "nps_estados" not in st.session_state:
@@ -2504,7 +2816,9 @@ def page_analytics() -> None:
 
         with col_enviar:
             st.markdown("#### 📤 1. Enviar Pesquisa NPS")
-            st.caption("Simula o task Celery com deduplicação Redis (`nps:solicitado:{id}` TTL 30d).")
+            st.caption(
+                "Simula o task Celery com deduplicação Redis (`nps:solicitado:{id}` TTL 30d)."
+            )
             cliente_sel = st.selectbox(
                 "Selecionar cliente",
                 options=clientes,
@@ -2515,11 +2829,15 @@ def page_analytics() -> None:
                 cid = cliente_sel["id"]
                 estado = nps_estados.get(cid, {})
                 if estado.get("aguardando_nps"):
-                    st.info(f"⏳ Pesquisa já enviada para **{cliente_sel['nome']}** — aguardando resposta.")
+                    st.info(
+                        f"⏳ Pesquisa já enviada para **{cliente_sel['nome']}** — aguardando resposta."
+                    )
                 elif estado.get("nps_registrado") is not None:
                     nota_reg = estado["nps_registrado"]
                     emoji_n = "🟢" if nota_reg >= 4 else "🟡" if nota_reg == 3 else "🔴"
-                    st.success(f"✅ NPS registrado: {emoji_n} **{nota_reg}/5** para {cliente_sel['nome']}")
+                    st.success(
+                        f"✅ NPS registrado: {emoji_n} **{nota_reg}/5** para {cliente_sel['nome']}"
+                    )
                     if st.button("🔄 Enviar nova pesquisa", key="nps_nova"):
                         nps_estados[cid] = {}
                         st.rerun()
@@ -2540,8 +2858,12 @@ def page_analytics() -> None:
                         key="btn_enviar_nps",
                     ):
                         nps_estados[cid] = {"aguardando_nps": True}
-                        st.success("✅ Pesquisa enviada! Interação salva com `aguardando_nps=True`.")
-                        st.caption(f"🔒 Redis key: `nps:solicitado:{cid}` — TTL 30 dias (anti-spam)")
+                        st.success(
+                            "✅ Pesquisa enviada! Interação salva com `aguardando_nps=True`."
+                        )
+                        st.caption(
+                            f"🔒 Redis key: `nps:solicitado:{cid}` — TTL 30 dias (anti-spam)"
+                        )
                         st.rerun()
 
         with col_responder:
@@ -2562,15 +2884,22 @@ def page_analytics() -> None:
                         "Nota enviada pelo cliente",
                         options=[1, 2, 3, 4, 5],
                         value=4,
-                        format_func=lambda n: f"{n} — " + {
-                            1: "Muito insatisfeito 😡", 2: "Insatisfeito 😞",
-                            3: "Neutro 😐", 4: "Satisfeito 😊", 5: "Muito satisfeito 🤩",
+                        format_func=lambda n: f"{n} — "
+                        + {
+                            1: "Muito insatisfeito 😡",
+                            2: "Insatisfeito 😞",
+                            3: "Neutro 😐",
+                            4: "Satisfeito 😊",
+                            5: "Muito satisfeito 🤩",
                         }[n],
                         key="nota_slider",
                     )
                     if st.button("✅ Registrar Resposta", type="primary", key="btn_registrar_nps"):
                         cid_resp = cliente_resp["id"]
-                        nps_estados[cid_resp] = {"nps_registrado": nota_input, "aguardando_nps": False}
+                        nps_estados[cid_resp] = {
+                            "nps_registrado": nota_input,
+                            "aguardando_nps": False,
+                        }
                         st.session_state[f"nps_{cid_resp}"] = float(nota_input)
                         st.success(
                             f"✅ `satisfacao = {nota_input}` registrado para **{cliente_resp['nome']}**. "
@@ -2634,13 +2963,24 @@ def page_analytics() -> None:
         def _gerar_csv_demo(mes: str, clientes_lista: list[dict]) -> bytes:
             import csv as csv_mod
             import random
+
             output = io.StringIO()
             writer = csv_mod.writer(output)
-            writer.writerow([
-                "id", "data", "cliente_id", "nome_cliente", "direcao",
-                "mensagem_cliente", "tokens_input", "tokens_output",
-                "custo_estimado_usd", "satisfacao", "autonomia",
-            ])
+            writer.writerow(
+                [
+                    "id",
+                    "data",
+                    "cliente_id",
+                    "nome_cliente",
+                    "direcao",
+                    "mensagem_cliente",
+                    "tokens_input",
+                    "tokens_output",
+                    "custo_estimado_usd",
+                    "satisfacao",
+                    "autonomia",
+                ]
+            )
             rng2 = random.Random(hash(mes))
             row_id = 1
             for c in clientes_lista:
@@ -2652,14 +2992,21 @@ def page_analytics() -> None:
                     ti = rng2.randint(200, 800)
                     to = rng2.randint(100, 400)
                     custo = round((ti * 3 + to * 15) / 1_000_000, 6)
-                    writer.writerow([
-                        row_id, data_str, c["id"], c["nome"],
-                        "recebida" if j % 2 == 0 else "enviada",
-                        f"Mensagem demo {j + 1}",
-                        ti, to, custo,
-                        satisfacao if j == n_rows - 1 else "",
-                        "sim" if rng2.random() > 0.3 else "não",
-                    ])
+                    writer.writerow(
+                        [
+                            row_id,
+                            data_str,
+                            c["id"],
+                            c["nome"],
+                            "recebida" if j % 2 == 0 else "enviada",
+                            f"Mensagem demo {j + 1}",
+                            ti,
+                            to,
+                            custo,
+                            satisfacao if j == n_rows - 1 else "",
+                            "sim" if rng2.random() > 0.3 else "não",
+                        ]
+                    )
                     row_id += 1
             return b"\xef\xbb\xbf" + output.getvalue().encode("utf-8")
 
@@ -2675,8 +3022,9 @@ def page_analytics() -> None:
         with st.expander("Preview das primeiras linhas"):
             preview_lines = csv_bytes.decode("utf-8-sig").split("\n")[:6]
             st.code("\n".join(preview_lines), language="text")
-        st.caption("O relatório inclui todos os atendimentos, notas de satisfação e se a IA respondeu sozinha ou precisou do advogado.")
-
+        st.caption(
+            "O relatório inclui todos os atendimentos, notas de satisfação e se a IA respondeu sozinha ou precisou do advogado."
+        )
 
 
 # =============================================================================
@@ -2697,58 +3045,150 @@ _PROSPECCAO_TIPOS_ACAO = [
 ]
 
 _EMPRESAS_DEMO = [
-    {"razao_social": "Metalúrgica São Paulo LTDA", "cnpj": "11.222.333/0001-81",
-     "porte": "MEDIA", "setor": "indústria", "situacao": "ATIVA", "processos": 8},
-    {"razao_social": "Comércio e Distribuição Norte S/A", "cnpj": "22.333.444/0001-92",
-     "porte": "GRANDE", "setor": "comércio", "situacao": "ATIVA", "processos": 15},
-    {"razao_social": "Tech Solutions LTDA ME", "cnpj": "33.444.555/0001-03",
-     "porte": "PEQUENA", "setor": "tecnologia", "situacao": "ATIVA", "processos": 3},
-    {"razao_social": "Transporte e Logística Brasil LTDA", "cnpj": "44.555.666/0001-14",
-     "porte": "MEDIA", "setor": "transporte", "situacao": "ATIVA", "processos": 12},
-    {"razao_social": "Construtora ABC S/A", "cnpj": "55.666.777/0001-25",
-     "porte": "GRANDE", "setor": "construção civil", "situacao": "ATIVA", "processos": 20},
-    {"razao_social": "Varejo Fashion LTDA", "cnpj": "66.777.888/0001-36",
-     "porte": "MEDIA", "setor": "varejo", "situacao": "ATIVA", "processos": 6},
-    {"razao_social": "Hospital e Clínica Central S/A", "cnpj": "77.888.999/0001-47",
-     "porte": "GRANDE", "setor": "saúde", "situacao": "ATIVA", "processos": 18},
-    {"razao_social": "Agro Sul Grãos LTDA", "cnpj": "88.999.000/0001-58",
-     "porte": "MEDIA", "setor": "agronegócio", "situacao": "ATIVA", "processos": 4},
-    {"razao_social": "Supermercados RegionalMais S/A", "cnpj": "99.000.111/0001-69",
-     "porte": "GRANDE", "setor": "varejo alimentício", "situacao": "ATIVA", "processos": 25},
-    {"razao_social": "Indústria de Calçados Norte LTDA", "cnpj": "10.111.222/0001-70",
-     "porte": "MEDIA", "setor": "indústria", "situacao": "ATIVA", "processos": 7},
+    {
+        "razao_social": "Metalúrgica São Paulo LTDA",
+        "cnpj": "11.222.333/0001-81",
+        "porte": "MEDIA",
+        "setor": "indústria",
+        "situacao": "ATIVA",
+        "processos": 8,
+    },
+    {
+        "razao_social": "Comércio e Distribuição Norte S/A",
+        "cnpj": "22.333.444/0001-92",
+        "porte": "GRANDE",
+        "setor": "comércio",
+        "situacao": "ATIVA",
+        "processos": 15,
+    },
+    {
+        "razao_social": "Tech Solutions LTDA ME",
+        "cnpj": "33.444.555/0001-03",
+        "porte": "PEQUENA",
+        "setor": "tecnologia",
+        "situacao": "ATIVA",
+        "processos": 3,
+    },
+    {
+        "razao_social": "Transporte e Logística Brasil LTDA",
+        "cnpj": "44.555.666/0001-14",
+        "porte": "MEDIA",
+        "setor": "transporte",
+        "situacao": "ATIVA",
+        "processos": 12,
+    },
+    {
+        "razao_social": "Construtora ABC S/A",
+        "cnpj": "55.666.777/0001-25",
+        "porte": "GRANDE",
+        "setor": "construção civil",
+        "situacao": "ATIVA",
+        "processos": 20,
+    },
+    {
+        "razao_social": "Varejo Fashion LTDA",
+        "cnpj": "66.777.888/0001-36",
+        "porte": "MEDIA",
+        "setor": "varejo",
+        "situacao": "ATIVA",
+        "processos": 6,
+    },
+    {
+        "razao_social": "Hospital e Clínica Central S/A",
+        "cnpj": "77.888.999/0001-47",
+        "porte": "GRANDE",
+        "setor": "saúde",
+        "situacao": "ATIVA",
+        "processos": 18,
+    },
+    {
+        "razao_social": "Agro Sul Grãos LTDA",
+        "cnpj": "88.999.000/0001-58",
+        "porte": "MEDIA",
+        "setor": "agronegócio",
+        "situacao": "ATIVA",
+        "processos": 4,
+    },
+    {
+        "razao_social": "Supermercados RegionalMais S/A",
+        "cnpj": "99.000.111/0001-69",
+        "porte": "GRANDE",
+        "setor": "varejo alimentício",
+        "situacao": "ATIVA",
+        "processos": 25,
+    },
+    {
+        "razao_social": "Indústria de Calçados Norte LTDA",
+        "cnpj": "10.111.222/0001-70",
+        "porte": "MEDIA",
+        "setor": "indústria",
+        "situacao": "ATIVA",
+        "processos": 7,
+    },
 ]
 
 _PESSOAS_DEMO = [
-    {"nome": "Carlos Eduardo Martins", "polo": "ativo", "fase": "Conhecimento",
-     "cnj": "0001234-56.2024.5.02.0100"},
-    {"nome": "Ana Beatriz Santos", "polo": "ativo", "fase": "Conhecimento",
-     "cnj": "0002345-67.2024.5.02.0200"},
-    {"nome": "Roberto José Ferreira", "polo": "ativo", "fase": "Instrução",
-     "cnj": "0003456-78.2024.5.02.0300"},
-    {"nome": "Juliana Costa Lima", "polo": "ativo", "fase": "Conhecimento",
-     "cnj": "0004567-89.2024.5.02.0400"},
-    {"nome": "Paulo Henrique Oliveira", "polo": "ativo", "fase": "Petição Inicial",
-     "cnj": "0005678-90.2024.5.02.0500"},
-    {"nome": "Maria Aparecida Souza", "polo": "ativo", "fase": "Conhecimento",
-     "cnj": "0006789-01.2024.5.02.0600"},
-    {"nome": "Fernando Augusto Rocha", "polo": "ativo", "fase": "Conhecimento",
-     "cnj": "0007890-12.2024.5.02.0700"},
-    {"nome": "Sandra Regina Alves", "polo": "ativo", "fase": "Distribuição",
-     "cnj": "0008901-23.2024.5.02.0800"},
+    {
+        "nome": "Carlos Eduardo Martins",
+        "polo": "ativo",
+        "fase": "Conhecimento",
+        "cnj": "0001234-56.2024.5.02.0100",
+    },
+    {
+        "nome": "Ana Beatriz Santos",
+        "polo": "ativo",
+        "fase": "Conhecimento",
+        "cnj": "0002345-67.2024.5.02.0200",
+    },
+    {
+        "nome": "Roberto José Ferreira",
+        "polo": "ativo",
+        "fase": "Instrução",
+        "cnj": "0003456-78.2024.5.02.0300",
+    },
+    {
+        "nome": "Juliana Costa Lima",
+        "polo": "ativo",
+        "fase": "Conhecimento",
+        "cnj": "0004567-89.2024.5.02.0400",
+    },
+    {
+        "nome": "Paulo Henrique Oliveira",
+        "polo": "ativo",
+        "fase": "Petição Inicial",
+        "cnj": "0005678-90.2024.5.02.0500",
+    },
+    {
+        "nome": "Maria Aparecida Souza",
+        "polo": "ativo",
+        "fase": "Conhecimento",
+        "cnj": "0006789-01.2024.5.02.0600",
+    },
+    {
+        "nome": "Fernando Augusto Rocha",
+        "polo": "ativo",
+        "fase": "Conhecimento",
+        "cnj": "0007890-12.2024.5.02.0700",
+    },
+    {
+        "nome": "Sandra Regina Alves",
+        "polo": "ativo",
+        "fase": "Distribuição",
+        "cnj": "0008901-23.2024.5.02.0800",
+    },
 ]
 
 _ESPECIALIDADES_POR_TIPO_ACAO: dict[str, list[str]] = {
-    "Reclamação Trabalhista":        ["reclamação trabalhista", "horas extras"],
-    "Horas Extras":                  ["horas extras", "reclamação trabalhista"],
-    "Rescisão Indireta":             ["rescisão indireta", "reclamação trabalhista"],
-    "Acidente de Trabalho":          ["acidente de trabalho", "indenização por danos morais"],
-    "Ação de Cobrança":              ["ação de cobrança", "execução de título extrajudicial"],
-    "Indenização por Danos Morais":  ["indenização por danos morais", "ação consumerista"],
-    "Ação de Divórcio":              ["ação de divórcio", "guarda e visitação"],
+    "Reclamação Trabalhista": ["reclamação trabalhista", "horas extras"],
+    "Horas Extras": ["horas extras", "reclamação trabalhista"],
+    "Rescisão Indireta": ["rescisão indireta", "reclamação trabalhista"],
+    "Acidente de Trabalho": ["acidente de trabalho", "indenização por danos morais"],
+    "Ação de Cobrança": ["ação de cobrança", "execução de título extrajudicial"],
+    "Indenização por Danos Morais": ["indenização por danos morais", "ação consumerista"],
+    "Ação de Divórcio": ["ação de divórcio", "guarda e visitação"],
     "Execução de Título Extrajudicial": ["execução de título extrajudicial", "ação de cobrança"],
-    "Ação Consumerista":             ["ação consumerista", "indenização por danos morais"],
-    "Rescisão Contratual":           ["rescisão contratual", "ação de cobrança"],
+    "Ação Consumerista": ["ação consumerista", "indenização por danos morais"],
+    "Rescisão Contratual": ["rescisão contratual", "ação de cobrança"],
 }
 
 
@@ -2762,9 +3202,15 @@ def _gerar_dna_demo(tipo_acao_ref: str | None = None, nome_escritorio: str = "")
     especialidades = list(dict.fromkeys(especialidades + ["indenização por danos morais"]))[:4]
 
     # B2B para ações tipicamente movidas contra empresas; B2C para demais
-    b2b_tipos = {"Reclamação Trabalhista", "Horas Extras", "Rescisão Indireta",
-                 "Acidente de Trabalho", "Rescisão Contratual", "Ação de Cobrança",
-                 "Execução de Título Extrajudicial"}
+    b2b_tipos = {
+        "Reclamação Trabalhista",
+        "Horas Extras",
+        "Rescisão Indireta",
+        "Acidente de Trabalho",
+        "Rescisão Contratual",
+        "Ação de Cobrança",
+        "Execução de Título Extrajudicial",
+    }
     tipo_lead = "empresa" if tipo in b2b_tipos else "pessoa"
     setores = ["indústria", "comércio", "serviços", "transporte"] if tipo_lead == "empresa" else []
 
@@ -2780,8 +3226,11 @@ def _gerar_dna_demo(tipo_acao_ref: str | None = None, nome_escritorio: str = "")
         diferenciais=["Atendimento ágil", "Especialização setorial", "Transparência no processo"],
         top_tipos_acao=[
             {"tipo": especialidades[0], "contagem": 65, "percentual": 65.0},
-            {"tipo": especialidades[1] if len(especialidades) > 1 else especialidades[0],
-             "contagem": 25, "percentual": 25.0},
+            {
+                "tipo": especialidades[1] if len(especialidades) > 1 else especialidades[0],
+                "contagem": 25,
+                "percentual": 25.0,
+            },
         ],
         dados_insuficientes=False,
     )
@@ -2804,17 +3253,18 @@ def _render_lead_card_prospeccao(lead: dict) -> None:
     icone = "🏢" if tipo == "empresa" else "👤"
     status = lead.get("status", "novo")
     status_cfg = {
-        "novo":        ("#1565c0", "#e3f2fd"),
-        "contatado":   ("#f57c00", "#fff3e0"),
+        "novo": ("#1565c0", "#e3f2fd"),
+        "contatado": ("#f57c00", "#fff3e0"),
         "qualificado": ("#2e7d32", "#e8f5e9"),
-        "descartado":  ("#757575", "#f5f5f5"),
+        "descartado": ("#757575", "#f5f5f5"),
     }
     s_cor, s_bg = status_cfg.get(status, ("#555", "#f0f0f0"))
     gerado_ia = lead.get("gerado_por_ia", False)
     ia_badge = (
         '<span style="font-size:10px;background:#7b1fa2;color:white;padding:1px 6px;'
         'border-radius:8px;margin-left:6px;">✨ IA</span>'
-        if gerado_ia else ""
+        if gerado_ia
+        else ""
     )
     st.markdown(
         f"""
@@ -2856,6 +3306,7 @@ def _buscar_e_pontuar_leads(
     usando o MatchingService real (heurística + Claude Sonnet ≥ 30pts).
     """
     import random
+
     rng = random.Random(hash(tipo_acao + tipo_lead) % 2**32)
 
     svc = MatchingService(anthropic_api_key=ANTHROPIC_API_KEY)
@@ -2878,7 +3329,8 @@ def _buscar_e_pontuar_leads(
                 ],
                 contatos_linkedin=(
                     [{"nome": "Ana Gerente", "cargo": "Gerente Jurídico", "url_perfil": ""}]
-                    if emp["porte"] in ("MEDIA", "GRANDE") else []
+                    if emp["porte"] in ("MEDIA", "GRANDE")
+                    else []
                 ),
                 linkedin_disponivel=False,
                 enriquecimento_parcial=False,
@@ -2886,22 +3338,24 @@ def _buscar_e_pontuar_leads(
             resultado = asyncio.run(svc.calcular_score(dna=dna, inteligencia=intel))
             if resultado.score < score_minimo:
                 continue
-            leads.append({
-                "id": len(leads),
-                "nome": emp["razao_social"],
-                "tipo_lead": "empresa",
-                "cnpj": emp["cnpj"],
-                "setor": emp["setor"],
-                "porte": emp["porte"],
-                "processos": emp["processos"],
-                "score": resultado.score,
-                "motivo": resultado.motivo,
-                "abordagem": resultado.abordagem_sugerida,
-                "gerado_por_ia": resultado.gerado_por_ia,
-                "componentes": resultado.componentes,
-                "status": "novo",
-                "tipo_acao_busca": tipo_acao,
-            })
+            leads.append(
+                {
+                    "id": len(leads),
+                    "nome": emp["razao_social"],
+                    "tipo_lead": "empresa",
+                    "cnpj": emp["cnpj"],
+                    "setor": emp["setor"],
+                    "porte": emp["porte"],
+                    "processos": emp["processos"],
+                    "score": resultado.score,
+                    "motivo": resultado.motivo,
+                    "abordagem": resultado.abordagem_sugerida,
+                    "gerado_por_ia": resultado.gerado_por_ia,
+                    "componentes": resultado.componentes,
+                    "status": "novo",
+                    "tipo_acao_busca": tipo_acao,
+                }
+            )
     else:
         pool = rng.sample(_PESSOAS_DEMO, min(limite, len(_PESSOAS_DEMO)))
         for p in pool:
@@ -2916,21 +3370,23 @@ def _buscar_e_pontuar_leads(
             resultado = asyncio.run(svc.calcular_score(dna=dna, inteligencia=intel))
             if resultado.score < score_minimo:
                 continue
-            leads.append({
-                "id": len(leads),
-                "nome": p["nome"],
-                "tipo_lead": "pessoa",
-                "polo": p["polo"],
-                "fase": p["fase"],
-                "cnj": p["cnj"],
-                "score": resultado.score,
-                "motivo": resultado.motivo,
-                "abordagem": resultado.abordagem_sugerida,
-                "gerado_por_ia": resultado.gerado_por_ia,
-                "componentes": resultado.componentes,
-                "status": "novo",
-                "tipo_acao_busca": tipo_acao,
-            })
+            leads.append(
+                {
+                    "id": len(leads),
+                    "nome": p["nome"],
+                    "tipo_lead": "pessoa",
+                    "polo": p["polo"],
+                    "fase": p["fase"],
+                    "cnj": p["cnj"],
+                    "score": resultado.score,
+                    "motivo": resultado.motivo,
+                    "abordagem": resultado.abordagem_sugerida,
+                    "gerado_por_ia": resultado.gerado_por_ia,
+                    "componentes": resultado.componentes,
+                    "status": "novo",
+                    "tipo_acao_busca": tipo_acao,
+                }
+            )
 
     leads.sort(key=lambda l: -l["score"])
     return leads
@@ -2949,18 +3405,22 @@ def page_prospeccao() -> None:
     if "leads_prospeccao" not in st.session_state:
         st.session_state["leads_prospeccao"] = []
     if "dna_escritorio" not in st.session_state:
-        st.session_state["dna_escritorio"] = _gerar_dna_demo(nome_escritorio=ob.get("nome_escritorio", ""))
+        st.session_state["dna_escritorio"] = _gerar_dna_demo(
+            nome_escritorio=ob.get("nome_escritorio", "")
+        )
     if "dna_tipo_acao_ref" not in st.session_state:
         st.session_state["dna_tipo_acao_ref"] = None
 
     dna: DNAEscritorio = st.session_state["dna_escritorio"]
     leads_total = len(st.session_state["leads_prospeccao"])
 
-    tab_dna, tab_descobrir, tab_pipeline = st.tabs([
-        "🧬 Perfil do Escritório",
-        "🔎 Buscar Candidatos",
-        f"📋 Minha Lista  ({leads_total} candidato{'s' if leads_total != 1 else ''})",
-    ])
+    tab_dna, tab_descobrir, tab_pipeline = st.tabs(
+        [
+            "🧬 Perfil do Escritório",
+            "🔎 Buscar Candidatos",
+            f"📋 Minha Lista  ({leads_total} candidato{'s' if leads_total != 1 else ''})",
+        ]
+    )
 
     # ── TAB 1 — DNA do Escritório ──────────────────────────────────────────────
     with tab_dna:
@@ -2976,7 +3436,9 @@ def page_prospeccao() -> None:
             for esp in dna.especialidades:
                 st.markdown(f"- {esp.title()}")
             st.markdown("**Tipo de lead predominante**")
-            tipo_badge = "🏢 Empresa (B2B)" if dna.tipo_lead_predominante == "empresa" else "👤 Pessoa (B2C)"
+            tipo_badge = (
+                "🏢 Empresa (B2B)" if dna.tipo_lead_predominante == "empresa" else "👤 Pessoa (B2C)"
+            )
             st.info(tipo_badge)
 
         with col_b:
@@ -3006,7 +3468,9 @@ def page_prospeccao() -> None:
                 )
 
         st.divider()
-        if st.button("🔄 Regenerar DNA", help="Recalcula o DNA com base no último tipo de ação pesquisado"):
+        if st.button(
+            "🔄 Regenerar DNA", help="Recalcula o DNA com base no último tipo de ação pesquisado"
+        ):
             tipo_ref = st.session_state.get("dna_tipo_acao_ref")
             st.session_state["dna_escritorio"] = _gerar_dna_demo(
                 tipo_acao_ref=tipo_ref,
@@ -3016,7 +3480,8 @@ def page_prospeccao() -> None:
             st.rerun()
 
         with st.expander("ℹ️ De onde vem este perfil?"):
-            st.markdown("""
+            st.markdown(
+                """
 O perfil é calculado automaticamente com base nos tipos de ação que você pesquisa aqui.
 Em produção, ele é gerado a partir do histórico real dos últimos 90 dias de processos do seu escritório.
 
@@ -3025,7 +3490,8 @@ A IA analisa:
 - Se o seu perfil é mais voltado para empresas ou para pessoas físicas
 - Quais setores têm mais a ver com o seu histórico
 - Qual é o perfil ideal de cliente para o seu escritório
-""")
+"""
+            )
 
     # ── TAB 2 — Descobrir Leads ────────────────────────────────────────────────
     with tab_descobrir:
@@ -3043,13 +3509,17 @@ A IA analisa:
                     "Tipo de lead",
                     ["empresa", "pessoa"],
                     horizontal=True,
-                    format_func=lambda x: "🏢 Empresa (B2B)" if x == "empresa" else "👤 Pessoa (B2C)",
+                    format_func=lambda x: (
+                        "🏢 Empresa (B2B)" if x == "empresa" else "👤 Pessoa (B2C)"
+                    ),
                 )
             with col_f2:
                 score_minimo = st.slider("Score mínimo para qualificar", 0, 100, 40)
                 limite = st.slider("Candidatos a analisar", 1, 10, 5)
 
-            submitted = st.form_submit_button("🚀 Buscar e Qualificar Leads", use_container_width=True, type="primary")
+            submitted = st.form_submit_button(
+                "🚀 Buscar e Qualificar Leads", use_container_width=True, type="primary"
+            )
 
         if submitted:
             if not ANTHROPIC_API_KEY:
@@ -3057,7 +3527,9 @@ A IA analisa:
             else:
                 # Atualiza DNA para refletir o tipo_acao buscado
                 st.session_state["dna_tipo_acao_ref"] = tipo_acao
-                dna = _gerar_dna_demo(tipo_acao_ref=tipo_acao, nome_escritorio=ob.get("nome_escritorio", ""))
+                dna = _gerar_dna_demo(
+                    tipo_acao_ref=tipo_acao, nome_escritorio=ob.get("nome_escritorio", "")
+                )
                 st.session_state["dna_escritorio"] = dna
 
                 with st.spinner(f"Buscando e analisando candidatos com a IA... (~{limite * 4}s)"):
@@ -3080,7 +3552,9 @@ A IA analisa:
                         st.session_state["leads_prospeccao"] = existentes
 
                         if inseridos:
-                            st.success(f"✅ {inseridos} novo(s) candidato(s) adicionado(s) à sua lista")
+                            st.success(
+                                f"✅ {inseridos} novo(s) candidato(s) adicionado(s) à sua lista"
+                            )
                         elif novos:
                             st.info("Todos os candidatos encontrados já estavam na sua lista.")
                         else:
@@ -3120,7 +3594,8 @@ A IA analisa:
 
         st.divider()
         with st.expander("ℹ️ Como a pontuação é calculada?"):
-            st.markdown("""
+            st.markdown(
+                """
 A IA analisa cada candidato em até 6 critérios e atribui uma pontuação de 0 a 100:
 
 **Para empresas:**
@@ -3138,34 +3613,44 @@ A IA analisa cada candidato em até 6 critérios e atribui uma pontuação de 0 
 - Alta recorrência de processos similares (+20 pts)
 
 Candidatos com 75+ são os mais quentes. Entre 40 e 74, valem uma abordagem cuidadosa.
-""")
+"""
+            )
 
     # ── TAB 3 — Pipeline ───────────────────────────────────────────────────────
     with tab_pipeline:
         leads = st.session_state.get("leads_prospeccao", [])
 
         if not leads:
-            st.info("Nenhum lead no pipeline ainda. Use **Descobrir Leads** para iniciar a prospecção.")
+            st.info(
+                "Nenhum lead no pipeline ainda. Use **Descobrir Leads** para iniciar a prospecção."
+            )
             return
 
         # Filtros
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             filtro_tipo = st.selectbox(
-                "Tipo de lead", ["Todos", "empresa", "pessoa"],
-                format_func=lambda x: "Todos os tipos" if x == "Todos" else ("🏢 Empresa" if x == "empresa" else "👤 Pessoa"),
+                "Tipo de lead",
+                ["Todos", "empresa", "pessoa"],
+                format_func=lambda x: (
+                    "Todos os tipos"
+                    if x == "Todos"
+                    else ("🏢 Empresa" if x == "empresa" else "👤 Pessoa")
+                ),
                 key="pipl_tipo",
             )
         with col_f2:
             filtro_status = st.selectbox(
-                "Status", ["Todos", "novo", "contatado", "qualificado", "descartado"],
+                "Status",
+                ["Todos", "novo", "contatado", "qualificado", "descartado"],
                 key="pipl_status",
             )
         with col_f3:
             filtro_score = st.slider("Score mínimo", 0, 100, 0, key="pipl_score")
 
         leads_filtrados = [
-            l for l in leads
+            l
+            for l in leads
             if (filtro_tipo == "Todos" or l.get("tipo_lead") == filtro_tipo)
             and (filtro_status == "Todos" or l.get("status") == filtro_status)
             and l.get("score", 0) >= filtro_score
@@ -3200,28 +3685,48 @@ Candidatos com 75+ são os mais quentes. Entre 40 e 74, valem uma abordagem cuid
             s = lead.get("status", "novo")
 
             with col_c:
-                if st.button("📞 Contatado", key=f"prosp_c_{lead['id']}", use_container_width=True,
-                             disabled=s == "contatado"):
+                if st.button(
+                    "📞 Contatado",
+                    key=f"prosp_c_{lead['id']}",
+                    use_container_width=True,
+                    disabled=s == "contatado",
+                ):
                     lead["status"] = "contatado"
                     st.rerun()
             with col_q:
-                if st.button("⭐ Qualificado", key=f"prosp_q_{lead['id']}", use_container_width=True,
-                             disabled=s == "qualificado"):
+                if st.button(
+                    "⭐ Qualificado",
+                    key=f"prosp_q_{lead['id']}",
+                    use_container_width=True,
+                    disabled=s == "qualificado",
+                ):
                     lead["status"] = "qualificado"
                     st.rerun()
             with col_d:
-                if st.button("❌ Descartar", key=f"prosp_d_{lead['id']}", use_container_width=True,
-                             disabled=s == "descartado"):
+                if st.button(
+                    "❌ Descartar",
+                    key=f"prosp_d_{lead['id']}",
+                    use_container_width=True,
+                    disabled=s == "descartado",
+                ):
                     lead["status"] = "descartado"
                     st.rerun()
             with col_r:
-                if st.button("🔄 Reabrir", key=f"prosp_r_{lead['id']}", use_container_width=True,
-                             disabled=s == "novo"):
+                if st.button(
+                    "🔄 Reabrir",
+                    key=f"prosp_r_{lead['id']}",
+                    use_container_width=True,
+                    disabled=s == "novo",
+                ):
                     lead["status"] = "novo"
                     st.rerun()
             with col_del:
-                if st.button("🗑️", key=f"prosp_del_{lead['id']}", help="Remover lead",
-                             use_container_width=True):
+                if st.button(
+                    "🗑️",
+                    key=f"prosp_del_{lead['id']}",
+                    help="Remover lead",
+                    use_container_width=True,
+                ):
                     st.session_state["leads_prospeccao"] = [
                         l for l in leads if l["id"] != lead["id"]
                     ]
@@ -3321,12 +3826,14 @@ def page_hub_advogado() -> None:
     st.divider()
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
-    tab_consulta, tab_peticao, tab_juris, tab_historico = st.tabs([
-        "💬 Consulta Jurídica",
-        "📄 Analisar Petição",
-        "🔍 Jurisprudência",
-        "📊 Histórico",
-    ])
+    tab_consulta, tab_peticao, tab_juris, tab_historico = st.tabs(
+        [
+            "💬 Consulta Jurídica",
+            "📄 Analisar Petição",
+            "🔍 Jurisprudência",
+            "📊 Histórico",
+        ]
+    )
 
     # ──────────────────────────────────────────────────────────────────────────
     # TAB 1 — Consulta Jurídica livre
@@ -3350,7 +3857,9 @@ def page_hub_advogado() -> None:
 
         col_btn, col_cls = st.columns([1, 2])
         with col_btn:
-            enviar = st.button("Consultar →", type="primary", use_container_width=True, key="hub_btn_consulta")
+            enviar = st.button(
+                "Consultar →", type="primary", use_container_width=True, key="hub_btn_consulta"
+            )
         with col_cls:
             if st.session_state.get("hub_ultima_intencao"):
                 intencao_label = {
@@ -3361,7 +3870,9 @@ def page_hub_advogado() -> None:
                     "rascunho_mensagem": "✍️ Rascunho",
                     "status_escritorio": "📊 Status",
                     "analise_peticao": "📄 Petição",
-                }.get(st.session_state["hub_ultima_intencao"], st.session_state["hub_ultima_intencao"])
+                }.get(
+                    st.session_state["hub_ultima_intencao"], st.session_state["hub_ultima_intencao"]
+                )
                 st.info(f"Intenção detectada: **{intencao_label}**", icon="🤖")
 
         if enviar and pergunta.strip():
@@ -3398,7 +3909,11 @@ def page_hub_advogado() -> None:
                 if classificacao.cliente_nome:
                     clientes = st.session_state.get("clientes_hub", [])
                     encontrado = next(
-                        (c for c in clientes if classificacao.cliente_nome.lower() in c["nome"].lower()),
+                        (
+                            c
+                            for c in clientes
+                            if classificacao.cliente_nome.lower() in c["nome"].lower()
+                        ),
                         None,
                     )
                     if encontrado:
@@ -3431,7 +3946,9 @@ def page_hub_advogado() -> None:
             st.markdown(resposta_txt)
 
             if tokens_in or tokens_out:
-                st.caption(f"Tokens: {tokens_in} in / {tokens_out} out · Latência: {resultado.get('latencia_ms', 0)} ms")
+                st.caption(
+                    f"Tokens: {tokens_in} in / {tokens_out} out · Latência: {resultado.get('latencia_ms', 0)} ms"
+                )
 
             st.rerun()
 
@@ -3472,7 +3989,9 @@ def page_hub_advogado() -> None:
                         texto = _extrair_texto(arquivo.getvalue(), arquivo.name)
 
                     if len(texto.strip()) < 50:
-                        st.error("Documento vazio ou apenas com imagens (OCR não suportado neste demo).")
+                        st.error(
+                            "Documento vazio ou apenas com imagens (OCR não suportado neste demo)."
+                        )
                     else:
                         texto_truncado = len(texto) > 8000
                         st.info(
@@ -3494,7 +4013,9 @@ def page_hub_advogado() -> None:
 
                         # Renderizar resultado
                         score = analise.get("score_geral", 0)
-                        cor_score = "#2e7d32" if score >= 70 else "#f57c00" if score >= 40 else "#c62828"
+                        cor_score = (
+                            "#2e7d32" if score >= 70 else "#f57c00" if score >= 40 else "#c62828"
+                        )
                         st.markdown(
                             f"""<div style="border:1.5px solid {cor_score};border-radius:10px;
                                            padding:14px 18px;background:{cor_score}18;margin-bottom:12px;">
@@ -3565,7 +4086,9 @@ def page_hub_advogado() -> None:
         if st.button("🔍 Pesquisar", type="primary", key="hub_btn_juris") and query_juris.strip():
             tribunais_str = ", ".join(tribunais_sel) if tribunais_sel else "STJ, STF"
             with st.spinner(f"Pesquisando com `{_MODELO_HUB_DEMO}`..."):
-                resultado = asyncio.run(hub.pesquisar_jurisprudencia(query_juris.strip(), tribunais_str))
+                resultado = asyncio.run(
+                    hub.pesquisar_jurisprudencia(query_juris.strip(), tribunais_str)
+                )
 
             sessoes.registrar(
                 intencao="pesquisa_jurisprudencia",
@@ -3602,9 +4125,13 @@ def page_hub_advogado() -> None:
         with col1:
             _render_hub_metrica("Consultas", str(len(todas)), "total na sessão")
         with col2:
-            _render_hub_metrica("Tokens", f"{tin_tot + tout_tot:,}", f"in: {tin_tot:,} · out: {tout_tot:,}")
+            _render_hub_metrica(
+                "Tokens", f"{tin_tot + tout_tot:,}", f"in: {tin_tot:,} · out: {tout_tot:,}"
+            )
         with col3:
-            _render_hub_metrica("Custo estimado", f"${sessoes.custo_total:.4f}", "USD · modelo Haiku")
+            _render_hub_metrica(
+                "Custo estimado", f"${sessoes.custo_total:.4f}", "USD · modelo Haiku"
+            )
         with col4:
             _render_hub_metrica("Mais usado", top_intencao, f"{contagem.get(top_intencao, 0)}x")
 
@@ -3662,7 +4189,9 @@ def _render_sidebar() -> None:
             # Hub disponível mesmo sem onboarding completo (só precisa da API key)
             paginas_disponiveis.append("⚖️ Hub do Advogado")
 
-        pagina_selecionada = st.radio("Navegação", paginas_disponiveis, label_visibility="collapsed")
+        pagina_selecionada = st.radio(
+            "Navegação", paginas_disponiveis, label_visibility="collapsed"
+        )
         mapa = {
             "🚀 Configuração Inicial": "onboarding",
             "👥 Meus Clientes": "hub",
@@ -3689,7 +4218,9 @@ def _render_sidebar() -> None:
         if onboarding_ok or clientes:
             st.divider()
             st.caption("Importar mais clientes (CSV)")
-            arquivo_extra = st.file_uploader("CSV adicional", type=["csv"], key="csv_extra", label_visibility="collapsed")
+            arquivo_extra = st.file_uploader(
+                "CSV adicional", type=["csv"], key="csv_extra", label_visibility="collapsed"
+            )
             if arquivo_extra:
                 extra_hash = hash(arquivo_extra.getvalue())
                 if st.session_state.get("_extra_csv_hash") != extra_hash:

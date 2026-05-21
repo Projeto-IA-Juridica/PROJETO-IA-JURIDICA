@@ -55,9 +55,7 @@ class LeadProspeccao(Base, TimestampMixin, TenantMixin):
 
     # --- Tipo de Lead ---
     # 'empresa' (B2B) | 'pessoa' (B2C)
-    tipo_lead: Mapped[str] = mapped_column(
-        String(10), server_default="empresa", nullable=False
-    )
+    tipo_lead: Mapped[str] = mapped_column(String(10), server_default="empresa", nullable=False)
 
     # --- Campos específicos de empresa (B2B) ---
     # CNPJ formatado (14 dígitos). Para B2C: armazena o número CNJ do processo.
@@ -67,9 +65,7 @@ class LeadProspeccao(Base, TimestampMixin, TenantMixin):
     # [{nome, qualificacao}] — nunca inclui CPF dos sócios (LGPD)
     socios: Mapped[list] = mapped_column(JSONB, server_default="[]", nullable=False)
     # [{nome, cargo, url_perfil}] — vazio quando LinkedIn indisponível
-    contatos_linkedin: Mapped[list] = mapped_column(
-        JSONB, server_default="[]", nullable=False
-    )
+    contatos_linkedin: Mapped[list] = mapped_column(JSONB, server_default="[]", nullable=False)
     linkedin_disponivel: Mapped[bool] = mapped_column(
         Boolean, server_default="false", nullable=False
     )
@@ -92,9 +88,7 @@ class LeadProspeccao(Base, TimestampMixin, TenantMixin):
 
     # --- Gestão do Pipeline ---
     # novo | contatado | qualificado | descartado
-    status: Mapped[str] = mapped_column(
-        String(50), server_default="novo", nullable=False
-    )
+    status: Mapped[str] = mapped_column(String(50), server_default="novo", nullable=False)
     notas_advogado: Mapped[str | None] = mapped_column(Text, nullable=True)
     # tipo_acao usado na descoberta
     fonte_descoberta: Mapped[str | None] = mapped_column(String(100), nullable=True)

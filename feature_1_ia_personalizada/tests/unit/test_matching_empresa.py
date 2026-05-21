@@ -24,6 +24,7 @@ from feature_1_ia_personalizada.services.prospeccao.matching import MatchingServ
 # Builders de fixture
 # ---------------------------------------------------------------------------
 
+
 def _dna_empresa(
     especialidades: list[str] | None = None,
     setores_alvo: list[str] | None = None,
@@ -72,6 +73,7 @@ def _empresa(
 # ---------------------------------------------------------------------------
 # Heurística por componente
 # ---------------------------------------------------------------------------
+
 
 class TestHeuristicaEmpresa:
     def test_score_maximo_todos_componentes(self):
@@ -144,6 +146,7 @@ class TestHeuristicaEmpresa:
 # Score abaixo do limiar: sem Claude
 # ---------------------------------------------------------------------------
 
+
 class TestScoreAbaixoLimiar:
     @pytest.mark.asyncio
     async def test_score_29_nao_chama_claude(self):
@@ -171,6 +174,7 @@ class TestScoreAbaixoLimiar:
 # Score acima do limiar: chama Claude
 # ---------------------------------------------------------------------------
 
+
 class TestScoreAcimaLimiar:
     @pytest.mark.asyncio
     async def test_score_alto_chama_claude_e_retorna_resultado_ia(self):
@@ -185,17 +189,17 @@ class TestScoreAcimaLimiar:
             linkedin_contatos=2,
         )
 
-        resposta_ia = json.dumps({
-            "score": 88,
-            "motivo": "Empresa com alta demanda trabalhista no setor-alvo.",
-            "abordagem_sugerida": "Contatar o diretor jurídico via LinkedIn.",
-        })
+        resposta_ia = json.dumps(
+            {
+                "score": 88,
+                "motivo": "Empresa com alta demanda trabalhista no setor-alvo.",
+                "abordagem_sugerida": "Contatar o diretor jurídico via LinkedIn.",
+            }
+        )
 
         resposta_mock = MagicMock()
         resposta_mock.status_code = 200
-        resposta_mock.json.return_value = {
-            "content": [{"text": resposta_ia}]
-        }
+        resposta_mock.json.return_value = {"content": [{"text": resposta_ia}]}
         resposta_mock.raise_for_status = MagicMock()
 
         http_mock = AsyncMock()
@@ -205,7 +209,10 @@ class TestScoreAcimaLimiar:
 
         svc = MatchingService(anthropic_api_key="sk-test")
 
-        with patch("feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient", return_value=http_mock):
+        with patch(
+            "feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient",
+            return_value=http_mock,
+        ):
             resultado = await svc.calcular_score(dna, empresa)
 
         assert resultado.gerado_por_ia is True
@@ -226,7 +233,10 @@ class TestScoreAcimaLimiar:
 
         svc = MatchingService(anthropic_api_key="sk-test")
 
-        with patch("feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient", return_value=http_mock):
+        with patch(
+            "feature_1_ia_personalizada.services.prospeccao.matching.httpx.AsyncClient",
+            return_value=http_mock,
+        ):
             resultado = await svc.calcular_score(dna, empresa)
 
         assert resultado.gerado_por_ia is False

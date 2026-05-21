@@ -56,8 +56,8 @@ _buscas_total = Counter(
 # ---------------------------------------------------------------------------
 
 _TTL_CACHE_BUSCA = 60 * 30  # 30 minutos
-_HNSW_EF_SEARCH = 80        # recall alto; padrão pgvector é 40
-_TOP_K_CANDIDATOS = 10       # candidatos retornados antes do re-ranking no RAGRetriever
+_HNSW_EF_SEARCH = 80  # recall alto; padrão pgvector é 40
+_TOP_K_CANDIDATOS = 10  # candidatos retornados antes do re-ranking no RAGRetriever
 
 
 # ---------------------------------------------------------------------------
@@ -124,9 +124,7 @@ class VectorStore:
         """
         _buscas_total.labels(tipo="embedding").inc()
 
-        distancia = DocumentoRag.embedding.cosine_distance(query_embedding).label(
-            "distancia"
-        )
+        distancia = DocumentoRag.embedding.cosine_distance(query_embedding).label("distancia")
 
         stmt = (
             select(DocumentoRag, distancia)
@@ -153,9 +151,7 @@ class VectorStore:
 
         async with self._session_factory() as session:
             # Configura ef_search por sessão — SET LOCAL é seguro em transação async
-            await session.execute(
-                text(f"SET LOCAL hnsw.ef_search = {_HNSW_EF_SEARCH}")
-            )
+            await session.execute(text(f"SET LOCAL hnsw.ef_search = {_HNSW_EF_SEARCH}"))
 
             with _latencia_busca.time():
                 result = await session.execute(stmt)
@@ -207,9 +203,7 @@ class VectorStore:
 
         return resultados
 
-    async def deletar_documento(
-        self, doc_hash: str, escritorio_id: int
-    ) -> int:
+    async def deletar_documento(self, doc_hash: str, escritorio_id: int) -> int:
         """
         Soft delete de todos os chunks de um documento pelo doc_hash.
         Retorna o número de chunks desativados.

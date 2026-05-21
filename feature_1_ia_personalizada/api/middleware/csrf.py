@@ -39,12 +39,12 @@ _METODOS_MUTANTES = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Prefixos de rota isentos de CSRF (não envolvem sessão de browser)
 _ROTAS_ISENTAS = (
-    "/webhook/",        # WhatsApp — autenticado via HMAC
-    "/health",          # leitura
-    "/metrics",         # leitura
-    "/auth/csrf-token", # emissão do token
-    "/auth/login",      # login inicial (sem sessão prévia para proteger)
-    "/auth/refresh",    # refresh usa JWT, não sessão
+    "/webhook/",  # WhatsApp — autenticado via HMAC
+    "/health",  # leitura
+    "/metrics",  # leitura
+    "/auth/csrf-token",  # emissão do token
+    "/auth/login",  # login inicial (sem sessão prévia para proteger)
+    "/auth/refresh",  # refresh usa JWT, não sessão
     "/onboarding/register",  # registro inicial (sem sessão prévia)
     "/docs",
     "/redoc",
@@ -53,8 +53,8 @@ _ROTAS_ISENTAS = (
 
 _COOKIE_NAME = "csrf_token"
 _HEADER_NAME = "x-csrf-token"
-_TOKEN_BYTES = 32          # 64 chars hex
-_COOKIE_MAX_AGE = 86400    # 24h em segundos
+_TOKEN_BYTES = 32  # 64 chars hex
+_COOKIE_MAX_AGE = 86400  # 24h em segundos
 
 
 def _rota_isenta(path: str) -> bool:

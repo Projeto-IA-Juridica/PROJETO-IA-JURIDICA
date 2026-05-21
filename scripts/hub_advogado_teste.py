@@ -133,16 +133,14 @@ def _calcular_score(cliente: dict, dados_dj: dict | None) -> dict | None:
         pass
 
     p = _Proxy()
-    p.polo_cliente    = cliente.get("polo_cliente") or "autor"
-    p.fase_processual = None   # DataJud público não expõe fase diretamente
-    p.valor_causa     = None   # não vem do CSV neste demo
+    p.polo_cliente = cliente.get("polo_cliente") or "autor"
+    p.fase_processual = None  # DataJud público não expõe fase diretamente
+    p.valor_causa = None  # não vem do CSV neste demo
 
     # Extrai tipo_acao do DataJud se disponível
     if dados_dj:
         classe = dados_dj.get("classe", {})
-        p.tipo_acao = (
-            classe.get("nome") if isinstance(classe, dict) else str(classe)
-        ) or None
+        p.tipo_acao = (classe.get("nome") if isinstance(classe, dict) else str(classe)) or None
     else:
         p.tipo_acao = None
 
@@ -150,36 +148,40 @@ def _calcular_score(cliente: dict, dados_dj: dict | None) -> dict | None:
     # A API pública não retorna tempo_medio nem taxa_procedencia →
     # esses componentes ficam em 50 (neutro), score é calculado com o que há
     datajud_data = {
-        "tempo_medio_tramitacao_dias": dados_dj.get("tempo_medio_tramitacao_dias") if dados_dj else None,
-        "taxa_procedencia_autor":      dados_dj.get("taxa_procedencia_autor") if dados_dj else None,
+        "tempo_medio_tramitacao_dias": (
+            dados_dj.get("tempo_medio_tramitacao_dias") if dados_dj else None
+        ),
+        "taxa_procedencia_autor": dados_dj.get("taxa_procedencia_autor") if dados_dj else None,
     }
 
     try:
         r = _score_calculator.calcular(p, datajud_data)
         return {
-            "score":         r.score,
-            "nivel":         r.nivel,
+            "score": r.score,
+            "nivel": r.nivel,
             "interpretacao": r.interpretacao,
-            "componentes":   r.componentes.model_dump(),
+            "componentes": r.componentes.model_dump(),
         }
     except Exception:
         return None
 
 
 def _cor_nivel(nivel: str) -> str:
-    return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(nivel, "#555")
+    return {"baixo": "#2e7d32", "moderado": "#f57c00", "alto": "#c62828", "critico": "#6a1b9a"}.get(
+        nivel, "#555"
+    )
 
 
 def _render_score_card(score_data: dict) -> None:
     """Renderiza o card de Score de Risco Processual. Uso exclusivo do advogado."""
-    score  = score_data["score"]
-    nivel  = score_data["nivel"]
+    score = score_data["score"]
+    nivel = score_data["nivel"]
     interp = score_data["interpretacao"]
-    comp   = score_data["componentes"]
-    cor    = _cor_nivel(nivel)
+    comp = score_data["componentes"]
+    cor = _cor_nivel(nivel)
 
     emojis = {"baixo": "🟢", "moderado": "🟡", "alto": "🔴", "critico": "🟣"}
-    emoji  = emojis.get(nivel, "⚪")
+    emoji = emojis.get(nivel, "⚪")
 
     st.markdown(
         f"""
@@ -212,22 +214,24 @@ def _render_score_card(score_data: dict) -> None:
     with st.expander("Ver detalhamento dos componentes"):
         nomes = {
             "complexidade_juridica": "Complexidade jurídica",
-            "duracao_estimada":      "Duração estimada",
-            "historico_vara":        "Histórico da vara",
-            "valor_causa":           "Valor da causa",
-            "fase_processual":       "Fase processual",
+            "duracao_estimada": "Duração estimada",
+            "historico_vara": "Histórico da vara",
+            "valor_causa": "Valor da causa",
+            "fase_processual": "Fase processual",
         }
         pesos = {
             "complexidade_juridica": "25%",
-            "duracao_estimada":      "25%",
-            "historico_vara":        "20%",
-            "valor_causa":           "15%",
-            "fase_processual":       "15%",
+            "duracao_estimada": "25%",
+            "historico_vara": "20%",
+            "valor_causa": "15%",
+            "fase_processual": "15%",
         }
         for chave, valor in comp.items():
             label = nomes.get(chave, chave)
-            peso  = pesos.get(chave, "")
-            bar_color = _cor_nivel("alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo")
+            peso = pesos.get(chave, "")
+            bar_color = _cor_nivel(
+                "alto" if valor >= 75 else "moderado" if valor >= 40 else "baixo"
+            )
             st.markdown(
                 f"""
                 <div style="margin-bottom:8px;">
@@ -806,17 +810,24 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                 st.info("Nenhum processo cadastrado para este cliente.")
             elif dados_dj:
                 tribunal = dados_dj.get("tribunal", {})
-                nome_trib = tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
+                nome_trib = (
+                    tribunal.get("nome", "—") if isinstance(tribunal, dict) else str(tribunal)
+                )
                 classe = dados_dj.get("classe", {})
                 nome_classe = classe.get("nome", "—") if isinstance(classe, dict) else str(classe)
                 assuntos = dados_dj.get("assuntos", [])
                 assunto_str = (
-                    ", ".join(a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]) or "—"
+                    ", ".join(
+                        a.get("nome", "") if isinstance(a, dict) else str(a) for a in assuntos[:2]
+                    )
+                    or "—"
                 )
                 movimentos = dados_dj.get("movimentos", [])
                 ultimo_mov = movimentos[0] if movimentos else {}
                 nome_mov = ultimo_mov.get("nome", "—") if isinstance(ultimo_mov, dict) else "—"
-                data_mov = (ultimo_mov.get("dataHora") or "")[:10] if isinstance(ultimo_mov, dict) else "—"
+                data_mov = (
+                    (ultimo_mov.get("dataHora") or "")[:10] if isinstance(ultimo_mov, dict) else "—"
+                )
                 data_ajuiz = (dados_dj.get("dataAjuizamento") or "")[:10] or "—"
 
                 linhas_proc: list[tuple[str, str]] = [
@@ -888,7 +899,9 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     intencao_bv = resultado_bv.get("intencao", "saudacao")
                     fallback_bv = resultado_bv.get("usando_fallback", False)
                 except Exception:
-                    boas_vindas = f"Olá, {cliente['nome'].split()[0]}! Bem-vindo(a) ao {escritorio_nome}."
+                    boas_vindas = (
+                        f"Olá, {cliente['nome'].split()[0]}! Bem-vindo(a) ao {escritorio_nome}."
+                    )
                     intencao_bv = "erro"
                     fallback_bv = True
 
@@ -919,7 +932,9 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                     if meta.get("intencao"):
                         partes.append(f"intent: `{meta['intencao']}`")
                     if meta.get("tokens_in") or meta.get("tokens_out"):
-                        partes.append(f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`")
+                        partes.append(
+                            f"tokens: `{meta.get('tokens_in', 0)}↑ {meta.get('tokens_out', 0)}↓`"
+                        )
                     if meta.get("fallback"):
                         partes.append("⚠️ fallback")
                     if partes:
@@ -953,7 +968,9 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                         st.session_state[tokens_key]["in"] += ti
                         st.session_state[tokens_key]["out"] += to
                     except Exception as exc:
-                        resposta = f"Desculpe, ocorreu um erro no processamento. Tente novamente. ({exc})"
+                        resposta = (
+                            f"Desculpe, ocorreu um erro no processamento. Tente novamente. ({exc})"
+                        )
                         intencao, ti, to, fallback = "erro", 0, 0, True
 
                 st.markdown(resposta)
@@ -968,7 +985,12 @@ for tab, cliente in zip(tabs, clientes, strict=False):
                 {
                     "role": "assistant",
                     "content": resposta,
-                    "meta": {"intencao": intencao, "tokens_in": ti, "tokens_out": to, "fallback": fallback},
+                    "meta": {
+                        "intencao": intencao,
+                        "tokens_in": ti,
+                        "tokens_out": to,
+                        "fallback": fallback,
+                    },
                 }
             )
             st.rerun()

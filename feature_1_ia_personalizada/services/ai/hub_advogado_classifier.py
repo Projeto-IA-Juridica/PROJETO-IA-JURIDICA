@@ -213,5 +213,3 @@ class HubAdvogadoClassificador:
         )
 
         return ClassificacaoAdvogado(intencao=intencao, entidades=entidades)
-
-

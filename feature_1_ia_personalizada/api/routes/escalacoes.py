@@ -55,6 +55,7 @@ _STATUS_VALIDOS = {"pendente", "aprovada", "rejeitada"}
 # Schemas
 # ---------------------------------------------------------------------------
 
+
 class EscalacaoItem(BaseModel):
     id: int
     cliente_id: int
@@ -77,6 +78,7 @@ class AprovarRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _extrair_escalacao(metadata: dict | None) -> dict[str, Any]:
     if not metadata:
         return {}
@@ -91,9 +93,12 @@ def _get_evolution() -> EvolutionClient:
 # GET /escalacoes
 # ---------------------------------------------------------------------------
 
+
 @router.get("", response_model=list[EscalacaoItem], status_code=status.HTTP_200_OK)
 async def listar_escalacoes(
-    status_filtro: str = Query("pendente", alias="status", description="pendente | aprovada | rejeitada"),
+    status_filtro: str = Query(
+        "pendente", alias="status", description="pendente | aprovada | rejeitada"
+    ),
     page: int = Query(1, ge=1),
     limit: int = Query(25, ge=1, le=100),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
@@ -153,6 +158,7 @@ async def listar_escalacoes(
 # POST /escalacoes/{id}/aprovar
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{escalacao_id}/aprovar", status_code=status.HTTP_200_OK)
 async def aprovar_escalacao(
     escalacao_id: int,
@@ -187,7 +193,9 @@ async def aprovar_escalacao(
     escritorio = await db.get(Escritorio, escritorio_id)
 
     if not cliente or not escritorio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente ou escritório não encontrado.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente ou escritório não encontrado."
+        )
 
     instance = escritorio.webhook_whatsapp_instance
     enviado = False
@@ -201,7 +209,9 @@ async def aprovar_escalacao(
             )
             enviado = True
         except Exception as exc:
-            logger.error("escalacao_aprovar_whatsapp_falhou", escalacao_id=escalacao_id, erro=str(exc))
+            logger.error(
+                "escalacao_aprovar_whatsapp_falhou", escalacao_id=escalacao_id, erro=str(exc)
+            )
 
     # Atualiza status no metadata_json
     meta = dict(interacao.metadata_json or {})
@@ -216,13 +226,16 @@ async def aprovar_escalacao(
     interacao.metadata_json = meta
     await db.commit()
 
-    logger.info("escalacao_aprovada", escalacao_id=escalacao_id, advogado_id=advogado_id, enviado=enviado)
+    logger.info(
+        "escalacao_aprovada", escalacao_id=escalacao_id, advogado_id=advogado_id, enviado=enviado
+    )
     return {"ok": True, "enviado": enviado, "resposta": resposta}
 
 
 # ---------------------------------------------------------------------------
 # POST /escalacoes/{id}/rejeitar
 # ---------------------------------------------------------------------------
+
 
 @router.post("/{escalacao_id}/rejeitar", status_code=status.HTTP_200_OK)
 async def rejeitar_escalacao(
@@ -262,6 +275,7 @@ async def rejeitar_escalacao(
 # Helper
 # ---------------------------------------------------------------------------
 
+
 async def _get_escalacao_ou_404(
     escalacao_id: int,
     escritorio_id: int,
@@ -269,7 +283,9 @@ async def _get_escalacao_ou_404(
 ) -> Interacao:
     interacao = await db.get(Interacao, escalacao_id)
     if not interacao or interacao.tipo != "escalacao":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Escalação não encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Escalação não encontrada."
+        )
     if interacao.escritorio_id != escritorio_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado.")
     return interacao

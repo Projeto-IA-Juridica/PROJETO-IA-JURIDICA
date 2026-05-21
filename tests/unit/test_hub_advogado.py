@@ -62,14 +62,16 @@ async def test_classificar_com_claude_sucesso():
     clf = HubAdvogadoClassificador.__new__(HubAdvogadoClassificador)
 
     mock_content = MagicMock()
-    mock_content.text = json.dumps({
-        "intencao": "resumo_processo",
-        "entidades": {
-            "cliente_nome": "João Silva",
-            "processo_cnj": "0001234-56.2024.8.26.0001",
-            "query_juris": None,
-        },
-    })
+    mock_content.text = json.dumps(
+        {
+            "intencao": "resumo_processo",
+            "entidades": {
+                "cliente_nome": "João Silva",
+                "processo_cnj": "0001234-56.2024.8.26.0001",
+                "query_juris": None,
+            },
+        }
+    )
     mock_response = MagicMock()
     mock_response.content = [mock_content]
 
@@ -93,10 +95,12 @@ async def test_classificar_intencao_invalida_cai_em_fallback():
     clf = HubAdvogadoClassificador.__new__(HubAdvogadoClassificador)
 
     mock_content = MagicMock()
-    mock_content.text = json.dumps({
-        "intencao": "intencao_inexistente",
-        "entidades": {},
-    })
+    mock_content.text = json.dumps(
+        {
+            "intencao": "intencao_inexistente",
+            "entidades": {},
+        }
+    )
     mock_response = MagicMock()
     mock_response.content = [mock_content]
 

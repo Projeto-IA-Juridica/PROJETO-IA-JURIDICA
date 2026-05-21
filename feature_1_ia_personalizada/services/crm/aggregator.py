@@ -98,9 +98,7 @@ class CRMDataAggregator:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def coletar_contexto_cliente(
-        self, cliente_id: int, escritorio_id: int
-    ) -> CRMContexto:
+    async def coletar_contexto_cliente(self, cliente_id: int, escritorio_id: int) -> CRMContexto:
         agora = datetime.now(UTC)
         ha_30d = agora - timedelta(days=30)
         ha_90d = agora - timedelta(days=90)  # também usado como janela "3 meses" do NPS
@@ -126,9 +124,7 @@ class CRMDataAggregator:
         cliente = (await self._db.execute(stmt_cliente)).one_or_none()
 
         if cliente is None:
-            raise ValueError(
-                f"Cliente {cliente_id} não encontrado no escritório {escritorio_id}"
-            )
+            raise ValueError(f"Cliente {cliente_id} não encontrado no escritório {escritorio_id}")
 
         # --- 2. NPS histórico (últimos 6 registros com nota) ---
         stmt_nps = (
@@ -201,9 +197,9 @@ class CRMDataAggregator:
         esc_status = Interacao.metadata_json["escalacao_status"].as_string()
         stmt_esc = select(
             func.count().filter(esc_status == "pendente").label("pendentes"),
-            func.count().filter(
-                and_(esc_status == "rejeitada", Interacao.created_at >= ha_30d)
-            ).label("rejeitadas_30d"),
+            func.count()
+            .filter(and_(esc_status == "rejeitada", Interacao.created_at >= ha_30d))
+            .label("rejeitadas_30d"),
         ).where(
             Interacao.cliente_id == cliente_id,
             Interacao.escritorio_id == escritorio_id,
@@ -243,7 +239,9 @@ class CRMDataAggregator:
             nome=cliente.nome,
             profissao=cliente.profissao,
             empresa=cliente.empresa_atual,
-            data_nascimento=cliente.data_nascimento.isoformat() if cliente.data_nascimento else None,
+            data_nascimento=(
+                cliente.data_nascimento.isoformat() if cliente.data_nascimento else None
+            ),
             crm_score_anterior=cliente.crm_score,
             crm_analisado_em_anterior=cliente.crm_analisado_em,
             crm_resumo_anterior=cliente.crm_resumo,

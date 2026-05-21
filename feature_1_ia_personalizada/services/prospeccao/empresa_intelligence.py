@@ -55,9 +55,9 @@ class EmpresaInteligencia:
     tipos_acao_envolvida: list[str] = field(default_factory=list)
     # None quando CNPJ não foi identificado
     cnpj: str | None = None
-    situacao: str = ""           # ATIVA | BAIXADA | SUSPENSA | ...
-    porte: str = ""              # MEI | ME | EPP | DEMAIS
-    setor_cnae: str = ""         # descrição do CNAE principal
+    situacao: str = ""  # ATIVA | BAIXADA | SUSPENSA | ...
+    porte: str = ""  # MEI | ME | EPP | DEMAIS
+    setor_cnae: str = ""  # descrição do CNAE principal
     # [{nome, qualificacao}] — sem CPF (LGPD)
     socios: list[dict[str, str]] = field(default_factory=list)
     contatos_linkedin: list[dict[str, str]] = field(default_factory=list)
@@ -104,9 +104,7 @@ class EmpresaIntelligenceService:
     # Interface pública
     # ------------------------------------------------------------------
 
-    async def enriquecer(
-        self, litigante: LitiganteEncontrado
-    ) -> EmpresaInteligencia:
+    async def enriquecer(self, litigante: LitiganteEncontrado) -> EmpresaInteligencia:
         """
         Agrega dados de Receita Federal e LinkedIn para o litigante.
 
@@ -274,9 +272,7 @@ class EmpresaIntelligenceService:
                 data = json.loads(raw)
                 return EmpresaInteligencia(**data)
         except (TypeError, KeyError) as exc:
-            logger.debug(
-                "empresa_intel.cache_schema_error", key=key, error=str(exc)
-            )
+            logger.debug("empresa_intel.cache_schema_error", key=key, error=str(exc))
         except Exception as exc:
             logger.debug("empresa_intel.cache_erro", key=key, error=str(exc))
         return None

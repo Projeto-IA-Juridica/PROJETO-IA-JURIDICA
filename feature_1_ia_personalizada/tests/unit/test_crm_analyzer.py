@@ -26,6 +26,7 @@ from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer, _valid
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ctx_base(**kwargs) -> CRMContexto:
     defaults = {
         "cliente_id": 1,
@@ -66,12 +67,13 @@ def _make_analyzer(db=None, claude=None) -> CRMAnalyzer:
 # Cache hit
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_cache_hit_nao_chama_claude():
     """Se score igual e análise < 24h, retorna sem chamar Claude."""
     agora = datetime.now(UTC)
     ctx = _ctx_base(
-        crm_score_anterior=75,          # será igual ao calculado
+        crm_score_anterior=75,  # será igual ao calculado
         crm_analisado_em_anterior=agora - timedelta(hours=1),
         crm_resumo_anterior="Resumo anterior.",
         crm_acao_sugerida_anterior="Nenhuma ação necessária",
@@ -81,11 +83,10 @@ async def test_cache_hit_nao_chama_claude():
     claude._client = AsyncMock()
     analyzer = _make_analyzer(claude=claude)
 
-    with patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator"
-    ) as MockAgg, patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm"
-    ) as mock_calc:
+    with (
+        patch("feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator") as MockAgg,
+        patch("feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm") as mock_calc,
+    ):
         MockAgg.return_value.coletar_contexto_cliente = AsyncMock(return_value=ctx)
         mock_score = MagicMock(score=75, nivel="satisfeito", fatores={})
         mock_calc.return_value = mock_score
@@ -124,11 +125,10 @@ async def test_cache_expirado_chama_claude():
 
     analyzer = CRMAnalyzer(claude_client=claude, db=db)
 
-    with patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator"
-    ) as MockAgg, patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm"
-    ) as mock_calc:
+    with (
+        patch("feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator") as MockAgg,
+        patch("feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm") as mock_calc,
+    ):
         MockAgg.return_value.coletar_contexto_cliente = AsyncMock(return_value=ctx)
         mock_calc.return_value = MagicMock(score=75, nivel="satisfeito", fatores={})
 
@@ -141,6 +141,7 @@ async def test_cache_expirado_chama_claude():
 # ---------------------------------------------------------------------------
 # Graceful degradation
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_claude_falha_persiste_score_sem_resumo():
@@ -157,11 +158,10 @@ async def test_claude_falha_persiste_score_sem_resumo():
 
     analyzer = CRMAnalyzer(claude_client=claude, db=db)
 
-    with patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator"
-    ) as MockAgg, patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm"
-    ) as mock_calc:
+    with (
+        patch("feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator") as MockAgg,
+        patch("feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm") as mock_calc,
+    ):
         MockAgg.return_value.coletar_contexto_cliente = AsyncMock(return_value=ctx)
         mock_calc.return_value = MagicMock(score=60, nivel="neutro", fatores={})
 
@@ -182,6 +182,7 @@ async def test_claude_falha_persiste_score_sem_resumo():
 # ---------------------------------------------------------------------------
 # Parse do output do Claude
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_output_claude_parseado_corretamente():
@@ -206,11 +207,10 @@ async def test_output_claude_parseado_corretamente():
 
     analyzer = CRMAnalyzer(claude_client=claude, db=db)
 
-    with patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator"
-    ) as MockAgg, patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm"
-    ) as mock_calc:
+    with (
+        patch("feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator") as MockAgg,
+        patch("feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm") as mock_calc,
+    ):
         MockAgg.return_value.coletar_contexto_cliente = AsyncMock(return_value=ctx)
         mock_calc.return_value = MagicMock(score=80, nivel="excelente", fatores={})
 
@@ -226,6 +226,7 @@ async def test_output_claude_parseado_corretamente():
 # ---------------------------------------------------------------------------
 # Cliente sem processos
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_cliente_sem_processos_gera_acao_sugerida():
@@ -250,11 +251,10 @@ async def test_cliente_sem_processos_gera_acao_sugerida():
 
     analyzer = CRMAnalyzer(claude_client=claude, db=db)
 
-    with patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator"
-    ) as MockAgg, patch(
-        "feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm"
-    ) as mock_calc:
+    with (
+        patch("feature_1_ia_personalizada.services.crm.analyzer.CRMDataAggregator") as MockAgg,
+        patch("feature_1_ia_personalizada.services.crm.analyzer.calcular_score_crm") as mock_calc,
+    ):
         MockAgg.return_value.coletar_contexto_cliente = AsyncMock(return_value=ctx)
         mock_calc.return_value = MagicMock(score=55, nivel="satisfeito", fatores={})
 
@@ -268,12 +268,16 @@ async def test_cliente_sem_processos_gera_acao_sugerida():
 # Compliance OAB
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("resumo,acao", [
-    ("Alta probabilidade de vitória no processo.", "Aguardar julgamento"),
-    ("Cliente deve ganhar a causa.", "Nenhuma ação necessária"),
-    ("Risco de perder o processo aumentou.", "Ligar"),
-    ("Probabilidade de sucesso estimada em 80%.", "Enviar atualização"),
-])
+
+@pytest.mark.parametrize(
+    "resumo,acao",
+    [
+        ("Alta probabilidade de vitória no processo.", "Aguardar julgamento"),
+        ("Cliente deve ganhar a causa.", "Nenhuma ação necessária"),
+        ("Risco de perder o processo aumentou.", "Ligar"),
+        ("Probabilidade de sucesso estimada em 80%.", "Enviar atualização"),
+    ],
+)
 def test_validar_output_rejeita_palavras_proibidas(resumo, acao):
     with pytest.raises(ValueError, match="compliance OAB"):
         _validar_output(resumo, acao)

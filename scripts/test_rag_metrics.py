@@ -31,6 +31,7 @@ from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 # Mock: VectorStore simples para testes
 # ============================================================================
 
+
 @dataclass
 class ResultadoBuscaMock:
     id: int
@@ -115,6 +116,7 @@ class VectorStoreMock:
 # ============================================================================
 # Testes
 # ============================================================================
+
 
 async def test_rag_metrics():
     """Executa série de testes contra o RAG retriever e coleta métricas."""
@@ -206,9 +208,7 @@ async def test_rag_metrics():
 
     # Filtra apenas métricas do RAG
     rag_metrics = [
-        line
-        for line in metrics_output.split("\n")
-        if "rag_" in line and not line.startswith("#")
+        line for line in metrics_output.split("\n") if "rag_" in line and not line.startswith("#")
     ]
 
     if rag_metrics:
@@ -223,7 +223,8 @@ async def test_rag_metrics():
     # Exibe resumo
     print("📋 RESUMO")
     print("=" * 70)
-    print("""
+    print(
+        """
 Métricas coletadas:
   • rag_contexto_injetado_total — Respostas com contexto RAG no prompt
   • rag_contexto_vazio_total — Buscas RAG sem resultado acima do threshold
@@ -233,7 +234,8 @@ Métricas coletadas:
 
 Em produção, essas métricas são scrapeadas por Prometheus e visualizadas
 em Grafana para monitorar performance e hit rate do RAG.
-""")
+"""
+    )
 
 
 # ============================================================================
@@ -247,5 +249,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Erro durante testes: {e}\n")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

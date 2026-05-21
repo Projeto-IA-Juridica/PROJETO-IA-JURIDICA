@@ -296,6 +296,7 @@ def processar_mensagem_recebida(
     # Se a transcrição falhar, substituímos por mensagem de fallback amigável para
     # que o orchestrador informe o cliente do problema sem crashar o fluxo.
     if tipo == "audio" and audio_message_id and instance_nome:
+
         async def _transcrever() -> str:
             from feature_1_ia_personalizada.services.messaging.evolution_client import (
                 EvolutionClient,
@@ -340,7 +341,11 @@ def processar_mensagem_recebida(
                 f"Motivo: {exc}. Por favor, tente enviar uma mensagem de texto.]"
             )
             tipo = "texto"
-            _resultado_audio = "erro_duracao" if "longo" in str(exc).lower() or "máximo" in str(exc).lower() else "erro_whisper"
+            _resultado_audio = (
+                "erro_duracao"
+                if "longo" in str(exc).lower() or "máximo" in str(exc).lower()
+                else "erro_whisper"
+            )
             if _ctr_audio:
                 _ctr_audio.labels(resultado=_resultado_audio).inc()
         except Exception as exc:
@@ -478,10 +483,15 @@ def processar_resposta_advogado(
                 if match:
                     interacao_id = int(match.group(1))
 
-            stmt = select(Interacao).where(
-                Interacao.escritorio_id == id_escritorio,
-                Interacao.tipo == "escalacao",
-            ).order_by(Interacao.id.desc()).limit(20)
+            stmt = (
+                select(Interacao)
+                .where(
+                    Interacao.escritorio_id == id_escritorio,
+                    Interacao.tipo == "escalacao",
+                )
+                .order_by(Interacao.id.desc())
+                .limit(20)
+            )
 
             result = await session.execute(stmt)
             interacoes_recentes = result.scalars().all()
@@ -490,7 +500,10 @@ def processar_resposta_advogado(
             if interacao_id:
                 for i in interacoes_recentes:
                     meta_i = i.metadata_json or {}
-                    if i.id == interacao_id and meta_i.get("escalacao", {}).get("status") == "pendente":
+                    if (
+                        i.id == interacao_id
+                        and meta_i.get("escalacao", {}).get("status") == "pendente"
+                    ):
                         interacao_alvo = i
                         break
 
@@ -498,7 +511,9 @@ def processar_resposta_advogado(
                 # Fallback: pegar pendente mais recente
                 for i in interacoes_recentes:
                     meta_esc = (i.metadata_json or {}).get("escalacao", {})
-                    if meta_esc.get("status") == "pendente" and id_advogado in meta_esc.get("advogados_notificados", []):
+                    if meta_esc.get("status") == "pendente" and id_advogado in meta_esc.get(
+                        "advogados_notificados", []
+                    ):
                         interacao_alvo = i
                         break
 
@@ -527,9 +542,10 @@ def processar_resposta_advogado(
             await service.enviar_mensagem(id_escritorio, interacao_alvo.cliente_id, resposta_final)
 
             await session.commit()
-            logger.info("escalacao_resolvida", interacao_id=interacao_alvo.id, advogado_id=id_advogado)
+            logger.info(
+                "escalacao_resolvida", interacao_id=interacao_alvo.id, advogado_id=id_advogado
+            )
             await service.evolution_client.close()
 
     asyncio.run(_processar())
     return {"status": "processado"}
-

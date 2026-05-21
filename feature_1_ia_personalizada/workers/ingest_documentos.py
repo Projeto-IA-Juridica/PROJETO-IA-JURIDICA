@@ -263,9 +263,7 @@ def ingest_jurisprudencia_publica(
 
     Nota: Jusbrasil não está ativo no momento — usa apenas DataJud.
     """
-    log = logger.bind(
-        escritorio_id=escritorio_id, tipo_acao=tipo_acao, tribunal=tribunal
-    )
+    log = logger.bind(escritorio_id=escritorio_id, tipo_acao=tipo_acao, tribunal=tribunal)
     log.info("ingest_jurisprudencia_publica_iniciado")
 
     resultado = asyncio.run(
@@ -318,9 +316,7 @@ async def _ingerir_jurisprudencia_async(
             if not texto or len(texto) < 100:
                 continue
 
-            titulo = (
-                f"{tribunal} — {tipo_acao} — {proc.get('numero_cnj', 'S/N')}"
-            )
+            titulo = f"{tribunal} — {tipo_acao} — {proc.get('numero_cnj', 'S/N')}"
             metadata = {
                 "tribunal": tribunal,
                 "tipo_acao": tipo_acao,

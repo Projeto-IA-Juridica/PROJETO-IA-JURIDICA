@@ -158,7 +158,12 @@ async def test_filtro_score_nivel_alto_retorna_so_processos_alto(
             r = await async_client.post(
                 "/processos",
                 headers=headers,
-                json={"numero_cnj": cnj, "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "Cobrança"},
+                json={
+                    "numero_cnj": cnj,
+                    "cliente_id": 1,
+                    "polo_cliente": "autor",
+                    "tipo_acao": "Cobrança",
+                },
             )
             assert r.status_code == 201
             ids_criados.append(r.json()["id"])
@@ -224,7 +229,12 @@ async def test_filtro_score_nivel_isolamento_multitenancy(
         r = await async_client.post(
             "/processos",
             headers=h2,
-            json={"numero_cnj": _make_cnj(300), "cliente_id": 1, "polo_cliente": "autor", "tipo_acao": "X"},
+            json={
+                "numero_cnj": _make_cnj(300),
+                "cliente_id": 1,
+                "polo_cliente": "autor",
+                "tipo_acao": "X",
+            },
         )
         assert r.status_code == 201
         pid2 = r.json()["id"]

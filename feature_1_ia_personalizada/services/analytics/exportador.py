@@ -37,7 +37,9 @@ def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
     try:
         dt = datetime.strptime(mes_ano, "%Y-%m")
     except ValueError as e:
-        raise ValueError(f"Formato inválido para 'mes': esperado YYYY-MM, recebido {mes_ano!r}") from e
+        raise ValueError(
+            f"Formato inválido para 'mes': esperado YYYY-MM, recebido {mes_ano!r}"
+        ) from e
 
     inicio = dt.replace(tzinfo=UTC)
     # Avança para o primeiro dia do mês seguinte
@@ -95,19 +97,21 @@ class ExportadorAnalytics:
         writer.writerow(_CABECALHO_CSV)
 
         for row in rows:
-            writer.writerow([
-                row.id,
-                row.created_at.isoformat() if row.created_at else "",
-                row.tipo,
-                row.direcao,
-                row.mensagem_cliente or "",
-                row.mensagem_ia or "",
-                row.tokens_input,
-                row.tokens_output,
-                float(row.custo_estimado) if row.custo_estimado is not None else 0.0,
-                row.satisfacao if row.satisfacao is not None else "",
-                row.tempo_resposta_ms if row.tempo_resposta_ms is not None else "",
-            ])
+            writer.writerow(
+                [
+                    row.id,
+                    row.created_at.isoformat() if row.created_at else "",
+                    row.tipo,
+                    row.direcao,
+                    row.mensagem_cliente or "",
+                    row.mensagem_ia or "",
+                    row.tokens_input,
+                    row.tokens_output,
+                    float(row.custo_estimado) if row.custo_estimado is not None else 0.0,
+                    row.satisfacao if row.satisfacao is not None else "",
+                    row.tempo_resposta_ms if row.tempo_resposta_ms is not None else "",
+                ]
+            )
 
         # UTF-8-BOM para compatibilidade com Excel
         return buffer.getvalue().encode("utf-8-sig")

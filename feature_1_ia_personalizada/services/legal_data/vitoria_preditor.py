@@ -519,8 +519,7 @@ class VitoriaPreditor:
 
         if polo_cliente.lower() == "reu":
             fatores.append(
-                "Perspectiva ajustada para polo réu "
-                "(cliente está sendo processado nesta ação)"
+                "Perspectiva ajustada para polo réu " "(cliente está sendo processado nesta ação)"
             )
 
         return fatores

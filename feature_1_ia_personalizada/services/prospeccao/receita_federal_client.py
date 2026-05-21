@@ -40,10 +40,10 @@ class EmpresaDados:
     cnpj: str
     razao_social: str
     nome_fantasia: str | None
-    situacao: str          # ATIVA | BAIXADA | SUSPENSA | INAPTA | NULA
-    porte: str             # MEI | ME | EPP | DEMAIS
-    cnae_codigo: str       # código numérico (ex: "6911-7/01")
-    cnae_descricao: str    # descrição textual
+    situacao: str  # ATIVA | BAIXADA | SUSPENSA | INAPTA | NULA
+    porte: str  # MEI | ME | EPP | DEMAIS
+    cnae_codigo: str  # código numérico (ex: "6911-7/01")
+    cnae_descricao: str  # descrição textual
     uf: str
     municipio: str
     socios: list[dict[str, Any]] = field(default_factory=list)

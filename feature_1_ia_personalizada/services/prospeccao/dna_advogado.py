@@ -101,9 +101,7 @@ class DNAAdvogadoService:
     # Interface pública
     # ------------------------------------------------------------------
 
-    async def obter_dna_salvo(
-        self, escritorio_id: int, db: AsyncSession
-    ) -> DNAEscritorio | None:
+    async def obter_dna_salvo(self, escritorio_id: int, db: AsyncSession) -> DNAEscritorio | None:
         """
         Retorna o DNA salvo (cache ou banco) sem gerar novo.
         Retorna None se não houver DNA salvo ou se for dados_insuficientes.
@@ -114,16 +112,12 @@ class DNAAdvogadoService:
         dna_banco, _ = await self._ler_banco(escritorio_id, db)
         return dna_banco if (dna_banco and not dna_banco.dados_insuficientes) else None
 
-    async def salvar_dna(
-        self, escritorio_id: int, dna: DNAEscritorio, db: AsyncSession
-    ) -> None:
+    async def salvar_dna(self, escritorio_id: int, dna: DNAEscritorio, db: AsyncSession) -> None:
         """Persiste o DNA no banco e atualiza o cache."""
         await self._persistir(escritorio_id, dna, db)
         await self._set_cache(escritorio_id, dna)
 
-    async def obter_dna(
-        self, escritorio_id: int, db: AsyncSession
-    ) -> DNAEscritorio:
+    async def obter_dna(self, escritorio_id: int, db: AsyncSession) -> DNAEscritorio:
         """
         Retorna o DNA do escritório. Ordem de resolução:
           1. Cache Redis (TTL 6h)
@@ -182,9 +176,7 @@ class DNAAdvogadoService:
     # Internos — queries
     # ------------------------------------------------------------------
 
-    async def _calcular_stats(
-        self, escritorio_id: int, db: AsyncSession
-    ) -> list[dict[str, Any]]:
+    async def _calcular_stats(self, escritorio_id: int, db: AsyncSession) -> list[dict[str, Any]]:
         """Retorna top 10 tipos de ação com contagem e percentual."""
         stmt = (
             select(
@@ -211,9 +203,7 @@ class DNAAdvogadoService:
             for r in rows
         ]
 
-    async def _calcular_polo(
-        self, escritorio_id: int, db: AsyncSession
-    ) -> dict[str, int]:
+    async def _calcular_polo(self, escritorio_id: int, db: AsyncSession) -> dict[str, int]:
         """Retorna distribuição autor/réu/terceiro."""
         stmt = (
             select(
@@ -292,9 +282,7 @@ class DNAAdvogadoService:
     # Internos — persistência
     # ------------------------------------------------------------------
 
-    async def _persistir(
-        self, escritorio_id: int, dna: DNAEscritorio, db: AsyncSession
-    ) -> None:
+    async def _persistir(self, escritorio_id: int, dna: DNAEscritorio, db: AsyncSession) -> None:
         await db.execute(
             update(Escritorio)
             .where(Escritorio.id == escritorio_id)
@@ -324,9 +312,7 @@ class DNAAdvogadoService:
                 )
         return None, nome
 
-    async def _obter_nome_escritorio(
-        self, escritorio_id: int, db: AsyncSession
-    ) -> str:
+    async def _obter_nome_escritorio(self, escritorio_id: int, db: AsyncSession) -> str:
         """Usado apenas quando gerar_dna é chamado diretamente (sem passar por obter_dna)."""
         stmt = select(Escritorio.nome).where(Escritorio.id == escritorio_id)
         return (await db.execute(stmt)).scalar_one_or_none() or "Escritório"

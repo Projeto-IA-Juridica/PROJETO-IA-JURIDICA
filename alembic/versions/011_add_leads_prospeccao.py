@@ -53,9 +53,7 @@ def upgrade() -> None:
             server_default=sa.text("NOW()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("escritorio_id", "cnpj", name="uq_lead_escritorio_cnpj"),
     )

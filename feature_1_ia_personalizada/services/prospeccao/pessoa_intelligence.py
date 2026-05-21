@@ -33,18 +33,19 @@ class LitiganteEncontrado:
     Se o DataJud retornar esses campos, descarte-os antes de instanciar.
     """
 
-    nome: str                  # Nome público conforme consta no processo
-    polo: str                  # 'ativo' | 'passivo'
-    tipo_acao: str             # Ex: "Reclamação Trabalhista", "Ação de Alimentos"
-    tribunal: str              # Ex: "TRT-2", "TJSP"
-    fase_processual: str       # Ex: "Conhecimento", "Execução", "Recurso"
-    numero_cnj: str            # Número CNJ do processo (público)
-    representado: bool = False # True se já há advogado cadastrado no polo
+    nome: str  # Nome público conforme consta no processo
+    polo: str  # 'ativo' | 'passivo'
+    tipo_acao: str  # Ex: "Reclamação Trabalhista", "Ação de Alimentos"
+    tribunal: str  # Ex: "TRT-2", "TJSP"
+    fase_processual: str  # Ex: "Conhecimento", "Execução", "Recurso"
+    numero_cnj: str  # Número CNJ do processo (público)
+    representado: bool = False  # True se já há advogado cadastrado no polo
 
 
 # ---------------------------------------------------------------------------
 # Dataclass de saída — sem nenhum dado pessoal além do que consta no processo
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class PessoaInteligencia:
@@ -58,8 +59,8 @@ class PessoaInteligencia:
     Qualquer campo novo deve ser aprovado pelo DPO antes do merge.
     """
 
-    nome: str               # Nome público do processo
-    polo: str               # 'ativo' | 'passivo'
+    nome: str  # Nome público do processo
+    polo: str  # 'ativo' | 'passivo'
     tipo_acao: str
     tribunal: str
     fase_processual: str
@@ -72,49 +73,48 @@ class PessoaInteligencia:
 # Palavras-chave que indicam dados especialmente sensíveis (art. 11 LGPD)
 # ---------------------------------------------------------------------------
 
-_ACOES_SENSIVEIS: frozenset[str] = frozenset({
-    # Saúde / condição médica
-    "internação compulsória",
-    "internação involuntária",
-    "curatela por doença mental",
-    "curatela por transtorno mental",
-    "interdição por doença",
-    "ação de saúde mental",
-    "fornecimento de medicamento",
-    "tratamento de saúde",
-    "plano de saúde negativa",
-    "custeio de tratamento",
-    "internação psiquiátrica",
-    "dependência química",
-    "dependência de drogas",
-
-    # Orientação sexual / identidade de gênero
-    "retificação de registro civil",
-    "mudança de nome e gênero",
-    "identidade de gênero",
-    "orientação sexual",
-    "discriminação por orientação",
-
-    # Religião / convicção
-    "liberdade religiosa",
-    "discriminação religiosa",
-    "objeção de consciência",
-
-    # Origem racial / étnica
-    "discriminação racial",
-    "injúria racial",
-    "racismo",
-
-    # Dados genéticos / biométricos
-    "teste de paternidade",
-    "exame de dna",
-    "dados biométricos",
-})
+_ACOES_SENSIVEIS: frozenset[str] = frozenset(
+    {
+        # Saúde / condição médica
+        "internação compulsória",
+        "internação involuntária",
+        "curatela por doença mental",
+        "curatela por transtorno mental",
+        "interdição por doença",
+        "ação de saúde mental",
+        "fornecimento de medicamento",
+        "tratamento de saúde",
+        "plano de saúde negativa",
+        "custeio de tratamento",
+        "internação psiquiátrica",
+        "dependência química",
+        "dependência de drogas",
+        # Orientação sexual / identidade de gênero
+        "retificação de registro civil",
+        "mudança de nome e gênero",
+        "identidade de gênero",
+        "orientação sexual",
+        "discriminação por orientação",
+        # Religião / convicção
+        "liberdade religiosa",
+        "discriminação religiosa",
+        "objeção de consciência",
+        # Origem racial / étnica
+        "discriminação racial",
+        "injúria racial",
+        "racismo",
+        # Dados genéticos / biométricos
+        "teste de paternidade",
+        "exame de dna",
+        "dados biométricos",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Serviço principal
 # ---------------------------------------------------------------------------
+
 
 class PessoaIntelligenceService:
     """
@@ -179,18 +179,41 @@ class PessoaIntelligenceService:
         tipo = litigante.tipo_acao.lower()
         polo = litigante.polo.lower()
 
-        trabalhista = any(t in tipo for t in (
-            "trabalhista", "reclamação trabalhista", "horas extras",
-            "verbas rescisórias", "clt", "fgts",
-        ))
-        consumidor = any(t in tipo for t in (
-            "consumidor", "código de defesa", "cdc", "negativação indevida",
-            "cobrança indevida", "recall", "produto defeituoso",
-        ))
-        familia = any(t in tipo for t in (
-            "família", "divórcio", "alimentos", "guarda", "inventário",
-            "união estável", "adoção",
-        ))
+        trabalhista = any(
+            t in tipo
+            for t in (
+                "trabalhista",
+                "reclamação trabalhista",
+                "horas extras",
+                "verbas rescisórias",
+                "clt",
+                "fgts",
+            )
+        )
+        consumidor = any(
+            t in tipo
+            for t in (
+                "consumidor",
+                "código de defesa",
+                "cdc",
+                "negativação indevida",
+                "cobrança indevida",
+                "recall",
+                "produto defeituoso",
+            )
+        )
+        familia = any(
+            t in tipo
+            for t in (
+                "família",
+                "divórcio",
+                "alimentos",
+                "guarda",
+                "inventário",
+                "união estável",
+                "adoção",
+            )
+        )
 
         if trabalhista and polo == "ativo":
             return True

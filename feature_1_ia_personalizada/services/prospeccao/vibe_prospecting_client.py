@@ -31,12 +31,29 @@ _TIMEOUT = 30.0
 _CACHE_TTL_S = 60 * 60 * 24 * 7  # 7 dias
 _MAX_CONTATOS = 10
 
-_CARGOS_RELEVANTES = frozenset({
-    "ceo", "presidente", "vice-presidente", "diretor", "diretora",
-    "cfo", "coo", "general counsel", "head of legal",
-    "advogado", "advogada", "jurídico", "juridico",
-    "compliance", "legal", "counsel", "sócio", "socio", "partner",
-})
+_CARGOS_RELEVANTES = frozenset(
+    {
+        "ceo",
+        "presidente",
+        "vice-presidente",
+        "diretor",
+        "diretora",
+        "cfo",
+        "coo",
+        "general counsel",
+        "head of legal",
+        "advogado",
+        "advogada",
+        "jurídico",
+        "juridico",
+        "compliance",
+        "legal",
+        "counsel",
+        "sócio",
+        "socio",
+        "partner",
+    }
+)
 
 
 class VibeProspectingClient:
@@ -108,9 +125,7 @@ class VibeProspectingClient:
     # Internos — chamada MCP
     # ------------------------------------------------------------------
 
-    async def _buscar(
-        self, nome_empresa: str, pais: str, limite: int
-    ) -> list[ContatoLinkedIn]:
+    async def _buscar(self, nome_empresa: str, pais: str, limite: int) -> list[ContatoLinkedIn]:
         headers = {
             "Content-Type": "application/json",
             "api_key": self._api_key,
@@ -163,11 +178,7 @@ class VibeProspectingClient:
             if tipo == "text":
                 try:
                     parsed = json.loads(item.get("text", "[]"))
-                    prospects = (
-                        parsed
-                        if isinstance(parsed, list)
-                        else parsed.get("prospects", [])
-                    )
+                    prospects = parsed if isinstance(parsed, list) else parsed.get("prospects", [])
                     for p in prospects:
                         c = self._mapear_contato(p, empresa)
                         if c:
@@ -192,23 +203,14 @@ class VibeProspectingClient:
         nome = (
             data.get("full_name")
             or data.get("name")
-            or (
-                f"{data.get('first_name', '')} {data.get('last_name', '')}".strip()
-            )
+            or (f"{data.get('first_name', '')} {data.get('last_name', '')}".strip())
         )
         if not nome:
             return None
 
-        cargo = (
-            data.get("job_title")
-            or data.get("title")
-            or data.get("current_role")
-            or ""
-        )
+        cargo = data.get("job_title") or data.get("title") or data.get("current_role") or ""
         linkedin_url = (
-            data.get("linkedin_url")
-            or data.get("profile_url")
-            or data.get("linkedin_profile")
+            data.get("linkedin_url") or data.get("profile_url") or data.get("linkedin_profile")
         )
 
         return ContatoLinkedIn(

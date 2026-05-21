@@ -120,6 +120,7 @@ class TestCarregarTemplates:
         assert resultado["boas_vindas"] == "Oi {nome_cliente}, bem-vindo!"
         # Os demais devem usar o default
         from feature_1_ia_personalizada.services.messaging.templates import _DEFAULT_ATUALIZACAO
+
         assert resultado["atualizacao"] == _DEFAULT_ATUALIZACAO
 
     @pytest.mark.asyncio

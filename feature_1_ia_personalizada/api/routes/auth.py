@@ -33,9 +33,9 @@ _DUMMY_HASH: str = hash_senha("__sentinel_dummy_para_timing_attack__")
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
-_LOGIN_MAX_FALHAS = 10          # tentativas antes do bloqueio
-_LOGIN_FALHA_JANELA_S = 3600    # 1 hora — janela de contagem de falhas
-_LOGIN_LOCKOUT_S = 900          # 15 min — duração do bloqueio
+_LOGIN_MAX_FALHAS = 10  # tentativas antes do bloqueio
+_LOGIN_FALHA_JANELA_S = 3600  # 1 hora — janela de contagem de falhas
+_LOGIN_LOCKOUT_S = 900  # 15 min — duração do bloqueio
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -119,7 +119,9 @@ async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         # Rejeita tokens já revogados (ex: refresh reutilizado após rotação)
         if token_esta_revogado(token):
-            raise HTTPException(status_code=401, detail="Refresh token revogado. Faça login novamente.")
+            raise HTTPException(
+                status_code=401, detail="Refresh token revogado. Faça login novamente."
+            )
 
         payload = validar_token(token)
 
@@ -192,9 +194,9 @@ async def csrf_token():
     response.set_cookie(
         key=_COOKIE_NAME,
         value=token,
-        httponly=False,   # precisa ser lido pelo JS (Double Submit Cookie)
-        samesite="lax",   # "strict" bloqueava o cookie em redirecionamentos OAuth
-        secure=is_prod,   # False em dev (HTTP); True em prod (HTTPS)
+        httponly=False,  # precisa ser lido pelo JS (Double Submit Cookie)
+        samesite="lax",  # "strict" bloqueava o cookie em redirecionamentos OAuth
+        secure=is_prod,  # False em dev (HTTP); True em prod (HTTPS)
         max_age=_COOKIE_MAX_AGE,
     )
     return response

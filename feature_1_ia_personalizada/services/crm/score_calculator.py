@@ -25,14 +25,15 @@ from shared.config.constants import (
 
 @dataclass
 class CRMScore:
-    score: int          # 0–100 arredondado
-    nivel: str          # excelente | satisfeito | neutro | em_risco | critico
-    fatores: dict       # detalhamento de cada componente (pontos e peso aplicado)
+    score: int  # 0–100 arredondado
+    nivel: str  # excelente | satisfeito | neutro | em_risco | critico
+    fatores: dict  # detalhamento de cada componente (pontos e peso aplicado)
 
 
 # ---------------------------------------------------------------------------
 # Helpers de lookup
 # ---------------------------------------------------------------------------
+
 
 def _pontos_nps(nps_medio: float | None) -> int:
     if nps_medio is None:
@@ -81,6 +82,7 @@ def _nivel(score: int) -> str:
 # Função pública
 # ---------------------------------------------------------------------------
 
+
 def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
     """
     Calcula o score CRM a partir de um CRMContexto.
@@ -97,20 +99,40 @@ def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
 
     pesos = CRM_SCORE_PESOS
     score_float = (
-        p_nps         * pesos["nps"]
-        + p_contato   * pesos["contato"]
-        + p_risco     * pesos["risco"]
+        p_nps * pesos["nps"]
+        + p_contato * pesos["contato"]
+        + p_risco * pesos["risco"]
         + p_engajamento * pesos["engajamento"]
-        + p_escalacoes  * pesos["escalacoes"]
+        + p_escalacoes * pesos["escalacoes"]
     )
     score = max(0, min(100, round(score_float)))
 
     fatores = {
-        "nps":         {"pontos": p_nps,         "peso": pesos["nps"],         "contribuicao": round(p_nps * pesos["nps"], 1)},
-        "contato":     {"pontos": p_contato,     "peso": pesos["contato"],     "contribuicao": round(p_contato * pesos["contato"], 1)},
-        "risco":       {"pontos": p_risco,       "peso": pesos["risco"],       "contribuicao": round(p_risco * pesos["risco"], 1)},
-        "engajamento": {"pontos": p_engajamento, "peso": pesos["engajamento"], "contribuicao": round(p_engajamento * pesos["engajamento"], 1)},
-        "escalacoes":  {"pontos": p_escalacoes,  "peso": pesos["escalacoes"],  "contribuicao": round(p_escalacoes * pesos["escalacoes"], 1)},
+        "nps": {
+            "pontos": p_nps,
+            "peso": pesos["nps"],
+            "contribuicao": round(p_nps * pesos["nps"], 1),
+        },
+        "contato": {
+            "pontos": p_contato,
+            "peso": pesos["contato"],
+            "contribuicao": round(p_contato * pesos["contato"], 1),
+        },
+        "risco": {
+            "pontos": p_risco,
+            "peso": pesos["risco"],
+            "contribuicao": round(p_risco * pesos["risco"], 1),
+        },
+        "engajamento": {
+            "pontos": p_engajamento,
+            "peso": pesos["engajamento"],
+            "contribuicao": round(p_engajamento * pesos["engajamento"], 1),
+        },
+        "escalacoes": {
+            "pontos": p_escalacoes,
+            "peso": pesos["escalacoes"],
+            "contribuicao": round(p_escalacoes * pesos["escalacoes"], 1),
+        },
     }
 
     return CRMScore(score=score, nivel=_nivel(score), fatores=fatores)

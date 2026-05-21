@@ -97,8 +97,8 @@ class CalculadoraAnalytics:
 
         horas_economizadas_estimadas = (interacoes_sem_humano * self.MINUTOS_POR_INTERACAO) / 60.0
         percentual_autonomia = (
-            interacoes_sem_humano / total_interacoes * 100.0
-        ) if total_interacoes > 0 else 0.0
+            (interacoes_sem_humano / total_interacoes * 100.0) if total_interacoes > 0 else 0.0
+        )
 
         # Custo total no período
         stmt_custos = select(func.sum(Interacao.custo_estimado)).where(
@@ -129,9 +129,7 @@ class CalculadoraAnalytics:
                 func.date_trunc("week", Interacao.created_at).label("semana"),
                 func.count(Interacao.id).label("total_interacoes"),
                 func.avg(Interacao.satisfacao).label("nps_medio"),
-                func.count(Interacao.id).filter(
-                    Interacao.direcao == "saida"
-                ).label("saidas"),
+                func.count(Interacao.id).filter(Interacao.direcao == "saida").label("saidas"),
             )
             .where(
                 Interacao.escritorio_id == self.escritorio_id,
@@ -148,12 +146,14 @@ class CalculadoraAnalytics:
             total = row.total_interacoes or 0
             saidas = row.saidas or 0
             autonomia_pct = (saidas / total * 100.0) if total > 0 else 0.0
-            tendencia.append({
-                "semana": row.semana.strftime("%Y-W%W") if row.semana else "",
-                "total_interacoes": total,
-                "nps_medio": round(float(row.nps_medio), 1) if row.nps_medio else 0.0,
-                "autonomia_pct": round(autonomia_pct, 1),
-            })
+            tendencia.append(
+                {
+                    "semana": row.semana.strftime("%Y-W%W") if row.semana else "",
+                    "total_interacoes": total,
+                    "nps_medio": round(float(row.nps_medio), 1) if row.nps_medio else 0.0,
+                    "autonomia_pct": round(autonomia_pct, 1),
+                }
+            )
         return tendencia
 
     async def ranking_clientes(self, limite: int = 20) -> list[dict]:
@@ -194,13 +194,15 @@ class CalculadoraAnalytics:
             em_risco = sem_contato_recente and nps is not None and nps <= 3
             # sem_avaliacao: nunca respondeu NPS — estado diferente de insatisfeito
             sem_avaliacao = nps is None
-            ranking.append({
-                "cliente_id": row.cliente_id,
-                "nome": row.nome,
-                "nps_medio": nps,
-                "total_interacoes": row.total_interacoes,
-                "ultimo_contato": ultimo.isoformat() if ultimo else None,
-                "em_risco": em_risco,
-                "sem_avaliacao": sem_avaliacao,
-            })
+            ranking.append(
+                {
+                    "cliente_id": row.cliente_id,
+                    "nome": row.nome,
+                    "nps_medio": nps,
+                    "total_interacoes": row.total_interacoes,
+                    "ultimo_contato": ultimo.isoformat() if ultimo else None,
+                    "em_risco": em_risco,
+                    "sem_avaliacao": sem_avaliacao,
+                }
+            )
         return ranking

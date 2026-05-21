@@ -1,6 +1,7 @@
 """
 Tipos, constantes e utilitários compartilhados pelo orquestrador e seus nós.
 """
+
 from __future__ import annotations
 
 import re

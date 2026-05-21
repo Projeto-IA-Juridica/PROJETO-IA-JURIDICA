@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: list[str] = [
         "https://app.conciergejuridico.com",
         "https://admin.conciergejuridico.com",
-        "projeto-ia-juridica-production-4bb1.up.railway.app"
+        "projeto-ia-juridica-production-4bb1.up.railway.app",
     ]
 
     APP_NAME: str = "Concierge Jurídico Digital"
@@ -125,7 +125,7 @@ class Settings(BaseSettings):
             pass
 
         # Se for hex de 32 chars, converte para Fernet
-        if len(v) == 32 and all(c in '0123456789abcdefABCDEF' for c in v):
+        if len(v) == 32 and all(c in "0123456789abcdefABCDEF" for c in v):
             try:
                 key_bytes = bytes.fromhex(v)
                 fernet_key = base64.urlsafe_b64encode(key_bytes).decode()
@@ -133,9 +133,7 @@ class Settings(BaseSettings):
                 Fernet(fernet_key.encode())
                 return fernet_key
             except Exception as exc:
-                raise ValueError(
-                    f"ENCRYPTION_KEY em formato hex inválido: {v}"
-                ) from exc
+                raise ValueError(f"ENCRYPTION_KEY em formato hex inválido: {v}") from exc
 
         raise ValueError(
             "ENCRYPTION_KEY deve ser uma chave Fernet válida (base64-urlsafe) "
@@ -154,9 +152,7 @@ class Settings(BaseSettings):
 
             Fernet(v.encode())
         except Exception as exc:
-            raise ValueError(
-                "ENCRYPTION_KEY_PREVIOUS deve ser uma chave Fernet válida."
-            ) from exc
+            raise ValueError("ENCRYPTION_KEY_PREVIOUS deve ser uma chave Fernet válida.") from exc
         return v
 
     @field_validator("REDIS_URL", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", mode="before")

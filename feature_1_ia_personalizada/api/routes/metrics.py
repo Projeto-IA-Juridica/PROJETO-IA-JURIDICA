@@ -126,13 +126,19 @@ audio_transcritos_total = Counter(
 escalacao_requests_total = Counter(
     "escalacao_requests_total",
     "Total de chamadas ao modelo de escalação (Claude Opus)",
-    labelnames=["escritorio_id", "resultado"],  # resultado: sucesso | fallback_claude | circuit_breaker
+    labelnames=[
+        "escritorio_id",
+        "resultado",
+    ],  # resultado: sucesso | fallback_claude | circuit_breaker
 )
 
 escalacao_roteamentos_total = Counter(
     "escalacao_roteamentos_total",
     "Total de mensagens roteadas para Claude Opus pelo ConfidenceRouter",
-    labelnames=["escritorio_id", "motivo"],  # motivo: score_baixo | forcado_termos | forcado_intencao
+    labelnames=[
+        "escritorio_id",
+        "motivo",
+    ],  # motivo: score_baixo | forcado_termos | forcado_intencao
 )
 
 escalacao_tokens_total = Counter(

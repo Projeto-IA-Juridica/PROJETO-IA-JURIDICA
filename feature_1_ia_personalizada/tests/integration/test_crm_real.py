@@ -31,13 +31,17 @@ from shared.security.jwt import criar_token
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _headers(user_id: int, escritorio_id: int) -> dict:
     token = criar_token(user_id=user_id, escritorio_id=escritorio_id, role="admin")
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _criar_cliente(db: AsyncSession, escritorio_id: int, nome: str = "Cliente Teste") -> Cliente:
+async def _criar_cliente(
+    db: AsyncSession, escritorio_id: int, nome: str = "Cliente Teste"
+) -> Cliente:
     from faker import Faker
+
     fake = Faker("pt_BR")
     cliente = Cliente(
         escritorio_id=escritorio_id,
@@ -96,6 +100,7 @@ async def _criar_processo(
 # CRMDataAggregator — sem duplicatas
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_aggregator_sem_duplicatas(
     async_db: AsyncSession,
@@ -124,6 +129,7 @@ async def test_aggregator_sem_duplicatas(
 # Multi-tenant — cliente de outro escritório não aparece
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_aggregator_multitenant_bloqueia_outro_escritorio(
     async_db: AsyncSession,
@@ -145,6 +151,7 @@ async def test_aggregator_multitenant_bloqueia_outro_escritorio(
 # ---------------------------------------------------------------------------
 # GET /crm/clientes?nivel=em_risco
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_listar_clientes_filtra_por_nivel(
@@ -181,6 +188,7 @@ async def test_listar_clientes_filtra_por_nivel(
 # POST /crm/clientes/{id}/analisar persiste resultado
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_analisar_cliente_persiste_no_banco(
     async_client: AsyncClient,
@@ -195,25 +203,23 @@ async def test_analisar_cliente_persiste_no_banco(
     cliente = await _criar_cliente(async_db, escritorio.id, "Cliente Análise")
     await _criar_interacao(async_db, cliente.id, escritorio.id, satisfacao=4)
 
-    payload_claude = json.dumps({
-        "resumo": "Cliente com bom engajamento.",
-        "acao_sugerida": "Nenhuma ação necessária",
-    })
+    payload_claude = json.dumps(
+        {
+            "resumo": "Cliente com bom engajamento.",
+            "acao_sugerida": "Nenhuma ação necessária",
+        }
+    )
     mock_msg = MagicMock()
     mock_msg.content = [MagicMock(text=payload_claude)]
     mock_msg.usage = MagicMock(input_tokens=150, output_tokens=40)
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.crm.ClaudeClient"
-    ) as MockClaude:
+    with patch("feature_1_ia_personalizada.api.routes.crm.ClaudeClient") as MockClaude:
         mock_claude_inst = MagicMock()
         mock_claude_inst._client = AsyncMock()
         mock_claude_inst._client.messages.create = AsyncMock(return_value=mock_msg)
         MockClaude.return_value = mock_claude_inst
 
-        resp = await async_client.post(
-            f"/crm/clientes/{cliente.id}/analisar", headers=headers
-        )
+        resp = await async_client.post(f"/crm/clientes/{cliente.id}/analisar", headers=headers)
 
     assert resp.status_code == 200
     data = resp.json()
@@ -232,6 +238,7 @@ async def test_analisar_cliente_persiste_no_banco(
 # GET /crm/resumo conta corretamente por nível
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_resumo_conta_por_nivel(
     async_client: AsyncClient,
@@ -247,7 +254,9 @@ async def test_resumo_conta_por_nivel(
     for i, nivel in enumerate(niveis):
         c = await _criar_cliente(async_db, escritorio.id, f"Cliente {i}")
         await async_db.execute(
-            update(Cliente).where(Cliente.id == c.id).values(crm_nivel=nivel, crm_score=10 * (i + 1))
+            update(Cliente)
+            .where(Cliente.id == c.id)
+            .values(crm_nivel=nivel, crm_score=10 * (i + 1))
         )
     # Um cliente sem análise
     await _criar_cliente(async_db, escritorio.id, "Sem análise")
@@ -268,6 +277,7 @@ async def test_resumo_conta_por_nivel(
 # ---------------------------------------------------------------------------
 # GET /crm/clientes/{id} retorna 404 para cliente de outro escritório
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_detalhe_cliente_outro_escritorio_retorna_404(

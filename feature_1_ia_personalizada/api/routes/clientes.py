@@ -38,11 +38,13 @@ router = APIRouter(prefix="/clientes", tags=["Clientes — LGPD"])
 # Rate-limit LGPD — dependency por endpoint, bucket por user_id
 # ---------------------------------------------------------------------------
 
+
 def _make_lgpd_rate_limit(action: str, limit: int, window_s: int):
     """
     Retorna uma FastAPI dependency que aplica rate limit por user_id no Redis.
     Falha aberta se Redis estiver indisponível (não bloqueia o usuário).
     """
+
     async def _dep(
         request: Request,
         user_id: int = Depends(get_advogado_id),
@@ -63,16 +65,18 @@ def _make_lgpd_rate_limit(action: str, limit: int, window_s: int):
                 ),
                 headers={"Retry-After": str(window_s)},
             )
+
     return _dep
 
 
 _rl_exportar = _make_lgpd_rate_limit("exportar", limit=10, window_s=3600)
-_rl_deletar  = _make_lgpd_rate_limit("deletar",  limit=5,  window_s=3600)
+_rl_deletar = _make_lgpd_rate_limit("deletar", limit=5, window_s=3600)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_ip(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
@@ -108,6 +112,7 @@ async def _get_cliente_do_escritorio(
 # ---------------------------------------------------------------------------
 # GET /clientes/{cliente_id}/exportar
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/{cliente_id}/exportar",
@@ -158,6 +163,7 @@ async def exportar_dados(
 # ---------------------------------------------------------------------------
 # DELETE /clientes/{cliente_id}
 # ---------------------------------------------------------------------------
+
 
 @router.delete(
     "/{cliente_id}",

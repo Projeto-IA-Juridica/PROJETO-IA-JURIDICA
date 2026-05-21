@@ -112,7 +112,7 @@ async def test_obter_eficiencia_com_dados():
 
     assert result["tempo_resposta_medio_ms"] == 1500
     assert result["interacoes_sem_humano"] == 60
-    assert result["percentual_autonomia"] == 60.0   # 60/100 * 100
+    assert result["percentual_autonomia"] == 60.0  # 60/100 * 100
     assert result["horas_economizadas_estimadas"] == 8.0  # 60 * 8min / 60
     assert result["custo_total_usd"] == 0.42
 
@@ -142,7 +142,9 @@ async def test_tendencia_semanal_com_dados():
     semana = datetime(2026, 3, 10, tzinfo=UTC)
     rows = [
         _make_row(semana=semana, total_interacoes=40, nps_medio=4.0, saidas=30),
-        _make_row(semana=semana + timedelta(weeks=1), total_interacoes=20, nps_medio=3.5, saidas=20),
+        _make_row(
+            semana=semana + timedelta(weeks=1), total_interacoes=20, nps_medio=3.5, saidas=20
+        ),
     ]
     mock_result = MagicMock()
     mock_result.all.return_value = rows
@@ -195,7 +197,11 @@ async def test_ranking_clientes_em_risco():
     """Cliente com NPS ≤ 3 e sem contato recente → em_risco=True, sem_avaliacao=False."""
     db = _mock_db()
     ultimo = datetime.now(UTC) - timedelta(days=45)
-    rows = [_make_row(cliente_id=1, nome="Maria", nps_medio=2.0, total_interacoes=5, ultimo_contato=ultimo)]
+    rows = [
+        _make_row(
+            cliente_id=1, nome="Maria", nps_medio=2.0, total_interacoes=5, ultimo_contato=ultimo
+        )
+    ]
     mock_result = MagicMock()
     mock_result.all.return_value = rows
     db.execute.return_value = mock_result
@@ -212,7 +218,11 @@ async def test_ranking_clientes_sem_avaliacao():
     """Cliente sem nenhum NPS respondido → sem_avaliacao=True, em_risco=False."""
     db = _mock_db()
     ultimo = datetime.now(UTC) - timedelta(days=45)
-    rows = [_make_row(cliente_id=2, nome="João", nps_medio=None, total_interacoes=3, ultimo_contato=ultimo)]
+    rows = [
+        _make_row(
+            cliente_id=2, nome="João", nps_medio=None, total_interacoes=3, ultimo_contato=ultimo
+        )
+    ]
     mock_result = MagicMock()
     mock_result.all.return_value = rows
     db.execute.return_value = mock_result
@@ -229,7 +239,11 @@ async def test_ranking_clientes_nps_baixo_mas_contato_recente():
     """NPS baixo mas com contato recente → não é em_risco."""
     db = _mock_db()
     ultimo = datetime.now(UTC) - timedelta(days=5)  # contato recente
-    rows = [_make_row(cliente_id=3, nome="Ana", nps_medio=2.0, total_interacoes=8, ultimo_contato=ultimo)]
+    rows = [
+        _make_row(
+            cliente_id=3, nome="Ana", nps_medio=2.0, total_interacoes=8, ultimo_contato=ultimo
+        )
+    ]
     mock_result = MagicMock()
     mock_result.all.return_value = rows
     db.execute.return_value = mock_result

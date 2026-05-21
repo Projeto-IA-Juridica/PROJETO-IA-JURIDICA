@@ -65,10 +65,13 @@ def _patch_evo():
     evo_mock = AsyncMock()
     evo_mock.enviar_texto = AsyncMock()
     evo_mock.close = AsyncMock()
-    return patch(
-        "feature_1_ia_personalizada.services.messaging.evolution_client.EvolutionClient",
-        return_value=evo_mock,
-    ), evo_mock
+    return (
+        patch(
+            "feature_1_ia_personalizada.services.messaging.evolution_client.EvolutionClient",
+            return_value=evo_mock,
+        ),
+        evo_mock,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -201,10 +204,7 @@ async def test_alerta_enviado_para_nps_baixo(nota: int):
     assert evo_mock.enviar_texto.await_count == 3
 
     # Verifica que o texto do alerta contém "ALERTA"
-    alerta_calls = [
-        call for call in evo_mock.enviar_texto.call_args_list
-        if "ALERTA" in str(call)
-    ]
+    alerta_calls = [call for call in evo_mock.enviar_texto.call_args_list if "ALERTA" in str(call)]
     assert len(alerta_calls) == 2
 
 

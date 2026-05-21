@@ -46,7 +46,9 @@ def _cpf_unico() -> str:
     return f"{_cpf_seq:011d}"
 
 
-async def _criar_cliente(db: AsyncSession, escritorio_id: int, nome: str = "Cliente Teste") -> Cliente:
+async def _criar_cliente(
+    db: AsyncSession, escritorio_id: int, nome: str = "Cliente Teste"
+) -> Cliente:
     c = Cliente(
         escritorio_id=escritorio_id,
         nome=nome,
@@ -186,7 +188,9 @@ async def test_obter_resumo_isolamento_multitenancy(async_db: AsyncSession, escr
 
 
 @pytest.mark.asyncio
-async def test_obter_eficiencia_percentual_autonomia_real(async_db: AsyncSession, escritorio_factory):
+async def test_obter_eficiencia_percentual_autonomia_real(
+    async_db: AsyncSession, escritorio_factory
+):
     escritorio = await escritorio_factory()
     cliente = await _criar_cliente(async_db, escritorio.id)
 
@@ -320,8 +324,12 @@ async def test_ranking_clientes_isolamento_multitenancy_real(
     await _criar_interacao(async_db, esc2.id, c2.id, satisfacao=2)
     await async_db.commit()
 
-    ranking_esc1 = await CalculadoraAnalytics(async_db, escritorio_id=esc1.id, dias=30).ranking_clientes()
-    ranking_esc2 = await CalculadoraAnalytics(async_db, escritorio_id=esc2.id, dias=30).ranking_clientes()
+    ranking_esc1 = await CalculadoraAnalytics(
+        async_db, escritorio_id=esc1.id, dias=30
+    ).ranking_clientes()
+    ranking_esc2 = await CalculadoraAnalytics(
+        async_db, escritorio_id=esc2.id, dias=30
+    ).ranking_clientes()
 
     assert len(ranking_esc1) == 1
     assert ranking_esc1[0]["nome"] == "Cliente do ESC1"
@@ -347,7 +355,9 @@ async def test_ranking_clientes_sem_interacoes_retorna_vazio(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="tendencia_semanal usa date_trunc (PostgreSQL-only). Rodar contra Postgres real.")
+@pytest.mark.skip(
+    reason="tendencia_semanal usa date_trunc (PostgreSQL-only). Rodar contra Postgres real."
+)
 @pytest.mark.asyncio
 async def test_tendencia_semanal_requer_postgres(async_db: AsyncSession, escritorio_factory):
     escritorio = await escritorio_factory()

@@ -39,6 +39,7 @@ from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 # Mock VectorStore (reutilizado do test_rag_metrics.py)
 # ============================================================================
 
+
 @dataclass
 class ResultadoBuscaMock:
     id: int
@@ -111,6 +112,7 @@ class VectorStoreMock:
 # Captura e Relatório de Métricas
 # ============================================================================
 
+
 @dataclass
 class MetricaSnapshot:
     timestamp: str
@@ -135,9 +137,7 @@ def capturar_metricas() -> MetricaSnapshot:
     """Captura snapshot das métricas atuais."""
     timestamp = datetime.now().isoformat()
 
-    metrics_output = (
-        REGISTRY.collect()
-    )  # Retorna generator de MetricFamily
+    metrics_output = REGISTRY.collect()  # Retorna generator de MetricFamily
 
     rag_injetado = 0.0
     rag_vazio = 0.0
@@ -300,7 +300,8 @@ async def main():
     print("=" * 70)
     print("RESUMO")
     print("=" * 70)
-    print(f"""
+    print(
+        f"""
 Antes dos testes:
   • Contextos injetados: {int(snapshot_antes.rag_contexto_injetado)}
   • Contextos vazios: {int(snapshot_antes.rag_contexto_vazio)}
@@ -314,7 +315,8 @@ Depois dos testes:
 Delta (testes realizados):
   • +{int(snapshot_depois.rag_contexto_injetado - snapshot_antes.rag_contexto_injetado)} contextos injetados
   • +{int(snapshot_depois.rag_contexto_vazio - snapshot_antes.rag_contexto_vazio)} contextos vazios
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

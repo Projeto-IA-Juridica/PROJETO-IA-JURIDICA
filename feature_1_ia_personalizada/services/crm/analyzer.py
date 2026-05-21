@@ -51,15 +51,20 @@ class CRMAnaliseResult:
 
 
 def _construir_input_claude(ctx: CRMContexto, nivel: str, score: int) -> str:
-    processos_txt = ", ".join(
-        f"{p.numero_cnj} ({p.fase_processual or 'fase desconhecida'}, risco {p.score_nivel or 'não avaliado'})"
-        for p in ctx.processos_ativos
-    ) or "Nenhum processo ativo"
+    processos_txt = (
+        ", ".join(
+            f"{p.numero_cnj} ({p.fase_processual or 'fase desconhecida'}, risco {p.score_nivel or 'não avaliado'})"
+            for p in ctx.processos_ativos
+        )
+        or "Nenhum processo ativo"
+    )
 
-    msgs_txt = "\n".join(
-        f"  Cliente: {m.pergunta_cliente}\n  IA: {m.resposta_ia}"
-        for m in ctx.ultimas_mensagens
-    ) or "  Sem mensagens recentes"
+    msgs_txt = (
+        "\n".join(
+            f"  Cliente: {m.pergunta_cliente}\n  IA: {m.resposta_ia}" for m in ctx.ultimas_mensagens
+        )
+        or "  Sem mensagens recentes"
+    )
 
     return (
         f"Cliente: {ctx.nome}"
@@ -81,9 +86,7 @@ def _validar_output(resumo: str, acao: str) -> None:
     texto = (resumo + " " + acao).lower()
     for palavra in _PALAVRAS_PROIBIDAS:
         if palavra in texto:
-            raise ValueError(
-                f"Output do Claude viola compliance OAB: contém '{palavra}'"
-            )
+            raise ValueError(f"Output do Claude viola compliance OAB: contém '{palavra}'")
 
 
 class CRMAnalyzer:
@@ -91,16 +94,12 @@ class CRMAnalyzer:
         self._claude = claude_client
         self._db = db
 
-    async def analisar_cliente(
-        self, cliente_id: int, escritorio_id: int
-    ) -> CRMAnaliseResult:
+    async def analisar_cliente(self, cliente_id: int, escritorio_id: int) -> CRMAnaliseResult:
         log = logger.bind(cliente_id=cliente_id, escritorio_id=escritorio_id)
 
         # 1. Agrega dados reais
         aggregator = CRMDataAggregator(self._db)
-        ctx: CRMContexto = await aggregator.coletar_contexto_cliente(
-            cliente_id, escritorio_id
-        )
+        ctx: CRMContexto = await aggregator.coletar_contexto_cliente(cliente_id, escritorio_id)
 
         # 2. Score determinístico
         crm_score = calcular_score_crm(ctx)
@@ -110,7 +109,8 @@ class CRMAnalyzer:
             ctx.crm_analisado_em_anterior
             and ctx.crm_resumo_anterior
             and ctx.crm_score_anterior == crm_score.score
-            and (datetime.now(UTC) - ctx.crm_analisado_em_anterior) < timedelta(hours=_CACHE_TTL_HORAS)
+            and (datetime.now(UTC) - ctx.crm_analisado_em_anterior)
+            < timedelta(hours=_CACHE_TTL_HORAS)
         ):
             log.info("crm.analyzer.cache_hit")
             return CRMAnaliseResult(

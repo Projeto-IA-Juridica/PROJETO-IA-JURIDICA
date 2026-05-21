@@ -184,9 +184,7 @@ async def test_analisar_peticao_falha_extracao_retorna_422(async_client, advogad
     assert "extrair" in resp.json()["detail"].lower()
 
 
-async def test_analisar_peticao_escalacao_indisponivel_retorna_503(
-    async_client, advogado_setup
-):
+async def test_analisar_peticao_escalacao_indisponivel_retorna_503(async_client, advogado_setup):
     """EscalacaoIndisponivelError deve retornar 503."""
     from feature_1_ia_personalizada.api.app import app
 
@@ -446,9 +444,7 @@ async def test_consultar_cliente_outro_escritorio_ignorado(
 
     _, advogado, headers = advogado_setup
     outro_escritorio = await escritorio_factory()
-    cliente_alheio = await cliente_factory(
-        escritorio_id=outro_escritorio.id, nome="Carlos Alheio"
-    )
+    cliente_alheio = await cliente_factory(escritorio_id=outro_escritorio.id, nome="Carlos Alheio")
     mock_client = _mock_escalacao_client()
 
     _override(app, mock_client)
@@ -473,9 +469,7 @@ async def test_consultar_cliente_outro_escritorio_ignorado(
     assert sessao.cliente_referenciado_id is None
 
 
-async def test_consultar_escalacao_indisponivel_retorna_503(
-    async_client, advogado_setup
-):
+async def test_consultar_escalacao_indisponivel_retorna_503(async_client, advogado_setup):
     """EscalacaoIndisponivelError em /consultar deve retornar 503."""
     from feature_1_ia_personalizada.api.app import app
 

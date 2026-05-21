@@ -60,6 +60,7 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
 
 # --- Schemas ---
 
+
 class InteracaoResponse(BaseModel):
     id: int
     data: datetime
@@ -118,6 +119,7 @@ class ChatStatsDashboardResponse(BaseModel):
 
 
 # --- Rotas ---
+
 
 @router.get("/history/{cliente_id}", response_model=list[InteracaoResponse])
 async def get_history(
@@ -241,6 +243,7 @@ async def get_chat_stats(
     score_risco_dist: dict[str, int] = {}
     try:
         from shared.models.processo import Processo
+
         stmt_score = (
             select(Processo.score_nivel, func.count(Processo.id))
             .where(
@@ -305,6 +308,7 @@ def _atualizar_metricas_prometheus(
     # escalacoes_pendentes: conta interações com escalacao.status=pendente
     async def _contar_escalacoes() -> int:
         from sqlalchemy import text
+
         result = await db.execute(
             text(
                 "SELECT COUNT(*) FROM interacoes "
@@ -359,7 +363,9 @@ async def exportar_relatorio(
         raise HTTPException(status_code=422, detail="Formato não suportado. Use formato=csv.")
 
     if not mes:
-        raise HTTPException(status_code=422, detail="Parâmetro 'mes' obrigatório (ex: ?mes=2026-03).")
+        raise HTTPException(
+            status_code=422, detail="Parâmetro 'mes' obrigatório (ex: ?mes=2026-03)."
+        )
 
     escritorio_id = _get_escritorio_id(request)
 

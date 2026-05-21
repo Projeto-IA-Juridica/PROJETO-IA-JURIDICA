@@ -1,6 +1,7 @@
 """
 Nó buscar_dados: carrega processo, andamentos (cache/DataJud) e RAG em paralelo.
 """
+
 from __future__ import annotations
 
 import asyncio

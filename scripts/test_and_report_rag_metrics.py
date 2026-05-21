@@ -45,6 +45,7 @@ from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 # Mock VectorStore
 # ============================================================================
 
+
 @dataclass
 class ResultadoBuscaMock:
     id: int
@@ -116,6 +117,7 @@ class VectorStoreMock:
 # ============================================================================
 # Captura de Métricas
 # ============================================================================
+
 
 @dataclass
 class MetricaSnapshot:
@@ -338,7 +340,8 @@ async def main():
     print("RESUMO")
     print("=" * 68)
     metrics = snapshot.to_dict()
-    print(f"""
+    print(
+        f"""
 Queries testadas: {metrics['total_queries_testadas']}
 Duração: {metrics['duracao_testes_s']:.3f}s
 
@@ -347,7 +350,8 @@ Contextos vazios: {metrics['rag_contexto_vazio_total']}
 Taxa de sucesso: {metrics['taxa_sucesso_pct']}%
 
 Status: {metrics['status']}
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

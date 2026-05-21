@@ -98,7 +98,11 @@ def hub_analisar_peticao_task(
         analise = asyncio.run(_run())
         d = dataclasses.asdict(analise)
         d["custo_estimado"] = str(d["custo_estimado"])  # Decimal → str
-        resultado = {**d, "texto_truncado": texto_truncado, "percentual_analisado": percentual_analisado}
+        resultado = {
+            **d,
+            "texto_truncado": texto_truncado,
+            "percentual_analisado": percentual_analisado,
+        }
         _set_job(r, job_id, {"status": "concluido", "resultado": resultado, "erro": None})
         log.info("hub_worker.analisar_peticao.concluido")
     except Exception as exc:

@@ -37,6 +37,7 @@ from shared.schemas.prospeccao import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _payload(role: str = "advogado", escritorio_id: int = 1, user_id: int = 10) -> dict:
     return {"role": role, "escritorio_id": escritorio_id, "sub": str(user_id)}
 
@@ -49,9 +50,7 @@ def _dna(escritorio_id: int = 1, tipo: str = "empresa") -> DNAEscritorio:
         tipo_lead_predominante=tipo,
         perfil_cliente_ideal="Empresas com demandas trabalhistas",
         diferenciais=["Agilidade"],
-        top_tipos_acao=[
-            {"tipo": "Reclamação Trabalhista", "contagem": 50, "percentual": 83.0}
-        ],
+        top_tipos_acao=[{"tipo": "Reclamação Trabalhista", "contagem": 50, "percentual": 83.0}],
         dados_insuficientes=False,
     )
 
@@ -119,6 +118,7 @@ def _make_lead_mock(id: int = 1, escritorio_id: int = 1, score: int = 75, tipo: 
     lead.numero_cnj_exemplo = None
     lead.processos_publicos_count = 4
     from datetime import datetime
+
     lead.created_at = datetime.now(UTC)
     lead.criado_em = lead.created_at
     return lead
@@ -127,6 +127,7 @@ def _make_lead_mock(id: int = 1, escritorio_id: int = 1, score: int = 75, tipo: 
 # ---------------------------------------------------------------------------
 # 1. Role guard — require_advogado
 # ---------------------------------------------------------------------------
+
 
 class TestRoleGuard:
     @pytest.mark.asyncio
@@ -187,6 +188,7 @@ class TestRoleGuard:
 # 2. GET /prospeccao/dna — retorna DNA ou dados_insuficientes
 # ---------------------------------------------------------------------------
 
+
 class TestGetDNA:
     @pytest.mark.asyncio
     async def test_retorna_dna_quando_disponivel(self):
@@ -198,6 +200,7 @@ class TestGetDNA:
         db = AsyncMock()
 
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
+
         original = mod._dna_service
         mod._dna_service = dna_service
 
@@ -219,6 +222,7 @@ class TestGetDNA:
         db = AsyncMock()
 
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
+
         original = mod._dna_service
         mod._dna_service = dna_service
 
@@ -234,6 +238,7 @@ class TestGetDNA:
 # ---------------------------------------------------------------------------
 # 3. POST /prospeccao/descobrir — salva lead e filtra por score_minimo
 # ---------------------------------------------------------------------------
+
 
 class TestDescobrirLeads:
     @pytest.mark.asyncio
@@ -260,6 +265,7 @@ class TestDescobrirLeads:
         db.refresh = AsyncMock(side_effect=_refresh)
 
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
+
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=_dna())),
             "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[_litigante_pj()])),
@@ -294,6 +300,7 @@ class TestDescobrirLeads:
     async def test_lead_abaixo_score_minimo_descartado(self):
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
         from feature_1_ia_personalizada.api.routes.prospeccao import descobrir_leads
+
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=_dna())),
             "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[_litigante_pj()])),
@@ -326,6 +333,7 @@ class TestDescobrirLeads:
 # ---------------------------------------------------------------------------
 # 4. Pipeline B2C — aviso_lgpd injetado automaticamente
 # ---------------------------------------------------------------------------
+
 
 class TestPipelineB2C:
     @pytest.mark.asyncio
@@ -390,6 +398,7 @@ class TestPipelineB2C:
         db.refresh = AsyncMock(side_effect=_refresh)
 
         import feature_1_ia_personalizada.api.routes.prospeccao as mod
+
         dna_b2c = DNAEscritorio(
             escritorio_id=1,
             especialidades=["Direito Trabalhista"],
@@ -473,6 +482,7 @@ class TestPipelineB2C:
 # 5. Isolamento — lead de outro escritório → 403
 # ---------------------------------------------------------------------------
 
+
 class TestIsolamentoEscritorios:
     @pytest.mark.asyncio
     async def test_patch_lead_outro_escritorio_retorna_403(self):
@@ -520,6 +530,7 @@ class TestIsolamentoEscritorios:
 # ---------------------------------------------------------------------------
 # 6. Deduplicação — mesmo CNPJ atualiza, não duplica
 # ---------------------------------------------------------------------------
+
 
 class TestDeduplicacao:
     @pytest.mark.asyncio

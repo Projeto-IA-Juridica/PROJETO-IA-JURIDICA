@@ -143,10 +143,10 @@ _SUFIXOS_PJ = frozenset(
 @dataclass
 class LitiganteEncontrado:
     nome: str
-    tipo: str                 # 'pessoa_juridica' | 'pessoa_fisica'
-    polo: str                 # 'ativo' | 'passivo'
-    processos_count: int      # quantas vezes aparece nos resultados
-    numero_cnj_exemplo: str   # um CNJ representativo para contexto
+    tipo: str  # 'pessoa_juridica' | 'pessoa_fisica'
+    polo: str  # 'ativo' | 'passivo'
+    processos_count: int  # quantas vezes aparece nos resultados
+    numero_cnj_exemplo: str  # um CNJ representativo para contexto
     tipo_acao: str
     tribunal: str
     # True quando nenhum advogado foi listado para essa parte —
@@ -204,10 +204,7 @@ class DataJudProspeccaoClient:
         if not indices:
             return []
 
-        tasks = [
-            self._buscar_em_indice(tipo_acao, indice, limite)
-            for indice in indices
-        ]
+        tasks = [self._buscar_em_indice(tipo_acao, indice, limite) for indice in indices]
         resultados = await asyncio.gather(*tasks, return_exceptions=True)
 
         brutos: list[dict] = []
@@ -287,9 +284,7 @@ class DataJudProspeccaoClient:
             resp = await client.post(url, json=query, headers=self._headers())
 
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"DataJud HTTP {resp.status_code} ({indice}): {resp.text[:200]}"
-            )
+            raise RuntimeError(f"DataJud HTTP {resp.status_code} ({indice}): {resp.text[:200]}")
 
         hits = resp.json().get("hits", {}).get("hits", [])
         # Sigla de fallback quando o tribunal não consta no _source
@@ -299,9 +294,7 @@ class DataJudProspeccaoClient:
         for hit in hits:
             source = hit.get("_source", {})
             numero_cnj = source.get("numeroProcesso", "")
-            tribunal_sigla = (
-                source.get("tribunal", {}).get("sigla") or sigla_fallback
-            )
+            tribunal_sigla = source.get("tribunal", {}).get("sigla") or sigla_fallback
 
             for parte in source.get("partes", []):
                 nome = (parte.get("nome") or "").strip()
@@ -354,9 +347,7 @@ class DataJudProspeccaoClient:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _deduplicar(
-        brutos: list[dict], tipo_acao: str
-    ) -> list[LitiganteEncontrado]:
+    def _deduplicar(brutos: list[dict], tipo_acao: str) -> list[LitiganteEncontrado]:
         """
         Agrupa por nome, acumula processos_count.
         Ordena: sem_advogado=True primeiro, depois por processos_count desc.
@@ -419,9 +410,7 @@ class DataJudProspeccaoClient:
             )
         return None
 
-    async def _set_cache(
-        self, key: str, litigantes: list[LitiganteEncontrado]
-    ) -> None:
+    async def _set_cache(self, key: str, litigantes: list[LitiganteEncontrado]) -> None:
         if self._redis is None:
             return
         try:

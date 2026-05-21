@@ -39,7 +39,9 @@ def _bloco_texto(texto: str) -> MagicMock:
     return b
 
 
-def _mock_resposta(texto: str = "Resposta Opus.", tokens_in: int = 200, tokens_out: int = 80) -> MagicMock:
+def _mock_resposta(
+    texto: str = "Resposta Opus.", tokens_in: int = 200, tokens_out: int = 80
+) -> MagicMock:
     r = MagicMock(spec=anthropic.types.Message)
     r.content = [_bloco_texto(texto)]
     r.usage = MagicMock()
@@ -66,26 +68,32 @@ def _auth_error() -> anthropic.AuthenticationError:
     return anthropic.AuthenticationError(message="auth error", response=resp, body=None)
 
 
-_ANALISE_JSON = json.dumps({
-    "tipo_peca": "Petição Inicial",
-    "pontos_fortes": ["Fundamentação sólida"],
-    "vulnerabilidades": ["Ausência de precedentes"],
-    "argumentos_ausentes": ["Dano moral"],
-    "precedentes_relevantes": ["REsp 1.234.567/SP"],
-    "score_geral": 75,
-    "sugestoes": ["Juntar jurisprudência do STJ"],
-})
+_ANALISE_JSON = json.dumps(
+    {
+        "tipo_peca": "Petição Inicial",
+        "pontos_fortes": ["Fundamentação sólida"],
+        "vulnerabilidades": ["Ausência de precedentes"],
+        "argumentos_ausentes": ["Dano moral"],
+        "precedentes_relevantes": ["REsp 1.234.567/SP"],
+        "score_geral": 75,
+        "sugestoes": ["Juntar jurisprudência do STJ"],
+    }
+)
 
-_JURIS_JSON = json.dumps({
-    "resultados": [{
-        "ementa": "Ementa do acórdão",
-        "tribunal": "STJ",
-        "numero_processo": "REsp 1.000.000/SP",
-        "data_julgamento": "2025-03-15",
-        "aplicabilidade": "FAVORAVEL",
-        "relevancia_score": 0.95,
-    }]
-})
+_JURIS_JSON = json.dumps(
+    {
+        "resultados": [
+            {
+                "ementa": "Ementa do acórdão",
+                "tribunal": "STJ",
+                "numero_processo": "REsp 1.000.000/SP",
+                "data_julgamento": "2025-03-15",
+                "aplicabilidade": "FAVORAVEL",
+                "relevancia_score": 0.95,
+            }
+        ]
+    }
+)
 
 
 # ---------------------------------------------------------------------------

@@ -119,9 +119,7 @@ class TestFluxoFeature3Chamadas:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        mock_state.update_state.assert_called_once_with(
-            42, ANDAMENTO_INSTRUCAO["texto"].strip()
-        )
+        mock_state.update_state.assert_called_once_with(42, ANDAMENTO_INSTRUCAO["texto"].strip())
 
     def test_gerar_contexto_historico_chamado_apos_update_state(self, infra):
         """gerar_contexto_historico() é chamado com o id do processo."""

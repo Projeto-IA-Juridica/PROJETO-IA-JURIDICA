@@ -116,6 +116,7 @@ async def list_processos(
         raise
     except Exception as exc:
         import structlog
+
         logger = structlog.get_logger(__name__)
         logger.error("list_processos_erro", erro=str(exc), exc_info=True, page=page)
         raise HTTPException(

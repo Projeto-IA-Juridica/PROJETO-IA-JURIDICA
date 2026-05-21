@@ -1,6 +1,7 @@
 """
 Nós de intenção: classificar_intencao, avaliar_escalacao, preparar_escalacao.
 """
+
 from __future__ import annotations
 
 import asyncio

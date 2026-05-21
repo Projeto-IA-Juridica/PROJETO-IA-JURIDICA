@@ -15,6 +15,7 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_escritorio(etapa: int = 0) -> MagicMock:
     e = MagicMock()
     e.id = 1
@@ -36,6 +37,7 @@ def _make_escritorio(etapa: int = 0) -> MagicMock:
     e.onboarding_completo = False
     e.onboarding_at = None
     from datetime import datetime
+
     e.created_at = datetime(2026, 3, 19)
     e.updated_at = datetime(2026, 3, 19)
     return e
@@ -165,7 +167,9 @@ class TestWhatsappStatus:
         mock_resp.status_code = 200
         mock_resp.json = MagicMock(return_value={"instance": {"state": "open"}})
 
-        with patch("feature_1_ia_personalizada.api.routes.onboarding.httpx.AsyncClient") as mock_client:
+        with patch(
+            "feature_1_ia_personalizada.api.routes.onboarding.httpx.AsyncClient"
+        ) as mock_client:
             mock_client.return_value.__aenter__ = AsyncMock(
                 return_value=MagicMock(get=AsyncMock(return_value=mock_resp))
             )
@@ -204,7 +208,9 @@ class TestGoLive:
         db.commit = AsyncMock()
 
         mock_result = MagicMock()
-        mock_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=processos)))
+        mock_result.scalars = MagicMock(
+            return_value=MagicMock(all=MagicMock(return_value=processos))
+        )
         db.execute = AsyncMock(return_value=mock_result)
 
         request = _make_request_state()

@@ -53,7 +53,7 @@ _SCORE_INTENCAO: dict[str, float] = {
     "pergunta_juridica": 0.45,
     "perspectivas": 0.35,
     "perspectiva_caso": 0.30,
-    "juridica_complexa": 0.0,   # sempre Claude Opus via forçamento abaixo
+    "juridica_complexa": 0.0,  # sempre Claude Opus via forçamento abaixo
 }
 
 # Pesos da fórmula de score ponderado
@@ -70,10 +70,10 @@ _PESO_HISTORICO = 0.15
 
 @dataclass(frozen=True)
 class ConfidenceScore:
-    valor: float                        # 0.0 → 1.0
-    componentes: dict[str, float]       # breakdown por dimensão
-    deve_escalar: bool           # True se valor < threshold ou forçamento
-    motivo: str                         # log interno — razão do roteamento
+    valor: float  # 0.0 → 1.0
+    componentes: dict[str, float]  # breakdown por dimensão
+    deve_escalar: bool  # True se valor < threshold ou forçamento
+    motivo: str  # log interno — razão do roteamento
 
 
 # ---------------------------------------------------------------------------
@@ -316,9 +316,7 @@ class ConfidenceRouter:
         Indica se Claude historicamente satisfez este cliente.
         Sem histórico com NPS → score neutro 0.5.
         """
-        interacoes_com_nps = [
-            h for h in historico[-20:] if h.get("satisfacao") is not None
-        ]
+        interacoes_com_nps = [h for h in historico[-20:] if h.get("satisfacao") is not None]
         if not interacoes_com_nps:
             return 0.5
         satisfeitas = sum(1 for h in interacoes_com_nps if h["satisfacao"] >= 4)

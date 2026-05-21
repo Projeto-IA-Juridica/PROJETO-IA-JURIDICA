@@ -263,8 +263,7 @@ async def _handler_duvida_juridica(
     contexto_historico = ""
     if historico:
         linhas = "\n".join(
-            f"Advogado: {s.mensagem_advogado}\nHub: {s.resposta_hub}"
-            for s in historico
+            f"Advogado: {s.mensagem_advogado}\nHub: {s.resposta_hub}" for s in historico
         )
         contexto_historico = f"\n\n<historico_recente>\n{linhas}\n</historico_recente>"
 
@@ -314,18 +313,26 @@ async def _handler_status_escritorio(
     amanha_7d = hoje + timedelta(days=7)
 
     # Atendimentos hoje
-    stmt_atend = select(func.count()).select_from(Interacao).where(
-        Interacao.escritorio_id == escritorio.id,
-        func.date(Interacao.created_at) == hoje,
-        Interacao.direcao == "saida",
+    stmt_atend = (
+        select(func.count())
+        .select_from(Interacao)
+        .where(
+            Interacao.escritorio_id == escritorio.id,
+            func.date(Interacao.created_at) == hoje,
+            Interacao.direcao == "saida",
+        )
     )
     total_hoje = (await session.execute(stmt_atend)).scalar() or 0
 
     # Processos com prazo nos próximos 7 dias
-    stmt_prazo = select(func.count()).select_from(Processo).where(
-        Processo.escritorio_id == escritorio.id,
-        Processo.monitoramento_ativo.is_(True),
-        Processo.proximo_prazo.between(hoje, amanha_7d),
+    stmt_prazo = (
+        select(func.count())
+        .select_from(Processo)
+        .where(
+            Processo.escritorio_id == escritorio.id,
+            Processo.monitoramento_ativo.is_(True),
+            Processo.proximo_prazo.between(hoje, amanha_7d),
+        )
     )
     processos_prazo = (await session.execute(stmt_prazo)).scalar() or 0
 
@@ -358,12 +365,17 @@ async def _handler_analise_peticao(
         return (
             "⚠️ Não foi possível acessar o documento. Tente reenviar o PDF.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
     # Confirmação imediata — análise pode levar até 60s
     await _enviar_whatsapp(
-        escritorio, usuario,
+        escritorio,
+        usuario,
         "📄 Recebi a petição. Analisando com Claude Opus... aguarde até 60 segundos.",
     )
 
@@ -376,7 +388,11 @@ async def _handler_analise_peticao(
         return (
             "⚠️ Falha ao baixar o documento. Tente reenviar.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
     finally:
         await evo.close()
@@ -389,7 +405,11 @@ async def _handler_analise_peticao(
         return (
             "⚠️ Não foi possível extrair o texto do PDF. Verifique se não está protegido.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
     texto = LegalDataCleaner.normalizar_espacos(texto_bruto or "")
@@ -398,7 +418,11 @@ async def _handler_analise_peticao(
         return (
             "⚠️ O documento parece estar vazio ou apenas com imagens (OCR não suportado).",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
     truncado = len(texto) > _MAX_CHARS_PETICAO
@@ -418,7 +442,11 @@ async def _handler_analise_peticao(
         return (
             "⚠️ Análise indisponível no momento. Tente novamente em instantes.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
     # Formatar resposta em markdown WhatsApp
@@ -427,7 +455,8 @@ async def _handler_analise_peticao(
 
     aviso_truncamento = (
         "\n\n_⚠️ Documento extenso — análise baseada nos primeiros 15 000 caracteres._"
-        if truncado else ""
+        if truncado
+        else ""
     )
 
     resposta = (
@@ -485,7 +514,11 @@ async def _handler_pesquisa_jurisprudencia(
         return (
             "⚠️ Pesquisa de jurisprudência indisponível. Tente novamente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
 
@@ -510,10 +543,14 @@ async def _handler_insight_cliente(
 
     # Tentar encontrar cliente pelo nome e coletar contexto CRM real
     if classificacao.cliente_nome:
-        stmt = select(Cliente).where(
-            Cliente.escritorio_id == escritorio.id,
-            Cliente.nome.ilike(f"%{classificacao.cliente_nome}%"),
-        ).limit(1)
+        stmt = (
+            select(Cliente)
+            .where(
+                Cliente.escritorio_id == escritorio.id,
+                Cliente.nome.ilike(f"%{classificacao.cliente_nome}%"),
+            )
+            .limit(1)
+        )
         cliente = (await session.execute(stmt)).scalars().first()
         if cliente:
             cliente_id = cliente.id
@@ -569,7 +606,11 @@ async def _handler_insight_cliente(
         return (
             "⚠️ Insight indisponível no momento. Tente novamente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), cliente_id, None,
+            0,
+            0,
+            Decimal("0"),
+            cliente_id,
+            None,
         )
 
 
@@ -597,18 +638,26 @@ async def _handler_resumo_processo(
 
     # 1. Buscar por CNJ (prioridade)
     if classificacao.processo_cnj:
-        stmt = select(Processo).where(
-            Processo.escritorio_id == escritorio.id,
-            Processo.numero_cnj == classificacao.processo_cnj,
-        ).limit(1)
+        stmt = (
+            select(Processo)
+            .where(
+                Processo.escritorio_id == escritorio.id,
+                Processo.numero_cnj == classificacao.processo_cnj,
+            )
+            .limit(1)
+        )
         processo = (await session.execute(stmt)).scalars().first()
 
     # 2. Fallback: buscar pelo nome do cliente → processo ativo mais recente
     if processo is None and classificacao.cliente_nome:
-        stmt_cli = select(Cliente).where(
-            Cliente.escritorio_id == escritorio.id,
-            Cliente.nome.ilike(f"%{classificacao.cliente_nome}%"),
-        ).limit(1)
+        stmt_cli = (
+            select(Cliente)
+            .where(
+                Cliente.escritorio_id == escritorio.id,
+                Cliente.nome.ilike(f"%{classificacao.cliente_nome}%"),
+            )
+            .limit(1)
+        )
         cliente_encontrado = (await session.execute(stmt_cli)).scalars().first()
         if cliente_encontrado:
             stmt_proc = (
@@ -628,7 +677,11 @@ async def _handler_resumo_processo(
             "⚠️ Processo não encontrado. Informe o número CNJ completo (ex: 0001234-55.2024.8.26.0001) "
             "ou o nome exato do cliente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
     processo_id = processo.id
@@ -673,14 +726,14 @@ async def _handler_resumo_processo(
     # 6. Montar bloco de dados do processo
     data_ult = (
         processo.data_ultimo_andamento.strftime("%d/%m/%Y")
-        if processo.data_ultimo_andamento else "N/D"
+        if processo.data_ultimo_andamento
+        else "N/D"
     )
-    valor_causa = (
-        f"R$ {processo.valor_causa:,.2f}" if processo.valor_causa else "N/D"
-    )
+    valor_causa = f"R$ {processo.valor_causa:,.2f}" if processo.valor_causa else "N/D"
     score_interpretacao = (
         f"\nInterpretação do score: {processo.score_interpretacao}"
-        if processo.score_interpretacao else ""
+        if processo.score_interpretacao
+        else ""
     )
     dados_processo = (
         f"CNJ: {processo.numero_cnj}\n"
@@ -704,8 +757,7 @@ async def _handler_resumo_processo(
     )
 
     mensagem_usuario = (
-        f"{mensagem}\n\n"
-        f"<andamentos_recentes>\n{andamentos_recentes}\n</andamentos_recentes>"
+        f"{mensagem}\n\n" f"<andamentos_recentes>\n{andamentos_recentes}\n</andamentos_recentes>"
     ).strip()
 
     try:
@@ -731,7 +783,11 @@ async def _handler_resumo_processo(
         return (
             "⚠️ Resumo indisponível no momento. Tente novamente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), cliente_id_ref, processo_id,
+            0,
+            0,
+            Decimal("0"),
+            cliente_id_ref,
+            processo_id,
         )
 
 
@@ -776,7 +832,11 @@ async def _handler_rascunho_mensagem(
         return (
             "⚠️ Geração de rascunho indisponível. Tente novamente.",
             "claude_opus_fallback",
-            0, 0, Decimal("0"), None, None,
+            0,
+            0,
+            Decimal("0"),
+            None,
+            None,
         )
 
 
@@ -796,21 +856,13 @@ def _extrair_conteudo(payload: dict[str, Any]) -> tuple[str, str, str | None]:
 
     # Documento PDF
     if "documentMessage" in msg or "documentWithCaptionMessage" in msg:
-        caption = (
-            msg.get("documentMessage", {}).get("caption")
-            or msg.get("documentWithCaptionMessage", {})
-            .get("message", {})
-            .get("documentMessage", {})
-            .get("caption", "")
-        )
+        caption = msg.get("documentMessage", {}).get("caption") or msg.get(
+            "documentWithCaptionMessage", {}
+        ).get("message", {}).get("documentMessage", {}).get("caption", "")
         return caption or "", "document", message_id
 
     # Texto simples
-    texto = (
-        msg.get("conversation")
-        or msg.get("extendedTextMessage", {}).get("text")
-        or ""
-    )
+    texto = msg.get("conversation") or msg.get("extendedTextMessage", {}).get("text") or ""
     return texto, "texto", message_id
 
 

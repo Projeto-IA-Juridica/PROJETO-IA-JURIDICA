@@ -28,6 +28,7 @@ from feature_1_ia_personalizada.services.prospeccao.vibe_prospecting_client impo
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_redis_mock(cached_data: str | None = None) -> MagicMock:
     mock = MagicMock()
     mock.get = AsyncMock(return_value=cached_data)
@@ -37,24 +38,12 @@ def _make_redis_mock(cached_data: str | None = None) -> MagicMock:
 
 def _prospect_text_content(prospects: list[dict]) -> dict:
     """Monta payload MCP com content[].type == 'text'."""
-    return {
-        "result": {
-            "content": [
-                {"type": "text", "text": json.dumps(prospects)}
-            ]
-        }
-    }
+    return {"result": {"content": [{"type": "text", "text": json.dumps(prospects)}]}}
 
 
 def _prospect_json_content(prospects: list[dict]) -> dict:
     """Monta payload MCP com content[].type == 'json'."""
-    return {
-        "result": {
-            "content": [
-                {"type": "json", "data": prospects}
-            ]
-        }
-    }
+    return {"result": {"content": [{"type": "json", "data": prospects}]}}
 
 
 def _mock_http_response(status_code: int = 200, json_data: dict | None = None) -> MagicMock:
@@ -82,6 +71,7 @@ def _client_com_key(redis=None) -> VibeProspectingClient:
 # Modo degradado (sem API key)
 # ---------------------------------------------------------------------------
 
+
 class TestModoDegradado:
     def test_disponivel_false_sem_chave(self):
         with patch("shared.config.settings.Settings", autospec=True):
@@ -103,12 +93,17 @@ class TestModoDegradado:
 # Cache Redis
 # ---------------------------------------------------------------------------
 
+
 class TestCacheRedis:
     async def test_cache_hit_nao_faz_http(self):
         """Se há cache, não deve fazer chamada HTTP."""
         cached = [
-            {"nome": "Maria Diretora", "cargo": "Diretora Jurídica",
-             "url_perfil": "https://linkedin.com/in/maria", "empresa": "Empresa X"}
+            {
+                "nome": "Maria Diretora",
+                "cargo": "Diretora Jurídica",
+                "url_perfil": "https://linkedin.com/in/maria",
+                "empresa": "Empresa X",
+            }
         ]
         redis = _make_redis_mock(json.dumps(cached))
         client = _client_com_key(redis=redis)
@@ -159,12 +154,16 @@ class TestCacheRedis:
 # Parsing de resposta MCP — formato "text"
 # ---------------------------------------------------------------------------
 
+
 class TestRespostaMCPFormatoText:
     async def test_extrai_contatos_formato_text(self):
         client = _client_com_key()
         prospects = [
-            {"full_name": "Carlos Presidente", "job_title": "Presidente",
-             "linkedin_url": "https://linkedin.com/in/carlos"},
+            {
+                "full_name": "Carlos Presidente",
+                "job_title": "Presidente",
+                "linkedin_url": "https://linkedin.com/in/carlos",
+            },
         ]
         payload = _prospect_text_content(prospects)
         resp = _mock_http_response(200, payload)
@@ -188,12 +187,17 @@ class TestRespostaMCPFormatoText:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({
-                            "prospects": [
-                                {"full_name": "Luis Diretor", "job_title": "Diretor",
-                                 "linkedin_url": None}
-                            ]
-                        }),
+                        "text": json.dumps(
+                            {
+                                "prospects": [
+                                    {
+                                        "full_name": "Luis Diretor",
+                                        "job_title": "Diretor",
+                                        "linkedin_url": None,
+                                    }
+                                ]
+                            }
+                        ),
                     }
                 ]
             }
@@ -214,12 +218,16 @@ class TestRespostaMCPFormatoText:
 # Parsing de resposta MCP — formato "json"
 # ---------------------------------------------------------------------------
 
+
 class TestRespostaMCPFormatoJson:
     async def test_extrai_contatos_formato_json(self):
         client = _client_com_key()
         prospects = [
-            {"full_name": "Paula Compliance", "job_title": "Compliance Officer",
-             "linkedin_url": "https://linkedin.com/in/paula"},
+            {
+                "full_name": "Paula Compliance",
+                "job_title": "Compliance Officer",
+                "linkedin_url": "https://linkedin.com/in/paula",
+            },
         ]
         payload = _prospect_json_content(prospects)
         resp = _mock_http_response(200, payload)
@@ -238,13 +246,12 @@ class TestRespostaMCPFormatoJson:
 # Tratamento de erros
 # ---------------------------------------------------------------------------
 
+
 class TestTratamentoDeErros:
     async def test_erro_jsonrpc_retorna_lista_vazia(self):
         """Campo 'error' na resposta MCP → retorna [] sem levantar."""
         client = _client_com_key()
-        payload = {
-            "error": {"code": -32601, "message": "Method not found: find_prospects"}
-        }
+        payload = {"error": {"code": -32601, "message": "Method not found: find_prospects"}}
         resp = _mock_http_response(200, payload)
 
         with patch("httpx.AsyncClient") as mock_cls:
@@ -275,9 +282,7 @@ class TestTratamentoDeErros:
         with patch("httpx.AsyncClient") as mock_cls:
             mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_cls.return_value)
             mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_cls.return_value.post = AsyncMock(
-                side_effect=httpx.TimeoutException("timeout")
-            )
+            mock_cls.return_value.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
             result = await client.buscar_contatos_empresa("Empresa X")
 
         assert result == []
@@ -299,6 +304,7 @@ class TestTratamentoDeErros:
 # ---------------------------------------------------------------------------
 # Filtro por cargo relevante
 # ---------------------------------------------------------------------------
+
 
 class TestFiltroCargoRelevante:
     async def test_exclui_cargos_irrelevantes(self):
@@ -337,10 +343,15 @@ class TestFiltroCargoRelevante:
 # Mapeamento de campos (_mapear_contato)
 # ---------------------------------------------------------------------------
 
+
 class TestMapearContato:
     def test_mapeia_full_name(self):
         c = VibeProspectingClient._mapear_contato(
-            {"full_name": "Maria Silva", "job_title": "Presidente", "linkedin_url": "https://li.com/maria"},
+            {
+                "full_name": "Maria Silva",
+                "job_title": "Presidente",
+                "linkedin_url": "https://li.com/maria",
+            },
             "Empresa X",
         )
         assert c is not None

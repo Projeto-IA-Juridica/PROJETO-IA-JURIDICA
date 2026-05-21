@@ -62,14 +62,16 @@ def upgrade() -> None:
 
     # Popula quota_tokens_mes de acordo com o plano atual de cada escritório.
     # enterprise fica NULL (sem limite).
-    op.execute("""
+    op.execute(
+        """
         UPDATE escritorios
         SET quota_tokens_mes = CASE plano
             WHEN 'basico'        THEN 500000
             WHEN 'profissional'  THEN 2000000
             ELSE NULL
         END
-    """)
+    """
+    )
 
 
 def downgrade() -> None:

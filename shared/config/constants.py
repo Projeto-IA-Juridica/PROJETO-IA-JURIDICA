@@ -90,55 +90,55 @@ MENSAGENS_FALLBACK: Final[dict[str, str]] = {
 # Pesos da média ponderada (devem somar 1.0)
 SCORE_RISCO_PESOS: Final[dict[str, float]] = {
     "complexidade_juridica": 0.25,
-    "duracao_estimada":      0.25,
-    "historico_vara":        0.20,
-    "valor_causa":           0.15,
-    "fase_processual":       0.15,
+    "duracao_estimada": 0.25,
+    "historico_vara": 0.20,
+    "valor_causa": 0.15,
+    "fase_processual": 0.15,
 }
 
 # Complexidade intrínseca por tipo de ação (0–100)
 # Chaves em minúsculo — correspondem ao campo tipo_acao do modelo Processo
 SCORE_RISCO_COMPLEXIDADE_POR_TIPO: Final[dict[str, int]] = {
-    "indenização por dano moral":          35,
-    "indenização por dano material":       35,
-    "ação de cobrança":                    30,
-    "ação monitória":                      30,
-    "execução de título extrajudicial":    40,
-    "ação trabalhista":                    40,
-    "reclamação trabalhista":              40,
-    "dissídio coletivo":                   65,
-    "ação civil pública trabalhista":      65,
-    "ação de obrigação de fazer":          45,
-    "ação de obrigação de não fazer":      45,
-    "ação contratual":                     45,
-    "divórcio litigioso":                  35,
-    "divórcio consensual":                 20,
-    "guarda de filhos":                    55,
-    "alimentos":                           45,
-    "benefício previdenciário":            50,
-    "aposentadoria por invalidez":         50,
-    "mandado de segurança":                55,
-    "ação popular":                        60,
-    "ação de improbidade administrativa":  75,
-    "execução fiscal":                     50,
-    "ação anulatória tributária":          70,
-    "embargos à execução fiscal":          60,
-    "ação penal pública":                  60,
-    "habeas corpus":                       50,
-    "ação ambiental":                      75,
-    "ação de desapropriação":              65,
+    "indenização por dano moral": 35,
+    "indenização por dano material": 35,
+    "ação de cobrança": 30,
+    "ação monitória": 30,
+    "execução de título extrajudicial": 40,
+    "ação trabalhista": 40,
+    "reclamação trabalhista": 40,
+    "dissídio coletivo": 65,
+    "ação civil pública trabalhista": 65,
+    "ação de obrigação de fazer": 45,
+    "ação de obrigação de não fazer": 45,
+    "ação contratual": 45,
+    "divórcio litigioso": 35,
+    "divórcio consensual": 20,
+    "guarda de filhos": 55,
+    "alimentos": 45,
+    "benefício previdenciário": 50,
+    "aposentadoria por invalidez": 50,
+    "mandado de segurança": 55,
+    "ação popular": 60,
+    "ação de improbidade administrativa": 75,
+    "execução fiscal": 50,
+    "ação anulatória tributária": 70,
+    "embargos à execução fiscal": 60,
+    "ação penal pública": 60,
+    "habeas corpus": 50,
+    "ação ambiental": 75,
+    "ação de desapropriação": 65,
 }
 
 # Risco de incerteza por fase processual (0–100)
 # Quanto mais avançado o processo, menor a incerteza operacional
 SCORE_RISCO_POR_FASE: Final[dict[str, int]] = {
     "conhecimento": 80,
-    "instrucao":    65,
-    "saneamento":   55,
-    "julgamento":   45,
-    "recurso":      60,   # recurso eleva incerteza novamente
-    "execucao":     25,
-    "encerrado":     0,
+    "instrucao": 65,
+    "saneamento": 55,
+    "julgamento": 45,
+    "recurso": 60,  # recurso eleva incerteza novamente
+    "execucao": 25,
+    "encerrado": 0,
 }
 
 # Prazo máximo de referência para normalização do componente duração (dias)
@@ -159,11 +159,11 @@ SCORE_RISCO_SALARIO_MINIMO_REF: Final[float] = 1_518.00
 # ---------------------------------------------------------------------------
 
 CRM_SCORE_PESOS: Final[dict[str, float]] = {
-    "nps":         0.35,
-    "contato":     0.20,
-    "risco":       0.20,
+    "nps": 0.35,
+    "contato": 0.20,
+    "risco": 0.20,
     "engajamento": 0.10,
-    "escalacoes":  0.15,
+    "escalacoes": 0.15,
 }
 
 # Pontuação por nota NPS (1–5); None → 40pts (sem dados = neutro)
@@ -172,18 +172,18 @@ CRM_NPS_PONTOS_NULO: Final[int] = 40
 
 # Pontuação por dias sem contato
 CRM_CONTATO_PONTOS: Final[list[tuple[int, int]]] = [
-    (7,   100),   # 0–7 dias
-    (30,   70),   # 8–30 dias
-    (60,   30),   # 31–60 dias
-    (9999,  0),   # > 60 dias
+    (7, 100),  # 0–7 dias
+    (30, 70),  # 8–30 dias
+    (60, 30),  # 31–60 dias
+    (9999, 0),  # > 60 dias
 ]
 
 # Pontuação por pior score de processo (None = sem processo)
 CRM_RISCO_PONTOS: Final[dict[str | None, int]] = {
-    None:      60,
-    "baixo":   90,
+    None: 60,
+    "baixo": 90,
     "moderado": 70,
-    "alto":    40,
+    "alto": 40,
     "critico": 10,
 }
 
@@ -191,9 +191,9 @@ CRM_RISCO_PONTOS: Final[dict[str | None, int]] = {
 # Semântica: se total_30d > limite → pontos. Iterar em ordem decrescente de limite.
 # >10 → 100pts | 5–10 → 70pts | 1–4 → 40pts | 0 → 0pts
 CRM_ENGAJAMENTO_PONTOS: Final[list[tuple[int, int]]] = [
-    (10, 100),   # > 10 interações/mês
-    (4,   70),   # > 4 (ou seja, 5–10)
-    (0,   40),   # > 0 (ou seja, 1–4)
+    (10, 100),  # > 10 interações/mês
+    (4, 70),  # > 4 (ou seja, 5–10)
+    (0, 40),  # > 0 (ou seja, 1–4)
 ]
 
 # Mapeamento score → nível CRM
@@ -202,5 +202,5 @@ CRM_NIVEL_FAIXAS: Final[list[tuple[int, str]]] = [
     (51, "satisfeito"),
     (26, "neutro"),
     (11, "em_risco"),
-    (0,  "critico"),
+    (0, "critico"),
 ]

@@ -28,13 +28,14 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/crm", tags=["CRM Inteligente"])
 
 _NIVEIS_VALIDOS = {"excelente", "satisfeito", "neutro", "em_risco", "critico"}
-_RATE_LIMIT_ANALISE_MANUAL_TTL = 300   # 5 minutos por cliente
-_RATE_LIMIT_ESCRITORIO_TTL = 14_400    # 4 horas por escritório
+_RATE_LIMIT_ANALISE_MANUAL_TTL = 300  # 5 minutos por cliente
+_RATE_LIMIT_ESCRITORIO_TTL = 14_400  # 4 horas por escritório
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _escritorio_id(request: Request) -> int:
     if not hasattr(request.state, "user_payload"):
@@ -85,6 +86,7 @@ async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -
 
     # Conta processos ativos via subquery separada para manter a query principal limpa
     from shared.models.processo import Processo
+
     total_proc = (
         await db.execute(
             select(func.count()).where(
@@ -114,11 +116,14 @@ async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -
 # GET /crm/clientes
 # ---------------------------------------------------------------------------
 
+
 @router.get("/clientes", response_model=list[CRMClienteCard])
 async def listar_clientes_crm(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    nivel: str | None = Query(None, description="excelente | satisfeito | neutro | em_risco | critico"),
+    nivel: str | None = Query(
+        None, description="excelente | satisfeito | neutro | em_risco | critico"
+    ),
     sem_analise: bool = Query(False, description="Retorna apenas clientes sem crm_nivel"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -126,7 +131,9 @@ async def listar_clientes_crm(
     eid = _escritorio_id(request)
 
     if nivel and nivel not in _NIVEIS_VALIDOS:
-        raise HTTPException(status_code=422, detail=f"nivel inválido. Opções: {sorted(_NIVEIS_VALIDOS)}")
+        raise HTTPException(
+            status_code=422, detail=f"nivel inválido. Opções: {sorted(_NIVEIS_VALIDOS)}"
+        )
 
     stmt = (
         select(
@@ -145,9 +152,14 @@ async def listar_clientes_crm(
         .outerjoin(Interacao, Interacao.cliente_id == Cliente.id)
         .where(Cliente.escritorio_id == eid, Cliente.ativo.is_(True))
         .group_by(
-            Cliente.id, Cliente.nome, Cliente.telefone_whatsapp,
-            Cliente.crm_nivel, Cliente.crm_score, Cliente.crm_resumo,
-            Cliente.crm_acao_sugerida, Cliente.crm_analisado_em,
+            Cliente.id,
+            Cliente.nome,
+            Cliente.telefone_whatsapp,
+            Cliente.crm_nivel,
+            Cliente.crm_score,
+            Cliente.crm_resumo,
+            Cliente.crm_acao_sugerida,
+            Cliente.crm_analisado_em,
         )
         .order_by(Cliente.crm_score.asc().nullslast())
         .offset((page - 1) * page_size)
@@ -202,6 +214,7 @@ async def listar_clientes_crm(
 # GET /crm/clientes/{id}
 # ---------------------------------------------------------------------------
 
+
 @router.get("/clientes/{cliente_id}", response_model=CRMClienteCard)
 async def detalhe_cliente_crm(
     cliente_id: int,
@@ -215,6 +228,7 @@ async def detalhe_cliente_crm(
 # ---------------------------------------------------------------------------
 # POST /crm/clientes/{id}/analisar
 # ---------------------------------------------------------------------------
+
 
 @router.post("/clientes/{cliente_id}/analisar", response_model=dict)
 async def analisar_cliente(
@@ -262,6 +276,7 @@ async def analisar_cliente(
 # POST /crm/analisar-escritorio
 # ---------------------------------------------------------------------------
 
+
 @router.post("/analisar-escritorio", status_code=status.HTTP_202_ACCEPTED)
 async def analisar_escritorio(request: Request):
     eid = _escritorio_id(request)
@@ -286,6 +301,7 @@ async def analisar_escritorio(request: Request):
 # GET /crm/resumo
 # ---------------------------------------------------------------------------
 
+
 @router.get("/resumo")
 async def resumo_crm(
     request: Request,
@@ -294,14 +310,18 @@ async def resumo_crm(
     eid = _escritorio_id(request)
 
     # Contagens por nível + média de score + sem análise
-    stmt_niveis = select(
-        Cliente.crm_nivel,
-        func.count().label("total"),
-        func.avg(Cliente.crm_score).label("score_medio"),
-    ).where(
-        Cliente.escritorio_id == eid,
-        Cliente.ativo.is_(True),
-    ).group_by(Cliente.crm_nivel)
+    stmt_niveis = (
+        select(
+            Cliente.crm_nivel,
+            func.count().label("total"),
+            func.avg(Cliente.crm_score).label("score_medio"),
+        )
+        .where(
+            Cliente.escritorio_id == eid,
+            Cliente.ativo.is_(True),
+        )
+        .group_by(Cliente.crm_nivel)
+    )
 
     rows = (await db.execute(stmt_niveis)).all()
 

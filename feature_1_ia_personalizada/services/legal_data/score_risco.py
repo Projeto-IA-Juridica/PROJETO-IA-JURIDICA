@@ -124,19 +124,19 @@ def _gerar_interpretacao_score(
     tipo_label = (tipo_acao or "processo").replace("_", " ").capitalize()
 
     cabecalhos = {
-        "baixo":    f"{tipo_label} com baixa complexidade operacional.",
+        "baixo": f"{tipo_label} com baixa complexidade operacional.",
         "moderado": f"{tipo_label} com complexidade moderada — acompanhamento padrão recomendado.",
-        "alto":     f"{tipo_label} com alta complexidade — atenção redobrada aos prazos.",
-        "critico":  f"{tipo_label} com complexidade crítica — revisão estratégica recomendada.",
+        "alto": f"{tipo_label} com alta complexidade — atenção redobrada aos prazos.",
+        "critico": f"{tipo_label} com complexidade crítica — revisão estratégica recomendada.",
     }
     partes = [cabecalhos.get(nivel, f"Score de risco: {score}/100.")]
 
     comp_dict = {
         "complexidade jurídica": componentes.complexidade_juridica,
-        "duração estimada":      componentes.duracao_estimada,
-        "histórico da vara":     componentes.historico_vara,
-        "valor da causa":        componentes.valor_causa,
-        "fase processual":       componentes.fase_processual,
+        "duração estimada": componentes.duracao_estimada,
+        "histórico da vara": componentes.historico_vara,
+        "valor da causa": componentes.valor_causa,
+        "fase processual": componentes.fase_processual,
     }
     top2 = sorted(comp_dict.items(), key=lambda x: x[1], reverse=True)[:2]
     drivers = " e ".join(f"{nome} ({val}/100)" for nome, val in top2 if val > 50)
@@ -173,16 +173,16 @@ class ScoreRiscoCalculator:
     """
 
     def calcular(self, processo: Any, datajud_data: dict | None = None) -> ScoreRisco:
-        tipo_acao       = getattr(processo, "tipo_acao", None)
-        valor_causa     = getattr(processo, "valor_causa", None)
+        tipo_acao = getattr(processo, "tipo_acao", None)
+        valor_causa = getattr(processo, "valor_causa", None)
         fase_processual = getattr(processo, "fase_processual", None)
-        polo_cliente    = getattr(processo, "polo_cliente", None)
+        polo_cliente = getattr(processo, "polo_cliente", None)
 
         c_complexidade = _componente_complexidade(tipo_acao)
-        c_duracao      = _componente_duracao(datajud_data)
-        c_historico    = _componente_historico_vara(datajud_data, polo_cliente)
-        c_valor        = _componente_valor_causa(float(valor_causa) if valor_causa else None)
-        c_fase         = _componente_fase(fase_processual)
+        c_duracao = _componente_duracao(datajud_data)
+        c_historico = _componente_historico_vara(datajud_data, polo_cliente)
+        c_valor = _componente_valor_causa(float(valor_causa) if valor_causa else None)
+        c_fase = _componente_fase(fase_processual)
 
         componentes = ComponentesScore(
             complexidade_juridica=c_complexidade,
@@ -192,13 +192,15 @@ class ScoreRiscoCalculator:
             fase_processual=c_fase,
         )
 
-        score = int(round(
-            c_complexidade * SCORE_RISCO_PESOS["complexidade_juridica"]
-            + c_duracao    * SCORE_RISCO_PESOS["duracao_estimada"]
-            + c_historico  * SCORE_RISCO_PESOS["historico_vara"]
-            + c_valor      * SCORE_RISCO_PESOS["valor_causa"]
-            + c_fase       * SCORE_RISCO_PESOS["fase_processual"]
-        ))
+        score = int(
+            round(
+                c_complexidade * SCORE_RISCO_PESOS["complexidade_juridica"]
+                + c_duracao * SCORE_RISCO_PESOS["duracao_estimada"]
+                + c_historico * SCORE_RISCO_PESOS["historico_vara"]
+                + c_valor * SCORE_RISCO_PESOS["valor_causa"]
+                + c_fase * SCORE_RISCO_PESOS["fase_processual"]
+            )
+        )
 
         if score <= 25:
             nivel = "baixo"

@@ -59,9 +59,7 @@ def setup_telemetry(app=None) -> None:
         # Exemplo .env: OTLP_ENDPOINT=http://localhost:4318/v1/traces
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-        provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint))
-        )
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=otlp_endpoint)))
         logger.info("otel_exporter_ativado", otlp_endpoint=otlp_endpoint)
     else:
         logger.info(
@@ -73,7 +71,7 @@ def setup_telemetry(app=None) -> None:
 
     # Auto-instrumentações — propagam W3C traceparent sem alterações nos serviços
     HTTPXClientInstrumentor().instrument()  # DataJud, Evolution API, Voyage AI, LinkedIn
-    CeleryInstrumentor().instrument()       # propaga contexto em .delay() / .apply_async()
+    CeleryInstrumentor().instrument()  # propaga contexto em .delay() / .apply_async()
 
     if app is not None:
         FastAPIInstrumentor.instrument_app(app)

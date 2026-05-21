@@ -29,8 +29,8 @@ logger = structlog.get_logger(__name__)
 # fallback imediatamente (sem aguardar timeout de rede) por 120 segundos.
 # Evita que um DataJud instável paralise todos os workers de monitoramento.
 _datajud_cb = pybreaker.CircuitBreaker(
-    fail_max=5,           # abre após 5 falhas consecutivas
-    reset_timeout=120,    # tenta novamente após 2 minutos (half-open)
+    fail_max=5,  # abre após 5 falhas consecutivas
+    reset_timeout=120,  # tenta novamente após 2 minutos (half-open)
     name="datajud",
 )
 

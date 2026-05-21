@@ -26,6 +26,7 @@ from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _hit(
     nome: str,
     polo: str = "ativo",
@@ -56,9 +57,7 @@ def _make_http_mock(hits: list[dict]) -> MagicMock:
     """Mock do httpx.AsyncClient retornando os hits especificados."""
     resp_mock = MagicMock()
     resp_mock.status_code = 200
-    resp_mock.json.return_value = {
-        "hits": {"hits": hits, "total": {"value": len(hits)}}
-    }
+    resp_mock.json.return_value = {"hits": {"hits": hits, "total": {"value": len(hits)}}}
 
     http_mock = AsyncMock()
     http_mock.post = AsyncMock(return_value=resp_mock)
@@ -70,6 +69,7 @@ def _make_http_mock(hits: list[dict]) -> MagicMock:
 # ---------------------------------------------------------------------------
 # Resolução de índices
 # ---------------------------------------------------------------------------
+
 
 class TestResolucaoIndices:
     def test_trabalhista_resolve_trt(self):
@@ -97,15 +97,34 @@ class TestResolucaoIndices:
 # Deduplicação
 # ---------------------------------------------------------------------------
 
+
 class TestDeduplicacao:
     def test_mesmo_litigante_acumula_processos_count(self):
         brutos = [
-            {"nome": "João Silva", "tipo": "pessoa_fisica", "polo": "ativo",
-             "numero_cnj": "001", "tribunal": "TRT2", "sem_advogado": True},
-            {"nome": "João Silva", "tipo": "pessoa_fisica", "polo": "ativo",
-             "numero_cnj": "002", "tribunal": "TRT2", "sem_advogado": False},
-            {"nome": "Maria Costa", "tipo": "pessoa_fisica", "polo": "ativo",
-             "numero_cnj": "003", "tribunal": "TRT2", "sem_advogado": False},
+            {
+                "nome": "João Silva",
+                "tipo": "pessoa_fisica",
+                "polo": "ativo",
+                "numero_cnj": "001",
+                "tribunal": "TRT2",
+                "sem_advogado": True,
+            },
+            {
+                "nome": "João Silva",
+                "tipo": "pessoa_fisica",
+                "polo": "ativo",
+                "numero_cnj": "002",
+                "tribunal": "TRT2",
+                "sem_advogado": False,
+            },
+            {
+                "nome": "Maria Costa",
+                "tipo": "pessoa_fisica",
+                "polo": "ativo",
+                "numero_cnj": "003",
+                "tribunal": "TRT2",
+                "sem_advogado": False,
+            },
         ]
         resultado = DataJudProspeccaoClient._deduplicar(brutos, "trabalhista")
 
@@ -118,10 +137,22 @@ class TestDeduplicacao:
 
     def test_sem_advogado_vem_primeiro(self):
         brutos = [
-            {"nome": "Empresa A", "tipo": "pessoa_juridica", "polo": "passivo",
-             "numero_cnj": "001", "tribunal": "TRT2", "sem_advogado": False},
-            {"nome": "Empresa B", "tipo": "pessoa_juridica", "polo": "passivo",
-             "numero_cnj": "002", "tribunal": "TRT2", "sem_advogado": True},
+            {
+                "nome": "Empresa A",
+                "tipo": "pessoa_juridica",
+                "polo": "passivo",
+                "numero_cnj": "001",
+                "tribunal": "TRT2",
+                "sem_advogado": False,
+            },
+            {
+                "nome": "Empresa B",
+                "tipo": "pessoa_juridica",
+                "polo": "passivo",
+                "numero_cnj": "002",
+                "tribunal": "TRT2",
+                "sem_advogado": True,
+            },
         ]
         resultado = DataJudProspeccaoClient._deduplicar(brutos, "trabalhista")
 
@@ -131,6 +162,7 @@ class TestDeduplicacao:
 # ---------------------------------------------------------------------------
 # buscar_litigantes — integração com HTTP mock
 # ---------------------------------------------------------------------------
+
 
 class TestBuscarLitigantes:
     @pytest.mark.asyncio
@@ -202,6 +234,7 @@ class TestBuscarLitigantes:
             sem_advogado=True,
         )
         import dataclasses
+
         cached_json = json.dumps([dataclasses.asdict(litigante_cached)])
 
         redis_mock = MagicMock()

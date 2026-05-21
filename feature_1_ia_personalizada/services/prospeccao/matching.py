@@ -28,13 +28,14 @@ from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import P
 # Dataclass de saída
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ResultadoMatch:
     score: int
     motivo: str
     abordagem_sugerida: str
     gerado_por_ia: bool
-    tipo_lead: str              # 'empresa' | 'pessoa'
+    tipo_lead: str  # 'empresa' | 'pessoa'
     componentes: dict = field(default_factory=dict)
 
 
@@ -226,9 +227,7 @@ class MatchingService:
 
         # Tipos recorrentes: top_tipos_acao com percentual > 30%
         recorrentes_lower = {
-            t["tipo"].lower()
-            for t in dna.top_tipos_acao
-            if t.get("percentual", 0) > 30
+            t["tipo"].lower() for t in dna.top_tipos_acao if t.get("percentual", 0) > 30
         }
         if any(rec in tipo_lower for rec in recorrentes_lower):
             componentes["alta_recorrencia"] = 20

@@ -25,6 +25,7 @@ from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import (
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _litigante(
     *,
     nome: str = "João da Silva",
@@ -50,6 +51,7 @@ def _litigante(
 # Compliance LGPD — campos proibidos no dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestPessoaInteligenciaLGPD:
     def test_dataclass_nao_tem_cpf(self):
         """PessoaInteligencia não deve ter campo cpf."""
@@ -71,7 +73,14 @@ class TestPessoaInteligenciaLGPD:
     def test_dataclass_tem_campos_publicos_permitidos(self):
         """PessoaInteligencia deve ter apenas dados do processo público."""
         campos = {f.name for f in dataclasses.fields(PessoaInteligencia)}
-        esperados = {"nome", "polo", "tipo_acao", "tribunal", "fase_processual", "numero_cnj_exemplo"}
+        esperados = {
+            "nome",
+            "polo",
+            "tipo_acao",
+            "tribunal",
+            "fase_processual",
+            "numero_cnj_exemplo",
+        }
         assert esperados.issubset(campos)
 
 
@@ -79,36 +88,43 @@ class TestPessoaInteligenciaLGPD:
 # validar_compliance — ações sensíveis (art. 11 LGPD)
 # ---------------------------------------------------------------------------
 
+
 class TestValidarCompliance:
-    @pytest.mark.parametrize("tipo_acao", [
-        "internação compulsória",
-        "INTERNAÇÃO COMPULSÓRIA",           # case-insensitive
-        "Internação Compulsória",
-        "curatela por doença mental",
-        "internação involuntária por transtorno",
-        "retificação de registro civil",
-        "exame de dna - investigação de paternidade",
-        "teste de paternidade",
-        "discriminação racial",
-        "racismo no ambiente de trabalho",
-        "orientação sexual - discriminação",
-        "liberdade religiosa",
-    ])
+    @pytest.mark.parametrize(
+        "tipo_acao",
+        [
+            "internação compulsória",
+            "INTERNAÇÃO COMPULSÓRIA",  # case-insensitive
+            "Internação Compulsória",
+            "curatela por doença mental",
+            "internação involuntária por transtorno",
+            "retificação de registro civil",
+            "exame de dna - investigação de paternidade",
+            "teste de paternidade",
+            "discriminação racial",
+            "racismo no ambiente de trabalho",
+            "orientação sexual - discriminação",
+            "liberdade religiosa",
+        ],
+    )
     def test_acoes_sensiveis_retornam_false(self, tipo_acao: str):
         """Ações com dados sensíveis devem ser descartadas."""
         litigante = _litigante(tipo_acao=tipo_acao)
         assert PessoaIntelligenceService.validar_compliance(litigante) is False
 
-    @pytest.mark.parametrize("tipo_acao", [
-        "Reclamação Trabalhista",
-        "Horas Extras",
-        "Ação de Divórcio",
-        "Ação de Alimentos",
-        "Ação de Cobrança",
-        "Indenização por Danos Morais",
-        "Execução de Título Extrajudicial",
-        "Negativação Indevida",
-    ])
+    @pytest.mark.parametrize(
+        "tipo_acao",
+        [
+            "Reclamação Trabalhista",
+            "Horas Extras",
+            "Ação de Divórcio",
+            "Ação de Alimentos",
+            "Ação de Cobrança",
+            "Indenização por Danos Morais",
+            "Execução de Título Extrajudicial",
+            "Negativação Indevida",
+        ],
+    )
     def test_acoes_publicas_retornam_true(self, tipo_acao: str):
         """Ações comuns sem dados sensíveis devem ser aprovadas."""
         litigante = _litigante(tipo_acao=tipo_acao)
@@ -118,6 +134,7 @@ class TestValidarCompliance:
 # ---------------------------------------------------------------------------
 # enriquecer — resultado e compliance
 # ---------------------------------------------------------------------------
+
 
 class TestEnriquecer:
     @pytest.mark.asyncio
@@ -154,6 +171,7 @@ class TestEnriquecer:
 # is_lead_valido — lógica de negócio
 # ---------------------------------------------------------------------------
 
+
 class TestIsLeadValido:
     def test_trabalhista_polo_ativo_valido(self):
         svc = PessoaIntelligenceService()
@@ -180,7 +198,5 @@ class TestIsLeadValido:
     def test_representado_invalido(self):
         """Parte já representada não deve ser prospectada."""
         svc = PessoaIntelligenceService()
-        lit = _litigante(
-            tipo_acao="Reclamação Trabalhista", polo="ativo", representado=True
-        )
+        lit = _litigante(tipo_acao="Reclamação Trabalhista", polo="ativo", representado=True)
         assert svc.is_lead_valido(lit) is False
