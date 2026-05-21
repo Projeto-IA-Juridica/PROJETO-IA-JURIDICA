@@ -288,5 +288,5 @@ def _search_cache_key(
 ) -> str:
     digest = hashlib.sha256(query.encode()).hexdigest()[:24]
     filtros_str = json.dumps(filtros or {}, sort_keys=True)
-    filtros_hash = hashlib.md5(filtros_str.encode()).hexdigest()[:8]
+    filtros_hash = hashlib.md5(filtros_str.encode(), usedforsecurity=False).hexdigest()[:8]
     return f"f1:rag:search:{digest}:{escritorio_id}:{top_k}:{filtros_hash}"
