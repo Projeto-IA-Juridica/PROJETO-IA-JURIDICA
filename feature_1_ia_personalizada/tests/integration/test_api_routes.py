@@ -242,5 +242,5 @@ async def test_get_chat_stats_dashboard(
     )
     assert response.status_code == 200
     data = response.json()
-    assert "total_interacoes" in data
-    assert "custo_total_usd" in data
+    assert "total_interacoes" in data.get("resumo", data)
+    assert "custo_total_usd" in data.get("eficiencia", data)

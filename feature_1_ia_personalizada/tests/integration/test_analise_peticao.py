@@ -190,12 +190,15 @@ async def test_analisar_peticao_broker_indisponivel_retorna_503(async_client, ad
 
     _, _, headers = advogado_setup
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
-        return_value=_FAKE_TEXT,
-    ), patch(
-        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
-    ) as mock_task:
+    with (
+        patch(
+            "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
+            return_value=_FAKE_TEXT,
+        ),
+        patch(
+            "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+        ) as mock_task,
+    ):
         mock_task.delay.side_effect = OperationalError("Redis connection refused")
         resp = await async_client.post(
             "/hub/analisar-peticao",
@@ -214,12 +217,15 @@ async def test_analisar_peticao_sucesso_retorna_202_com_job_id(
     """PDF válido: endpoint enfileira task e retorna 202 com job_id."""
     _, _, headers = advogado_setup
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
-        return_value=_FAKE_TEXT,
-    ), patch(
-        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
-    ) as mock_task:
+    with (
+        patch(
+            "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
+            return_value=_FAKE_TEXT,
+        ),
+        patch(
+            "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+        ) as mock_task,
+    ):
         mock_task.delay.return_value = None
         resp = await async_client.post(
             "/hub/analisar-peticao",
@@ -245,12 +251,15 @@ async def test_analisar_peticao_texto_longo_truncado(async_client, advogado_setu
     _, _, headers = advogado_setup
     texto_longo = "Considerando que " * 1_000  # ~17 000 chars
 
-    with patch(
-        "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
-        return_value=texto_longo,
-    ), patch(
-        "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
-    ) as mock_task:
+    with (
+        patch(
+            "feature_1_ia_personalizada.api.routes.hub_advogado._extrair_texto_pdf",
+            return_value=texto_longo,
+        ),
+        patch(
+            "feature_1_ia_personalizada.workers.hub_worker.hub_analisar_peticao_task",
+        ) as mock_task,
+    ):
         mock_task.delay.return_value = None
         resp = await async_client.post(
             "/hub/analisar-peticao",
