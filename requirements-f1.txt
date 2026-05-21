@@ -15,6 +15,17 @@ langchain-community==0.2.16
 langchain-openai==0.1.25
 langchain-text-splitters==0.2.4
 langchain==0.2.16
+langchain-anthropic==0.1.23
+langgraph==0.2.28
+anthropic==0.100.0
+openai==1.50.2
+tiktoken==0.7.0
+
+# HTTP assíncrono
+aiohttp==3.9.3
+
+# Resiliência (circuit breaker)
+pybreaker==1.2.0
 
 # Processamento de áudio
 openai-whisper==20231117
