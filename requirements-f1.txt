@@ -62,3 +62,7 @@ weasyprint==61.1
 
 # Conector MySQL (necessário para o LlamaIndex conectar ao DataJud)
 mysql-connector-python==8.3.0
+
+# Google APIs (Google Sheets)
+google-auth==2.53.0
+google-api-python-client==2.196.0
