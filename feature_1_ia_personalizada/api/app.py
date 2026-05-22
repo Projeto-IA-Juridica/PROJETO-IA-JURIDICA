@@ -206,8 +206,8 @@ async def lifespan(app: FastAPI):
     # Pré-aquece embeddings das queries mais comuns (P4) — com timeout para não travar startup
     try:
         await asyncio.wait_for(_warmup_embeddings(app.state.redis_client), timeout=15)
-    except TimeoutError:
-        print("⚠️  Warm-up de embeddings: timeout (15s) — será gerado sob demanda.")
+    except Exception:
+        print("⚠️  Warm-up de embeddings: falhou — será gerado sob demanda.")
 
     yield
 

@@ -37,6 +37,9 @@ from shared.models.documento_rag import EMBEDDING_DIM
 # ---------------------------------------------------------------------------
 
 
+_CSRF_TEST_TOKEN = "a" * 64
+
+
 class _FakeRedis:
     """Redis em memória simples para integração."""
 
@@ -46,11 +49,29 @@ class _FakeRedis:
     async def get(self, key: str) -> str | None:
         return self._store.get(key)
 
+    async def set(self, key: str, value: str, *, ex: int | None = None, nx: bool = False) -> bool:
+        if nx and key in self._store:
+            return False
+        self._store[key] = str(value)
+        return True
+
     async def setex(self, key: str, ttl: int, value: str) -> None:
         self._store[key] = value
 
     async def mget(self, *keys: str) -> list[str | None]:
         return [self._store.get(k) for k in keys]
+
+    async def incr(self, key: str) -> int:
+        current = int(self._store.get(key, "0"))
+        current += 1
+        self._store[key] = str(current)
+        return current
+
+    async def expire(self, key: str, seconds: int) -> int:
+        return 1
+
+    async def aclose(self) -> None:
+        pass
 
     def pipeline(self):
         return _FakePipeline(self)
@@ -114,14 +135,16 @@ async def rag_http_client():
     fake_redis = _FakeRedis()
     token = criar_token(user_id=99, escritorio_id=1, role="admin")
 
-    app.state.redis_client = fake_redis
     app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "x-csrf-token": _CSRF_TEST_TOKEN},
+        cookies={"csrf_token": _CSRF_TEST_TOKEN},
     ) as client:
+        # Re-inject after lifespan startup overwrites app.state.redis_client with real Redis
+        app.state.redis_client = fake_redis
         yield client, fake_redis
 
     app.dependency_overrides.pop(get_redis, None)
@@ -220,7 +243,12 @@ async def test_buscar_sem_auth_retorna_401():
     """POST /rag/buscar sem autenticação deve retornar 401."""
     from feature_1_ia_personalizada.api.app import app
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"x-csrf-token": _CSRF_TEST_TOKEN},
+        cookies={"csrf_token": _CSRF_TEST_TOKEN},
+    ) as client:
         response = await client.post(
             "/rag/buscar",
             json={"query": "prazo recursal"},

@@ -51,15 +51,16 @@ async def test_list_processos_vazio(async_client: AsyncClient, escritorio_factor
 
 @pytest.mark.asyncio
 async def test_create_processo_sucesso(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     payload = {
         "numero_cnj": _make_cnj(1),
-        "cliente_id": 999,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Ação de cobrança",
     }
@@ -75,16 +76,17 @@ async def test_create_processo_sucesso(
 
 @pytest.mark.asyncio
 async def test_create_processo_duplicado_retorna_400(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(2)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 999,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Cobrança",
     }
@@ -102,16 +104,17 @@ async def test_create_processo_duplicado_retorna_400(
 
 @pytest.mark.asyncio
 async def test_get_processo_existente(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(3)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 999,
+        "cliente_id": cliente.id,
         "polo_cliente": "reu",
         "tipo_acao": "Dano moral",
     }
@@ -142,20 +145,21 @@ async def test_get_processo_nao_encontrado_retorna_404(
 
 @pytest.mark.asyncio
 async def test_get_processo_de_outro_escritorio_retorna_404(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     """Multi-tenant: não pode ver processos de outro escritório."""
     esc1 = await escritorio_factory()
     esc2 = await escritorio_factory()
     user1 = await usuario_factory(escritorio_id=esc1.id)
     user2 = await usuario_factory(escritorio_id=esc2.id)
+    cliente1 = await cliente_factory(escritorio_id=esc1.id)
     headers1 = _auth_headers(user_id=user1.id, escritorio_id=esc1.id)
     headers2 = _auth_headers(user_id=user2.id, escritorio_id=esc2.id)
 
     cnj = _make_cnj(10)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 1,
+        "cliente_id": cliente1.id,
         "polo_cliente": "autor",
         "tipo_acao": "Teste",
     }
@@ -171,15 +175,18 @@ async def test_get_processo_de_outro_escritorio_retorna_404(
 
 
 @pytest.mark.asyncio
-async def test_update_processo(async_client: AsyncClient, escritorio_factory, usuario_factory):
+async def test_update_processo(
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
+):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(4)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Cobrança",
     }
@@ -216,16 +223,17 @@ async def test_update_processo_nao_encontrado_retorna_404(
 
 @pytest.mark.asyncio
 async def test_delete_processo_soft_delete(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(5)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Teste",
     }
@@ -255,16 +263,17 @@ async def test_delete_processo_nao_encontrado_retorna_404(
 
 @pytest.mark.asyncio
 async def test_list_processos_com_filtro_status(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(6)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Teste",
     }
@@ -280,16 +289,17 @@ async def test_list_processos_com_filtro_status(
 
 @pytest.mark.asyncio
 async def test_list_processos_com_busca_cnj(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _auth_headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnj = _make_cnj(7)
     payload = {
         "numero_cnj": cnj,
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Teste",
     }

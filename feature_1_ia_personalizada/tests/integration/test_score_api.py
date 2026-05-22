@@ -42,16 +42,17 @@ def _headers(user_id: int, escritorio_id: int) -> dict:
 
 @pytest.mark.asyncio
 async def test_get_processo_score_campos_nulos_quando_nao_calculado(
-    async_client: AsyncClient, escritorio_factory, usuario_factory
+    async_client: AsyncClient, escritorio_factory, usuario_factory, cliente_factory
 ):
     """Processo recém-criado não tem score calculado — campos devem ser null."""
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     payload = {
         "numero_cnj": _make_cnj(100),
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Ação de cobrança",
     }
@@ -79,15 +80,17 @@ async def test_get_processo_score_preenchido(
     async_db: AsyncSession,
     escritorio_factory,
     usuario_factory,
+    cliente_factory,
 ):
     """Após simular worker gravando score, GET deve retornar os campos preenchidos."""
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     payload = {
         "numero_cnj": _make_cnj(101),
-        "cliente_id": 1,
+        "cliente_id": cliente.id,
         "polo_cliente": "autor",
         "tipo_acao": "Ação de dano moral",
     }
@@ -144,10 +147,12 @@ async def test_filtro_score_nivel_alto_retorna_so_processos_alto(
     async_db: AsyncSession,
     escritorio_factory,
     usuario_factory,
+    cliente_factory,
 ):
     """Filtro ?score_nivel=alto deve retornar apenas processos com esse nível."""
     escritorio = await escritorio_factory()
     usuario = await usuario_factory(escritorio_id=escritorio.id)
+    cliente = await cliente_factory(escritorio_id=escritorio.id)
     headers = _headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cnjs = [_make_cnj(200 + i) for i in range(3)]
@@ -160,7 +165,7 @@ async def test_filtro_score_nivel_alto_retorna_so_processos_alto(
                 headers=headers,
                 json={
                     "numero_cnj": cnj,
-                    "cliente_id": 1,
+                    "cliente_id": cliente.id,
                     "polo_cliente": "autor",
                     "tipo_acao": "Cobrança",
                 },
@@ -215,12 +220,14 @@ async def test_filtro_score_nivel_isolamento_multitenancy(
     async_db: AsyncSession,
     escritorio_factory,
     usuario_factory,
+    cliente_factory,
 ):
     """Processos com score 'alto' de outro escritório NÃO devem aparecer no filtro."""
     esc1 = await escritorio_factory()
     esc2 = await escritorio_factory()
     user1 = await usuario_factory(escritorio_id=esc1.id)
     user2 = await usuario_factory(escritorio_id=esc2.id)
+    cliente2 = await cliente_factory(escritorio_id=esc2.id)
     h1 = _headers(user_id=user1.id, escritorio_id=esc1.id)
     h2 = _headers(user_id=user2.id, escritorio_id=esc2.id)
 
@@ -231,7 +238,7 @@ async def test_filtro_score_nivel_isolamento_multitenancy(
             headers=h2,
             json={
                 "numero_cnj": _make_cnj(300),
-                "cliente_id": 1,
+                "cliente_id": cliente2.id,
                 "polo_cliente": "autor",
                 "tipo_acao": "X",
             },

@@ -41,6 +41,7 @@ for _key, _value in _FAKE_ENV.items():
 class _FakeStore:
     def __init__(self) -> None:
         self.lists: dict[str, list] = {}
+        self.strings: dict[str, str] = {}
         self.ttls: dict[str, int] = {}
 
     def _ltrim_impl(self, key: str, start: int, end: int) -> None:
@@ -129,6 +130,30 @@ class FakeRedis:
         self._store.lists.pop(key, None)
         self._store.ttls.pop(key, None)
         return 1 if existed else 0
+
+    async def get(self, key: str) -> str | None:
+        return self._store.strings.get(key)
+
+    async def set(self, key: str, value: str, *, ex: int | None = None, nx: bool = False) -> bool:
+        if nx and key in self._store.strings:
+            return False
+        self._store.strings[key] = str(value)
+        if ex is not None:
+            self._store.ttls[key] = ex
+        return True
+
+    async def incr(self, key: str) -> int:
+        current = int(self._store.strings.get(key, "0"))
+        current += 1
+        self._store.strings[key] = str(current)
+        return current
+
+    async def expire(self, key: str, seconds: int) -> int:
+        self._store.ttls[key] = seconds
+        return 1
+
+    async def aclose(self) -> None:
+        pass
 
     # Helpers de inspeção para testes
     def _list(self, key: str) -> list:
@@ -319,6 +344,8 @@ async def async_client(db_session):
         headers={"x-csrf-token": _CSRF_TEST_TOKEN},
         cookies={"csrf_token": _CSRF_TEST_TOKEN},
     ) as client:
+        # Re-inject fake redis after lifespan startup (which sets real Redis in app.state)
+        app.state.redis_client = FakeRedis()
         yield client
 
     app.dependency_overrides.clear()
