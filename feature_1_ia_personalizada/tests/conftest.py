@@ -207,10 +207,31 @@ _is_sqlite = TEST_DATABASE_URL.startswith("sqlite")
 
 # JSONB → JSON apenas no SQLite. PostgreSQL suporta JSONB nativamente.
 if _is_sqlite:
+    from datetime import timedelta
+
     from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
     if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
         SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
+
+    def _sqlite_date_trunc(field: str, value: str | None) -> str | None:
+        """Emula date_trunc do PostgreSQL para testes em SQLite."""
+        if value is None:
+            return None
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if field == "week":
+            dt = (dt - timedelta(days=dt.weekday())).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+        elif field == "day":
+            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif field == "month":
+            dt = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif field == "year":
+            dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return dt.isoformat()
 
 # Dependências reais/modelos
 from shared.database.session import get_db
@@ -227,6 +248,7 @@ fake = Faker("pt_BR")
 @pytest.fixture(scope="session")
 def engine():
     if _is_sqlite:
+        from sqlalchemy import event
         from sqlalchemy.pool import StaticPool
 
         _engine = create_async_engine(
@@ -235,6 +257,11 @@ def engine():
             poolclass=StaticPool,
             connect_args={"check_same_thread": False},
         )
+
+        @event.listens_for(_engine.sync_engine, "connect")
+        def _register_sqlite_functions(dbapi_conn, _record):
+            dbapi_conn.create_function("date_trunc", 2, _sqlite_date_trunc)
+
     else:
         # PostgreSQL: NullPool evita conflito de event loop no pytest-asyncio
         from sqlalchemy.pool import NullPool
