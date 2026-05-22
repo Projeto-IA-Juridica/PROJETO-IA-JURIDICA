@@ -1,5 +1,10 @@
 -r requirements-base.txt
 
+# Força a instalação do PyTorch em versão CPU-only (sem CUDA/NVIDIA) para economizar gigabytes de espaço
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchaudio
+
 # ==============================================================================
 # requirements-f1.txt — Dependências da Feature 1 (IA Personalizada)
 # ==============================================================================
