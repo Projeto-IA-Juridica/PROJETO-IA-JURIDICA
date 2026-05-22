@@ -122,6 +122,7 @@ def mock_celery(monkeypatch) -> MagicMock:
     """
     task_mock = MagicMock()
     monkeypatch.setattr(_wh_module, "processar_mensagem_recebida", task_mock)
+    monkeypatch.setattr(_wh_module, "disparar_analise_com_debounce", MagicMock(return_value=True))
     return task_mock
 
 

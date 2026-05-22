@@ -359,6 +359,10 @@ async def test_pipeline_ingestao_texto_completo():
             new_callable=AsyncMock,
             return_value={},
         ),
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion._chunkar",
+            return_value=["chunk1 do texto jurídico", "chunk2 do texto jurídico"],
+        ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
