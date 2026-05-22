@@ -21,7 +21,6 @@ import pytest
 
 from feature_1_ia_personalizada.services.rag.ingestion import (
     DocumentoIngester,
-    _chunkar,
     _limpar_texto,
 )
 from shared.models.documento_rag import EMBEDDING_DIM
@@ -184,10 +183,10 @@ async def test_chunks_sao_inseridos_no_banco():
     """Texto novo deve gerar chunks e inseri-los no banco."""
     texto = "Vistos, relatados e discutidos estes autos. " * 100  # texto longo
 
-    # Conta quantos chunks serão gerados
-    chunks_esperados = _chunkar(texto)
-    n = len(chunks_esperados)
-    assert n >= 1
+    # Chunks fixos — evita dependência do langchain_text_splitters (incompatível com
+    # pydantic==2.5.0 + Python 3.12 em CI via pydantic.v1.ForwardRef._evaluate)
+    _chunks_fixos = ["chunk jurídico A", "chunk jurídico B", "chunk jurídico C"]
+    n = len(_chunks_fixos)
 
     session = _FakeSession()
     # Simula banco vazio (não é duplicata)
@@ -201,6 +200,10 @@ async def test_chunks_sao_inseridos_no_banco():
             "feature_1_ia_personalizada.services.rag.ingestion.DocumentoIngester._extrair_metadata",
             new_callable=AsyncMock,
             return_value={"numero_cnj": "0001234-56.2024.8.26.0001", "tribunal": "TJSP"},
+        ),
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion._chunkar",
+            return_value=_chunks_fixos,
         ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
@@ -234,7 +237,13 @@ async def test_texto_vazio_apos_limpeza_retorna_erro():
     factory = _make_session_factory(session)
     embeddings_mock = _make_embedding_mock(0)
 
-    with patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings:
+    with (
+        patch("feature_1_ia_personalizada.services.rag.ingestion.settings") as mock_settings,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion._chunkar",
+            return_value=[],
+        ),
+    ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
             embedding_generator=embeddings_mock,
@@ -293,6 +302,10 @@ async def test_regex_extrai_numero_cnj():
             new_callable=AsyncMock,
             return_value={},
         ) as _mock_claude,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion._chunkar",
+            return_value=["chunk único jurídico"],
+        ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
@@ -332,6 +345,10 @@ async def test_claude_nao_chamado_quando_regex_encontra_tudo():
             new_callable=AsyncMock,
             return_value={},
         ) as mock_claude,
+        patch(
+            "feature_1_ia_personalizada.services.rag.ingestion._chunkar",
+            return_value=["chunk único jurídico"],
+        ),
     ):
         mock_settings.ANTHROPIC_API_KEY = "fake-key"
         ingester = DocumentoIngester(
