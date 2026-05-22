@@ -144,8 +144,10 @@ async def rag_http_client():
         cookies={"csrf_token": _CSRF_TEST_TOKEN},
     ) as client:
         # Re-inject after lifespan startup overwrites app.state.redis_client with real Redis
+        _original_redis = getattr(app.state, "redis_client", None)
         app.state.redis_client = fake_redis
         yield client, fake_redis
+        app.state.redis_client = _original_redis
 
     app.dependency_overrides.pop(get_redis, None)
 
