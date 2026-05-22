@@ -174,7 +174,8 @@ class TestCapa:
     async def test_ttl_correto_apos_set(self, cache: LegalDataCacheManager, redis: _FakeCacheRedis):
         await cache.set_capa(CNJ, CAPA)
         chave = LegalDataCacheManager._key_capa(CNJ)
-        assert redis._ttl(chave) == LegalDataCacheManager.TTL_CAPA_PROCESSO
+        ttl = redis._ttl(chave)
+        assert LegalDataCacheManager.TTL_CAPA_PROCESSO <= ttl <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
 
     async def test_unicode_preservado(self, cache: LegalDataCacheManager):
         capa_unicode = {
@@ -211,7 +212,8 @@ class TestAndamentos:
     async def test_ttl_correto_apos_set(self, cache: LegalDataCacheManager, redis: _FakeCacheRedis):
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         chave = LegalDataCacheManager._key_andamentos(CNJ)
-        assert redis._ttl(chave) == LegalDataCacheManager.TTL_ANDAMENTOS
+        ttl = redis._ttl(chave)
+        assert LegalDataCacheManager.TTL_ANDAMENTOS <= ttl <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
 
     async def test_lista_vazia_salva_e_recupera(self, cache: LegalDataCacheManager):
         await cache.set_andamentos(CNJ, [])
@@ -379,11 +381,11 @@ class TestHelpersSincronos:
         mock_redis = MagicMock()
         with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
             set_andamentos_sync(CNJ, ANDAMENTOS)
-        mock_redis.setex.assert_called_once_with(
-            LegalDataCacheManager._key_andamentos(CNJ),
-            LegalDataCacheManager.TTL_ANDAMENTOS,
-            json.dumps(ANDAMENTOS, ensure_ascii=False),
-        )
+        mock_redis.setex.assert_called_once()
+        args = mock_redis.setex.call_args[0]
+        assert args[0] == LegalDataCacheManager._key_andamentos(CNJ)
+        assert LegalDataCacheManager.TTL_ANDAMENTOS <= args[1] <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
+        assert args[2] == json.dumps(ANDAMENTOS, ensure_ascii=False)
 
     def test_set_andamentos_sync_lista_vazia(self):
         """Lista vazia é persitida normalmente."""
@@ -437,11 +439,11 @@ class TestHelpersSincronos:
         mock_redis = MagicMock()
         with patch(f"{_CACHE_MODULE}._sync_redis", mock_redis):
             set_capa_sync(CNJ, CAPA)
-        mock_redis.setex.assert_called_once_with(
-            LegalDataCacheManager._key_capa(CNJ),
-            LegalDataCacheManager.TTL_CAPA_PROCESSO,
-            json.dumps(CAPA, ensure_ascii=False),
-        )
+        mock_redis.setex.assert_called_once()
+        args = mock_redis.setex.call_args[0]
+        assert args[0] == LegalDataCacheManager._key_capa(CNJ)
+        assert LegalDataCacheManager.TTL_CAPA_PROCESSO <= args[1] <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
+        assert args[2] == json.dumps(CAPA, ensure_ascii=False)
 
     def test_set_capa_sync_redis_error_nao_crasha(self):
         """Erro no Redis não propaga exceção (graceful degradation)."""

@@ -47,6 +47,8 @@ def _mock_resposta(
     r.usage = MagicMock()
     r.usage.input_tokens = input_tokens
     r.usage.output_tokens = output_tokens
+    r.usage.cache_creation_input_tokens = 0
+    r.usage.cache_read_input_tokens = 0
     return r
 
 

@@ -152,6 +152,25 @@ class FakeRedis:
         self._store.ttls[key] = seconds
         return 1
 
+    async def exists(self, *keys: str) -> int:
+        return sum(1 for k in keys if k in self._store.strings)
+
+    async def setex(self, key: str, seconds: int, value: str) -> bool:
+        self._store.strings[key] = str(value)
+        self._store.ttls[key] = seconds
+        return True
+
+    async def delete(self, *keys: str) -> int:
+        count = 0
+        for key in keys:
+            existed = key in self._store.strings or key in self._store.lists
+            self._store.strings.pop(key, None)
+            self._store.lists.pop(key, None)
+            self._store.ttls.pop(key, None)
+            if existed:
+                count += 1
+        return count
+
     async def aclose(self) -> None:
         pass
 

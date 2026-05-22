@@ -499,6 +499,7 @@ def verificar_clientes_sem_contato(self) -> dict:
     return {
         "status": "ok",
         "enviados": enviados,
+        "ignorados": ignorados,
         "candidatos": len(candidatos),
     }
 

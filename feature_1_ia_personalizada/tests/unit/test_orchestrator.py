@@ -236,6 +236,7 @@ def _base_state(**overrides) -> ConversationState:
         "historico": [],
         "intencao": "status",
         "dados_processo": None,
+        "contexto_rag": None,
         "resposta_ia": None,
         "resposta_verificada": None,
         "tokens_usados": {"input": 0, "output": 0},
@@ -243,6 +244,13 @@ def _base_state(**overrides) -> ConversationState:
         "tentativas_correcao": 0,
         "usando_fallback": False,
         "precisa_regenerar": False,
+        "requer_escalacao": False,
+        "motivo_escalacao": None,
+        "confidence_score": None,
+        "modelo_ia_usado": "claude",
+        "_escalar_para_opus": False,
+        "rag_docs_com_score": [],
+        "fact_check_result": {},
     }
     state.update(overrides)  # type: ignore[typeddict-item]
     return state

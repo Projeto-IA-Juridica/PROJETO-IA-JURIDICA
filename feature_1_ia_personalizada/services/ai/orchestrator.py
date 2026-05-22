@@ -387,6 +387,28 @@ class ConversationOrchestrator:
         return graph.compile()
 
     # -----------------------------------------------------------------------
+    # Proxy methods para os nós (mantidos para retrocompatibilidade com testes)
+    # -----------------------------------------------------------------------
+
+    async def _node_classificar_intencao(self, state: ConversationState) -> dict[str, Any]:
+        return await node_classificar_intencao(state, self._deps)
+
+    async def _node_buscar_dados(self, state: ConversationState) -> dict[str, Any]:
+        return await node_buscar_dados(state, self._deps)
+
+    async def _node_gerar_resposta(self, state: ConversationState) -> dict[str, Any]:
+        return await node_gerar_resposta(state, self._deps)
+
+    async def _node_verificar_resposta(self, state: ConversationState) -> dict[str, Any]:
+        return await node_verificar_resposta(state, self._deps)
+
+    async def _node_enviar_resposta(self, state: ConversationState) -> dict[str, Any]:
+        return await node_enviar_resposta(state, self._deps)
+
+    async def _node_tratar_erro(self, state: ConversationState) -> dict[str, Any]:
+        return await node_tratar_erro(state, self._deps)
+
+    # -----------------------------------------------------------------------
     # Routing functions
     # -----------------------------------------------------------------------
 

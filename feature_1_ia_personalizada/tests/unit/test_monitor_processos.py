@@ -63,11 +63,17 @@ def fase3():
 
     mock_translator = MagicMock()
     mock_translator.traduzir_andamento.side_effect = lambda t: f"[tr] {t}"
+    mock_translator.traduzir_com_contexto = MagicMock(side_effect=lambda **kw: f"[tr] {kw.get('andamento', '')}")
+
+    mock_state_manager = MagicMock()
+    mock_state_manager.update_state.return_value = {"fase": "conhecimento", "andamentos": []}
+    mock_state_manager.gerar_contexto_historico.return_value = ""
 
     with (
         patch(f"{MODULE}.DataJudClient", create=True),
         patch(f"{MODULE}.DataCleaner", new=mock_cleaner, create=True),
         patch(f"{MODULE}.JuridicalTranslator", new=mock_translator, create=True),
+        patch(f"{MODULE}.ProcessoStateManager", return_value=mock_state_manager),
         # Nome correto da função importada de worker_queries
         patch(f"{MODULE}.update_ultimo_andamento") as mock_atualizar,
         # Cache mockado como miss por padrão — isola testes do Redis real
@@ -78,6 +84,7 @@ def fase3():
         yield {
             "cleaner": mock_cleaner,
             "translator": mock_translator,
+            "state_manager": mock_state_manager,
             "atualizar": mock_atualizar,
             "get_cache": mock_get_cache,
             "set_cache": mock_set_cache,
