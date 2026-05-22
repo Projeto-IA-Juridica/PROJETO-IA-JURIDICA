@@ -541,14 +541,14 @@ class TestEnviarBoasVindas:
         svc, ev, rp = _service()
         await svc.enviar_boas_vindas(ESCRITORIO_ID, CLIENTE_ID)
         texto_enviado = ev.chamadas_texto[0]["texto"]
-        assert "bem-vindo" in texto_enviado.lower()
+        assert "assistente virtual" in texto_enviado.lower()
 
     async def test_texto_contem_aviso_juridico(self):
         svc, ev, rp = _service()
         await svc.enviar_boas_vindas(ESCRITORIO_ID, CLIENTE_ID)
         texto_enviado = ev.chamadas_texto[0]["texto"]
-        # Alinhado ao template literal: "não substituem orientação jurídica formal"
-        assert "não substituem orientação jurídica formal" in texto_enviado
+        # Alinhado ao template atual: "não forneço parecer jurídico"
+        assert "não forneço parecer jurídico" in texto_enviado.lower()
 
     async def test_processo_id_none(self):
         svc, ev, rp = _service()

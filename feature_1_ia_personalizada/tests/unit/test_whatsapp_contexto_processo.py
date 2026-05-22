@@ -197,6 +197,10 @@ async def test_enviar_sem_movimentacao_texto_correto(service: WhatsAppService):
     row = MagicMock()
     row.escritorio_id = 3
     row.cliente_id = 9
+    # Forçar None para que carregar_templates use o template padrão (string real, não MagicMock)
+    row.template_boas_vindas = None
+    row.template_atualizacao = None
+    row.template_sem_novidade = None
 
     ctx = _mock_session_ctx(row=row)
 

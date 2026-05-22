@@ -46,12 +46,9 @@ class TestCheckPostgresql:
 
     async def test_erro_generico_retorna_error(self):
         mock_session = AsyncMock()
+        mock_session.execute = AsyncMock(side_effect=Exception("connection refused"))
 
-        with patch(
-            "feature_1_ia_personalizada.api.routes.health.asyncio.wait_for",
-            side_effect=Exception("connection refused"),
-        ):
-            result = await _check_postgresql(mock_session)
+        result = await _check_postgresql(mock_session)
 
         assert result["status"] == "error"
         assert "connection refused" in result["detail"]

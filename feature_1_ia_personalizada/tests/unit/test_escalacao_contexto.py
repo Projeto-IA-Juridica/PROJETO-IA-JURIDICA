@@ -103,7 +103,7 @@ async def test_com_advogado_cria_interacao():
     """Deve criar uma Interacao com metadata de escalação pendente."""
     adv = _make_usuario(id=5, whatsapp_numero="5511999999999")
     manager, session_mock, evolution = _make_manager(advogados=[adv])
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "WAMID_ABC"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "WAMID_ABC"}})
 
     resultado = await manager.avaliar_e_notificar_advogados(
         escritorio_id=10,
@@ -124,7 +124,7 @@ async def test_com_advogado_metadata_status_pendente():
     """Metadata da Interacao deve ter escalacao.status = 'pendente'."""
     adv = _make_usuario(id=5)
     manager, session_mock, evolution = _make_manager(advogados=[adv])
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "WAMID_XYZ"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "WAMID_XYZ"}})
 
     interacao_salva = None
     original_add = session_mock.add
@@ -158,7 +158,7 @@ async def test_sugestao_incluida_na_metadata():
     adv = _make_usuario(id=5)
     sugestao = "Sua dúvida foi recebida e o advogado entrará em contato."
     manager, session_mock, evolution = _make_manager(advogados=[adv], sugestao=sugestao)
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "WAMID_1"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "WAMID_1"}})
 
     interacao_salva = None
 
@@ -192,7 +192,7 @@ async def test_multiplos_advogados_todos_notificados():
     adv1 = _make_usuario(id=1, whatsapp_numero="5511111111111")
     adv2 = _make_usuario(id=2, whatsapp_numero="5522222222222")
     manager, session_mock, evolution = _make_manager(advogados=[adv1, adv2])
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "WAMID_M"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "WAMID_M"}})
 
     resultado = await manager.avaliar_e_notificar_advogados(
         escritorio_id=10,
@@ -205,7 +205,7 @@ async def test_multiplos_advogados_todos_notificados():
 
     assert resultado["enviado"] is True
     assert resultado["notificados_count"] == 2
-    assert evolution.enviar_mensagem.call_count == 2
+    assert evolution.enviar_texto.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -214,7 +214,7 @@ async def test_multiplos_advogados_ids_em_metadata():
     adv1 = _make_usuario(id=10, whatsapp_numero="5511111111111")
     adv2 = _make_usuario(id=20, whatsapp_numero="5522222222222")
     manager, session_mock, evolution = _make_manager(advogados=[adv1, adv2])
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "WID"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "WID"}})
 
     capturado = None
 
@@ -249,7 +249,7 @@ async def test_gerar_sugestao_chamada_com_historico():
     """_gerar_sugestao_resposta deve ser chamado com a mensagem e o histórico."""
     adv = _make_usuario(id=5)
     manager, session_mock, evolution = _make_manager(advogados=[adv])
-    evolution.enviar_mensagem = AsyncMock(return_value={"key": {"id": "W1"}})
+    evolution.enviar_texto = AsyncMock(return_value={"key": {"id": "W1"}})
 
     historico = [
         {"role": "user", "content": "Olá"},
@@ -280,7 +280,7 @@ async def test_falha_whatsapp_nao_impede_gravacao():
     """Mesmo se o envio WhatsApp falhar, a Interacao deve ser gravada."""
     adv = _make_usuario(id=5)
     manager, session_mock, evolution = _make_manager(advogados=[adv])
-    evolution.enviar_mensagem = AsyncMock(side_effect=Exception("WhatsApp offline"))
+    evolution.enviar_texto = AsyncMock(side_effect=Exception("WhatsApp offline"))
 
     # Não deve lançar exceção — o resultado pode indicar falha parcial
     try:

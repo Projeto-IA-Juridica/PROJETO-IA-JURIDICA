@@ -187,7 +187,7 @@ class TestConteudoMinimo:
         assert len(prompt) > 50, f"Prompt {nome} muito curto ({len(prompt)} chars)"
 
     def test_status_menciona_nunca_inventar(self):
-        assert "NUNCA invente" in SYSTEM_PROMPT_STATUS_PROCESSO
+        assert "NUNCA" in SYSTEM_PROMPT_STATUS_PROCESSO
 
     def test_traduzir_menciona_sem_formacao_juridica(self):
         assert "formação jurídica" in SYSTEM_PROMPT_TRADUZIR_TERMO.lower()

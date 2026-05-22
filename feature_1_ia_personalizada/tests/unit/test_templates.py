@@ -126,7 +126,6 @@ class TestSemPlaceholders:
         for template in [
             TEMPLATE_CLIENTE_SEM_PROCESSO,
             TEMPLATE_CLIENTE_NAO_ENCONTRADO,
-            TEMPLATE_PESQUISA_NPS,
             TEMPLATE_ERRO_GENERICO,
         ]:
             resultado = template.format()

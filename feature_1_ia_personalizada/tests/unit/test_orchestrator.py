@@ -62,6 +62,16 @@ class _Escritorio:
     id = 1
     nome = "Escritório Advocacia Teste"
     webhook_whatsapp_instance = "inst-abc"
+    persona_nome = None
+    persona_tom = None
+    plano = "basico"
+    quota_tokens_mes = None
+    tokens_usados_mes = 0
+    tokens_reset_em = None
+    escalacao_habilitada = False
+    escalacao_confidence_threshold = 0.7
+    escalacao_quota_tokens_mes = None
+    escalacao_tokens_usados_mes = 0
 
 
 class _Cliente:
@@ -663,13 +673,13 @@ class TestNodeVerificarResposta:
         O FactChecker é mockado — a correção da linguagem em si é testada em test_fact_checker.py.
         """
         orq = _make_orchestrator()
-        orq._fact_checker = MagicMock()
-        orq._fact_checker.filtrar_resposta = MagicMock(
+        orq._deps.fact_checker = MagicMock()
+        orq._deps.fact_checker.filtrar_resposta = MagicMock(
             return_value="Texto já filtrado pelo FactChecker."
         )
         state = _base_state(resposta_ia="Resposta original da IA.", usando_fallback=False)
         result = await orq._node_verificar_resposta(state)
-        orq._fact_checker.filtrar_resposta.assert_called_once()
+        orq._deps.fact_checker.filtrar_resposta.assert_called_once()
         assert result["resposta_verificada"] == "Texto já filtrado pelo FactChecker."
 
     async def test_sem_dados_processo_nao_executa_fact_check(self):
@@ -697,7 +707,7 @@ class TestNodeVerificarResposta:
         from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 
         orq = _make_orchestrator()
-        orq._fact_checker = FactChecker(buscar_dados_processo=_buscar_ok)
+        orq._deps.fact_checker = FactChecker(buscar_dados_processo=_buscar_ok)
         state = _base_state(
             resposta_ia=(
                 "O processo 1234567-89.2023.8.26.0100 está no TJSP. "
@@ -725,7 +735,7 @@ class TestNodeVerificarResposta:
         from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 
         orq = _make_orchestrator()
-        orq._fact_checker = FactChecker(buscar_dados_processo=_buscar_divergente)
+        orq._deps.fact_checker = FactChecker(buscar_dados_processo=_buscar_divergente)
         state = _base_state(
             resposta_ia="Processo no TJSP sem sentença.",
             dados_processo={"numero_cnj": "CNJ-REAL", "tribunal": "TJRJ"},
@@ -746,7 +756,7 @@ class TestNodeVerificarResposta:
         from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 
         orq = _make_orchestrator()
-        orq._fact_checker = FactChecker(buscar_dados_processo=_buscar_divergente)
+        orq._deps.fact_checker = FactChecker(buscar_dados_processo=_buscar_divergente)
         state = _base_state(
             resposta_ia="Informação incorreta sem CNJ.",
             dados_processo={"numero_cnj": "CNJ-X"},
@@ -764,8 +774,8 @@ class TestNodeVerificarResposta:
     async def test_excecao_no_fact_checker_passa_resposta_sem_bloquear(self):
         """Exceção interna no FactChecker não deve interromper o fluxo."""
         orq = _make_orchestrator()
-        orq._fact_checker = MagicMock()
-        orq._fact_checker.filtrar_resposta = MagicMock(side_effect=RuntimeError("bug"))
+        orq._deps.fact_checker = MagicMock()
+        orq._deps.fact_checker.filtrar_resposta = MagicMock(side_effect=RuntimeError("bug"))
 
         state = _base_state(resposta_ia="Resposta qualquer.", usando_fallback=False)
         result = await orq._node_verificar_resposta(state)
@@ -1034,7 +1044,7 @@ class TestRotas:
 
     # _rota_apos_gerar_resposta
     def test_gerar_sem_erro_vai_para_verificar(self):
-        assert self._orq()._rota_apos_gerar_resposta(_base_state(erro=None)) == "verificar_resposta"
+        assert self._orq()._rota_apos_gerar_resposta(_base_state(erro=None)) == "avaliar_confianca"
 
     def test_gerar_com_erro_vai_para_tratar_erro(self):
         assert (

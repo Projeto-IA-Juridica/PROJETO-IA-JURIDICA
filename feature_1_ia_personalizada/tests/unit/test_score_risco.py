@@ -227,12 +227,14 @@ def test_calcular_retorna_score_risco():
 
 
 def test_calcular_processo_minimo_sem_datajud():
-    """Processo sem nenhum dado → score válido com tudo em 50."""
+    """Processo sem nenhum dado → score válido (fase_processual=None → conhecimento=80)."""
     calc = ScoreRiscoCalculator()
     resultado = calc.calcular(_Processo(), None)
 
     assert isinstance(resultado, ScoreRisco)
-    assert resultado.score == 50  # todos componentes == 50; média ponderada = 50
+    # complexidade=50, duracao=50, historico=50, valor_causa=50, fase_processual=80(conhecimento)
+    # score = 50*0.25 + 50*0.25 + 50*0.20 + 50*0.15 + 80*0.15 = 12.5+12.5+10+7.5+12 = 54.5 → 54
+    assert resultado.score == 54
 
 
 def test_calcular_nivel_baixo_faixa_0_25():

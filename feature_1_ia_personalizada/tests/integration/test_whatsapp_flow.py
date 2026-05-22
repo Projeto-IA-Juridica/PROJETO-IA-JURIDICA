@@ -313,6 +313,8 @@ class TestWebhookHappyPath:
             id_cliente=cliente_cadastrado.id,
             mensagem="Olá",
             tipo="texto",
+            instance_nome=INSTANCIA,
+            audio_message_id=None,
         )
 
     @pytest.mark.asyncio
@@ -482,4 +484,6 @@ class TestWebhookMultiTenant:
             id_cliente=cliente_b.id,
             mensagem="Olá, preciso de ajuda",
             tipo="texto",
+            instance_nome="instancia-escritorio-b",
+            audio_message_id=None,
         )
