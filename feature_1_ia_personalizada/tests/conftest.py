@@ -233,6 +233,7 @@ if _is_sqlite:
             dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         return dt.isoformat()
 
+
 # Dependências reais/modelos
 from shared.database.session import get_db
 from shared.models.base import Base
