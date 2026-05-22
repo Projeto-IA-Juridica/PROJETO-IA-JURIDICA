@@ -63,7 +63,9 @@ def fase3():
 
     mock_translator = MagicMock()
     mock_translator.traduzir_andamento.side_effect = lambda t: f"[tr] {t}"
-    mock_translator.traduzir_com_contexto = MagicMock(side_effect=lambda **kw: f"[tr] {kw.get('andamento', '')}")
+    mock_translator.traduzir_com_contexto = MagicMock(
+        side_effect=lambda **kw: f"[tr] {kw.get('andamento', '')}"
+    )
 
     mock_state_manager = MagicMock()
     mock_state_manager.update_state.return_value = {"fase": "conhecimento", "andamentos": []}

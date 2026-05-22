@@ -31,6 +31,7 @@ MODULE = "feature_1_ia_personalizada.services.ai.processo_state"
 
 def _make_factory(session_mock):
     """Cria um mock de async_session_factory compatível com 'async with ... as session'."""
+
     # session.begin() precisa ser async context manager que chama commit() ao sair.
     # MagicMock passa 'self' como 1º argumento ao chamar dunders, por isso _aexit aceita *args.
     async def _begin_aexit(*args):

@@ -125,12 +125,6 @@ class FakeRedis:
     async def llen(self, key: str) -> int:
         return len(self._store.lists.get(key, []))
 
-    async def delete(self, key: str) -> int:
-        existed = key in self._store.lists
-        self._store.lists.pop(key, None)
-        self._store.ttls.pop(key, None)
-        return 1 if existed else 0
-
     async def get(self, key: str) -> str | None:
         return self._store.strings.get(key)
 

@@ -61,7 +61,7 @@ def _make_manager(advogados: list, sugestao: str = "Olá, entendo sua dúvida.")
 
     # Mock do método _gerar_sugestao_resposta
     manager = EscalacaoManager(claude, evolution, session_factory)
-    manager._gerar_sugestao_resposta = AsyncMock(
+    manager._gerar_sugestao_resposta = AsyncMock(  # type: ignore[method-assign]
         return_value={
             "resposta": sugestao,
             "tokens_input": 100,

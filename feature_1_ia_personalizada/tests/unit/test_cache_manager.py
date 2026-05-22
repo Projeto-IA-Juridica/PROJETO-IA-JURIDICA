@@ -175,7 +175,12 @@ class TestCapa:
         await cache.set_capa(CNJ, CAPA)
         chave = LegalDataCacheManager._key_capa(CNJ)
         ttl = redis._ttl(chave)
-        assert LegalDataCacheManager.TTL_CAPA_PROCESSO <= ttl <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
+        assert ttl is not None
+        assert (
+            LegalDataCacheManager.TTL_CAPA_PROCESSO
+            <= ttl
+            <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
+        )
 
     async def test_unicode_preservado(self, cache: LegalDataCacheManager):
         capa_unicode = {
@@ -213,7 +218,10 @@ class TestAndamentos:
         await cache.set_andamentos(CNJ, ANDAMENTOS)
         chave = LegalDataCacheManager._key_andamentos(CNJ)
         ttl = redis._ttl(chave)
-        assert LegalDataCacheManager.TTL_ANDAMENTOS <= ttl <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
+        assert ttl is not None
+        assert (
+            LegalDataCacheManager.TTL_ANDAMENTOS <= ttl <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
+        )
 
     async def test_lista_vazia_salva_e_recupera(self, cache: LegalDataCacheManager):
         await cache.set_andamentos(CNJ, [])
@@ -384,7 +392,11 @@ class TestHelpersSincronos:
         mock_redis.setex.assert_called_once()
         args = mock_redis.setex.call_args[0]
         assert args[0] == LegalDataCacheManager._key_andamentos(CNJ)
-        assert LegalDataCacheManager.TTL_ANDAMENTOS <= args[1] <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
+        assert (
+            LegalDataCacheManager.TTL_ANDAMENTOS
+            <= args[1]
+            <= LegalDataCacheManager.TTL_ANDAMENTOS + 60
+        )
         assert args[2] == json.dumps(ANDAMENTOS, ensure_ascii=False)
 
     def test_set_andamentos_sync_lista_vazia(self):
@@ -442,7 +454,11 @@ class TestHelpersSincronos:
         mock_redis.setex.assert_called_once()
         args = mock_redis.setex.call_args[0]
         assert args[0] == LegalDataCacheManager._key_capa(CNJ)
-        assert LegalDataCacheManager.TTL_CAPA_PROCESSO <= args[1] <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
+        assert (
+            LegalDataCacheManager.TTL_CAPA_PROCESSO
+            <= args[1]
+            <= LegalDataCacheManager.TTL_CAPA_PROCESSO + 60
+        )
         assert args[2] == json.dumps(CAPA, ensure_ascii=False)
 
     def test_set_capa_sync_redis_error_nao_crasha(self):
