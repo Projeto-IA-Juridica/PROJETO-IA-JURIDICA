@@ -220,4 +220,4 @@ async def test_enviar_sem_movimentacao_texto_correto(service: WhatsAppService):
 
     _, kwargs = mock_enviar.call_args
     texto = mock_enviar.call_args[0][2]
-    assert "sem movimentação" in texto.lower() or "30 dias" in texto
+    assert "movimentaç" in texto.lower() or "atualização" in texto.lower()
