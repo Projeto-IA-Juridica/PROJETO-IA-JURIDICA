@@ -6,7 +6,7 @@ from typing import Any, cast
 import httpx
 import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,10 +41,12 @@ async def _check_postgresql(db: AsyncSession) -> dict[str, Any]:
         return {"status": "error", "detail": str(e)}
 
 
-async def _check_redis() -> dict[str, Any]:
-    r = None
+async def _check_redis(client: redis.Redis | None = None) -> dict[str, Any]:
+    owned = client is None
+    r: redis.Redis | None = client
     try:
-        r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        if r is None:
+            r = redis.from_url(settings.REDIS_URL, decode_responses=True)
         t = time.perf_counter()
         await asyncio.wait_for(cast(Awaitable[bool], r.ping()), timeout=_CHECK_TIMEOUT)
         return {
@@ -56,8 +58,8 @@ async def _check_redis() -> dict[str, Any]:
     except Exception as e:
         return {"status": "error", "detail": str(e)}
     finally:
-        if r:
-            await r.close()
+        if owned and r:
+            await r.aclose()
 
 
 async def _check_claude_api() -> dict[str, Any]:
@@ -183,12 +185,13 @@ async def health_basic():
 
 
 @router.get("/ready")
-async def health_ready(db: AsyncSession = Depends(get_db)):
+async def health_ready(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Verifica se a API está pronta: testa PostgreSQL e Redis.
     Retorna 503 se algum dos dois falhar.
     """
-    pg, rd = await asyncio.gather(_check_postgresql(db), _check_redis())
+    redis_client: redis.Redis | None = getattr(request.app.state, "redis_client", None)
+    pg, rd = await asyncio.gather(_check_postgresql(db), _check_redis(redis_client))
 
     health = {"status": "ok", "db": pg, "redis": rd}
 
@@ -200,17 +203,18 @@ async def health_ready(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/detailed")
-async def health_detailed(db: AsyncSession = Depends(get_db)):
+async def health_detailed(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Health check exaustivo — verifica todos os serviços:
       - PostgreSQL e Redis (críticos: falha → 503)
       - Claude API, Evolution API, Celery workers, Google Sheets (externos: falha → 200 degraded)
     """
     t_total = time.perf_counter()
+    redis_client: redis.Redis | None = getattr(request.app.state, "redis_client", None)
 
     pg, rd, claude, evolution, celery_w, sheets = await asyncio.gather(
         _check_postgresql(db),
-        _check_redis(),
+        _check_redis(redis_client),
         _check_claude_api(),
         _check_evolution_api(),
         _check_celery_workers(),
