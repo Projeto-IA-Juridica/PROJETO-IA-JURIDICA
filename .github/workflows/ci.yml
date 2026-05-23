@@ -139,6 +139,29 @@ jobs:
             --tb=short -v --no-cov
 
   # ----------------------------------------------------------------------------
+  # Job 2b: CI Gate — status check único que resume os dois jobs obrigatórios.
+  # Quando o plano GitHub Pro/Team for ativado, basta marcar "CI Gate" como
+  # required status check nas branch protection rules para bloquear merges.
+  # ----------------------------------------------------------------------------
+  ci-gate:
+    name: "✅ CI Gate — obrigatório para merge"
+    needs: [test, integration-postgres]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Verificar resultado dos checks obrigatórios
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.integration-postgres.result }}" != "success" ]; then
+            echo "❌ Lint/Testes ou Integração falharam — merge bloqueado"
+            echo "   test: ${{ needs.test.result }}"
+            echo "   integration-postgres: ${{ needs.integration-postgres.result }}"
+            exit 1
+          fi
+          echo "✅ Todos os checks obrigatórios passaram"
+
+  # ----------------------------------------------------------------------------
   # Job 3: Segurança — bandit (SAST) + safety (dependências vulneráveis)
   # Roda em paralelo com os outros jobs.
   # bandit: analisa o código Python em busca de padrões inseguros (SQLi, shell injection, etc.)
