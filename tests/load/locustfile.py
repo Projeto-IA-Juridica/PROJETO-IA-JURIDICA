@@ -199,6 +199,10 @@ class AdvogadoAutenticado(HttpUser):
                 resp.success()
                 self.token = None
                 self.headers = {}
+            elif resp.status_code == 429:
+                # Rate limit em CI (todos os usuários no mesmo IP) — comportamento correto
+                resp.success()
+                # Mantém token existente se houver; caso contrário fica sem token
             else:
                 resp.failure(f"Login falhou: HTTP {resp.status_code}")
 

@@ -116,7 +116,7 @@ async def _check_celery_workers() -> dict[str, Any]:
         try:
             from feature_1_ia_personalizada.workers.celery_app import celery_app
 
-            inspector = celery_app.control.inspect(timeout=3.0)
+            inspector = celery_app.control.inspect(timeout=0.5)
             respostas = inspector.ping()
             if respostas:
                 return {"status": "ok", "workers": list(respostas.keys())}

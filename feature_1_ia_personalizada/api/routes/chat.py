@@ -46,7 +46,10 @@ def _get_ip(request: Request) -> str:
 def _get_escritorio_id(request: Request) -> int:
     if not hasattr(request.state, "user_payload"):
         raise HTTPException(status_code=401, detail="Não autenticado")
-    return int(request.state.user_payload.get("escritorio_id"))
+    escritorio_id = request.state.user_payload.get("escritorio_id")
+    if escritorio_id is None:
+        raise HTTPException(status_code=401, detail="Token sem escritorio_id")
+    return int(escritorio_id)
 
 
 async def get_redis() -> AsyncGenerator[Redis, None]:
@@ -288,10 +291,7 @@ def _atualizar_metricas_prometheus(
     Executado apenas em cache miss (cálculo real) — não em cache hit.
     Falhas são silenciosas para não impactar a resposta ao cliente.
     """
-    import asyncio
-
     from feature_1_ia_personalizada.api.routes.metrics import (
-        escalacoes_pendentes_gauge,
         ia_autonomia_percent_gauge,
         nps_score_gauge,
     )
@@ -304,48 +304,8 @@ def _atualizar_metricas_prometheus(
         )
     except Exception as e:
         logger.warning("prometheus_gauge_update_error", error=str(e))
-
-    # escalacoes_pendentes: conta interações com escalacao.status=pendente
-    async def _contar_escalacoes() -> int:
-        from sqlalchemy import text
-
-        result = await db.execute(
-            text(
-                "SELECT COUNT(*) FROM interacoes "
-                "WHERE escritorio_id = :eid "
-                "AND metadata_json->'escalacao'->>'status' = 'pendente'"
-            ),
-            {"eid": escritorio_id},
-        )
-        return result.scalar() or 0
-
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Já estamos em contexto async — agenda como task sem bloquear
-            asyncio.ensure_future(
-                _atualizar_gauge_escalacoes(escalacoes_pendentes_gauge, label, db)
-            )
-    except Exception as e:
-        logger.warning("prometheus_escalacoes_gauge_error", error=str(e))
-
-
-async def _atualizar_gauge_escalacoes(gauge, label: str, db: AsyncSession) -> None:
-    from sqlalchemy import text
-
-    try:
-        result = await db.execute(
-            text(
-                "SELECT COUNT(*) FROM interacoes "
-                "WHERE escritorio_id = :eid "
-                "AND metadata_json->'escalacao'->>'status' = 'pendente'"
-            ),
-            {"eid": int(label)},
-        )
-        total = result.scalar() or 0
-        gauge.labels(escritorio_id=label).set(total)
-    except Exception as e:
-        logger.warning("prometheus_escalacoes_count_error", error=str(e))
+    # Nota: escalacoes_pendentes_gauge não é atualizado aqui para evitar reutilizar
+    # a sessão DB do request em uma task em background (causa corrupção do estado da sessão).
 
 
 @router.get("/stats/export")

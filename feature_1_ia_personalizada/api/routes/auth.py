@@ -212,7 +212,10 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db)):
     if not hasattr(request.state, "user_payload"):
         raise HTTPException(status_code=401, detail="Não autenticado")
 
-    user_id = int(request.state.user_payload.get("sub"))
+    sub = request.state.user_payload.get("sub")
+    if sub is None:
+        raise HTTPException(status_code=401, detail="Token inválido: sub ausente")
+    user_id = int(sub)
 
     usuario = await db.get(Usuario, user_id)
     if not usuario:

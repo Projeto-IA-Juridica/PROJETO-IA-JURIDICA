@@ -24,7 +24,10 @@ def _get_escritorio_id(request: Request) -> int:
     """Helper para extrair o escritorio_id injetado pelo JWTAuthMiddleware"""
     if not hasattr(request.state, "user_payload"):
         raise HTTPException(status_code=401, detail="Não autenticado")
-    return int(request.state.user_payload.get("escritorio_id"))
+    escritorio_id = request.state.user_payload.get("escritorio_id")
+    if escritorio_id is None:
+        raise HTTPException(status_code=401, detail="Token sem escritorio_id")
+    return int(escritorio_id)
 
 
 def _get_user_id(request: Request) -> int:

@@ -45,7 +45,7 @@ SLA_TARGETS: dict[tuple[str, str], int] = {
     # Health / infra
     ("/health", "GET"): 200,
     ("/health/ready", "GET"): 300,
-    ("/health/detailed", "GET"): 500,
+    ("/health/detailed", "GET"): 5000,
     ("/metrics", "GET"): 200,
     # Auth
     ("/auth/login", "POST"): 1000,

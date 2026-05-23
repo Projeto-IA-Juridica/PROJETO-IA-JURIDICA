@@ -259,17 +259,34 @@ async def receive_message(
     elif "imageMessage" in _msg_content_dict:
         tipo_mensagem = "imagem"
 
-    processar_mensagem_recebida.delay(
-        id_escritorio=escritorio.id,
-        id_cliente=cliente.id,
-        mensagem=texto,
-        tipo=tipo_mensagem,
-        instance_nome=instance_name,
-        audio_message_id=audio_message_id,
-    )
+    try:
+        processar_mensagem_recebida.delay(
+            id_escritorio=escritorio.id,
+            id_cliente=cliente.id,
+            mensagem=texto,
+            tipo=tipo_mensagem,
+            instance_nome=instance_name,
+            audio_message_id=audio_message_id,
+        )
+    except Exception as exc:
+        logger.error(
+            "webhook_celery_dispatch_falhou",
+            cliente_id=cliente.id,
+            escritorio_id=escritorio.id,
+            erro=str(exc),
+        )
+        return {"status": "error", "reason": "task_dispatch_failed"}
 
     # 7.10 — CRM: dispara análise com debounce (1h) após cada interação
-    disparar_analise_com_debounce(cliente.id, escritorio.id)
+    try:
+        disparar_analise_com_debounce(cliente.id, escritorio.id)
+    except Exception as exc:
+        logger.warning(
+            "webhook_crm_debounce_falhou",
+            cliente_id=cliente.id,
+            escritorio_id=escritorio.id,
+            erro=str(exc),
+        )
 
     _mensagens_recebidas.labels(escritorio_id=str(escritorio.id), tipo=tipo_mensagem).inc()
     _webhook_processing_time.observe(time.perf_counter() - _inicio)
