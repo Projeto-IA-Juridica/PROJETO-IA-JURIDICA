@@ -243,7 +243,9 @@ class TestFormatarDataRelativa:
         return datetime.now(tz=UTC) - timedelta(hours=horas)
 
     def test_hoje(self):
-        assert formatar_data_relativa(self._dt_horas_atras(1)) == "hoje"
+        # Usa poucos minutos atrás para evitar falha na virada de dia UTC
+        dt = datetime.now(tz=UTC) - timedelta(minutes=5)
+        assert formatar_data_relativa(dt) == "hoje"
 
     def test_mais_de_24h_e_ontem(self):
         # 23:59 de ontem vs 00:01 de hoje — deve ser "ontem", não "hoje"
@@ -281,8 +283,9 @@ class TestFormatarDataRelativa:
         assert formatar_data_relativa(dt) == "em breve"
 
     def test_naive_datetime_tratado_como_utc(self):
-        # Naive datetime de 3 dias atrás deve funcionar sem erro
-        dt_naive = datetime.now() - timedelta(days=3)  # naive sem tzinfo
+        # Naive datetime criado a partir de UTC (sem tzinfo) — confirma que
+        # a função não lança exceção e interpreta corretamente como UTC
+        dt_naive = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=3)
         assert formatar_data_relativa(dt_naive) == "há 3 dias"
 
 
