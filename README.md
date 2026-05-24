@@ -72,9 +72,66 @@ O resultado: mais clientes atendidos, menos tempo operacional, relacionamento ma
 
 ### Modelo de negócio (SaaS B2B)
 
-- Cobrança mensal por escritório (por número de processos ativos ou por volume de interações)
-- Planos diferenciados por funcionalidade: `basico` (500K tokens/mês) | `profissional` (2M tokens/mês) | `enterprise` (sem limite)
-- Receita recorrente e baixo churn estrutural (dados e personas ficam no sistema)
+Cobrança mensal por escritório com 4 planos. Receita recorrente e baixo churn estrutural — dados, personas e base RAG ficam no sistema, tornando a troca de produto extremamente custosa para o cliente.
+
+#### Planos e funcionalidades
+
+| | **Starter** | **Profissional** | **Escritório** | **Enterprise** |
+|---|---|---|---|---|
+| **Preço** | R$ 497/mês | R$ 1.997/mês | R$ 4.997/mês | sob consulta |
+| **Advogados** | 1 | até 5 | até 15 | ilimitado |
+| **Processos monitorados** | 30 | 300 | 500 | ilimitado |
+| **Clientes** | 50 | 500 | ilimitado | ilimitado |
+| **Tokens Claude Sonnet/mês** | 500K | 2M | 5M | ilimitado |
+| **IA WhatsApp 24h** | ✅ | ✅ | ✅ | ✅ |
+| **Monitoramento de processos** | ✅ | ✅ | ✅ | ✅ |
+| **RAG — base de conhecimento** | ✅ | ✅ | ✅ | ✅ |
+| **CRM Inteligente** | ✅ | ✅ | ✅ | ✅ |
+| **Analytics & exportação** | básico | completo | completo | completo |
+| **Hub do Advogado (Claude Opus)** | ❌ | ✅ 300K tokens/mês | ✅ 1M tokens/mês | ✅ ilimitado |
+| **Prospecção Inteligente** | ❌ | ✅ | ✅ | ✅ |
+| **Suporte** | email | prioritário | dedicado | SLA contratual |
+
+#### Valor entregue vs. preço cobrado
+
+O preço de cada plano representa aproximadamente **2–10% do valor econômico mensal entregue** ao escritório — calculado sobre economia de tempo dos advogados, churn evitado e nova receita gerada por prospecção inteligente.
+
+| Plano | Valor econômico entregue/mês¹ | Preço | % do valor |
+|---|---|---|---|
+| Starter | ~R$ 23.000 | R$ 497 | 2,2% |
+| Profissional | ~R$ 96.000 | R$ 1.997 | 2,1% |
+| Escritório | ~R$ 210.000 | R$ 4.997 | 2,4% |
+
+> ¹ Estimativa para perfil típico de cada plano: inclui tempo de advogado recuperado (3–5h/semana/advogado × R$ 180/h), churn evitado pelo CRM (~17% de redução, ~R$ 7.150/cliente/ano), nova receita gerada pela prospecção inteligente (6 novos clientes/mês × R$ 5.500 ticket médio no plano Profissional) e análise de petições via Hub do Advogado (2h economizadas/petição × R$ 180/h).
+
+#### Margens por plano (modelo com sócios como equipe)
+
+Custos variáveis por cliente: Claude API (com prompt caching ativo) + infra Railway pro-rata + Stripe 2,5%. DataJud CNJ como fonte de dados primária (gratuito). Impostos ~15% (Simples Nacional).
+
+| | Starter | Profissional | Escritório |
+|---|---|---|---|
+| Receita | R$ 497 | R$ 1.997 | R$ 4.997 |
+| Claude Sonnet (com caching) | R$ 15 | R$ 58 | R$ 145 |
+| Claude Opus — Hub | — | R$ 77 | R$ 255 |
+| Infra Railway pro-rata | R$ 25 | R$ 50 | R$ 100 |
+| Enriquecimento CNPJ | — | R$ 25 | R$ 60 |
+| Whisper (áudio) | R$ 1 | R$ 5 | R$ 12 |
+| Stripe 2,5% | R$ 12 | R$ 50 | R$ 125 |
+| Impostos ~15% | R$ 75 | R$ 300 | R$ 750 |
+| **Lucro líquido/cliente** | **R$ 369** | **R$ 1.432** | **R$ 3.550** |
+| **Margem líquida** | **74%** | **72%** | **71%** |
+
+#### Projeção por escala (3 sócios, mix realista de planos)
+
+| Clientes ativos | Mix | Líquido total/mês | Por sócio/mês |
+|---|---|---|---|
+| 10 | 6 Profissional + 4 Starter | R$ 10.063 | **R$ 3.354** |
+| 20 | 12 Profissional + 8 Starter | R$ 20.125 | **R$ 6.708** |
+| 30 | 20 Profissional + 8 Starter + 2 Escritório | R$ 36.604 | **R$ 12.201** |
+| 50 | 32 Profissional + 12 Starter + 6 Escritório | R$ 63.523 | **R$ 21.174** |
+| 100 | 65 Profissional + 20 Starter + 15 Escritório | R$ 154.721 | **R$ 51.573** |
+
+> Break-even operacional: **cliente 1** (sem folha fixa — sócios são a equipe). A partir de ~40 clientes, cada sócio supera R$ 15k/mês sem capital externo nem diluição.
 
 ---
 
