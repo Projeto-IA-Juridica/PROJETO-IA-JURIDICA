@@ -8,10 +8,11 @@ Cada mensagem que o advogado envia ao Hub gera um registro aqui,
 com a resposta, intenção classificada, modelo usado e custo.
 """
 
+import uuid as _uuid
 from decimal import Decimal
 
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
@@ -65,6 +66,12 @@ class SessaoAdvogado(Base, TimestampMixin, TenantMixin):
     )
     processo_referenciado_id: Mapped[int | None] = mapped_column(
         ForeignKey("processos.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Agrupa múltiplas trocas em um thread de conversa (UUID gerado pelo frontend)
+    conversa_id: Mapped[_uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
         nullable=True,
     )
 

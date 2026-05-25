@@ -30,19 +30,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "clientes",
-        sa.Column(
-            "cpf_version",
-            sa.SmallInteger(),
-            nullable=False,
-            server_default="1",
-            comment=(
-                "Versão da chave Fernet usada para criptografar o CPF. "
-                "Incrementar ao rotar ENCRYPTION_KEY."
+    conn = op.get_bind()
+    col_exists = conn.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='clientes' AND column_name='cpf_version'"
+        )
+    ).fetchone()
+    if not col_exists:
+        op.add_column(
+            "clientes",
+            sa.Column(
+                "cpf_version",
+                sa.SmallInteger(),
+                nullable=False,
+                server_default="1",
+                comment=(
+                    "Versão da chave Fernet usada para criptografar o CPF. "
+                    "Incrementar ao rotar ENCRYPTION_KEY."
+                ),
             ),
-        ),
-    )
+        )
 
 
 def downgrade() -> None:
