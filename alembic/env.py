@@ -10,6 +10,14 @@ Destaques:
 
 import asyncio
 import os
+import sys
+from pathlib import Path
+
+# Adiciona o diretório raiz do projeto ao sys.path
+# para que o Alembic possa encontrar os módulos (como 'shared')
+root_dir = Path(__file__).resolve().parents[1]
+sys.path.append(str(root_dir))
+
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
