@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>amicus — Concierge Jurídico com IA</title>
+  <meta name="description" content="Assistente de IA para escritórios de advocacia. Atenda clientes no WhatsApp 24h, monitore processos e capte leads qualificados." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cormorant+Garamond:wght@400;500;600&display=swap" />
+  <style>
+    :root {
+      --bg:#F4F8FC; --surface:#EAF2FA; --white:#FFFFFF;
+      --ink:#0C1E30; --secondary:#4A6A88; --muted:#8AAAC0;
+      --blue:#3A7AB8; --blue-accent:#1248BE; --blue-hover:#0F3BA0;
+      --blue-light:#A8C8E8; --blue-pale:#E8F2FC; --blue-mid:#2A62C8;
+      --green:#1A9E78; --amber:#D08010; --red:#C83030;
+      --border:rgba(168,200,232,0.30); --border-s:#D4E6F4;
+      --dark:#0C1E30; --dark-surface:#132540; --dark-hover:#1A3050;
+      --dark-border:rgba(168,200,232,0.12);
+      --sans:'Plus Jakarta Sans',system-ui,sans-serif;
+      --serif:'Cormorant Garamond',Georgia,serif;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:var(--sans);background:var(--white);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--blue-light);border-radius:99px}
+    .wrap{max-width:1160px;margin:0 auto;padding:0 28px}
+
+    /* NAV */
+    nav{position:fixed;top:0;left:0;right:0;z-index:200;transition:background .25s,box-shadow .25s;padding:0}
+    nav.scrolled{background:rgba(255,255,255,0.92);backdrop-filter:blur(16px);box-shadow:0 1px 0 var(--border-s)}
+    nav:not(.scrolled){background:transparent}
+    .nav-i{display:flex;align-items:center;justify-content:space-between;height:64px}
+    .nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .nav-logo-name{font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--white)}
+    nav.scrolled .nav-logo-name{color:var(--ink)}
+    .nav-links{display:flex;align-items:center;gap:30px}
+    .nav-links a{font-size:.82rem;font-weight:500;text-decoration:none;color:rgba(255,255,255,.75);transition:color .15s}
+    nav.scrolled .nav-links a{color:var(--secondary)}
+    .nav-links a:hover{color:var(--white)}
+    nav.scrolled .nav-links a:hover{color:var(--ink)}
+    .nav-cta{background:var(--white);color:var(--blue-accent);font-size:.82rem;font-weight:700;padding:9px 20px;border-radius:10px;border:none;cursor:pointer;text-decoration:none;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+    nav.scrolled .nav-cta{background:var(--blue-accent);color:var(--white);box-shadow:0 4px 16px rgba(18,72,190,.3)}
+    .nav-cta:hover{transform:translateY(-1px)}
+    @media(max-width:680px){.nav-links{display:none}}
+
+    /* HERO */
+    .hero{min-height:100vh;display:flex;align-items:center;padding:100px 0 80px;position:relative;overflow:hidden;
+      background:linear-gradient(140deg,#0C1E30 0%,#1248BE 55%,#1A4ED8 100%)}
+    .hero-orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
+    .orb1{width:600px;height:600px;background:radial-gradient(circle,rgba(58,122,184,.45) 0%,transparent 70%);top:-150px;right:-100px;animation:float1 12s ease-in-out infinite alternate}
+    .orb2{width:400px;height:400px;background:radial-gradient(circle,rgba(26,158,120,.2) 0%,transparent 70%);bottom:-50px;left:-80px;animation:float2 10s ease-in-out infinite alternate}
+    .orb3{width:300px;height:300px;background:radial-gradient(circle,rgba(168,200,232,.15) 0%,transparent 70%);top:40%;right:35%;animation:float3 8s ease-in-out infinite alternate}
+    @keyframes float1{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,20px) scale(1.08)}}
+    @keyframes float2{from{transform:translate(0,0)}to{transform:translate(20px,-30px)}}
+    @keyframes float3{from{transform:translate(0,0) scale(1)}to{transform:translate(-15px,15px) scale(1.1)}}
+    .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:52px 52px;pointer-events:none}
+    .hero-content{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+    @media(max-width:900px){.hero-content{grid-template-columns:1fr}.hero-right{display:none}}
+    .hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(8px);color:rgba(255,255,255,.9);font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;border-radius:99px;margin-bottom:24px}
+    .hero-dot{width:6px;height:6px;border-radius:50%;background:#1A9E78;animation:pdot 2s infinite}
+    @keyframes pdot{0%,100%{box-shadow:0 0 0 0 rgba(26,158,120,.6)}50%{box-shadow:0 0 0 6px rgba(26,158,120,0)}}
+    .hero h1{font-size:clamp(2.4rem,4.5vw,3.8rem);font-weight:800;line-height:1.07;color:#fff;letter-spacing:-.03em;margin-bottom:22px}
+    .hero h1 em{font-style:normal;color:var(--blue-light)}
+    .hero-sub{font-size:1.05rem;color:rgba(255,255,255,.7);max-width:480px;line-height:1.7;margin-bottom:36px}
+    .hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:48px}
+    .btn-hero-primary{background:#fff;color:var(--blue-accent);font-size:.9rem;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;text-decoration:none;transition:all .18s;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+    .btn-hero-primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.25)}
+    .btn-hero-ghost{background:rgba(255,255,255,.1);color:#fff;font-size:.9rem;font-weight:600;padding:13px 24px;border-radius:12px;border:1px solid rgba(255,255,255,.25);cursor:pointer;text-decoration:none;backdrop-filter:blur(8px);transition:all .18s}
+    .btn-hero-ghost:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4)}
+    .hero-stats{display:flex;gap:36px;flex-wrap:wrap}
+    .stat-val{font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-.03em;line-height:1}
+    .stat-lbl{font-size:.72rem;color:rgba(255,255,255,.55);margin-top:4px}
+
+    /* MOCKUP HERO */
+    .mockup-wrap{position:relative;z-index:2}
+    .mockup-glow{position:absolute;inset:-40px;background:radial-gradient(circle,rgba(58,122,184,.3) 0%,transparent 65%);pointer-events:none}
+    .mockup-phone{background:var(--dark-surface);border:1px solid rgba(255,255,255,.12);border-radius:20px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.08);position:relative}
+    .phone-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--dark-border);background:rgba(255,255,255,.03)}
+    .phone-dot{width:10px;height:10px;border-radius:50%}
+    .phone-title{font-size:.7rem;color:var(--muted);margin-left:4px;font-weight:500}
+    .phone-status{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:.65rem;color:#1A9E78;font-weight:600}
+    .online-dot{width:5px;height:5px;border-radius:50%;background:#1A9E78;animation:pdot 2s infinite}
+    .phone-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+    .pmsg{max-width:82%;padding:10px 14px;font-size:.76rem;line-height:1.55}
+    .pmsg-ai{background:var(--dark-hover);color:var(--blue-light);border-radius:12px 12px 12px 3px;border:1px solid var(--dark-border);align-self:flex-start}
+    .pmsg-user{background:linear-gradient(135deg,#1248BE,#2D6FD4);color:#fff;border-radius:12px 12px 3px 12px;align-self:flex-end}
+    .pmsg-lbl{font-size:.62rem;font-weight:700;margin-bottom:3px;opacity:.7;letter-spacing:.03em}
+    .typing{display:flex;gap:4px;padding:10px 14px;align-items:center;background:var(--dark-hover);border-radius:12px 12px 12px 3px;border:1px solid var(--dark-border);align-self:flex-start;width:fit-content}
+    .td{width:5px;height:5px;border-radius:50%;background:var(--muted);animation:dp 1.3s infinite}
+    .td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
+    @keyframes dp{0%,80%,100%{transform:scale(.65);opacity:.35}40%{transform:scale(1);opacity:1}}
+
+    /* TICKER */
+    .ticker-wrap{background:var(--white);border-bottom:1px solid var(--border-s);padding:16px 0;overflow:hidden}
+    .ticker{display:flex;gap:40px;width:max-content;animation:tick 35s linear infinite}
+    .ticker:hover{animation-play-state:paused}
+    @keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .tick-item{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:.76rem;font-weight:600;color:var(--secondary)}
+    .tick-dot{width:4px;height:4px;border-radius:50%;background:var(--border-s)}
+
+    /* SECTION */
+    .section{padding:100px 0}
+    .stag{display:inline-flex;align-items:center;gap:8px;font-size:.68rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--blue-accent);margin-bottom:12px}
+    .stag::before{content:'';width:16px;height:2px;background:var(--blue-accent);border-radius:99px}
+    h2.stitle{font-size:clamp(1.9rem,3.5vw,2.8rem);font-weight:800;letter-spacing:-.025em;line-height:1.1;color:var(--ink);margin-bottom:14px}
+    h2.stitle em{font-style:normal;color:var(--blue-accent)}
+    .ssub{font-size:1rem;color:var(--secondary);line-height:1.7;max-width:520px}
+
+    /* PROBLEM */
+    .problem{background:var(--white)}
+    .problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+    @media(max-width:780px){.problem-grid{grid-template-columns:1fr;gap:48px}}
+    .pcard{background:linear-gradient(135deg,#0C1E30 0%,#1248BE 100%);border-radius:24px;padding:44px;position:relative;overflow:hidden}
+    .pcard::before{content:'"';font-family:var(--serif);font-size:9rem;line-height:1;color:rgba(168,200,232,.1);position:absolute;top:0;left:16px;pointer-events:none}
+    .pcard blockquote{font-family:var(--serif);font-size:1.3rem;line-height:1.65;color:#fff;position:relative;z-index:1;font-weight:400}
+    .pcard-author{margin-top:20px;font-size:.78rem;color:rgba(255,255,255,.5);position:relative;z-index:1}
+    .plist{list-style:none;display:flex;flex-direction:column;gap:14px;margin-top:28px}
+    .plist li{display:flex;align-items:flex-start;gap:13px;padding:16px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border-s);font-size:.88rem;color:var(--secondary);line-height:1.5}
+    .plist-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(200,48,48,.1)}
+
+    /* STATS */
+    .stats-sec{background:linear-gradient(135deg,var(--blue-accent) 0%,#1A4ED8 100%);padding:72px 0;position:relative;overflow:hidden}
+    .stats-sec::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 100% at 80% 50%,rgba(255,255,255,.06) 0%,transparent 60%);pointer-events:none}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+    @media(max-width:680px){.stats-grid{grid-template-columns:repeat(2,1fr);gap:20px}}
+    .stat-item{text-align:center;padding:8px 16px;position:relative}
+    .stat-item:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;bottom:20%;width:1px;background:rgba(255,255,255,.15)}
+    .sval{font-size:2.6rem;font-weight:800;color:#fff;letter-spacing:-.04em;line-height:1}
+    .slbl{font-size:.75rem;color:rgba(255,255,255,.65);margin-top:6px;line-height:1.4}
+
+    /* FEATURES */
+    .features{background:var(--bg)}
+    .feat-header{text-align:center;margin-bottom:60px}
+    .feat-header .stag{justify-content:center}.feat-header .stag::before{display:none}
+    .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    @media(max-width:900px){.feat-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+    .fcard{background:var(--white);border-radius:20px;padding:28px;border:1px solid var(--border-s);transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s,border-color .18s}
+    .fcard:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(12,30,48,.1);border-color:rgba(18,72,190,.35)}
+    .ficon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+    .fcard h3{font-size:.97rem;font-weight:700;color:var(--ink);margin-bottom:8px}
+    .fcard p{font-size:.84rem;color:var(--secondary);line-height:1.65}
+    .ftag{display:inline-block;margin-top:14px;font-size:.67rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px}
+
+    /* SCREENS */
+    .screens{background:var(--white);padding:100px 0}
+    .screens-header{text-align:center;margin-bottom:64px}
+    .screens-header .stag{justify-content:center}.screens-header .stag::before{display:none}
+    .screens-row{display:flex;flex-direction:column;gap:80px}
+    .screen-block{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+    .screen-block.reverse{direction:rtl}.screen-block.reverse>*{direction:ltr}
+    @media(max-width:860px){.screen-block,.screen-block.reverse{grid-template-columns:1fr;direction:ltr}}
+    .screen-text .stag{justify-content:flex-start}
+    .screen-text p{font-size:.92rem;color:var(--secondary);line-height:1.7;margin-top:12px;margin-bottom:24px}
+    .screen-chips{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg);border:1px solid var(--border-s);border-radius:8px;font-size:.75rem;color:var(--secondary);font-weight:500}
+    .chip svg{color:var(--green)}
+    .screen-frame{border-radius:20px;overflow:hidden;box-shadow:0 24px 72px rgba(12,30,48,.14),0 0 0 1px var(--border-s);background:var(--bg);position:relative}
+    .screen-frame::before{content:'';position:absolute;top:0;left:0;right:0;height:36px;background:var(--white);border-bottom:1px solid var(--border-s);display:flex;align-items:center;z-index:1}
+    .frame-bar{height:36px;background:var(--white);border-bottom:1px solid var(--border-s);display:flex;align-items:center;padding:0 14px;gap:6px;flex-shrink:0}
+    .frame-dot{width:9px;height:9px;border-radius:50%}
+    .frame-title{font-size:.65rem;font-weight:600;color:var(--muted);margin-left:6px}
+
+    /* APP MOCKUP: HUB IA */
+    .hub-mock{background:var(--bg);border-radius:0 0 18px 18px}
+    .hub-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--white);border-bottom:1px solid var(--border-s)}
+    .tool-pills{display:flex;gap:2px;background:rgba(12,30,48,.05);padding:3px;border-radius:12px}
+    .tpill{padding:5px 12px;border-radius:9px;font-size:.7rem;font-weight:600;color:var(--muted);cursor:default}
+    .tpill.active{background:var(--white);color:var(--blue-accent);box-shadow:0 1px 4px rgba(18,72,190,.15)}
+    .hub-msgs{padding:14px;display:flex;flex-direction:column;gap:10px}
+    .hmsg{max-width:85%;padding:10px 14px;font-size:.74rem;line-height:1.55;border-radius:16px}
+    .hmsg-ai{background:var(--white);color:var(--secondary);border:1px solid var(--border-s);border-radius:16px 16px 16px 3px;align-self:flex-start;box-shadow:0 1px 4px rgba(12,30,48,.05)}
+    .hmsg-user{background:linear-gradient(135deg,#1248BE,#2D6FD4);color:#fff;border-radius:16px 16px 3px 16px;align-self:flex-end}
+    .ai-avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1248BE,#4A8ED4);display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:#fff;flex-shrink:0}
+    .hmsg-row{display:flex;align-items:flex-end;gap:7px}
+    .hub-input-bar{padding:10px 14px;background:var(--white);border-top:1px solid var(--border-s);display:flex;gap:8px;align-items:center}
+    .hub-input{flex:1;background:var(--bg);border:1px solid var(--border-s);border-radius:10px;padding:8px 12px;font-size:.73rem;color:var(--muted)}
+    .hub-send{width:30px;height:30px;border-radius:8px;background:var(--blue-accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+    /* APP MOCKUP: PAINEL */
+    .painel-mock{background:var(--bg);border-radius:0 0 18px 18px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .kpi-card{background:var(--white);border-radius:12px;padding:12px;border:1px solid var(--border-s)}
+    .kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .kpi-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+    .kpi-icon{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center}
+    .kpi-val{font-size:1.4rem;font-weight:800;line-height:1;letter-spacing:-.02em}
+    .kpi-sub{font-size:.62rem;color:var(--muted);margin-top:3px}
+    .section-card{background:var(--white);border-radius:12px;border:1px solid var(--border-s);overflow:hidden}
+    .section-card-header{padding:8px 12px;border-bottom:1px solid var(--border-s);background:rgba(12,30,48,.02);display:flex;align-items:center;gap:6px}
+    .section-card-title{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--secondary)}
+    .risk-row{display:flex;align-items:center;gap:8px;padding:7px 12px}
+    .risk-lbl{font-size:.67rem;font-weight:600;width:52px;flex-shrink:0}
+    .risk-bar-wrap{flex:1;height:5px;border-radius:99px;overflow:hidden;background:rgba(12,30,48,.06)}
+    .risk-bar-fill{height:100%;border-radius:99px}
+    .risk-count{font-size:.67rem;font-weight:700;color:var(--ink);width:18px;text-align:right}
+    .client-row{display:flex;align-items:center;gap:8px;padding:7px 12px;border-top:1px solid var(--border-s)}
+    .c-avatar{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0}
+    .c-name{font-size:.72rem;font-weight:600;color:var(--ink)}
+    .c-sub{font-size:.62rem;color:var(--muted);margin-top:1px}
+    .c-badge{font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:5px;margin-left:auto;flex-shrink:0}
+
+    /* APP MOCKUP: CAPTACAO */
+    .capt-mock{background:var(--bg);border-radius:0 0 18px 18px;padding:14px;display:flex;flex-direction:column;gap:10px}
+    .dna-card{background:linear-gradient(135deg,rgba(18,72,190,.08),rgba(58,122,184,.05));border:1px solid rgba(18,72,190,.18);border-radius:12px;padding:12px}
+    .dna-header{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .dna-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--blue-accent)}
+    .dna-tags{display:flex;flex-wrap:wrap;gap:5px}
+    .dna-tag{font-size:.62rem;font-weight:600;padding:3px 8px;background:rgba(18,72,190,.1);color:var(--blue-accent);border-radius:6px;border:1px solid rgba(18,72,190,.18)}
+    .lead-card{background:var(--white);border-radius:12px;border:1px solid var(--border-s);overflow:hidden}
+    .lead-accent{height:100%;width:3px;flex-shrink:0;border-radius:0}
+    .lead-inner{padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+    .score-box{width:38px;height:38px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+    .score-n{font-size:.9rem;font-weight:800;line-height:1}
+    .score-s{font-size:.55rem;font-weight:700;opacity:.8}
+    .lead-info{flex:1;min-width:0}
+    .lead-name{font-size:.75rem;font-weight:700;color:var(--ink)}
+    .lead-sub{font-size:.63rem;color:var(--muted);margin-top:2px}
+    .lead-tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+    .ltag{font-size:.58rem;font-weight:600;padding:2px 7px;border-radius:5px}
+    .status-novo{background:rgba(58,122,184,.1);color:var(--blue);border:1px solid rgba(58,122,184,.22)}
+    .status-qual{background:rgba(26,158,120,.1);color:var(--green);border:1px solid rgba(26,158,120,.22)}
+    .status-cont{background:rgba(208,128,16,.1);color:var(--amber);border:1px solid rgba(208,128,16,.22)}
+
+    /* HOW */
+    .how{background:linear-gradient(160deg,#0C1E30 0%,#132540 100%);padding:100px 0;position:relative;overflow:hidden}
+    .how::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(18,72,190,.15) 0%,transparent 55%);pointer-events:none}
+    .how .stitle{color:#EAF2FA}.how .ssub{color:var(--muted)}
+    .how-hd{margin-bottom:60px}
+    .steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
+    @media(max-width:720px){.steps-grid{grid-template-columns:1fr;gap:0}}
+    .steps-line{position:absolute;top:32px;left:calc(16.7% + 24px);right:calc(16.7% + 24px);height:1px;background:linear-gradient(90deg,var(--dark-border),rgba(58,122,184,.5),var(--dark-border))}
+    @media(max-width:720px){.steps-line{display:none}}
+    .step{padding:28px 24px}
+    .step-n{width:46px;height:46px;border-radius:50%;border:2px solid rgba(58,122,184,.4);background:var(--dark-surface);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:800;color:var(--blue-light);margin-bottom:20px;position:relative;z-index:1}
+    .step h3{font-size:.97rem;font-weight:700;color:#EAF2FA;margin-bottom:8px}
+    .step p{font-size:.84rem;color:var(--muted);line-height:1.65}
+    .how-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:48px}
+    .hchip{display:flex;align-items:center;gap:7px;background:var(--dark-surface);border:1px solid var(--dark-border);padding:8px 16px;border-radius:99px;font-size:.75rem;color:var(--muted)}
+    .hchip svg{color:var(--green);flex-shrink:0}
+
+    /* PRICING */
+    .pricing{background:var(--bg);padding:100px 0}
+    .price-hd{text-align:center;margin-bottom:52px}
+    .price-hd .stag{justify-content:center}.price-hd .stag::before{display:none}
+    .plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start}
+    @media(max-width:960px){.plans{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:540px){.plans{grid-template-columns:1fr}}
+    .plan{border-radius:20px;padding:28px 22px;border:1px solid var(--border-s);background:var(--white);position:relative;transition:transform .18s,box-shadow .18s}
+    .plan:hover{transform:translateY(-3px);box-shadow:0 16px 48px rgba(12,30,48,.1)}
+    .plan-pop{border-color:var(--blue-accent);background:linear-gradient(160deg,#0C1E30 0%,#1248BE 100%);box-shadow:0 0 0 1px var(--blue-accent),0 20px 60px rgba(18,72,190,.25)}
+    .plan-pop:hover{transform:translateY(-4px);box-shadow:0 0 0 1px var(--blue-accent),0 24px 70px rgba(18,72,190,.3)}
+    .pop-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--blue-accent);color:#fff;font-size:.64rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 14px;border-radius:99px;white-space:nowrap}
+    .plan-name{font-size:.72rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+    .plan-pop .plan-name{color:rgba(168,200,232,.7)}
+    .plan-price{font-size:1.9rem;font-weight:800;color:var(--ink);letter-spacing:-.03em;line-height:1}
+    .plan-pop .plan-price{color:#fff}
+    .plan-price span{font-size:.82rem;font-weight:500;color:var(--secondary);letter-spacing:0}
+    .plan-pop .plan-price span{color:rgba(255,255,255,.55)}
+    .plan-desc{font-size:.79rem;color:var(--secondary);margin:8px 0 18px;line-height:1.5}
+    .plan-pop .plan-desc{color:rgba(255,255,255,.6)}
+    .pdiv{height:1px;background:var(--border-s);margin-bottom:18px}
+    .plan-pop .pdiv{background:rgba(168,200,232,.15)}
+    .pfeats{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:22px}
+    .pfeats li{display:flex;align-items:flex-start;gap:8px;font-size:.78rem;line-height:1.45;color:var(--secondary)}
+    .plan-pop .pfeats li{color:rgba(255,255,255,.7)}
+    .pcheck{color:var(--green);flex-shrink:0;margin-top:1px}
+    .pcross{color:var(--muted);flex-shrink:0;margin-top:1px}
+    .pbtn{width:100%;padding:11px;border-radius:10px;font-size:.84rem;font-weight:700;cursor:pointer;border:none;transition:all .14s;font-family:var(--sans)}
+    .pbtn-out{background:transparent;color:var(--blue-accent);border:1.5px solid var(--border-s)}
+    .pbtn-out:hover{border-color:var(--blue-accent);background:rgba(18,72,190,.04)}
+    .pbtn-dark{background:rgba(58,122,184,.15);color:var(--blue-light);border:1px solid rgba(58,122,184,.3)}
+    .pbtn-dark:hover{background:rgba(58,122,184,.25)}
+    .pbtn-muted{background:transparent;color:var(--secondary);border:1.5px solid var(--border-s)}
+    .value-note{margin-top:32px;padding:18px 24px;background:var(--white);border-radius:14px;border:1px solid var(--border-s);display:flex;align-items:center;gap:12px}
+    .value-note p{font-size:.81rem;color:var(--secondary);line-height:1.55}
+    .value-note strong{color:var(--ink)}
+
+    /* COMPLIANCE */
+    .compliance{background:var(--blue-pale);padding:44px 0;border-top:1px solid var(--border-s);border-bottom:1px solid var(--border-s)}
+    .comp-inner{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+    .comp-item{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--white);border-radius:10px;border:1px solid var(--border-s);font-size:.78rem;font-weight:600;color:var(--secondary)}
+    .comp-item svg{color:var(--green)}
+
+    /* CTA */
+    .cta-section{background:linear-gradient(140deg,#0C1E30 0%,#1248BE 55%,#1A4ED8 100%);padding:100px 0;text-align:center;position:relative;overflow:hidden}
+    .cta-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 100% at 50% 50%,rgba(255,255,255,.05) 0%,transparent 60%);pointer-events:none}
+    .cta-section .hero-orb{pointer-events:none}
+    .cta-section h2{font-size:clamp(1.9rem,4vw,3.1rem);font-weight:800;letter-spacing:-.025em;color:#fff;margin-bottom:14px;position:relative;line-height:1.1}
+    .cta-section p{font-size:.97rem;color:rgba(255,255,255,.65);margin-bottom:36px;position:relative}
+    .cta-btns{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;position:relative}
+
+    /* FOOTER */
+    footer{background:#060D16;border-top:1px solid rgba(168,200,232,.06);padding:52px 0 32px}
+    .foot-inner{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:48px;margin-bottom:40px}
+    @media(max-width:660px){.foot-inner{grid-template-columns:1fr;gap:28px}}
+    .foot-brand{display:flex;flex-direction:column;gap:12px}
+    .foot-name{font-size:1.05rem;font-weight:700;color:#EAF2FA;letter-spacing:-.01em}
+    .foot-sub{font-size:.79rem;color:var(--muted);line-height:1.65;max-width:240px}
+    .foot-col h4{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .foot-col a{display:block;font-size:.81rem;color:#4A6A88;text-decoration:none;margin-bottom:9px;transition:color .14s}
+    .foot-col a:hover{color:#EAF2FA}
+    .foot-bottom{border-top:1px solid rgba(168,200,232,.06);padding-top:22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    .foot-bottom p{font-size:.73rem;color:#2E4560}
+    .foot-links{display:flex;gap:18px}
+    .foot-links a{font-size:.73rem;color:#2E4560;text-decoration:none;transition:color .14s}
+    .foot-links a:hover{color:var(--muted)}
+
+    /* ANIMS */
+    @keyframes fadeup{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+    .au{opacity:0}
+    .au.vis{animation:fadeup .55s cubic-bezier(.22,1,.36,1) both}
+    .au:nth-child(1).vis{animation-delay:0ms}
+    .au:nth-child(2).vis{animation-delay:80ms}
+    .au:nth-child(3).vis{animation-delay:160ms}
+    .au:nth-child(4).vis{animation-delay:240ms}
+    .au:nth-child(5).vis{animation-delay:320ms}
+    .au:nth-child(6).vis{animation-delay:400ms}
+
+    /* msg anim */
+    @keyframes msgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .m1{animation:msgin .4s .3s both}
+    .m2{animation:msgin .4s .9s both}
+    .m3{animation:msgin .4s 1.6s both}
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="wrap nav-i">
+    <a href="#" class="nav-logo">
+      <svg width="28" height="30" viewBox="0 0 68 72" fill="none">
+        <rect x="10" y="0" width="48" height="6" rx="1" fill="rgba(168,200,232,.9)"/>
+        <path d="M4 9L64 9L60 18L8 18Z" fill="rgba(168,200,232,.9)"/>
+        <rect x="0" y="21" width="68" height="26" fill="rgba(58,122,184,.9)"/>
+        <path d="M24 47L24 36Q24 27 34 27Q44 27 44 36L44 47Z" fill="rgba(234,242,250,.9)"/>
+        <rect x="7" y="27" width="12" height="12" fill="rgba(234,242,250,.9)"/>
+        <rect x="10" y="30" width="6" height="6" fill="rgba(58,122,184,.9)"/>
+        <rect x="49" y="27" width="12" height="12" fill="rgba(234,242,250,.9)"/>
+        <rect x="52" y="30" width="6" height="6" fill="rgba(58,122,184,.9)"/>
+        <rect x="0" y="47" width="24" height="25" fill="rgba(58,122,184,.9)"/>
+        <rect x="44" y="47" width="24" height="25" fill="rgba(58,122,184,.9)"/>
+      </svg>
+      <span class="nav-logo-name">amicus</span>
+    </a>
+    <div class="nav-links">
+      <a href="#funcionalidades">Funcionalidades</a>
+      <a href="#telas">Como é na prática</a>
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#planos">Planos</a>
+    </div>
+    <a href="/cadastro" class="nav-cta">Começar grátis →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-orb orb3"></div>
+  <div class="hero-grid"></div>
+  <div class="wrap">
+    <div class="hero-content">
+      <div>
+        <div class="hero-badge"><span class="hero-dot"></span>IA jurídica em produção</div>
+        <h1>Seu escritório atende <em>24 horas.</em> Sem contratar mais ninguém.</h1>
+        <p class="hero-sub">Assistente de IA que conhece seus processos, fala com clientes no WhatsApp no seu tom e ainda descobre leads com demanda jurídica comprovada.</p>
+        <div class="hero-btns">
+          <a href="/cadastro" class="btn-hero-primary">Começar 14 dias grátis</a>
+          <a href="#telas" class="btn-hero-ghost">Ver o produto →</a>
+        </div>
+        <div class="hero-stats">
+          <div><div class="stat-val">~70%</div><div class="stat-lbl">das dúvidas respondidas sem o advogado</div></div>
+          <div><div class="stat-val">5h</div><div class="stat-lbl">economizadas por advogado/semana</div></div>
+          <div><div class="stat-val">30min</div><div class="stat-lbl">para estar operacional</div></div>
+        </div>
+      </div>
+      <!-- WhatsApp Mockup -->
+      <div class="hero-right">
+        <div class="mockup-wrap">
+          <div class="mockup-glow"></div>
+          <div class="mockup-phone">
+            <div class="phone-bar">
+              <div class="phone-dot" style="background:#C83030"></div>
+              <div class="phone-dot" style="background:#D08010"></div>
+              <div class="phone-dot" style="background:#1A9E78"></div>
+              <span class="phone-title">WhatsApp · Camila (amicus IA)</span>
+              <div class="phone-status"><span class="online-dot"></span>Online</div>
+            </div>
+            <div class="phone-body">
+              <div class="pmsg pmsg-user m1">
+                <div class="pmsg-lbl">João Silva</div>
+                Tem novidade no meu processo?
+              </div>
+              <div class="pmsg pmsg-ai m2">
+                <div class="pmsg-lbl">Camila · amicus</div>
+                Olá, João! Há uma movimentação nova: o juiz proferiu despacho ordenando a citação da parte contrária. Seu processo segue normalmente na fase de conhecimento. Alguma dúvida?
+              </div>
+              <div class="pmsg pmsg-user m3">
+                <div class="pmsg-lbl">João Silva</div>
+                O que significa "citação"?
+              </div>
+              <div class="typing m3" style="animation-delay:2.2s;animation:msgin .4s 2.2s both">
+                <span class="td"></span><span class="td"></span><span class="td"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker">
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Monitoramento automático a cada 6h</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>RAG por escritório — isolado e proprietário</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Anti-alucinação com fact-check automático</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>OAB Provimento 205/2021</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>LGPD by design · AES-256 em repouso</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Onboarding em 30 minutos</div><div class="tick-dot"></div>
+    <!-- dup for loop -->
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Monitoramento automático a cada 6h</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>RAG por escritório — isolado e proprietário</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Anti-alucinação com fact-check automático</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>OAB Provimento 205/2021</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>LGPD by design · AES-256 em repouso</div><div class="tick-dot"></div>
+    <div class="tick-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Onboarding em 30 minutos</div>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section class="section problem">
+  <div class="wrap">
+    <div class="problem-grid">
+      <div>
+        <div class="stag">O problema</div>
+        <h2 class="stitle">Escritórios perdem clientes por falta de <em>comunicação</em></h2>
+        <p class="ssub">Não por falta de competência. O cliente não sabe o que acontece, liga para perguntar "tem novidade?" — e o advogado gasta horas respondendo WhatsApp que não geram receita.</p>
+        <ul class="plist">
+          <li>
+            <div class="plist-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C83030" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <span>Clientes sem resposta trocam de escritório — mesmo quando o processo vai bem.</span>
+          </li>
+          <li>
+            <div class="plist-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C83030" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <span>Cada hora em WhatsApp é uma hora que não gera receita para o escritório.</span>
+          </li>
+          <li>
+            <div class="plist-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C83030" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <span>Captar clientes é artesanal — esperar indicação ou garimpar no Jusbrasil sem critério.</span>
+          </li>
+        </ul>
+      </div>
+      <div class="pcard">
+        <blockquote>"Imagine um assistente que conhece todos os seus processos, fala com seus clientes no WhatsApp 24h no seu tom, nunca erra um prazo e ainda te indica quem está litigando na sua área sem advogado."</blockquote>
+        <p class="pcard-author">— É isso que o amicus entrega.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-sec">
+  <div class="wrap">
+    <div class="stats-grid">
+      <div class="stat-item au"><div class="sval">74%</div><div class="slbl">margem líquida<br/>por cliente</div></div>
+      <div class="stat-item au"><div class="sval">3–5h</div><div class="slbl">economizadas por<br/>advogado/semana</div></div>
+      <div class="stat-item au"><div class="sval">R$96k</div><div class="slbl">valor econômico<br/>no plano Profissional/mês</div></div>
+      <div class="stat-item au"><div class="sval">Dia 1</div><div class="slbl">break-even desde<br/>o primeiro cliente</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section features" id="funcionalidades">
+  <div class="wrap">
+    <div class="feat-header">
+      <div class="stag">Funcionalidades</div>
+      <h2 class="stitle">Tudo que um escritório precisa. <em>Em uma plataforma.</em></h2>
+      <p class="ssub" style="margin:0 auto">Da primeira mensagem do cliente à captação do próximo.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(18,72,190,.08)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1248BE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>IA no WhatsApp 24h</h3>
+        <p>Responde clientes com a persona e o tom do escritório. Textos, áudios e documentos — qualquer canal, qualquer hora.</p>
+        <span class="ftag" style="background:rgba(18,72,190,.08);color:#1248BE">MVP · Em produção</span>
+      </div>
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(26,158,120,.08)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <h3>Monitoramento de Processos</h3>
+        <p>Consulta automática a cada 6h no Jusbrasil e DataJud CNJ. Movimentação → notificação proativa em linguagem simples.</p>
+        <span class="ftag" style="background:rgba(26,158,120,.08);color:#1A9E78">Automático</span>
+      </div>
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(58,122,184,.08)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3A7AB8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+        <h3>Base RAG Proprietária</h3>
+        <p>Suba petições, jurisprudências e modelos. A IA aprende com seus documentos — isolada por escritório, efeito composto com o tempo.</p>
+        <span class="ftag" style="background:rgba(58,122,184,.08);color:#3A7AB8">Lock-in estratégico</span>
+      </div>
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(208,128,16,.08)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D08010" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+        <h3>CRM Inteligente</h3>
+        <p>Score de relacionamento 0–100 por cliente com análise narrativa pelo Claude. Identifica clientes em risco de churn antes que aconteça.</p>
+        <span class="ftag" style="background:rgba(208,128,16,.08);color:#D08010">Retenção</span>
+      </div>
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(168,200,232,.18)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3A7AB8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <h3>Hub do Advogado</h3>
+        <p>Análise de petições em PDF com Claude Opus. Pontos fortes, riscos, precedentes e sugestões — interface exclusiva para advogados.</p>
+        <span class="ftag" style="background:rgba(168,200,232,.18);color:#3A7AB8">Harvey AI</span>
+      </div>
+      <div class="fcard au">
+        <div class="ficon" style="background:rgba(26,158,120,.08)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+        <h3>Prospecção Inteligente</h3>
+        <p>Busca no DataJud CNJ quem está litigando na sua área sem advogado. Score de fit IA + abordagem sugerida pelo Claude.</p>
+        <span class="ftag" style="background:rgba(26,158,120,.08);color:#1A9E78">Leads qualificados</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREENS -->
+<section class="screens" id="telas">
+  <div class="wrap">
+    <div class="screens-header">
+      <div class="stag">Na prática</div>
+      <h2 class="stitle">Telas reais do <em>produto</em></h2>
+      <p class="ssub" style="margin:0 auto">Veja como cada funcionalidade aparece para o advogado no dia a dia.</p>
+    </div>
+    <div class="screens-row">
+
+      <!-- Screen 1: Hub IA -->
+      <div class="screen-block au">
+        <div class="screen-text">
+          <div class="stag">Hub do Advogado</div>
+          <h2 class="stitle" style="font-size:1.9rem">Assistente jurídico com <em>Claude Opus</em></h2>
+          <p>Interface exclusiva para advogados — chat livre, análise de petições em PDF e busca de jurisprudência. Sem as restrições do canal do cliente.</p>
+          <div class="screen-chips">
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Assistente · Petição · Jurisprudência</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Análise estruturada de PDF</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Score 0–100 da petição</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Histórico de sessões</div>
+          </div>
+        </div>
+        <div>
+          <div class="screen-frame">
+            <div class="frame-bar">
+              <div class="frame-dot" style="background:#C83030"></div>
+              <div class="frame-dot" style="background:#D08010"></div>
+              <div class="frame-dot" style="background:#1A9E78"></div>
+              <span class="frame-title">amicus · Hub do Advogado</span>
+            </div>
+            <div class="hub-mock">
+              <div class="hub-toolbar">
+                <div class="tool-pills">
+                  <div class="tpill active">✦ Assistente</div>
+                  <div class="tpill">⚖ Petição</div>
+                  <div class="tpill">🔍 Jurisprudência</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <div style="padding:5px 10px;background:var(--bg);border:1px solid var(--border-s);border-radius:8px;font-size:.65rem;color:var(--muted)">⏱ Histórico</div>
+                  <div style="padding:5px 10px;background:var(--bg);border:1px solid var(--border-s);border-radius:8px;font-size:.65rem;color:var(--muted)">↺ Limpar</div>
+                </div>
+              </div>
+              <div class="hub-msgs">
+                <div class="hmsg-row">
+                  <div class="ai-avatar">C</div>
+                  <div class="hmsg hmsg-ai">Olá! Sou a Dra. Camila, sua assistente jurídica. Como posso ajudar hoje?</div>
+                </div>
+                <div class="hmsg hmsg-user">Quais são os requisitos para configurar dano moral coletivo em ação civil pública?</div>
+                <div class="hmsg-row">
+                  <div class="ai-avatar">C</div>
+                  <div class="hmsg hmsg-ai">O dano moral coletivo exige: (1) ofensa a interesses difusos ou coletivos; (2) gravidade suficiente para abalar o equilíbrio social; (3) nexo causal demonstrado. O STJ consolidou no REsp 1.057.274/RS que dispensa a prova individual do sofrimento — basta a lesão ao bem jurídico coletivo. Quer que eu pesquise precedentes mais recentes?</div>
+                </div>
+                <div class="hmsg hmsg-user">Sim, foque em decisões de 2023–2024</div>
+                <div class="hmsg-row">
+                  <div class="ai-avatar">C</div>
+                  <div style="display:flex;gap:4px;padding:10px 14px;align-items:center;background:var(--white);border:1px solid var(--border-s);border-radius:16px 16px 16px 3px">
+                    <span class="td" style="background:var(--muted)"></span><span class="td" style="background:var(--muted)"></span><span class="td" style="background:var(--muted)"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="hub-input-bar">
+                <div class="hub-input">O que é responsabilidade civil objetiva?</div>
+                <div class="hub-send"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 2: Painel -->
+      <div class="screen-block reverse au">
+        <div class="screen-text">
+          <div class="stag">Painel de Resultados</div>
+          <h2 class="stitle" style="font-size:1.9rem">Visão completa do <em>escritório</em></h2>
+          <p>KPIs em tempo real, distribuição de risco dos clientes, eficiência da IA e ranking de relacionamento — tudo em um dashboard compacto.</p>
+          <div class="screen-chips">
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Clientes · Processos · NPS · Risco</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Eficiência da IA por período</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Escalações pendentes</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Exportação CSV por mês</div>
+          </div>
+        </div>
+        <div>
+          <div class="screen-frame">
+            <div class="frame-bar">
+              <div class="frame-dot" style="background:#C83030"></div>
+              <div class="frame-dot" style="background:#D08010"></div>
+              <div class="frame-dot" style="background:#1A9E78"></div>
+              <span class="frame-title">amicus · Painel de Resultados</span>
+              <div style="margin-left:auto;display:flex;gap:4px">
+                <span style="padding:3px 8px;background:var(--blue-pale);color:var(--blue-accent);border-radius:6px;font-size:.6rem;font-weight:700">7d</span>
+                <span style="padding:3px 8px;background:var(--blue-accent);color:#fff;border-radius:6px;font-size:.6rem;font-weight:700">30d</span>
+                <span style="padding:3px 8px;background:var(--blue-pale);color:var(--blue-accent);border-radius:6px;font-size:.6rem;font-weight:700">90d</span>
+              </div>
+            </div>
+            <div class="painel-mock">
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <div class="kpi-top"><span class="kpi-lbl">Clientes ativos</span><div class="kpi-icon" style="background:rgba(18,72,190,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1248BE" stroke-width="2.2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div></div>
+                  <div class="kpi-val" style="color:#1248BE">47</div><div class="kpi-sub">312 processos</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-top"><span class="kpi-lbl">Em risco</span><div class="kpi-icon" style="background:rgba(200,48,48,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C83030" stroke-width="2.2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div></div>
+                  <div class="kpi-val" style="color:#C83030">3</div><div class="kpi-sub">Alto ou crítico</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-top"><span class="kpi-lbl">NPS médio</span><div class="kpi-icon" style="background:rgba(26,158,120,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2.2" stroke-linecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div></div>
+                  <div class="kpi-val" style="color:#1A9E78">8.4</div><div class="kpi-sub">Satisfação</div>
+                </div>
+                <div class="kpi-card">
+                  <div class="kpi-top"><span class="kpi-lbl">Autonomia IA</span><div class="kpi-icon" style="background:rgba(18,72,190,.1)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1248BE" stroke-width="2.2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div></div>
+                  <div class="kpi-val" style="color:#1248BE">76%</div><div class="kpi-sub">Sem intervenção</div>
+                </div>
+              </div>
+              <div class="section-card">
+                <div class="section-card-header"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3A7AB8" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="section-card-title">Distribuição de risco</span></div>
+                <div class="risk-row"><span class="risk-lbl" style="color:#1A9E78">Baixo</span><div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:68%;background:#1A9E78"></div></div><span class="risk-count">32</span></div>
+                <div class="risk-row"><span class="risk-lbl" style="color:#D08010">Moderado</span><div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:25%;background:#D08010"></div></div><span class="risk-count">12</span></div>
+                <div class="risk-row"><span class="risk-lbl" style="color:#C83030">Alto</span><div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:6%;background:#C83030"></div></div><span class="risk-count">3</span></div>
+              </div>
+              <div class="section-card">
+                <div class="section-card-header"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3A7AB8" stroke-width="2.5" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><span class="section-card-title">Ranking de clientes</span></div>
+                <div class="client-row"><div class="c-avatar" style="background:#C83030">MS</div><div><div class="c-name">Maria Santos</div><div class="c-sub">3 processos · há 21d</div></div><span class="c-badge" style="background:rgba(200,48,48,.1);color:#C83030;border:1px solid rgba(200,48,48,.2)">Crítico</span></div>
+                <div class="client-row"><div class="c-avatar" style="background:linear-gradient(135deg,#1248BE,#4A8ED4)">JP</div><div><div class="c-name">João Pereira</div><div class="c-sub">1 processo · há 5d</div></div><span class="c-badge" style="background:rgba(208,128,16,.1);color:#D08010;border:1px solid rgba(208,128,16,.2)">Moderado</span></div>
+                <div class="client-row"><div class="c-avatar" style="background:linear-gradient(135deg,#1248BE,#4A8ED4)">AC</div><div><div class="c-name">Ana Costa</div><div class="c-sub">2 processos · hoje</div></div><span class="c-badge" style="background:rgba(26,158,120,.1);color:#1A9E78;border:1px solid rgba(26,158,120,.2)">Baixo</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 3: Captacao -->
+      <div class="screen-block au">
+        <div class="screen-text">
+          <div class="stag">Prospecção Inteligente</div>
+          <h2 class="stitle" style="font-size:1.9rem">Leads com demanda <em>comprovada</em></h2>
+          <p>O motor busca no DataJud CNJ quem está litigando na sua área sem advogado. Score de fit calculado por IA com abordagem personalizada.</p>
+          <div class="screen-chips">
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>DNA do escritório por Claude Haiku</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Score IA de compatibilidade</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Enriquecimento B2B via CNPJ</div>
+            <div class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>LGPD by design</div>
+          </div>
+        </div>
+        <div>
+          <div class="screen-frame">
+            <div class="frame-bar">
+              <div class="frame-dot" style="background:#C83030"></div>
+              <div class="frame-dot" style="background:#D08010"></div>
+              <div class="frame-dot" style="background:#1A9E78"></div>
+              <span class="frame-title">amicus · Prospecção Inteligente</span>
+            </div>
+            <div class="capt-mock">
+              <div class="dna-card">
+                <div class="dna-header"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1248BE" stroke-width="2.2" stroke-linecap="round"><path d="M2 12C2 6.48 6.48 2 12 2"/><path d="M22 12c0 5.52-4.48 10-10 10"/><path d="M8 12c0-2.21 1.79-4 4-4"/><path d="M16 12c0 2.21-1.79 4-4 4"/></svg><span class="dna-title">DNA do Escritório · Atualizado há 2h</span></div>
+                <div class="dna-tags">
+                  <span class="dna-tag">Direito Trabalhista</span>
+                  <span class="dna-tag">Horas Extras</span>
+                  <span class="dna-tag">Rescisão Indireta</span>
+                  <span class="dna-tag">B2C · TRT2</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+                <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">Pipeline de leads</span>
+                <span style="font-size:.65rem;color:var(--muted)">14 leads · score ≥ 30</span>
+              </div>
+              <div class="lead-card">
+                <div style="display:flex">
+                  <div style="width:3px;background:#1A9E78;flex-shrink:0;border-radius:0 0 0 0"></div>
+                  <div class="lead-inner" style="flex:1">
+                    <div class="score-box" style="background:rgba(26,158,120,.1);border:1px solid rgba(26,158,120,.22)"><span class="score-n" style="color:#1A9E78">87</span><span class="score-s" style="color:#1A9E78">score</span></div>
+                    <div class="lead-info">
+                      <div class="lead-name">TechLog Transportes Ltda</div>
+                      <div class="lead-sub">TJSP · Reclamação Trabalhista · Fase inicial · CNPJ ativo</div>
+                      <div class="lead-tags">
+                        <span class="ltag status-qual">Qualificado</span>
+                        <span class="ltag" style="background:rgba(58,122,184,.08);color:var(--blue);border:1px solid rgba(58,122,184,.2)">Empresa · 120 func</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="lead-card">
+                <div style="display:flex">
+                  <div style="width:3px;background:#D08010;flex-shrink:0"></div>
+                  <div class="lead-inner" style="flex:1">
+                    <div class="score-box" style="background:rgba(208,128,16,.1);border:1px solid rgba(208,128,16,.22)"><span class="score-n" style="color:#D08010">64</span><span class="score-s" style="color:#D08010">score</span></div>
+                    <div class="lead-info">
+                      <div class="lead-name">Carlos Alberto Mendes</div>
+                      <div class="lead-sub">TRT2 · Rescisão Indireta · Polo ativo · Sem advogado</div>
+                      <div class="lead-tags">
+                        <span class="ltag status-cont">Contatado</span>
+                        <span class="ltag" style="background:rgba(58,122,184,.08);color:var(--blue);border:1px solid rgba(58,122,184,.2)">B2C</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="lead-card">
+                <div style="display:flex">
+                  <div style="width:3px;background:#3A7AB8;flex-shrink:0"></div>
+                  <div class="lead-inner" style="flex:1">
+                    <div class="score-box" style="background:rgba(58,122,184,.1);border:1px solid rgba(58,122,184,.22)"><span class="score-n" style="color:#3A7AB8">52</span><span class="score-s" style="color:#3A7AB8">score</span></div>
+                    <div class="lead-info">
+                      <div class="lead-name">Distribuidora Alfa S.A.</div>
+                      <div class="lead-sub">TJSP · Horas Extras · 3 ações ativas · CNPJ ativo</div>
+                      <div class="lead-tags">
+                        <span class="ltag status-novo">Novo</span>
+                        <span class="ltag" style="background:rgba(58,122,184,.08);color:var(--blue);border:1px solid rgba(58,122,184,.2)">Empresa · Grande porte</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="how" id="como-funciona">
+  <div class="wrap">
+    <div class="how-hd">
+      <div class="stag" style="color:var(--blue-light)">Como funciona</div>
+      <h2 class="stitle">Operacional em <em style="color:var(--blue-light)">30 minutos.</em></h2>
+      <p class="ssub">Sem integração complexa. Sem time de TI. Seis etapas guiadas.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="steps-line"></div>
+      <div class="step"><div class="step-n">01</div><h3>Conecte o WhatsApp</h3><p>Via Evolution API, o número do escritório é conectado em menos de 5 minutos.</p></div>
+      <div class="step"><div class="step-n">02</div><h3>Configure a persona</h3><p>Defina nome, tom e especialidades. Importe clientes via CSV ou Google Sheets.</p></div>
+      <div class="step"><div class="step-n">03</div><h3>Sua IA atende e você fatura</h3><p>O amicus responde, envia atualizações proativas e te aciona só quando precisa.</p></div>
+    </div>
+    <div class="how-chips">
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Respeita janela comercial</div>
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Transcreve áudios automaticamente</div>
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Fact-check anti-alucinação em toda resposta</div>
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Escalação automática para advogado</div>
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Memória de conversa por cliente</div>
+      <div class="hchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Termos jurídicos traduzidos para o cliente</div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="planos">
+  <div class="wrap">
+    <div class="price-hd">
+      <div class="stag">Planos</div>
+      <h2 class="stitle">Preço que cabe no <em>primeiro mês.</em></h2>
+      <p class="ssub" style="margin:0 auto">Cada plano representa menos de 3% do valor econômico que entrega.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">R$&nbsp;497<span>/mês</span></div>
+        <p class="plan-desc">Para advogados autônomos com carteira estabelecida.</p>
+        <div class="pdiv"></div>
+        <ul class="pfeats">
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>1 advogado</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>30 processos monitorados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>50 clientes · IA WhatsApp 24h</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Base RAG + CRM Inteligente</li>
+          <li><span class="pcross"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>Hub do Advogado</li>
+          <li><span class="pcross"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>Prospecção Inteligente</li>
+        </ul>
+        <button class="pbtn pbtn-out">Começar grátis</button>
+      </div>
+      <div class="plan plan-pop">
+        <div class="pop-badge">Mais popular</div>
+        <div class="plan-name">Profissional</div>
+        <div class="plan-price">R$&nbsp;1.997<span>/mês</span></div>
+        <p class="plan-desc">Para escritórios boutique em crescimento.</p>
+        <div class="pdiv"></div>
+        <ul class="pfeats">
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Até 5 advogados</li>
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>300 processos · 500 clientes</li>
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>IA WhatsApp + RAG + CRM</li>
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Hub do Advogado (300K tokens)</li>
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Prospecção Inteligente</li>
+          <li><span class="pcheck" style="color:#4AE0B0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Suporte prioritário</li>
+        </ul>
+        <button class="pbtn pbtn-dark">Começar grátis</button>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Escritório</div>
+        <div class="plan-price">R$&nbsp;4.997<span>/mês</span></div>
+        <p class="plan-desc">Para escritórios com mais de uma área.</p>
+        <div class="pdiv"></div>
+        <ul class="pfeats">
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Até 15 advogados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>500 processos · Clientes ilimitados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Hub (1M tokens) + Prospecção</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Analytics completo + CSV</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Enriquecimento B2B de leads</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Suporte dedicado</li>
+        </ul>
+        <button class="pbtn pbtn-out">Começar grátis</button>
+      </div>
+      <div class="plan" style="background:var(--bg)">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price" style="font-size:1.5rem">Sob consulta</div>
+        <p class="plan-desc">Grandes escritórios e redes.</p>
+        <div class="pdiv"></div>
+        <ul class="pfeats">
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Advogados ilimitados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Processos ilimitados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Tokens Claude ilimitados</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>SLA contratual</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Integração com CRMs jurídicos</li>
+          <li><span class="pcheck"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></span>Onboarding personalizado</li>
+        </ul>
+        <button class="pbtn pbtn-muted">Falar com vendas</button>
+      </div>
+    </div>
+    <div class="value-note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A9E78" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p><strong>Valor entregue vs. preço cobrado:</strong> o plano Profissional entrega ~R$96.000/mês ao escritório (tempo recuperado + churn evitado + novos clientes via prospecção). Você paga R$1.997 — 2,1% do valor gerado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMPLIANCE -->
+<div class="compliance">
+  <div class="wrap">
+    <div class="comp-inner">
+      <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>OAB Provimento 205/2021</div>
+      <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>LGPD by Design</div>
+      <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>AES-256 em repouso</div>
+      <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>TLS 1.3 em trânsito</div>
+      <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Multi-tenancy isolado</div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="hero-orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(58,122,184,.3) 0%,transparent 70%);top:-100px;right:-50px;filter:blur(80px)"></div>
+  <div class="hero-orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(26,158,120,.15) 0%,transparent 70%);bottom:-80px;left:-60px;filter:blur(80px)"></div>
+  <div class="wrap" style="position:relative">
+    <h2>Pronto para recuperar<br/>3–5 horas por semana?</h2>
+    <p>14 dias grátis. Sem cartão de crédito. Operacional em 30 minutos.</p>
+    <div class="cta-btns">
+      <a href="/cadastro" class="btn-hero-primary" style="font-size:.95rem;padding:15px 32px">Começar agora — é grátis</a>
+      <a href="/ajuda" class="btn-hero-ghost" style="font-size:.9rem">Falar com a equipe →</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot-inner">
+      <div class="foot-brand">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="22" height="24" viewBox="0 0 68 72" fill="none"><rect x="10" y="0" width="48" height="6" rx="1" fill="#3A7AB8"/><path d="M4 9L64 9L60 18L8 18Z" fill="#3A7AB8"/><rect x="0" y="21" width="68" height="26" fill="#3A7AB8"/><path d="M24 47L24 36Q24 27 34 27Q44 27 44 36L44 47Z" fill="#EAF2FA"/><rect x="7" y="27" width="12" height="12" fill="#EAF2FA"/><rect x="10" y="30" width="6" height="6" fill="#3A7AB8"/><rect x="49" y="27" width="12" height="12" fill="#EAF2FA"/><rect x="52" y="30" width="6" height="6" fill="#3A7AB8"/><rect x="0" y="47" width="24" height="25" fill="#3A7AB8"/><rect x="44" y="47" width="24" height="25" fill="#3A7AB8"/></svg>
+          <span class="foot-name">amicus</span>
+        </div>
+        <p class="foot-sub">Concierge Jurídico Digital. Plataforma B2B SaaS de IA para escritórios de advocacia.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Produto</h4>
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#telas">Telas do produto</a>
+        <a href="#planos">Planos</a>
+        <a href="/cadastro">Começar grátis</a>
+      </div>
+      <div class="foot-col">
+        <h4>Empresa</h4>
+        <a href="/ajuda">Central de Ajuda</a>
+        <a href="/ajuda">Contato</a>
+        <a href="/privacidade">Privacidade (LGPD)</a>
+        <a href="/termos">Termos de uso</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <p>© 2026 amicus. Todos os direitos reservados.</p>
+      <div class="foot-links">
+        <a href="/privacidade">Privacidade</a>
+        <a href="/termos">Termos</a>
+        <a href="/ajuda">Ajuda</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Nav scroll
+  const nav = document.getElementById('nav')
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40)
+  }, { passive: true })
+
+  // Scroll animations
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('vis'); obs.unobserve(e.target) } })
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' })
+  document.querySelectorAll('.au').forEach(el => obs.observe(el))
+</script>
+</body>
+</html>
