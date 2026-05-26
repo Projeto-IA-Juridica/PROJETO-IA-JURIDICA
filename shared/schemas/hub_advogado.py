@@ -86,7 +86,7 @@ class ConversaListItem(BaseModel):
     """Item de listagem de conversas — uma thread de múltiplas trocas Q&A."""
 
     conversa_id: str
-    titulo: str          # primeira mensagem truncada (usado como nome da conversa)
+    titulo: str  # primeira mensagem truncada (usado como nome da conversa)
     ultima_mensagem_em: datetime
     total_mensagens: int
 

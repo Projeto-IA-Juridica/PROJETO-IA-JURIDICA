@@ -12,7 +12,8 @@ import uuid as _uuid
 from decimal import Decimal
 
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PgUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TenantMixin, TimestampMixin

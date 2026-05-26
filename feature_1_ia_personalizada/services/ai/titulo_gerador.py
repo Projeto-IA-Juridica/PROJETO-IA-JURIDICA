@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import anthropic
 import structlog
+from anthropic.types import TextBlock
 
 from shared.config.settings import settings
 
@@ -22,9 +23,7 @@ _PROMPT_SISTEMA = (
     "Responda APENAS com o título — sem aspas, sem pontuação final, sem explicações."
 )
 
-_PROMPT_USUARIO = (
-    "Crie um título de até 6 palavras para esta pergunta jurídica:\n\n{mensagem}"
-)
+_PROMPT_USUARIO = "Crie um título de até 6 palavras para esta pergunta jurídica:\n\n{mensagem}"
 
 
 async def gerar_titulo_conversa(mensagem: str) -> str:
@@ -48,7 +47,9 @@ async def gerar_titulo_conversa(mensagem: str) -> str:
                 }
             ],
         )
-        titulo = resposta.content[0].text.strip().strip('"').strip("'").rstrip(".")
+        bloco = resposta.content[0]
+        texto_bruto = bloco.text if isinstance(bloco, TextBlock) else ""
+        titulo = texto_bruto.strip().strip('"').strip("'").rstrip(".")
         logger.info(
             "titulo_gerado",
             modelo=_MODELO,

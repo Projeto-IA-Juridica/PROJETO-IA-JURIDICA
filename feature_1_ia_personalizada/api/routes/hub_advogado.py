@@ -145,9 +145,7 @@ async def _gerar_e_salvar_titulo(conversa_id: uuid.UUID, mensagem: str) -> None:
                 .scalar_subquery()
             )
             await db.execute(
-                update(SessaoAdvogado)
-                .where(SessaoAdvogado.id == subq)
-                .values(titulo=titulo)
+                update(SessaoAdvogado).where(SessaoAdvogado.id == subq).values(titulo=titulo)
             )
             await db.commit()
             logger.info("titulo_salvo", conversa_id=str(conversa_id), titulo=titulo)
@@ -384,9 +382,7 @@ async def consultar(
 
     # Dispara geração de título em background apenas na 1ª mensagem
     if is_primeira_mensagem:
-        asyncio.create_task(
-            _gerar_e_salvar_titulo(conversa_uuid, body.pergunta)
-        )
+        asyncio.create_task(_gerar_e_salvar_titulo(conversa_uuid, body.pergunta))
 
     return ConsultaHubResponse(
         resposta=resultado.conteudo,
@@ -546,9 +542,7 @@ async def listar_conversas(
                 order_by=SessaoAdvogado.created_at.asc(),
             )
             .label("rn_asc"),
-            func.count()
-            .over(partition_by=SessaoAdvogado.conversa_id)
-            .label("total"),
+            func.count().over(partition_by=SessaoAdvogado.conversa_id).label("total"),
             func.max(SessaoAdvogado.created_at)
             .over(partition_by=SessaoAdvogado.conversa_id)
             .label("ultima_em"),
