@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  evolution-api:
+    image: atendeai/evolution-api:latest
+    container_name: evolution_api
+    ports:
+      - "8080:8080"
+    environment:
+      - API_KEY=${EVOLUTION_API_KEY}
+      - AUTHENTICATION_TYPE=api-key
+      - DATABASE_ENABLED=false # Usaremos sem banco de dados por enquanto para simplificar
+    volumes:
+      - ./evolution_data:/app/instances
+    command: ["node", "./dist/src/main.js"]
