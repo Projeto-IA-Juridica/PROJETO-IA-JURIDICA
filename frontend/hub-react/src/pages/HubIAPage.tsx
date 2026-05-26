@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, Scale, FileSearch, AlertTriangle, RotateCcw,
-  Upload, ChevronDown, ChevronUp, Clock, X, ArrowLeft,
+  Upload, X, MessageSquare, Plus, Clock,
 } from 'lucide-react'
-import { consultar, analisarPeticaoAsync, pollHubJob, listarHistorico, detalharSessao, type PeticaoAnalise, type SessaoListItem, type SessaoDetalhe } from '../api/hub'
+import {
+  consultar, analisarPeticaoAsync, pollHubJob,
+  fetchConversas, fetchConversa,
+  type PeticaoAnalise, type ConversaListItem, type ConversaMensagem,
+} from '../api/hub'
 import type { ChatMessage } from '../types'
 import { PlaceholdersAndVanishInput } from '../components/ui/PlaceholdersAndVanishInput'
 
@@ -38,11 +42,38 @@ const INTENT_MAP: Record<Tool, string> = {
   jurisprudencia: 'duvida_juridica',
 }
 
+/* ── Utilitários de data ────────────────────────────────────────────────── */
+
+function labelDataGrupo(iso: string): string {
+  const d = new Date(iso)
+  const hoje = new Date()
+  const diff = Math.floor((hoje.getTime() - d.getTime()) / 86_400_000)
+  if (diff === 0) return 'Hoje'
+  if (diff === 1) return 'Ontem'
+  if (diff <= 7) return 'Últimos 7 dias'
+  if (diff <= 30) return 'Últimos 30 dias'
+  return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+}
+
+function agruparPorData(conversas: ConversaListItem[]) {
+  const grupos: Record<string, ConversaListItem[]> = {}
+  for (const c of conversas) {
+    const label = labelDataGrupo(c.ultima_mensagem_em)
+    if (!grupos[label]) grupos[label] = []
+    grupos[label].push(c)
+  }
+  return grupos
+}
+
 /* ── MessageBubble ─────────────────────────────────────────────────────── */
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user'
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
         <div className="flex items-end gap-2 max-w-[82%]">
           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mb-0.5"
@@ -59,7 +90,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           {msg.content}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
 
@@ -100,7 +131,6 @@ function ScoreBar({ valor }: { valor: number }) {
 function AnalisePeticaoResult({ analise, onReset }: { analise: PeticaoAnalise; onReset: () => void }) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      {/* Score */}
       <div className="bg-white rounded-2xl p-4" style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 4px rgba(12,30,48,0.05)' }}>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -121,13 +151,12 @@ function AnalisePeticaoResult({ analise, onReset }: { analise: PeticaoAnalise; o
         )}
       </div>
 
-      {/* Seções */}
       {[
-        { title: 'Pontos fortes',        items: analise.pontos_fortes,         cor: '#1A9E78' },
-        { title: 'Vulnerabilidades',      items: analise.vulnerabilidades,       cor: '#C83030' },
-        { title: 'Argumentos ausentes',   items: analise.argumentos_ausentes,    cor: '#D08010' },
-        { title: 'Precedentes relevantes',items: analise.precedentes_relevantes, cor: '#1248BE' },
-        { title: 'Sugestões',             items: analise.sugestoes,              cor: '#7C4DFF' },
+        { title: 'Pontos fortes',         items: analise.pontos_fortes,          cor: '#1A9E78' },
+        { title: 'Vulnerabilidades',       items: analise.vulnerabilidades,        cor: '#C83030' },
+        { title: 'Argumentos ausentes',    items: analise.argumentos_ausentes,     cor: '#D08010' },
+        { title: 'Precedentes relevantes', items: analise.precedentes_relevantes,  cor: '#1248BE' },
+        { title: 'Sugestões',              items: analise.sugestoes,               cor: '#7C4DFF' },
       ].filter(s => s.items.length > 0).map(({ title, items, cor }) => (
         <div key={title} className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-am-border)' }}>
           <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid var(--color-am-border)', background: 'rgba(12,30,48,0.02)' }}>
@@ -212,197 +241,222 @@ function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
   )
 }
 
-/* ── Painel de histórico ────────────────────────────────────────────────── */
-function HistoricoPanel({ onClose, onRestaurar }: {
-  onClose: () => void
-  onRestaurar: (pergunta: string) => void
-}) {
-  const [sessaoId, setSessaoId] = useState<number | null>(null)
+/* ── Drawer de histórico de conversas ──────────────────────────────────── */
 
-  const { data: sessoes, isLoading: loadingLista } = useQuery({
-    queryKey: ['hub-historico'],
-    queryFn: () => listarHistorico(1, 50),
+function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
+  onClose: () => void
+  onSelectConversa: (conversaId: string) => void
+  onNovaConversa: () => void
+}) {
+  const { data: conversas, isLoading } = useQuery({
+    queryKey: ['hub-conversas'],
+    queryFn: () => fetchConversas(1, 50),
     staleTime: 30_000,
   })
 
-  const { data: detalhe, isLoading: loadingDetalhe } = useQuery({
-    queryKey: ['hub-sessao', sessaoId],
-    queryFn: () => detalharSessao(sessaoId!),
-    enabled: sessaoId !== null,
-    staleTime: 5 * 60_000,
-  })
-
-  function labelIntencao(intencao: string) {
-    if (intencao === 'analise_peticao') return 'Petição'
-    if (intencao === 'duvida_juridica') return 'Consulta'
-    return intencao
-  }
+  const grupos = conversas ? agruparPorData(conversas) : {}
+  const grupoKeys = Object.keys(grupos)
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 20 }}
+      initial={{ opacity: 0, x: -24 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      className="absolute inset-0 flex flex-col bg-am-bg z-10">
+      exit={{ opacity: 0, x: -24 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+      className="absolute inset-0 flex flex-col z-10"
+      style={{ background: 'var(--color-am-bg)' }}>
 
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 pt-5 pb-3">
         <div className="flex items-center gap-2">
-          {sessaoId !== null && (
-            <button onClick={() => setSessaoId(null)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
-              style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
-              <ArrowLeft size={12} />
-            </button>
-          )}
-          <Clock size={14} style={{ color: 'var(--color-am-blue)' }} />
-          <span className="text-sm font-bold text-am-ink">
-            {sessaoId !== null ? 'Detalhe da sessão' : 'Histórico'}
-          </span>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(18,72,190,0.1)' }}>
+            <MessageSquare size={12} style={{ color: 'var(--color-am-blue)' }} />
+          </div>
+          <span className="text-sm font-bold text-am-ink">Histórico</span>
         </div>
-        <button onClick={onClose}
+        <motion.button
+          onClick={onClose}
+          whileHover={{ scale: 1.1, rotate: 90 }}
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           className="w-8 h-8 rounded-xl flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
           style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
           <X size={13} />
-        </button>
+        </motion.button>
       </div>
 
-      {/* Lista */}
-      {sessaoId === null && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
-          {loadingLista && (
-            <div className="flex items-center justify-center h-32">
-              <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
-            </div>
-          )}
-          {!loadingLista && (!sessoes || sessoes.length === 0) && (
-            <div className="flex flex-col items-center justify-center h-32 gap-2 text-am-muted">
-              <Clock size={20} strokeWidth={1.5} />
-              <span className="text-xs">Nenhuma consulta ainda</span>
-            </div>
-          )}
-          {sessoes?.map((s: SessaoListItem) => (
-            <button key={s.id} onClick={() => setSessaoId(s.id)}
-              className="w-full text-left px-4 py-3 rounded-2xl transition-colors"
-              style={{ border: '1px solid var(--color-am-border)', background: 'white', boxShadow: '0 1px 3px rgba(12,30,48,0.04)' }}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-                  style={{ background: 'rgba(18,72,190,0.08)', color: 'var(--color-am-blue)' }}>
-                  {labelIntencao(s.intencao)}
-                </span>
-                <span className="text-[10px] text-am-muted">
-                  {new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p className="text-xs text-am-secondary truncate">{s.mensagem_preview}</p>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Nova conversa */}
+      <div className="flex-shrink-0 px-4 pb-3">
+        <motion.button
+          onClick={() => { onNovaConversa(); onClose() }}
+          whileHover={{ scale: 1.02, boxShadow: '0 6px 20px rgba(18,72,190,0.35)' }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white"
+          style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', boxShadow: '0 3px 12px rgba(18,72,190,0.25)' }}>
+          <Plus size={13} />
+          Nova conversa
+        </motion.button>
+      </div>
 
-      {/* Detalhe */}
-      {sessaoId !== null && (
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
-          {loadingDetalhe && (
-            <div className="flex items-center justify-center h-32">
-              <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
+      {/* Lista de conversas */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+        {isLoading && (
+          <div className="flex items-center justify-center h-32">
+            <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
+          </div>
+        )}
+
+        {!isLoading && grupoKeys.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-40 gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(12,30,48,0.05)' }}>
+              <MessageSquare size={18} strokeWidth={1.5} className="text-am-muted" />
             </div>
-          )}
-          {detalhe && <SessaoDetalheView detalhe={detalhe} onRestaurar={pergunta => { onRestaurar(pergunta); onClose() }} />}
-        </div>
-      )}
+            <div className="text-center">
+              <p className="text-xs font-semibold text-am-secondary">Nenhuma conversa ainda</p>
+              <p className="text-[11px] text-am-muted mt-0.5">Suas conversas aparecerão aqui</p>
+            </div>
+          </div>
+        )}
+
+        {grupoKeys.map(grupo => (
+          <div key={grupo}>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-2 px-1">
+              {grupo}
+            </p>
+            <div className="space-y-1.5">
+              {grupos[grupo].map((c: ConversaListItem) => (
+                <motion.button
+                  key={c.conversa_id}
+                  onClick={() => onSelectConversa(c.conversa_id)}
+                  whileHover={{ x: 3, borderColor: 'rgba(18,72,190,0.25)', backgroundColor: 'rgba(18,72,190,0.03)' }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                  className="w-full text-left px-3.5 py-3 rounded-xl group"
+                  style={{ border: '1px solid var(--color-am-border)', background: 'white', boxShadow: '0 1px 3px rgba(12,30,48,0.04)' }}>
+                  <div className="flex items-start gap-2">
+                    <MessageSquare size={12} className="flex-shrink-0 mt-0.5 text-am-muted group-hover:text-am-blue transition-colors duration-150" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-am-ink leading-snug line-clamp-2 font-medium group-hover:text-am-blue transition-colors duration-150">{c.titulo}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-am-muted">
+                          {new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[10px] text-am-muted">·</span>
+                        <span className="text-[10px] text-am-muted">
+                          {c.total_mensagens} {c.total_mensagens === 1 ? 'troca' : 'trocas'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </motion.div>
   )
 }
 
-function SessaoDetalheView({ detalhe, onRestaurar }: {
-  detalhe: SessaoDetalhe
-  onRestaurar: (pergunta: string) => void
+/* ── Banner de conversa restaurada ──────────────────────────────────────── */
+function ConversaRestauradaBanner({ onContinuar, onNova }: {
+  onContinuar: () => void
+  onNova: () => void
 }) {
   return (
-    <div className="space-y-3">
-      {/* Meta */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-          style={{ background: 'rgba(18,72,190,0.08)', color: 'var(--color-am-blue)' }}>
-          {detalhe.intencao === 'analise_peticao' ? 'Petição' : 'Consulta'}
-        </span>
-        <span className="text-[10px] text-am-muted font-mono">{detalhe.modelo_ia}</span>
-        <span className="text-[10px] text-am-muted">
-          {new Date(detalhe.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-        </span>
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5"
+      style={{ background: 'rgba(18,72,190,0.05)', borderBottom: '1px solid rgba(18,72,190,0.12)' }}>
+      <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(18,72,190,0.12)' }}>
+        <Clock size={9} style={{ color: 'var(--color-am-blue)' }} />
       </div>
-
-      {/* Pergunta */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--color-am-border)' }}>
-        <div className="px-4 py-2.5 flex items-center gap-2"
-          style={{ background: 'rgba(12,30,48,0.03)', borderBottom: '1px solid var(--color-am-border)' }}>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-am-secondary">Pergunta</span>
-        </div>
-        <div className="px-4 py-3 bg-white">
-          <p className="text-xs text-am-ink leading-relaxed whitespace-pre-wrap">{detalhe.mensagem_advogado}</p>
-        </div>
-      </div>
-
-      {/* Resposta */}
-      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(18,72,190,0.18)' }}>
-        <div className="px-4 py-2.5 flex items-center gap-2"
-          style={{ background: 'rgba(18,72,190,0.04)', borderBottom: '1px solid rgba(18,72,190,0.14)' }}>
-          <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>C</div>
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-am-blue)' }}>Resposta da IA</span>
-        </div>
-        <div className="px-4 py-3 bg-white">
-          <p className="text-xs text-am-secondary leading-relaxed whitespace-pre-wrap">{detalhe.resposta_hub}</p>
-        </div>
-      </div>
-
-      {/* Tokens + custo */}
-      <div className="flex items-center gap-3 px-1">
-        <span className="text-[10px] text-am-muted">
-          {detalhe.tokens_input.toLocaleString()} + {detalhe.tokens_output.toLocaleString()} tokens
-        </span>
-        <span className="text-[10px] text-am-muted">·</span>
-        <span className="text-[10px] text-am-muted">Custo: {detalhe.custo_estimado}</span>
-      </div>
-
-      {/* CTA */}
-      <button
-        onClick={() => onRestaurar(detalhe.mensagem_advogado)}
-        className="press w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white"
-        style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
-        Usar esta pergunta novamente
-      </button>
-    </div>
+      <span className="text-[11px] text-am-secondary flex-1">Conversa anterior restaurada</span>
+      <motion.button
+        onClick={onContinuar}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+        className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors"
+        style={{ color: 'var(--color-am-blue)', background: 'rgba(18,72,190,0.1)' }}>
+        Continuar
+      </motion.button>
+      <motion.button
+        onClick={onNova}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg text-am-muted hover:text-am-secondary transition-colors"
+        style={{ background: 'rgba(12,30,48,0.05)' }}>
+        Nova
+      </motion.button>
+    </motion.div>
   )
 }
 
 /* ── Página principal ────────────────────────────────────────────────────── */
+
+const MSG_INICIAL: ChatMessage = {
+  role: 'assistant',
+  content: 'Olá! Sou a Dra. Camila, sua assistente jurídica. Como posso ajudar hoje?',
+  intencao: 'saudacao',
+}
+
 export default function HubIAPage() {
-  const [tool, setTool]               = useState<Tool>('chat')
-  const [messages, setMessages]       = useState<ChatMessage[]>([{
-    role: 'assistant',
-    content: 'Olá! Sou a Dra. Camila, sua assistente jurídica. Como posso ajudar hoje?',
-    intencao: 'saudacao',
-  }])
-  const [analise, setAnalise]         = useState<PeticaoAnalise | null>(null)
-  const [analiseErro, setAnaliseErro] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const [tool, setTool]                 = useState<Tool>('chat')
+  const [messages, setMessages]         = useState<ChatMessage[]>([MSG_INICIAL])
+  const [analise, setAnalise]           = useState<PeticaoAnalise | null>(null)
+  const [analiseErro, setAnaliseErro]   = useState<string | null>(null)
   const [peticaoJobId, setPeticaoJobId] = useState<string | null>(null)
   const [showHistorico, setShowHistorico] = useState(false)
+  const [conversaId, setConversaId]     = useState<string>(() => crypto.randomUUID())
+  const [conversaRestaurada, setConversaRestaurada] = useState(false)
+
   const messagesRef = useRef<HTMLDivElement>(null)
 
+  /* ── Enviar mensagem ── */
   const chatMutation = useMutation({
-    mutationFn: (pergunta: string) => consultar({ pergunta }),
+    mutationFn: (pergunta: string) => consultar({ pergunta, conversa_id: conversaId }),
     onSuccess: data => {
+      if (data.conversa_id) setConversaId(data.conversa_id)
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: data.resposta,
         intencao: INTENT_MAP[tool],
         tokens: data.tokens_output,
       }])
+      // Invalida a lista de conversas para refletir a nova mensagem
+      queryClient.invalidateQueries({ queryKey: ['hub-conversas'] })
     },
   })
 
+  /* ── Carregar conversa histórica ── */
+  const carregarConversaMut = useMutation({
+    mutationFn: fetchConversa,
+    onSuccess: (mensagens: ConversaMensagem[], loadedId: string) => {
+      const msgs: ChatMessage[] = mensagens.flatMap(m => [
+        { role: 'user' as const,      content: m.mensagem_advogado },
+        { role: 'assistant' as const, content: m.resposta_hub, tokens: m.tokens_output },
+      ])
+      setMessages(msgs)
+      setConversaId(loadedId)
+      setConversaRestaurada(true)
+      setTool('chat')
+      setAnalise(null)
+      setAnaliseErro(null)
+    },
+  })
+
+  /* ── Petição ── */
   const submitPeticaoMut = useMutation({
     mutationFn: analisarPeticaoAsync,
     onSuccess: ({ job_id }) => { setPeticaoJobId(job_id); setAnaliseErro(null) },
@@ -435,6 +489,7 @@ export default function HubIAPage() {
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, chatMutation.isPending])
 
+  /* ── Ações ── */
   const handleSend = useCallback((text: string) => {
     const t = text.trim()
     if (!t || chatMutation.isPending) return
@@ -442,8 +497,18 @@ export default function HubIAPage() {
     chatMutation.mutate(t)
   }, [chatMutation])
 
+  function novaConversa() {
+    setMessages([{
+      role: 'assistant',
+      content: 'Nova conversa iniciada. Como posso ajudar?',
+      intencao: 'saudacao',
+    }])
+    setConversaId(crypto.randomUUID())
+    setConversaRestaurada(false)
+  }
+
   function resetChat() {
-    setMessages([{ role: 'assistant', content: 'Nova conversa iniciada. Como posso ajudar?', intencao: 'saudacao' }])
+    novaConversa()
   }
 
   function switchTool(t: Tool) {
@@ -487,26 +552,45 @@ export default function HubIAPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowHistorico(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+            <motion.button
+              onClick={() => setShowHistorico(v => !v)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.93 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200"
               style={{
-                border: '1px solid var(--color-am-border)', background: 'white',
+                border: `1px solid ${showHistorico ? 'rgba(18,72,190,0.35)' : 'var(--color-am-border)'}`,
+                background: showHistorico ? 'rgba(18,72,190,0.08)' : 'white',
                 color: showHistorico ? 'var(--color-am-blue)' : 'var(--color-am-muted)',
+                boxShadow: showHistorico ? '0 0 0 3px rgba(18,72,190,0.1)' : 'none',
               }}>
-              <Clock size={11} />
+              <MessageSquare size={11} />
               Histórico
-              {showHistorico ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-            </button>
+            </motion.button>
             {tool !== 'peticao' && (
-              <button onClick={resetChat}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-am-muted hover:text-am-secondary transition-colors"
+              <motion.button
+                onClick={resetChat}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.93 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-am-muted transition-all duration-200 hover:text-red-400"
                 style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
                 <RotateCcw size={11} />
                 Limpar
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
+
+        {/* Banner de conversa restaurada */}
+        <AnimatePresence>
+          {conversaRestaurada && tool !== 'peticao' && (
+            <ConversaRestauradaBanner
+              onContinuar={() => setConversaRestaurada(false)}
+              onNova={() => { novaConversa() }}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Conteúdo central */}
         {tool === 'peticao' ? (
@@ -532,11 +616,16 @@ export default function HubIAPage() {
                   </div>
                   <div className="w-full grid grid-cols-2 gap-2">
                     {prompts.map(p => (
-                      <button key={p} onClick={() => handleSend(p)}
-                        className="px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium bg-white border border-am-border hover:border-am-blue hover:text-am-ink transition-all duration-200 leading-relaxed"
+                      <motion.button
+                        key={p}
+                        onClick={() => handleSend(p)}
+                        whileHover={{ y: -2, boxShadow: '0 6px 16px rgba(12,30,48,0.1)', borderColor: 'rgba(18,72,190,0.35)' }}
+                        whileTap={{ scale: 0.97, y: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+                        className="px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium bg-white border border-am-border hover:text-am-ink leading-relaxed"
                         style={{ boxShadow: '0 1px 4px rgba(12,30,48,0.05)' }}>
                         {p}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
@@ -550,13 +639,19 @@ export default function HubIAPage() {
                   Erro ao enviar. Verifique a conexão e tente novamente.
                 </div>
               )}
+              {carregarConversaMut.isPending && (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-am-muted">
+                  <div className="w-4 h-4 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
+                  Carregando conversa…
+                </div>
+              )}
             </div>
 
             <div className="flex-shrink-0 px-4 pb-5 pt-2">
               <PlaceholdersAndVanishInput
                 placeholders={prompts}
                 onSubmit={handleSend}
-                disabled={chatMutation.isPending}
+                disabled={chatMutation.isPending || carregarConversaMut.isPending}
               />
               <p className="text-center text-[10px] text-am-muted mt-2">
                 Amicus IA pode cometer erros. Verifique informações importantes.
@@ -565,16 +660,16 @@ export default function HubIAPage() {
           </>
         )}
 
-        {/* Histórico overlay */}
+        {/* Drawer de histórico */}
         <AnimatePresence>
           {showHistorico && (
-            <HistoricoPanel
+            <ConversasDrawer
               onClose={() => setShowHistorico(false)}
-              onRestaurar={preview => {
+              onSelectConversa={(id) => {
                 setShowHistorico(false)
-                if (tool === 'peticao') switchTool('chat')
-                handleSend(preview)
+                carregarConversaMut.mutate(id)
               }}
+              onNovaConversa={novaConversa}
             />
           )}
         </AnimatePresence>

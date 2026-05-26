@@ -66,6 +66,7 @@ export interface ConsultaHubResponse {
   tokens_input: number
   tokens_output: number
   custo_estimado: string
+  conversa_id: string | null
 }
 
 export interface ChatMessage {

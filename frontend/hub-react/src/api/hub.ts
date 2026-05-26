@@ -5,6 +5,7 @@ export async function consultar(params: {
   pergunta: string
   cliente_id?: number
   processo_id?: number
+  conversa_id?: string
 }): Promise<ConsultaHubResponse> {
   const { data } = await api.post<ConsultaHubResponse>('/hub/consultar', params)
   return data
@@ -43,6 +44,38 @@ export async function detalharSessao(sessaoId: number): Promise<SessaoDetalhe> {
   return data
 }
 
+/* ── Conversas (threads de múltiplas trocas Q&A) ─────────────────────────── */
+
+export interface ConversaListItem {
+  conversa_id: string
+  titulo: string
+  ultima_mensagem_em: string
+  total_mensagens: number
+}
+
+export interface ConversaMensagem {
+  id: number
+  mensagem_advogado: string
+  resposta_hub: string
+  modelo_ia: string
+  tokens_input: number
+  tokens_output: number
+  custo_estimado: string
+  created_at: string
+}
+
+export async function fetchConversas(page = 1, limit = 30): Promise<ConversaListItem[]> {
+  const { data } = await api.get<ConversaListItem[]>('/hub/conversas', { params: { page, limit } })
+  return data
+}
+
+export async function fetchConversa(conversaId: string): Promise<ConversaMensagem[]> {
+  const { data } = await api.get<ConversaMensagem[]>(`/hub/conversas/${conversaId}`)
+  return data
+}
+
+/* ── Petição ─────────────────────────────────────────────────────────────── */
+
 export interface PeticaoAnalise {
   tipo_peca: string
   pontos_fortes: string[]
@@ -77,6 +110,8 @@ export async function pollHubJob(jobId: string): Promise<HubJobStatus> {
   const { data } = await api.get<HubJobStatus>(`/hub/jobs/${jobId}`)
   return data
 }
+
+/* ── Métricas ────────────────────────────────────────────────────────────── */
 
 export interface MetricasHub {
   mes_atual: string

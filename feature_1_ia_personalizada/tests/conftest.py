@@ -214,6 +214,9 @@ if _is_sqlite:
     if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
         SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON  # type: ignore[attr-defined]
 
+    if not hasattr(SQLiteTypeCompiler, "visit_UUID"):
+        SQLiteTypeCompiler.visit_UUID = lambda self, type_, **kw: "VARCHAR(36)"  # type: ignore[attr-defined]
+
     def _sqlite_date_trunc(field: str, value: str | None) -> str | None:
         """Emula date_trunc do PostgreSQL para testes em SQLite."""
         if value is None:

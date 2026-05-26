@@ -8,10 +8,12 @@ Cada mensagem que o advogado envia ao Hub gera um registro aqui,
 com a resposta, intenção classificada, modelo usado e custo.
 """
 
+import uuid as _uuid
 from decimal import Decimal
 
 from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
@@ -67,6 +69,15 @@ class SessaoAdvogado(Base, TimestampMixin, TenantMixin):
         ForeignKey("processos.id", ondelete="SET NULL"),
         nullable=True,
     )
+
+    # Agrupa múltiplas trocas em um thread de conversa (UUID gerado pelo frontend)
+    conversa_id: Mapped[_uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
+        nullable=True,
+    )
+
+    # Título gerado por Claude Haiku — populado apenas na primeira mensagem da conversa
+    titulo: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # Dados extras (entidades extraídas, score de confiança, etc.)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
