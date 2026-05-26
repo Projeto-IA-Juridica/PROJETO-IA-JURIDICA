@@ -75,6 +75,9 @@ class SessaoAdvogado(Base, TimestampMixin, TenantMixin):
         nullable=True,
     )
 
+    # Título gerado por Claude Haiku — populado apenas na primeira mensagem da conversa
+    titulo: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
     # Dados extras (entidades extraídas, score de confiança, etc.)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
 

@@ -11,6 +11,7 @@ Acesso: exclusivo para advogado e admin (require_advogado).
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import json
 import uuid
@@ -20,7 +21,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.api.middleware.auth import (
@@ -34,9 +35,10 @@ from feature_1_ia_personalizada.services.ai.escalation_client import (
     EscalacaoIndisponivelError,
 )
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_HUB_ADVOGADO_BASE
+from feature_1_ia_personalizada.services.ai.titulo_gerador import gerar_titulo_conversa
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import LegalDataCleaner
 from feature_1_ia_personalizada.services.rag.ingestion import _extrair_texto_pdf
-from shared.database.session import get_db
+from shared.database.session import get_db, get_session_factory
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.processo import Processo
@@ -123,6 +125,35 @@ async def _salvar_sessao(db: AsyncSession, sessao: SessaoAdvogado) -> None:
         await db.rollback()
         logger.error("hub_sessao_salvar_falhou", erro=str(exc))
         # Não propaga: a resposta ao advogado já foi produzida com sucesso.
+
+
+async def _gerar_e_salvar_titulo(conversa_id: uuid.UUID, mensagem: str) -> None:
+    """
+    Gera título com Haiku e salva na primeira sessão da conversa.
+    Executado como fire-and-forget após a resposta ser enviada ao cliente.
+    """
+    titulo = await gerar_titulo_conversa(mensagem)
+    session_factory = get_session_factory()
+    async with session_factory() as db:
+        try:
+            # Encontra o id da primeira sessão desta conversa (menor created_at)
+            subq = (
+                select(SessaoAdvogado.id)
+                .where(SessaoAdvogado.conversa_id == conversa_id)
+                .order_by(SessaoAdvogado.created_at.asc())
+                .limit(1)
+                .scalar_subquery()
+            )
+            await db.execute(
+                update(SessaoAdvogado)
+                .where(SessaoAdvogado.id == subq)
+                .values(titulo=titulo)
+            )
+            await db.commit()
+            logger.info("titulo_salvo", conversa_id=str(conversa_id), titulo=titulo)
+        except Exception as exc:
+            await db.rollback()
+            logger.warning("titulo_salvar_falhou", erro=str(exc))
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +357,12 @@ async def consultar(
             detail="Serviço de consulta indisponível. Tente novamente.",
         ) from exc
 
+    # Verifica se é a primeira mensagem desta conversa (para gerar título)
+    count_result = await db.execute(
+        select(func.count()).where(SessaoAdvogado.conversa_id == conversa_uuid)
+    )
+    is_primeira_mensagem = (count_result.scalar() or 0) == 0
+
     await _salvar_sessao(
         db,
         SessaoAdvogado(
@@ -344,6 +381,12 @@ async def consultar(
             metadata_json={},
         ),
     )
+
+    # Dispara geração de título em background apenas na 1ª mensagem
+    if is_primeira_mensagem:
+        asyncio.create_task(
+            _gerar_e_salvar_titulo(conversa_uuid, body.pergunta)
+        )
 
     return ConsultaHubResponse(
         resposta=resultado.conteudo,
@@ -495,6 +538,7 @@ async def listar_conversas(
         select(
             SessaoAdvogado.conversa_id,
             SessaoAdvogado.mensagem_advogado,
+            SessaoAdvogado.titulo,
             SessaoAdvogado.created_at,
             func.row_number()
             .over(
@@ -530,12 +574,20 @@ async def listar_conversas(
     return [
         ConversaListItem(
             conversa_id=str(row.conversa_id),
-            titulo=row.mensagem_advogado[:80],
+            titulo=row.titulo or _truncar_titulo(row.mensagem_advogado),
             ultima_mensagem_em=row.ultima_em,
             total_mensagens=row.total,
         )
         for row in rows
     ]
+
+
+def _truncar_titulo(texto: str, limite: int = 80) -> str:
+    """Fallback: trunca na última palavra inteira antes do limite."""
+    if len(texto) <= limite:
+        return texto
+    truncado = texto[:limite].rsplit(" ", 1)[0]
+    return truncado + "…"
 
 
 # ---------------------------------------------------------------------------
