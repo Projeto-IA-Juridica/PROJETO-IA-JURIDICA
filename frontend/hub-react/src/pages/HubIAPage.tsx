@@ -69,7 +69,11 @@ function agruparPorData(conversas: ConversaListItem[]) {
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user'
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
         <div className="flex items-end gap-2 max-w-[82%]">
           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mb-0.5"
@@ -86,7 +90,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           {msg.content}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
 
@@ -255,34 +259,45 @@ function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0, x: -24 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-      className="absolute inset-0 flex flex-col bg-am-bg z-10">
+      exit={{ opacity: 0, x: -24 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+      className="absolute inset-0 flex flex-col z-10"
+      style={{ background: 'var(--color-am-bg)' }}>
 
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 pt-5 pb-3">
         <div className="flex items-center gap-2">
-          <MessageSquare size={14} style={{ color: 'var(--color-am-blue)' }} />
-          <span className="text-sm font-bold text-am-ink">Histórico de conversas</span>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(18,72,190,0.1)' }}>
+            <MessageSquare size={12} style={{ color: 'var(--color-am-blue)' }} />
+          </div>
+          <span className="text-sm font-bold text-am-ink">Histórico</span>
         </div>
-        <button onClick={onClose}
+        <motion.button
+          onClick={onClose}
+          whileHover={{ scale: 1.1, rotate: 90 }}
+          whileTap={{ scale: 0.88 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           className="w-8 h-8 rounded-xl flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
           style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
           <X size={13} />
-        </button>
+        </motion.button>
       </div>
 
       {/* Nova conversa */}
       <div className="flex-shrink-0 px-4 pb-3">
-        <button
+        <motion.button
           onClick={() => { onNovaConversa(); onClose() }}
+          whileHover={{ scale: 1.02, boxShadow: '0 6px 20px rgba(18,72,190,0.35)' }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white"
-          style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)' }}>
+          style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', boxShadow: '0 3px 12px rgba(18,72,190,0.25)' }}>
           <Plus size={13} />
           Nova conversa
-        </button>
+        </motion.button>
       </div>
 
       {/* Lista de conversas */}
@@ -294,11 +309,14 @@ function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
         )}
 
         {!isLoading && grupoKeys.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-40 gap-3 text-am-muted">
-            <MessageSquare size={24} strokeWidth={1.5} />
+          <div className="flex flex-col items-center justify-center h-40 gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(12,30,48,0.05)' }}>
+              <MessageSquare size={18} strokeWidth={1.5} className="text-am-muted" />
+            </div>
             <div className="text-center">
-              <p className="text-xs font-medium text-am-secondary">Nenhuma conversa ainda</p>
-              <p className="text-[11px] mt-0.5">Suas conversas aparecerão aqui</p>
+              <p className="text-xs font-semibold text-am-secondary">Nenhuma conversa ainda</p>
+              <p className="text-[11px] text-am-muted mt-0.5">Suas conversas aparecerão aqui</p>
             </div>
           </div>
         )}
@@ -310,15 +328,18 @@ function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
             </p>
             <div className="space-y-1.5">
               {grupos[grupo].map((c: ConversaListItem) => (
-                <button
+                <motion.button
                   key={c.conversa_id}
                   onClick={() => onSelectConversa(c.conversa_id)}
-                  className="w-full text-left px-3.5 py-3 rounded-xl transition-colors group"
+                  whileHover={{ x: 3, borderColor: 'rgba(18,72,190,0.25)', backgroundColor: 'rgba(18,72,190,0.03)' }}
+                  whileTap={{ scale: 0.985 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                  className="w-full text-left px-3.5 py-3 rounded-xl group"
                   style={{ border: '1px solid var(--color-am-border)', background: 'white', boxShadow: '0 1px 3px rgba(12,30,48,0.04)' }}>
                   <div className="flex items-start gap-2">
-                    <MessageSquare size={12} className="flex-shrink-0 mt-0.5 text-am-muted group-hover:text-am-blue transition-colors" />
+                    <MessageSquare size={12} className="flex-shrink-0 mt-0.5 text-am-muted group-hover:text-am-blue transition-colors duration-150" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-am-ink leading-snug line-clamp-2 font-medium">{c.titulo}</p>
+                      <p className="text-xs text-am-ink leading-snug line-clamp-2 font-medium group-hover:text-am-blue transition-colors duration-150">{c.titulo}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-am-muted">
                           {new Date(c.ultima_mensagem_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -330,7 +351,7 @@ function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
                       </div>
                     </div>
                   </div>
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -346,20 +367,37 @@ function ConversaRestauradaBanner({ onContinuar, onNova }: {
   onNova: () => void
 }) {
   return (
-    <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5"
-      style={{ background: 'rgba(18,72,190,0.05)', borderBottom: '1px solid rgba(18,72,190,0.14)' }}>
-      <Clock size={11} style={{ color: 'var(--color-am-blue)' }} />
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5"
+      style={{ background: 'rgba(18,72,190,0.05)', borderBottom: '1px solid rgba(18,72,190,0.12)' }}>
+      <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
+        style={{ background: 'rgba(18,72,190,0.12)' }}>
+        <Clock size={9} style={{ color: 'var(--color-am-blue)' }} />
+      </div>
       <span className="text-[11px] text-am-secondary flex-1">Conversa anterior restaurada</span>
-      <button onClick={onContinuar}
-        className="text-[11px] font-semibold px-2 py-0.5 rounded-md transition-colors"
-        style={{ color: 'var(--color-am-blue)' }}>
+      <motion.button
+        onClick={onContinuar}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+        className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors"
+        style={{ color: 'var(--color-am-blue)', background: 'rgba(18,72,190,0.1)' }}>
         Continuar
-      </button>
-      <button onClick={onNova}
-        className="text-[11px] font-semibold px-2 py-0.5 rounded-md text-am-muted hover:text-am-ink transition-colors">
+      </motion.button>
+      <motion.button
+        onClick={onNova}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+        className="text-[11px] font-semibold px-2.5 py-1 rounded-lg text-am-muted hover:text-am-secondary transition-colors"
+        style={{ background: 'rgba(12,30,48,0.05)' }}>
         Nova
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   )
 }
 
@@ -514,33 +552,45 @@ export default function HubIAPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowHistorico(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+            <motion.button
+              onClick={() => setShowHistorico(v => !v)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.93 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200"
               style={{
-                border: '1px solid var(--color-am-border)', background: 'white',
+                border: `1px solid ${showHistorico ? 'rgba(18,72,190,0.35)' : 'var(--color-am-border)'}`,
+                background: showHistorico ? 'rgba(18,72,190,0.08)' : 'white',
                 color: showHistorico ? 'var(--color-am-blue)' : 'var(--color-am-muted)',
+                boxShadow: showHistorico ? '0 0 0 3px rgba(18,72,190,0.1)' : 'none',
               }}>
               <MessageSquare size={11} />
               Histórico
-            </button>
+            </motion.button>
             {tool !== 'peticao' && (
-              <button onClick={resetChat}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-am-muted hover:text-am-secondary transition-colors"
+              <motion.button
+                onClick={resetChat}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.93 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-am-muted transition-all duration-200 hover:text-red-400"
                 style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
                 <RotateCcw size={11} />
                 Limpar
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
 
         {/* Banner de conversa restaurada */}
-        {conversaRestaurada && tool !== 'peticao' && (
-          <ConversaRestauradaBanner
-            onContinuar={() => setConversaRestaurada(false)}
-            onNova={() => { novaConversa() }}
-          />
-        )}
+        <AnimatePresence>
+          {conversaRestaurada && tool !== 'peticao' && (
+            <ConversaRestauradaBanner
+              onContinuar={() => setConversaRestaurada(false)}
+              onNova={() => { novaConversa() }}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Conteúdo central */}
         {tool === 'peticao' ? (
@@ -566,11 +616,16 @@ export default function HubIAPage() {
                   </div>
                   <div className="w-full grid grid-cols-2 gap-2">
                     {prompts.map(p => (
-                      <button key={p} onClick={() => handleSend(p)}
-                        className="px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium bg-white border border-am-border hover:border-am-blue hover:text-am-ink transition-all duration-200 leading-relaxed"
+                      <motion.button
+                        key={p}
+                        onClick={() => handleSend(p)}
+                        whileHover={{ y: -2, boxShadow: '0 6px 16px rgba(12,30,48,0.1)', borderColor: 'rgba(18,72,190,0.35)' }}
+                        whileTap={{ scale: 0.97, y: 0 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+                        className="px-3 py-2.5 rounded-xl text-left text-xs text-am-secondary font-medium bg-white border border-am-border hover:text-am-ink leading-relaxed"
                         style={{ boxShadow: '0 1px 4px rgba(12,30,48,0.05)' }}>
                         {p}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>

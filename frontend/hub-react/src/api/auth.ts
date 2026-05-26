@@ -49,6 +49,8 @@ function storeTokens(data: TokenResponse) {
 export async function fetchCsrfToken(): Promise<string> {
   const { data } = await plain.get<{ csrf_token: string }>('/auth/csrf-token')
   localStorage.setItem(KEYS.csrf, data.csrf_token)
+  // eslint-disable-next-line no-useless-concat
+  document.cookie = 'csrf_token=' + data.csrf_token + '; Path=/'
   return data.csrf_token
 }
 
