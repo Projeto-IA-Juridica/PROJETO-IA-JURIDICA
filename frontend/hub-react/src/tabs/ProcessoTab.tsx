@@ -75,13 +75,6 @@ function NovoProcessoModal({ clienteId, onClose }: { clienteId: number; onClose:
     mut.mutate({ numero_cnj: cnj.trim(), cliente_id: clienteId, polo_cliente: polo, tipo_acao: acao.trim() || undefined })
   }
 
-  const inp = {
-    width: '100%', boxSizing: 'border-box' as const, padding: '9px 12px',
-    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-am-ink)',
-    background: 'var(--color-am-bg)', border: '1px solid var(--color-am-border)',
-    borderRadius: 12, outline: 'none',
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
       style={{ background: 'rgba(12,30,48,0.45)', backdropFilter: 'blur(4px)' }}>
@@ -99,9 +92,7 @@ function NovoProcessoModal({ clienteId, onClose }: { clienteId: number; onClose:
         <div className="space-y-3 mb-4">
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">Nº do processo (CNJ) *</label>
-            <input value={cnj} onChange={e => setCnj(e.target.value)} placeholder="0000001-23.2024.8.26.0100" style={inp}
-              onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(18,72,190,0.10)' }}
-              onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }} />
+            <input value={cnj} onChange={e => setCnj(e.target.value)} placeholder="0000001-23.2024.8.26.0100" className="am-input" />
           </div>
 
           <div>
@@ -122,9 +113,7 @@ function NovoProcessoModal({ clienteId, onClose }: { clienteId: number; onClose:
 
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">Tipo de ação (opcional)</label>
-            <input value={acao} onChange={e => setAcao(e.target.value)} placeholder="Ex: Ação de Indenização" style={inp}
-              onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(18,72,190,0.10)' }}
-              onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }} />
+            <input value={acao} onChange={e => setAcao(e.target.value)} placeholder="Ex: Ação de Indenização" className="am-input" />
           </div>
         </div>
 
@@ -158,13 +147,6 @@ function EditarProcessoModal({ processo, clienteId, onClose }: { processo: Proce
     mutationFn: (payload: ProcessoUpdate) => atualizarProcesso(processo.id, payload),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['processos', clienteId] }); onClose() },
   })
-
-  const inp = {
-    width: '100%', boxSizing: 'border-box' as const, padding: '9px 12px',
-    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-am-ink)',
-    background: 'var(--color-am-bg)', border: '1px solid var(--color-am-border)',
-    borderRadius: 12, outline: 'none',
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
@@ -200,9 +182,7 @@ function EditarProcessoModal({ processo, clienteId, onClose }: { processo: Proce
 
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">Tipo de ação</label>
-            <input value={acao} onChange={e => setAcao(e.target.value)} placeholder="Ex: Ação de Indenização" style={inp}
-              onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(18,72,190,0.10)' }}
-              onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }} />
+            <input value={acao} onChange={e => setAcao(e.target.value)} placeholder="Ex: Ação de Indenização" className="am-input" />
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer">
@@ -341,10 +321,7 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
             value={filtroCNJ}
             onChange={e => setFiltroCNJ(e.target.value)}
             placeholder="Buscar por CNJ (mín. 3 caracteres)…"
-            className="w-full pl-8 pr-4 py-2 rounded-xl text-xs text-am-ink placeholder:text-am-muted outline-none"
-            style={{ background: 'white', border: '1px solid var(--color-am-border)', boxShadow: '0 1px 4px rgba(12,30,48,0.04)' }}
-            onFocus={e => (e.target.style.borderColor = 'var(--color-am-blue)')}
-            onBlur={e  => (e.target.style.borderColor = 'var(--color-am-border)')}
+            className="am-input am-input-with-icon"
           />
         </div>
 

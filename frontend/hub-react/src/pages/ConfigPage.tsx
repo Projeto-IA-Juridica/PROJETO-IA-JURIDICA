@@ -156,21 +156,15 @@ function SectionTitle({ icon, label, desc }: { icon: React.ReactNode; label: str
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="text-[10px] font-bold text-am-secondary uppercase tracking-wider block">
-        {label}
-      </label>
+    <div className="space-y-1.5">
+      <label className="am-label">{label}</label>
       {children}
-      {hint && <p className="text-[10px] text-am-muted">{hint}</p>}
+      {hint && <p className="am-hint">{hint}</p>}
     </div>
   )
 }
 
-const inputCls = "w-full px-3 py-2.5 text-xs border border-am-border rounded-xl bg-am-bg text-am-ink outline-none transition-fast placeholder:text-am-muted"
-const focusInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-  (e.target.style.borderColor = 'var(--color-am-blue)')
-const blurInput = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-  (e.target.style.borderColor = 'var(--color-am-border)')
+const inputCls = "am-input"
 
 export default function ConfigPage() {
   const qc = useQueryClient()
@@ -302,23 +296,21 @@ export default function ConfigPage() {
                 <Field label="Nome do escritório">
                   <input type="text" value={cfg.nome}
                     onChange={(e) => update('nome', e.target.value)}
-                    className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                    className={inputCls} />
                 </Field>
               </div>
               <Field label="CNPJ">
-                <input type="text" value={cfg.cnpj} readOnly
-                  className={`${inputCls} cursor-default`}
-                  style={{ color: 'var(--color-am-muted)', background: 'rgba(12,30,48,0.03)' }} />
+                <input type="text" value={cfg.cnpj} readOnly className={inputCls} />
               </Field>
               <Field label="E-mail">
                 <input type="email" value={cfg.email}
                   onChange={(e) => update('email', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                  className={inputCls} />
               </Field>
               <Field label="Telefone / WhatsApp">
                 <input type="tel" value={cfg.telefone ?? ''} placeholder="(11) 9 9999-9999"
                   onChange={(e) => update('telefone', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                  className={inputCls} />
               </Field>
             </div>
           </div>
@@ -330,7 +322,7 @@ export default function ConfigPage() {
               <Field label="Nome da persona">
                 <input type="text" value={cfg.persona_nome}
                   onChange={(e) => update('persona_nome', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                  className={inputCls} />
               </Field>
 
               <Field label="Tom de comunicação">
@@ -363,12 +355,12 @@ export default function ConfigPage() {
               <Field label="Início">
                 <input type="time" value={cfg.horario_inicio}
                   onChange={(e) => update('horario_inicio', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                  className={inputCls} />
               </Field>
               <Field label="Fim">
                 <input type="time" value={cfg.horario_fim}
                   onChange={(e) => update('horario_fim', e.target.value)}
-                  className={inputCls} onFocus={focusInput} onBlur={blurInput} />
+                  className={inputCls} />
               </Field>
             </div>
             <p className="text-[10px] text-am-muted mt-3">
@@ -388,8 +380,7 @@ export default function ConfigPage() {
                 <Field key={key} label={label} hint={hint}>
                   <textarea rows={3} value={cfg[key]}
                     onChange={(e) => update(key, e.target.value)}
-                    className={`${inputCls} resize-none leading-relaxed`}
-                    onFocus={focusInput} onBlur={blurInput}
+                    className="am-textarea"
                   />
                 </Field>
               ))}

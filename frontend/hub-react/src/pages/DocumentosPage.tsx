@@ -10,6 +10,7 @@ import {
   listarDocumentos, uploadDocumento, deletarDocumento, statusJob, buscarSemantico,
   type DocItem, type JobStatus,
 } from '../api/rag'
+import { Select } from '../components/Select'
 
 /* ── Tipos e constantes ── */
 const TIPO_CFG = {
@@ -130,10 +131,7 @@ function TipoModal({
           <input
             value={titulo}
             onChange={e => setTitulo(e.target.value)}
-            className="w-full px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none"
-            style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
-            onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(18,72,190,0.10)' }}
-            onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }}
+            className="am-input"
           />
         </div>
 
@@ -431,23 +429,18 @@ export default function DocumentosPage() {
                 onChange={e => setBuscarQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && buscarQuery.trim() && !buscarMut.isPending) buscarMut.mutate() }}
                 placeholder="Ex: quais os argumentos para prescrição trabalhista?"
-                className="w-full px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg placeholder:text-am-muted"
-                style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
-                onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)' }}
-                onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)' }}
+                className="am-input"
               />
               <div className="flex gap-2">
-                <select
+                <Select
                   value={buscarTipo}
-                  onChange={e => setBuscarTipo(e.target.value)}
-                  className="flex-1 px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg"
-                  style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
-                >
-                  <option value="">Todos os tipos</option>
-                  {(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => (
-                    <option key={t} value={t}>{TIPO_CFG[t].label}</option>
-                  ))}
-                </select>
+                  onChange={setBuscarTipo}
+                  className="flex-1"
+                  options={[
+                    { value: '', label: 'Todos os tipos' },
+                    ...(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => ({ value: t, label: TIPO_CFG[t].label })),
+                  ]}
+                />
                 <button
                   onClick={() => buscarMut.mutate()}
                   disabled={!buscarQuery.trim() || buscarMut.isPending}
@@ -502,8 +495,7 @@ export default function DocumentosPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar documento…"
-                className="w-full pl-8 pr-4 py-2 text-xs rounded-xl bg-am-bg text-am-ink outline-none placeholder:text-am-muted"
-                style={{ border: '1px solid var(--color-am-border)' }}
+                className="am-input am-input-with-icon"
               />
             </div>
           </div>

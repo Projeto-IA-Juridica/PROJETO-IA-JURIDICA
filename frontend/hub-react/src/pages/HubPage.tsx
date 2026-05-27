@@ -102,12 +102,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar cliente..."
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl text-xs text-am-ink placeholder:text-am-muted outline-none"
-                style={{
-                  background: 'white',
-                  border: '1px solid var(--color-am-border)',
-                  boxShadow: '0 1px 4px rgba(12,30,48,0.05)',
-                }}
+                className="am-input am-input-with-icon"
               />
             </div>
           </div>

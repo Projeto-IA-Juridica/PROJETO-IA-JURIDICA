@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 
 const WHATSAPP = import.meta.env.VITE_SUPORTE_WHATSAPP || '5500000000000'
 
@@ -95,25 +95,24 @@ export default function AjudaPage({ onBack }: Props) {
               <form onSubmit={handleSubmit} noValidate>
 
                 <FGroup label="Nome completo" required>
-                  <input type="text" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Seu nome completo" style={inp} onFocus={focusFn} onBlur={blurFn} />
+                  <input type="text" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Seu nome completo" className="am-input" />
                 </FGroup>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <FGroup label="E-mail" required>
-                    <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="seu@escritorio.com.br" style={inp} onFocus={focusFn} onBlur={blurFn} />
+                    <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="seu@escritorio.com.br" className="am-input" />
                   </FGroup>
                   <FGroup label="Telefone" required>
-                    <input type="tel" value={form.tel} onChange={e => setForm(f => ({ ...f, tel: maskTel(e.target.value) }))} placeholder="(00) 00000-0000" style={inp} onFocus={focusFn} onBlur={blurFn} />
+                    <input type="tel" value={form.tel} onChange={e => setForm(f => ({ ...f, tel: maskTel(e.target.value) }))} placeholder="(00) 00000-0000" className="am-input" />
                   </FGroup>
                 </div>
 
                 <FGroup label="Escritório / Empresa" required>
-                  <input type="text" value={form.empresa} onChange={e => setForm(f => ({ ...f, empresa: e.target.value }))} placeholder="Nome do seu escritório" style={inp} onFocus={focusFn} onBlur={blurFn} />
+                  <input type="text" value={form.empresa} onChange={e => setForm(f => ({ ...f, empresa: e.target.value }))} placeholder="Nome do seu escritório" className="am-input" />
                 </FGroup>
 
                 <FGroup label="Mensagem" required>
-                  <textarea value={form.msg} onChange={e => setForm(f => ({ ...f, msg: e.target.value }))} rows={5} placeholder="Como podemos ajudar você?" style={{ ...inp, resize: 'vertical', minHeight: 110 }}
-                    onFocus={focusFn as never} onBlur={blurFn as never} />
+                  <textarea value={form.msg} onChange={e => setForm(f => ({ ...f, msg: e.target.value }))} rows={5} placeholder="Como podemos ajudar você?" className="am-textarea" style={{ minHeight: 110 }} />
                 </FGroup>
 
                 {error && (
@@ -163,7 +162,7 @@ function SuccessState() {
 function FGroup({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={labelSt}>
+      <label className="am-label">
         {label}{required && <span style={{ color: 'var(--color-am-blue)', marginLeft: 2 }}>*</span>}
       </label>
       {children}
@@ -179,27 +178,3 @@ function AmicusLogo() {
   )
 }
 
-/* ── Styles ───────────────────────────────────────────────────────────────── */
-
-const labelSt: CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  color: 'var(--color-am-secondary)', textTransform: 'uppercase',
-  letterSpacing: '0.08em', marginBottom: 6,
-}
-
-const inp: CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-am-ink)',
-  background: '#fff', border: '1px solid var(--color-am-border)',
-  borderRadius: 12, outline: 'none', resize: 'none',
-  transition: 'border-color 0.14s ease, box-shadow 0.14s ease',
-}
-
-const focusFn = (e: React.FocusEvent<HTMLInputElement>) => {
-  e.target.style.borderColor = 'var(--color-am-blue)'
-  e.target.style.boxShadow   = '0 0 0 3px rgba(58,122,184,0.12)'
-}
-const blurFn = (e: React.FocusEvent<HTMLInputElement>) => {
-  e.target.style.borderColor = 'var(--color-am-border)'
-  e.target.style.boxShadow   = 'none'
-}
