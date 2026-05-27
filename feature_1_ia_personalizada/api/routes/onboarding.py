@@ -535,6 +535,44 @@ async def connect_whatsapp(
             elif resp.status_code == 409:
                 # Instância já existe — reconecta e busca QR atual
                 data = await _reconectar_instancia()
+            elif resp.status_code == 403:
+                # Algumas versões/instâncias retornam 403 quando o nome já está em uso.
+                # Detectamos mensagens que indiquem "already in use" e tratamos como 409.
+                already_in_use = False
+                try:
+                    body = resp.json()
+                    msgs: list[str] = []
+                    if isinstance(body, dict):
+                        if "response" in body and isinstance(body["response"], dict):
+                            m = body["response"].get("message")
+                            if isinstance(m, list):
+                                msgs.extend([str(x) for x in m if x])
+                            elif isinstance(m, str):
+                                msgs.append(m)
+                        m2 = body.get("message")
+                        if isinstance(m2, str):
+                            msgs.append(m2)
+                    joined = " ".join(msgs).lower()
+                    if "already in use" in joined or "já está em uso" in joined:
+                        already_in_use = True
+                except Exception:
+                    already_in_use = False
+
+                if already_in_use:
+                    data = await _reconectar_instancia()
+                else:
+                    # Não é o caso esperado; trata como erro genérico abaixo
+                    detail = f"Evolution API retornou erro inesperado (HTTP {resp.status_code})."
+                    try:
+                        raw = resp.text
+                        if raw:
+                            detail = f"{detail} Resposta: {raw[:400]}"
+                    except Exception:
+                        pass
+                    logger.warning(
+                        "evolution_create_erro", status=resp.status_code, escritorio_id=escritorio.id
+                    )
+                    raise HTTPException(status_code=502, detail=detail)
             else:
                 detail = f"Evolution API retornou erro inesperado (HTTP {resp.status_code})."
                 try:
