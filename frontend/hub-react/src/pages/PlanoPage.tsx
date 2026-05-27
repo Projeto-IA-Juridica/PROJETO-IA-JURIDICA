@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Loader2, CheckCircle, Zap, Building2, Crown } from 'lucide-react'
 import {
   PLANOS,
@@ -35,7 +36,7 @@ interface Props {
 
 /* ── Ícones por plano ────────────────────────────────────────────────────── */
 
-const PLANO_ICONS: Record<PlanoId, React.ReactNode> = {
+const PLANO_ICONS: Record<PlanoId, ReactNode> = {
   basico:       <Zap size={20} />,
   profissional: <Building2 size={20} />,
   escritorio:   <Crown size={20} />,
@@ -222,7 +223,7 @@ function PlanoCard({ plano, ativo, carregando, onEscolher }: CardProps) {
             ? '0 4px 16px rgba(18,72,190,0.22)'
             : 'none',
           border: plano.destaque ? 'none' : '1.5px solid var(--color-am-blue)',
-        } as React.CSSProperties}
+        } as CSSProperties}
       >
         {carregando && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
         {ativo ? 'Plano atual' : carregando ? 'Aguardando…' : 'Começar grátis por 7 dias →'}
@@ -250,7 +251,7 @@ function AmicusLogo() {
 
 /* ── Estilos ─────────────────────────────────────────────────────────────── */
 
-const containerSt: React.CSSProperties = {
+const containerSt: CSSProperties = {
   minHeight: '100vh',
   background: 'var(--color-am-bg)',
   fontFamily: 'var(--font-sans)',
@@ -259,7 +260,7 @@ const containerSt: React.CSSProperties = {
   margin: '0 auto',
 }
 
-const h1St: React.CSSProperties = {
+const h1St: CSSProperties = {
   fontSize: 28,
   fontWeight: 900,
   color: 'var(--color-am-ink)',
@@ -268,20 +269,20 @@ const h1St: React.CSSProperties = {
   marginBottom: 10,
 }
 
-const subtitleSt: React.CSSProperties = {
+const subtitleSt: CSSProperties = {
   fontSize: 14,
   color: 'var(--color-am-muted)',
   lineHeight: 1.6,
 }
 
-const gridSt: React.CSSProperties = {
+const gridSt: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
   gap: 20,
   alignItems: 'start',
 }
 
-const badgeSt: React.CSSProperties = {
+const badgeSt: CSSProperties = {
   position: 'absolute',
   top: -12,
   left: '50%',
@@ -296,7 +297,7 @@ const badgeSt: React.CSSProperties = {
   letterSpacing: '0.02em',
 }
 
-const tagSt: React.CSSProperties = {
+const tagSt: CSSProperties = {
   fontSize: 10,
   fontWeight: 600,
   padding: '3px 9px',
@@ -307,7 +308,7 @@ const tagSt: React.CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-const erroSt: React.CSSProperties = {
+const erroSt: CSSProperties = {
   marginTop: 20,
   padding: '12px 16px',
   background: 'rgba(200,48,48,0.06)',
