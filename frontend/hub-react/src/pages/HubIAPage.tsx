@@ -130,7 +130,7 @@ function ScoreBar({ valor }: { valor: number }) {
 
 function AnalisePeticaoResult({ analise, onReset }: { analise: PeticaoAnalise; onReset: () => void }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
       <div className="bg-white rounded-2xl p-4" style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 4px rgba(12,30,48,0.05)' }}>
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -288,7 +288,7 @@ function ConversasDrawer({ onClose, onSelectConversa, onNovaConversa }: {
       </div>
 
       {/* Nova conversa */}
-      <div className="flex-shrink-0 px-4 pb-3">
+      <div className="flex-shrink-0 px-6 pb-3">
         <motion.button
           onClick={() => { onNovaConversa(); onClose() }}
           whileHover={{ scale: 1.02, boxShadow: '0 6px 20px rgba(18,72,190,0.35)' }}
@@ -524,10 +524,10 @@ export default function HubIAPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-am-bg">
-      <div className="flex flex-col h-full w-full max-w-2xl mx-auto relative">
+      <div className="flex flex-col h-full w-full max-w-3xl mx-auto relative">
 
         {/* Tool switcher */}
-        <div className="flex-shrink-0 flex items-center justify-between px-4 pt-5 pb-3">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 pt-5 pb-4">
           <div className="flex gap-1 p-1 rounded-2xl relative" style={{ background: 'rgba(12,30,48,0.05)' }}>
             {TOOLS.map(t => {
               const active = tool === t.id
@@ -604,7 +604,7 @@ export default function HubIAPage() {
               />
         ) : (
           <>
-            <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+            <div ref={messagesRef} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
               {isEmpty && (
                 <div className="flex flex-col items-center justify-center h-full gap-6 pb-4">
                   <div className="text-center">
@@ -648,7 +648,7 @@ export default function HubIAPage() {
               )}
             </div>
 
-            <div className="flex-shrink-0 px-4 pb-5 pt-2">
+            <div className="flex-shrink-0 px-6 pb-5 pt-2">
               <PlaceholdersAndVanishInput
                 placeholders={prompts}
                 onSubmit={handleSend}

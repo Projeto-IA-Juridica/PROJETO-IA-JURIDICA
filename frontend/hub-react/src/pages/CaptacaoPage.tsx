@@ -308,19 +308,13 @@ export default function CaptacaoPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex flex-col h-full w-full max-w-2xl mx-auto">
+      <div className="flex flex-col h-full w-full max-w-3xl mx-auto">
 
         {/* ── Header ── */}
-        <div className="flex-shrink-0 px-4 pt-5 pb-3">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-extrabold text-am-ink tracking-tight">Captação</h2>
-              <p className="text-[11px] text-am-muted mt-0.5">Leads qualificados pela IA</p>
-            </div>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 3px 10px rgba(18,72,190,0.20)' }}>
-              <Target size={16} className="text-white" />
-            </div>
+        <div className="flex-shrink-0 px-6 pt-5 pb-4">
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-am-ink tracking-tight">Captação</h2>
+            <p className="text-xs text-am-muted mt-0.5">Leads qualificados pela IA</p>
           </div>
 
           {/* Tabs */}
@@ -353,7 +347,7 @@ export default function CaptacaoPage() {
 
         {/* ── Conteúdo ── */}
         <div className="flex-1 overflow-y-auto">
-          <div className="px-4 pb-8 space-y-4">
+          <div className="px-6 pb-8 space-y-4">
 
             {/* ── TAB DNA ── */}
             {tab === 'dna' && (
@@ -520,7 +514,7 @@ export default function CaptacaoPage() {
                     )}
                   </div>
 
-                  <div className="px-4 pb-4">
+                  <div className="px-6 pb-4">
                     <button
                       onClick={() => descobrir.mutate({
                         tipo_acao:    tipoAcao,

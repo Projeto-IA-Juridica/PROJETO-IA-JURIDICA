@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, FileText, AlertTriangle, Star,
+  Users, FileText, AlertTriangle, MessageCircle, Star,
   ArrowRight, Zap,
   TrendingUp, TrendingDown, Minus, Download,
   Bell, Check, X, ChevronDown, ChevronUp,
@@ -62,9 +62,9 @@ function Section({ title, icon, badge, children }: {
   title: string; icon: React.ReactNode; badge?: React.ReactNode; children: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-2xl overflow-hidden card-shadow card-border-hover"
+    <div className="bg-white rounded-2xl overflow-hidden card-shadow card-border-hover flex flex-col h-full"
       style={{ border: '1px solid var(--color-am-border)' }}>
-      <div className="flex items-center justify-between px-4 py-3"
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3"
         style={{ borderBottom: '1px solid var(--color-am-border)', background: 'rgba(12,30,48,0.02)' }}>
         <div className="flex items-center gap-2">
           <span className="text-am-blue">{icon}</span>
@@ -72,7 +72,7 @@ function Section({ title, icon, badge, children }: {
         </div>
         {badge}
       </div>
-      {children}
+      <div className="flex-1 flex flex-col">{children}</div>
     </div>
   )
 }
@@ -107,6 +107,7 @@ function EscalacoesSection() {
   if (!isLoading && count === 0) return null
 
   return (
+    <div className="flex-shrink-0">
     <Section
       title="Escalações pendentes"
       icon={<Bell size={13} />}
@@ -220,6 +221,7 @@ function EscalacoesSection() {
         </div>
       )}
     </Section>
+    </div>
   )
 }
 
@@ -270,76 +272,80 @@ export default function PainelPage({ onSelectCliente }: Props) {
   const horasEconomiadas = +(analisados * 0.5).toFixed(1)
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-4 max-w-3xl mx-auto space-y-4 page-enter">
+    <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col px-6 pt-3 pb-5 max-w-6xl mx-auto w-full gap-5 page-enter">
 
-        {/* ── Header + período ── */}
-        <div className="flex items-end justify-between">
+        {/* ── Header ── */}
+        <div className="flex-shrink-0">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-base font-extrabold text-am-ink tracking-tight">Painel de Resultados</h2>
-            <p className="text-[11px] text-am-muted mt-0.5">Visão geral do escritório</p>
+            <h2 className="text-sm font-bold text-am-ink tracking-tight">Painel de Resultados</h2>
+            <p className="text-xs text-am-muted mt-0.5">Visão geral do escritório</p>
           </div>
-          <div className="flex gap-1 p-0.5 rounded-xl" style={{ background: 'rgba(12,30,48,0.05)' }}>
-            {([7, 30, 90] as const).map((d) => (
-              <motion.button
-                key={d}
-                onClick={() => setPeriodo(d)}
-                whileHover={{ scale: periodo === d ? 1 : 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold press"
-                style={periodo === d
-                  ? { background: 'white', color: 'var(--color-am-blue)', boxShadow: '0 1px 4px rgba(18,72,190,0.12)' }
-                  : { color: 'var(--color-am-muted)' }
-                }>
-                {d}d
-              </motion.button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Período */}
+            <div className="flex gap-0.5 p-0.5 rounded-xl" style={{ background: 'rgba(12,30,48,0.05)' }}>
+              {([7, 30, 90] as const).map((d) => (
+                <motion.button
+                  key={d}
+                  onClick={() => setPeriodo(d)}
+                  whileHover={{ scale: periodo === d ? 1 : 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold press"
+                  style={periodo === d
+                    ? { background: 'white', color: 'var(--color-am-blue)', boxShadow: '0 1px 4px rgba(18,72,190,0.12)' }
+                    : { color: 'var(--color-am-muted)' }
+                  }>
+                  {d}d
+                </motion.button>
+              ))}
+            </div>
+            {/* Exportar */}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="month"
+                value={mes}
+                onChange={e => setMes(e.target.value)}
+                className="am-input"
+                style={{ width: 140 }}
+              />
+              <button
+                onClick={() => exportMut.mutate()}
+                disabled={exportMut.isPending}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white flex-shrink-0 transition-opacity"
+                style={{
+                  background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
+                  opacity: exportMut.isPending ? 0.6 : 1,
+                  cursor: exportMut.isPending ? 'not-allowed' : 'pointer',
+                }}>
+                {exportMut.isPending
+                  ? <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  : <Download size={12} />}
+                CSV
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* ── Exportar relatório ── */}
-        <div className="flex items-center gap-2">
-          <input
-            type="month"
-            value={mes}
-            onChange={e => setMes(e.target.value)}
-            className="am-input flex-1"
-          />
-          <button
-            onClick={() => exportMut.mutate()}
-            disabled={exportMut.isPending}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white flex-shrink-0 transition-opacity"
-            style={{
-              background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
-              opacity: exportMut.isPending ? 0.6 : 1,
-              cursor: exportMut.isPending ? 'not-allowed' : 'pointer',
-            }}>
-            {exportMut.isPending
-              ? <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              : <Download size={13} />}
-            {exportMut.isPending ? 'Exportando…' : 'Exportar CSV'}
-          </button>
         </div>
         {exportMut.isError && (
-          <p className="text-[11px] text-red-600 -mt-2">
-            Erro ao exportar. Verifique se há dados para o mês selecionado.
-          </p>
+          <p className="text-xs text-red-500 mt-1">Erro ao exportar. Verifique se há dados para o mês selecionado.</p>
         )}
+        </div>
 
         {/* ── KPIs ── */}
+        <div className="flex-shrink-0">
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: 'rgba(12,30,48,0.05)' }} />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { icon: <Users size={14} />,         label: 'Clientes ativos', value: total,     color: '#1248BE', sub: `${totalProc} processos` },
               { icon: <FileText size={14} />,      label: 'Processos',       value: totalProc, color: '#6B7CFF', sub: 'Total vinculados' },
-              { icon: <AlertTriangle size={14} />, label: 'Em risco',        value: emRisco,   color: '#C83030', sub: 'Alto ou crítico', delta: emRisco > 0 ? emRisco : undefined },
+              { icon: <MessageCircle size={14} />, label: 'Atenção ao cliente', value: emRisco, color: '#C83030', sub: 'Satisfação crítica', delta: emRisco > 0 ? emRisco : undefined },
               { icon: <Star size={14} />,          label: 'NPS médio',       value: npsMedia !== null ? `${npsMedia}` : '—', color: '#1A9E78', sub: 'Satisfação' },
             ].map((kpi, i) => (
               <motion.div
@@ -353,15 +359,19 @@ export default function PainelPage({ onSelectCliente }: Props) {
             ))}
           </div>
         )}
+        </div>
 
         {/* ── Escalações pendentes ── */}
         <EscalacoesSection />
 
+        {/* ── Clientes em risco + Eficiência (lado a lado quando há dados de risco) ── */}
+        <div className={`flex-1 min-h-0 grid gap-5 items-stretch ${!isLoading && clientesRisco.length > 0 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+
         {/* ── Clientes em risco ── */}
         {!isLoading && clientesRisco.length > 0 && (
           <Section
-            title="Clientes em risco"
-            icon={<AlertTriangle size={13} />}
+            title="Atenção ao relacionamento"
+            icon={<MessageCircle size={13} />}
             badge={
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: '#C83030' }}>
@@ -369,7 +379,7 @@ export default function PainelPage({ onSelectCliente }: Props) {
               </span>
             }
           >
-            <div className="divide-y divide-am-border">
+            <div className="flex-1 overflow-y-auto divide-y divide-am-border">
               {clientesRisco.map((c: CRMClienteCard) => {
                 const cfg = NIVEL_CFG[c.crm_nivel ?? ''] ?? NIVEL_CFG.alto
 
@@ -419,37 +429,45 @@ export default function PainelPage({ onSelectCliente }: Props) {
 
         {/* ── Eficiência da IA ── */}
         <Section title="Eficiência da IA" icon={<Zap size={13} />}>
-          <div className="p-4 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'Clientes analisados', value: `${analisados}/${total}`, color: '#1248BE' },
-                { label: 'Autonomia IA',         value: `${autonomiaPct}%`,       color: autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030' },
-                { label: 'Horas economizadas',   value: `${horasEconomiadas}h`,   color: '#6B7CFF' },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="text-center py-2 px-3 rounded-xl"
-                  style={{ background: `${color}08`, border: `1px solid ${color}18` }}>
-                  <p className="text-base font-extrabold leading-none mb-1" style={{ color }}>{value}</p>
-                  <p className="text-[10px] text-am-muted leading-tight">{label}</p>
-                </div>
-              ))}
-            </div>
+          {(() => {
+            const autoColor = autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030'
+            return (
+              <div className="flex-1 min-h-0 flex flex-col p-5 gap-4">
 
-            {/* Barra de autonomia */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] text-am-secondary">Atendimentos resolvidos pela IA</span>
-                <span className="text-[11px] font-bold" style={{ color: autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030' }}>
-                  {autonomiaPct}%
-                </span>
+                {/* Stat cards — grow to fill the card height */}
+                <div className="flex-1 min-h-0 grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Clientes analisados', value: `${analisados}/${total}`, color: '#1248BE' },
+                    { label: 'Autonomia IA',         value: `${autonomiaPct}%`,       color: autoColor },
+                    { label: 'Horas economizadas',   value: `${horasEconomiadas}h`,   color: '#6B7CFF' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label}
+                      className="flex flex-col items-center justify-center rounded-2xl gap-2 px-2"
+                      style={{ background: `${color}08`, border: `1px solid ${color}18` }}>
+                      <p className="text-2xl font-extrabold leading-none" style={{ color }}>{value}</p>
+                      <p className="text-[10px] text-am-muted leading-snug text-center">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Progress bar — anchored at bottom */}
+                <div className="flex-shrink-0 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-am-secondary">Atendimentos resolvidos pela IA</span>
+                    <span className="text-[11px] font-bold" style={{ color: autoColor }}>{autonomiaPct}%</span>
+                  </div>
+                  <Bar pct={autonomiaPct} color={autoColor} />
+                  <p className="text-[10px] text-am-muted">
+                    {analisados} de {total} clientes analisados · {horasEconomiadas}h economizadas
+                  </p>
+                </div>
+
               </div>
-              <Bar pct={autonomiaPct} color={autonomiaPct >= 70 ? '#1A9E78' : autonomiaPct >= 50 ? '#D08010' : '#C83030'} />
-              <p className="text-[10px] text-am-muted mt-1">
-                {analisados} de {total} clientes analisados sem intervenção manual
-              </p>
-            </div>
-          </div>
+            )
+          })()}
         </Section>
 
+        </div>{/* /grid 2 colunas */}
 
       </div>
     </div>

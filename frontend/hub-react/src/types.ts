@@ -5,6 +5,7 @@ export type Section =
   | 'hub-ia'
   | 'captacao'
   | 'documentos'
+  | 'planos'
   | 'config'
 
 /* ── Clientes / Processos (existentes) ── */

@@ -394,19 +394,13 @@ export default function ConfigPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <form onSubmit={handleSave}>
-        <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6 page-enter">
+        <div className="px-6 pt-3 pb-5 max-w-4xl mx-auto space-y-6 page-enter">
 
           {/* Header */}
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(58,122,184,0.1)', border: '1px solid rgba(58,122,184,0.2)' }}>
-                <Settings size={16} className="text-am-blue" />
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-am-ink tracking-tight">Configurações</h2>
-                <p className="text-xs text-am-muted mt-0.5">Personalize o escritório e a IA</p>
-              </div>
+            <div>
+              <h2 className="text-sm font-bold text-am-ink tracking-tight">Configurações</h2>
+              <p className="text-xs text-am-muted mt-0.5">Personalize o escritório e a IA</p>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={handleLogout}

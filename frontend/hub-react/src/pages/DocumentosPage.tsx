@@ -249,7 +249,7 @@ export default function DocumentosPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 max-w-3xl mx-auto space-y-4 page-enter">
+      <div className="px-5 py-4 max-w-5xl mx-auto space-y-4 page-enter">
 
         {/* Header */}
         <div className="flex items-center gap-3">

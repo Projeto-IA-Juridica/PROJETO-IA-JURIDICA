@@ -12,7 +12,7 @@ const NIVEL_CFG: Record<string, { color: string; bg: string; border: string; lab
   moderado:    { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.22)',  label: 'Moderado'   },
   alto:        { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Alto'       },
   critico:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Crítico'    },
-  em_risco:    { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Em risco'   },
+  em_risco:    { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Atenção'    },
   sem_analise: { color: '#8AAAC0', bg: 'rgba(138,170,192,0.08)', border: 'rgba(138,170,192,0.22)', label: 'Sem análise'},
 }
 
@@ -89,22 +89,14 @@ export default function CRMPage({ onSelectCliente }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5 page-enter">
+      <div className="px-6 pt-3 pb-5 max-w-6xl mx-auto space-y-5 page-enter">
 
         {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(200,48,48,0.08)', border: '1px solid rgba(200,48,48,0.2)' }}>
-              <Heart size={16} style={{ color: '#C83030' }} />
-            </div>
-            <div>
-              <h2 className="text-lg font-extrabold text-am-ink tracking-tight">Relacionamento de Clientes</h2>
-              <p className="text-xs text-am-muted mt-0.5">CRM · Análise de saúde e ações recomendadas</p>
-            </div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-am-ink tracking-tight">Relacionamento de Clientes</h2>
+            <p className="text-xs text-am-muted mt-0.5">Satisfação baseada no histórico de conversas com a IA</p>
           </div>
-
-          {/* Botão análise do escritório */}
           <button
             onClick={() => analisarEscritoriMut.mutate()}
             disabled={analisarEscritoriMut.isPending}
@@ -136,7 +128,7 @@ export default function CRMPage({ onSelectCliente }: Props) {
         )}
 
         {/* Filtros de nível */}
-        <div className="flex gap-2 flex-wrap" role="group" aria-label="Filtrar por nível de risco">
+        <div className="flex gap-2 flex-wrap" role="group" aria-label="Filtrar por nível de satisfação">
           {NIVEIS.map(n => {
             const cfg   = n === 'todos' || n === 'sem_analise' ? null : NIVEL_CFG[n]
             const count = countFor(n)
@@ -147,11 +139,11 @@ export default function CRMPage({ onSelectCliente }: Props) {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold press"
                 style={active
                   ? { background: cfg?.bg ?? 'var(--color-am-surface)', color: cfg?.color ?? 'var(--color-am-blue)', border: `1px solid ${cfg?.border ?? 'var(--color-am-border)'}` }
-                  : { background: 'var(--color-am-surface)', color: 'var(--color-am-secondary)', border: '1px solid var(--color-am-border)' }
+                  : { background: 'var(--color-am-surface)', color: cfg?.color ?? 'var(--color-am-secondary)', border: '1px solid var(--color-am-border)' }
                 }>
                 {cfg && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.color }} />}
                 {n === 'todos' ? 'Todos' : n === 'sem_analise' ? 'Sem análise' : NIVEL_CFG[n]?.label ?? n}
-                <span className="ml-1 text-[10px] font-bold opacity-70">{count}</span>
+                <span className="ml-1 text-[10px] font-bold opacity-60">{count}</span>
               </button>
             )
           })}
@@ -225,11 +217,14 @@ export default function CRMPage({ onSelectCliente }: Props) {
                     <div className="text-[10px] text-am-muted mt-0.5 sm:hidden">
                       {c.total_processos} proc. · {formatDate(c.ultimo_contato)}
                     </div>
-                    {c.crm_resumo && (
-                      <div className="text-[10px] text-am-muted mt-0.5 truncate max-w-xs hidden sm:block">
-                        {hasErro ? <span style={{ color: '#C83030' }}>{erroId.msg}</span> : c.crm_resumo}
-                      </div>
-                    )}
+                    {hasErro
+                      ? <div className="text-[10px] mt-0.5 truncate max-w-xs hidden sm:block" style={{ color: '#C83030' }}>{erroId.msg}</div>
+                      : c.crm_acao_sugerida
+                        ? <div className="text-[10px] mt-0.5 truncate max-w-xs hidden sm:block" style={{ color: cfg.color }}>{c.crm_acao_sugerida}</div>
+                        : c.crm_resumo
+                          ? <div className="text-[10px] text-am-muted mt-0.5 truncate max-w-xs hidden sm:block">{c.crm_resumo}</div>
+                          : null
+                    }
                   </div>
                 </button>
 
