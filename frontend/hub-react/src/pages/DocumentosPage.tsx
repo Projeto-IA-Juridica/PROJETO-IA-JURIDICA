@@ -10,6 +10,7 @@ import {
   listarDocumentos, uploadDocumento, deletarDocumento, statusJob, buscarSemantico,
   type DocItem, type JobStatus,
 } from '../api/rag'
+import { Select } from '../components/Select'
 
 /* ── Tipos e constantes ── */
 const TIPO_CFG = {
@@ -431,16 +432,15 @@ export default function DocumentosPage() {
                 className="am-input"
               />
               <div className="flex gap-2">
-                <select
+                <Select
                   value={buscarTipo}
-                  onChange={e => setBuscarTipo(e.target.value)}
-                  className="am-select flex-1"
-                >
-                  <option value="">Todos os tipos</option>
-                  {(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => (
-                    <option key={t} value={t}>{TIPO_CFG[t].label}</option>
-                  ))}
-                </select>
+                  onChange={setBuscarTipo}
+                  className="flex-1"
+                  options={[
+                    { value: '', label: 'Todos os tipos' },
+                    ...(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => ({ value: t, label: TIPO_CFG[t].label })),
+                  ]}
+                />
                 <button
                   onClick={() => buscarMut.mutate()}
                   disabled={!buscarQuery.trim() || buscarMut.isPending}

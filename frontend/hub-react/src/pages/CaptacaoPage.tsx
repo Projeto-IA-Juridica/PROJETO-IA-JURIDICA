@@ -7,6 +7,7 @@ import {
   XCircle, Trash2, Sparkles, ChevronDown, ChevronUp,
   Shield, ExternalLink, FileText,
 } from 'lucide-react'
+import { Select } from '../components/Select'
 import {
   fetchDNA, atualizarDNA, descobrirLeads, fetchPipeline,
   atualizarStatus, deletarLead,
@@ -474,28 +475,33 @@ export default function CaptacaoPage() {
                   <div className="px-4 py-4 space-y-3">
                     <div>
                       <label className="am-label">Tipo de ação</label>
-                      <select value={tipoAcao} onChange={(e) => setTipoAcao(e.target.value)}
-                        className="am-select">
-                        {TIPOS_ACAO.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <Select
+                        value={tipoAcao}
+                        onChange={setTipoAcao}
+                        options={TIPOS_ACAO.map((t) => ({ value: t, label: t }))}
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="am-label">Tribunal</label>
-                        <select value={tribunal} onChange={(e) => setTribunal(e.target.value)}
-                          className="am-select">
-                          {TRIBUNAIS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
+                        <Select
+                          value={tribunal}
+                          onChange={setTribunal}
+                          options={TRIBUNAIS.map((t) => ({ value: t.value, label: t.label }))}
+                        />
                       </div>
                       <div>
                         <label className="am-label">Tipo de lead</label>
-                        <select value={tipoLead} onChange={(e) => setTipoLead(e.target.value as TipoLead | 'auto')}
-                          className="am-select">
-                          <option value="auto">Auto (via DNA)</option>
-                          <option value="empresa">Empresa (B2B)</option>
-                          <option value="pessoa">Pessoa (B2C)</option>
-                        </select>
+                        <Select
+                          value={tipoLead}
+                          onChange={(v) => setTipoLead(v as TipoLead | 'auto')}
+                          options={[
+                            { value: 'auto',    label: 'Auto (via DNA)' },
+                            { value: 'empresa', label: 'Empresa (B2B)'  },
+                            { value: 'pessoa',  label: 'Pessoa (B2C)'   },
+                          ]}
+                        />
                       </div>
                     </div>
 

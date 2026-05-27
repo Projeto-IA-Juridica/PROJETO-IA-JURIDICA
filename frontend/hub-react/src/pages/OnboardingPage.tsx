@@ -15,6 +15,7 @@ import {
   type ImportProcessosResult,
 } from '../api/onboarding'
 import { getAccessToken, fetchCsrfToken } from '../api/auth'
+import { Select } from '../components/Select'
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
@@ -477,9 +478,11 @@ function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S
           <input type="text" value={s2.responsavel} onChange={e => setS2(v => ({ ...v, responsavel: e.target.value }))} placeholder="Dr. João Silva" className="am-input" />
         </FGroup>
         <FGroup label="Nº de advogados">
-          <select value={s2.advogados} onChange={e => setS2(v => ({ ...v, advogados: e.target.value }))} className="am-select">
-            {['1','2–5','6–15','15–50','50+'].map(o => <option key={o}>{o}</option>)}
-          </select>
+          <Select
+            value={s2.advogados}
+            onChange={(v) => setS2(s => ({ ...s, advogados: v }))}
+            options={['1','2–5','6–15','15–50','50+'].map(o => ({ value: o, label: o }))}
+          />
         </FGroup>
       </div>
 
