@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  LayoutDashboard, Users, Heart, Sparkles, Target,
+  LayoutDashboard, Users, Heart, Sparkles, Target, MessageSquare,
   FolderOpen, Settings, Search, Shield, X, ChevronDown,
 } from 'lucide-react'
 import { fetchClientes } from '../api/crm'
@@ -12,6 +12,7 @@ const NAV: { id: Section; icon: React.ReactNode; label: string }[] = [
   { id: 'clientes',   icon: <Users size={15} />,           label: 'Clientes'        },
   { id: 'crm',        icon: <Heart size={15} />,           label: 'Relacionamento'  },
   { id: 'hub-ia',     icon: <Sparkles size={15} />,        label: 'Hub IA'          },
+  { id: 'whatsapp',   icon: <MessageSquare size={15} />,   label: 'WhatsApp'        },
   { id: 'captacao',   icon: <Target size={15} />,          label: 'Captação'        },
   { id: 'documentos', icon: <FolderOpen size={15} />,      label: 'Documentos'      },
   { id: 'config',     icon: <Settings size={15} />,        label: 'Configurações'   },
