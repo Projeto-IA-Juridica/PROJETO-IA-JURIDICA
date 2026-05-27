@@ -130,10 +130,7 @@ function TipoModal({
           <input
             value={titulo}
             onChange={e => setTitulo(e.target.value)}
-            className="w-full px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none"
-            style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
-            onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(18,72,190,0.10)' }}
-            onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }}
+            className="am-input"
           />
         </div>
 
@@ -431,17 +428,13 @@ export default function DocumentosPage() {
                 onChange={e => setBuscarQuery(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && buscarQuery.trim() && !buscarMut.isPending) buscarMut.mutate() }}
                 placeholder="Ex: quais os argumentos para prescrição trabalhista?"
-                className="w-full px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg placeholder:text-am-muted"
-                style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
-                onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)' }}
-                onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)' }}
+                className="am-input"
               />
               <div className="flex gap-2">
                 <select
                   value={buscarTipo}
                   onChange={e => setBuscarTipo(e.target.value)}
-                  className="flex-1 px-3 py-2.5 text-xs rounded-xl text-am-ink outline-none bg-am-bg"
-                  style={{ border: '1px solid var(--color-am-border)', fontFamily: 'var(--font-sans)' }}
+                  className="am-select flex-1"
                 >
                   <option value="">Todos os tipos</option>
                   {(Object.keys(TIPO_CFG) as TipoDoc[]).map(t => (
@@ -502,8 +495,7 @@ export default function DocumentosPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar documento…"
-                className="w-full pl-8 pr-4 py-2 text-xs rounded-xl bg-am-bg text-am-ink outline-none placeholder:text-am-muted"
-                style={{ border: '1px solid var(--color-am-border)' }}
+                className="am-input am-input-with-icon"
               />
             </div>
           </div>

@@ -86,7 +86,7 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(58,122,184,0.12)' }}
-                  onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }}
+                  onBlur={e =>  { e.target.style.borderColor = 'rgba(168, 200, 232, 0.55)'; e.target.style.boxShadow = '0 1px 2px rgba(12, 30, 48, 0.04)' }}
                   placeholder="advogado@escritorio.com.br"
                   autoComplete="email"
                   style={iconInput}
@@ -110,7 +110,7 @@ export default function LoginPage({ onLogin, onRegister, onAjuda }: Props) {
                   value={pass}
                   onChange={e => setPass(e.target.value)}
                   onFocus={e => { e.target.style.borderColor = 'var(--color-am-blue)'; e.target.style.boxShadow = '0 0 0 3px rgba(58,122,184,0.12)' }}
-                  onBlur={e =>  { e.target.style.borderColor = 'var(--color-am-border)'; e.target.style.boxShadow = 'none' }}
+                  onBlur={e =>  { e.target.style.borderColor = 'rgba(168, 200, 232, 0.55)'; e.target.style.boxShadow = '0 1px 2px rgba(12, 30, 48, 0.04)' }}
                   placeholder="••••••••"
                   autoComplete="current-password"
                   onKeyDown={e => { if (e.key === 'Enter') handleLogin() }}
@@ -234,15 +234,17 @@ function EyeIcon({ visible }: { visible: boolean }) {
 /* ── Styles ───────────────────────────────────────────────────────────────── */
 
 const labelSt: CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  color: 'var(--color-am-secondary)', textTransform: 'uppercase',
-  letterSpacing: '0.08em', marginBottom: 6,
+  display: 'block', fontSize: 10.5, fontWeight: 600,
+  color: 'var(--color-am-secondary)',
+  letterSpacing: '0.03em', marginBottom: 6,
 }
 
 const iconInput: CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px 10px 34px',
+  width: '100%', boxSizing: 'border-box', padding: '10px 14px 10px 36px',
   fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-am-ink)',
-  background: 'var(--color-am-bg)', border: '1px solid var(--color-am-border)',
+  background: '#ffffff',
+  border: '1.5px solid rgba(168, 200, 232, 0.55)',
   borderRadius: 12, outline: 'none',
-  transition: 'border-color 0.14s ease, box-shadow 0.14s ease',
+  boxShadow: '0 1px 2px rgba(12, 30, 48, 0.04)',
+  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
 }

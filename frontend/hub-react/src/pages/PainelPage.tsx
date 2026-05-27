@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, FileText, AlertTriangle, Star,
-  Zap,
+  ArrowRight, Zap,
   TrendingUp, TrendingDown, Minus, Download,
   Bell, Check, X, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { fetchClientes, fetchResumoCRM } from '../api/crm'
 import { exportarRelatorio } from '../api/chat'
 import { listarEscalacoes, aprovarEscalacao, rejeitarEscalacao, type EscalacaoItem } from '../api/escalacoes'
+import type { CRMClienteCard } from '../types'
 /* ── Barra animada ── */
 function Bar({ pct, color }: { pct: number; color: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -182,8 +183,7 @@ function EscalacoesSection() {
                             value={respostaEditada}
                             onChange={e => setRespostas(prev => ({ ...prev, [esc.id]: e.target.value }))}
                             rows={4}
-                            className="w-full text-xs text-am-ink leading-relaxed rounded-xl px-3 py-2.5 resize-none focus:outline-none"
-                            style={{ border: '1px solid rgba(18,72,190,0.25)', background: 'rgba(18,72,190,0.03)', fontFamily: 'var(--font-sans)' }}
+                            className="am-textarea"
                           />
                         </div>
 
@@ -223,7 +223,19 @@ function EscalacoesSection() {
   )
 }
 
-export default function PainelPage() {
+function ini(nome: string) {
+  return nome.split(' ').slice(0, 2).map((n) => n[0].toUpperCase()).join('')
+}
+
+
+const NIVEL_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  alto:    { label: 'Alto',    color: '#C83030', bg: 'rgba(200,48,48,0.08)'   },
+  critico: { label: 'Crítico', color: '#C83030', bg: 'rgba(200,48,48,0.08)'   },
+}
+
+interface Props { onSelectCliente: (id: number) => void }
+
+export default function PainelPage({ onSelectCliente }: Props) {
   const [periodo, setPeriodo] = useState<7 | 30 | 90>(30)
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
 
@@ -244,11 +256,12 @@ export default function PainelPage() {
   })
 
   /* ── Métricas derivadas ── */
-  const total      = clientes?.length ?? 0
-  const totalProc  = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
-  const emRisco    = clientes?.filter((c) => c.crm_nivel === 'alto' || c.crm_nivel === 'critico').length ?? 0
-  const npsArr     = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
-  const npsMedia   = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
+  const total         = clientes?.length ?? 0
+  const totalProc     = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
+  const clientesRisco = clientes?.filter((c) => c.crm_nivel === 'alto' || c.crm_nivel === 'critico') ?? []
+  const emRisco       = clientesRisco.length
+  const npsArr        = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
+  const npsMedia      = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
 
   /* Eficiência estimada (derivada dos dados disponíveis) */
   const semAnalise     = resumo?.sem_analise ?? 0
@@ -291,8 +304,7 @@ export default function PainelPage() {
             type="month"
             value={mes}
             onChange={e => setMes(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl text-xs text-am-ink border border-am-border bg-white focus:outline-none focus:border-am-blue"
-            style={{ fontFamily: 'var(--font-sans)' }}
+            className="am-input flex-1"
           />
           <button
             onClick={() => exportMut.mutate()}
@@ -344,6 +356,66 @@ export default function PainelPage() {
 
         {/* ── Escalações pendentes ── */}
         <EscalacoesSection />
+
+        {/* ── Clientes em risco ── */}
+        {!isLoading && clientesRisco.length > 0 && (
+          <Section
+            title="Clientes em risco"
+            icon={<AlertTriangle size={13} />}
+            badge={
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                style={{ background: '#C83030' }}>
+                {clientesRisco.length}
+              </span>
+            }
+          >
+            <div className="divide-y divide-am-border">
+              {clientesRisco.map((c: CRMClienteCard) => {
+                const cfg = NIVEL_CFG[c.crm_nivel ?? ''] ?? NIVEL_CFG.alto
+
+                return (
+                  <motion.button
+                    key={c.id}
+                    onClick={() => onSelectCliente(c.id)}
+                    whileHover={{ backgroundColor: 'var(--color-am-bg)' }}
+                    whileTap={{ scale: 0.99 }}
+                    transition={{ duration: 0.15 }}
+                    className="w-full flex items-start gap-3 px-4 py-3.5 text-left group transition-colors">
+
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 mt-0.5"
+                      style={{ background: 'linear-gradient(135deg,#C83030,#E05050)' }}>
+                      {ini(c.nome)}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 space-y-1.5">
+
+                      {/* Nome + badge */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-am-ink truncate">{c.nome}</p>
+                        <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{ color: cfg.color, background: cfg.bg }}>
+                          {cfg.label}
+                        </span>
+                      </div>
+
+                      {/* Recomendação */}
+                      {c.crm_acao_sugerida && (
+                        <p className="text-xs font-medium leading-snug text-am-ink pt-1.5"
+                          style={{ borderTop: '1px solid var(--color-am-border)' }}>
+                          {c.crm_acao_sugerida}
+                        </p>
+                      )}
+                    </div>
+
+                    <ArrowRight size={12} className="text-am-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+                  </motion.button>
+                )
+              })}
+            </div>
+          </Section>
+        )}
 
         {/* ── Eficiência da IA ── */}
         <Section title="Eficiência da IA" icon={<Zap size={13} />}>

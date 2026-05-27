@@ -268,11 +268,7 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
           rows={1}
           placeholder="Pergunte sobre o processo, termos jurídicos ou prazos…"
           disabled={mutation.isPending}
-          className="flex-1 px-3.5 py-2.5 text-xs border border-am-border rounded-xl resize-none outline-none
-            font-sans text-am-ink bg-am-bg transition-fast placeholder:text-am-muted
-            disabled:opacity-50 max-h-[120px]"
-          onFocus={(e) => (e.target.style.borderColor = 'var(--color-am-blue)')}
-          onBlur={(e)  => (e.target.style.borderColor = 'var(--color-am-border)')}
+          className="am-textarea flex-1 max-h-[120px] disabled:opacity-50"
         />
         <button
           onClick={handleSend}

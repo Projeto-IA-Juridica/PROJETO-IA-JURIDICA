@@ -161,9 +161,7 @@ export default function CRMPage({ onSelectCliente }: Props) {
           <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-am-muted" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente…"
-            className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl bg-white border border-am-border text-am-ink outline-none transition-fast placeholder:text-am-muted card-shadow"
-            onFocus={e => (e.target.style.borderColor = 'var(--color-am-blue)')}
-            onBlur={e =>  (e.target.style.borderColor = 'var(--color-am-border)')}
+            className="am-input am-input-with-icon"
           />
         </div>
 

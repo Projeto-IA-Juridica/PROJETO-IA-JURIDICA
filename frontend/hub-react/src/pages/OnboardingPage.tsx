@@ -423,12 +423,12 @@ function Step1({ s1, setS1, errors }: { s1: S1; setS1: Dispatch<SetStateAction<S
   return (
     <>
       <FGroup label="E-mail profissional" required error={errors.email}>
-        <input type="email" value={s1.email} onChange={e => setS1(v => ({ ...v, email: e.target.value }))} placeholder="voce@escritorio.com.br" style={inp} onFocus={focusFn} onBlur={blurFn} />
+        <input type="email" value={s1.email} onChange={e => setS1(v => ({ ...v, email: e.target.value }))} placeholder="voce@escritorio.com.br" className="am-input" />
       </FGroup>
 
       <FGroup label="Senha" required error={errors.pass}>
         <div style={{ position: 'relative' }}>
-          <input type={showPass ? 'text' : 'password'} value={s1.pass} onChange={e => setS1(v => ({ ...v, pass: e.target.value }))} placeholder="Mínimo 8 caracteres" style={{ ...inp, paddingRight: 40 }} onFocus={focusFn} onBlur={blurFn} />
+          <input type={showPass ? 'text' : 'password'} value={s1.pass} onChange={e => setS1(v => ({ ...v, pass: e.target.value }))} placeholder="Mínimo 8 caracteres" className="am-input" style={{ paddingRight: 40 }} />
           <EyeBtn visible={showPass} onToggle={() => setShowPass(v => !v)} />
         </div>
         <div style={{ display: 'flex', gap: 4, margin: '6px 0 2px' }}>
@@ -441,7 +441,7 @@ function Step1({ s1, setS1, errors }: { s1: S1; setS1: Dispatch<SetStateAction<S
 
       <FGroup label="Confirmar senha" required error={errors.confirm}>
         <div style={{ position: 'relative' }}>
-          <input type={showConfirm ? 'text' : 'password'} value={s1.confirm} onChange={e => setS1(v => ({ ...v, confirm: e.target.value }))} placeholder="Repita a senha" style={{ ...inp, paddingRight: 40 }} onFocus={focusFn} onBlur={blurFn} />
+          <input type={showConfirm ? 'text' : 'password'} value={s1.confirm} onChange={e => setS1(v => ({ ...v, confirm: e.target.value }))} placeholder="Repita a senha" className="am-input" style={{ paddingRight: 40 }} />
           <EyeBtn visible={showConfirm} onToggle={() => setShowConfirm(v => !v)} />
         </div>
         {s1.confirm && s1.confirm === s1.pass && !errors.confirm && (
@@ -460,24 +460,24 @@ function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S
   return (
     <>
       <FGroup label="Nome do escritório" required error={errors.nome}>
-        <input type="text" value={s2.nome} onChange={e => setS2(v => ({ ...v, nome: e.target.value }))} placeholder="Silva & Associados Advogados" style={inp} onFocus={focusFn} onBlur={blurFn} />
+        <input type="text" value={s2.nome} onChange={e => setS2(v => ({ ...v, nome: e.target.value }))} placeholder="Silva & Associados Advogados" className="am-input" />
       </FGroup>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FGroup label="CNPJ" required error={errors.cnpj}>
-          <input type="text" value={s2.cnpj} onChange={e => setS2(v => ({ ...v, cnpj: e.target.value }))} placeholder="00.000.000/0001-81" style={inp} onFocus={focusFn} onBlur={blurFn} />
+          <input type="text" value={s2.cnpj} onChange={e => setS2(v => ({ ...v, cnpj: e.target.value }))} placeholder="00.000.000/0001-81" className="am-input" />
         </FGroup>
         <FGroup label="OAB do responsável" required error={errors.oab}>
-          <input type="text" value={s2.oab} onChange={e => setS2(v => ({ ...v, oab: e.target.value }))} placeholder="SP123456" style={inp} onFocus={focusFn} onBlur={blurFn} />
+          <input type="text" value={s2.oab} onChange={e => setS2(v => ({ ...v, oab: e.target.value }))} placeholder="SP123456" className="am-input" />
         </FGroup>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FGroup label="Nome do responsável" required error={errors.responsavel}>
-          <input type="text" value={s2.responsavel} onChange={e => setS2(v => ({ ...v, responsavel: e.target.value }))} placeholder="Dr. João Silva" style={inp} onFocus={focusFn} onBlur={blurFn} />
+          <input type="text" value={s2.responsavel} onChange={e => setS2(v => ({ ...v, responsavel: e.target.value }))} placeholder="Dr. João Silva" className="am-input" />
         </FGroup>
         <FGroup label="Nº de advogados">
-          <select value={s2.advogados} onChange={e => setS2(v => ({ ...v, advogados: e.target.value }))} style={inp} onFocus={focusFn} onBlur={blurFn}>
+          <select value={s2.advogados} onChange={e => setS2(v => ({ ...v, advogados: e.target.value }))} className="am-select">
             {['1','2–5','6–15','15–50','50+'].map(o => <option key={o}>{o}</option>)}
           </select>
         </FGroup>
@@ -606,7 +606,7 @@ function Step4({ s4, setS4, errors }: { s4: S4; setS4: Dispatch<SetStateAction<S
   return (
     <>
       <FGroup label="Nome da assistente" required error={errors.assistente}>
-        <input type="text" value={s4.assistente} onChange={e => setS4(v => ({ ...v, assistente: e.target.value }))} placeholder="Ex: Sofia, Laura, Rafael, Bruno…" style={inp} onFocus={focusFn} onBlur={blurFn} />
+        <input type="text" value={s4.assistente} onChange={e => setS4(v => ({ ...v, assistente: e.target.value }))} placeholder="Ex: Sofia, Laura, Rafael, Bruno…" className="am-input" />
       </FGroup>
 
       <FGroup label="Tom de comunicação">
@@ -865,7 +865,7 @@ function Step6({ s1, s2, s3, s4, aceite, waConnected, importDone }: { s1: S1; s2
 function FGroup({ label, required, error, children }: { label: string; required?: boolean; error?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={labelSt}>
+      <label className="am-label">
         {label}{required && <span style={{ color: 'var(--color-am-blue)', marginLeft: 2 }}>*</span>}
       </label>
       {error && <p style={{ fontSize: 11, color: '#C83030', marginBottom: 4 }}>{error}</p>}
@@ -924,26 +924,9 @@ function AmicusLogo() {
 /* ── Style constants ──────────────────────────────────────────────────────── */
 
 const labelSt: CSSProperties = {
-  display: 'block', fontSize: 10, fontWeight: 700,
-  color: 'var(--color-am-secondary)', textTransform: 'uppercase',
-  letterSpacing: '0.08em', marginBottom: 6,
-}
-
-const inp: CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--color-am-ink)',
-  background: 'var(--color-am-bg)', border: '1px solid var(--color-am-border)',
-  borderRadius: 12, outline: 'none', resize: 'vertical',
-  transition: 'border-color 0.14s ease, box-shadow 0.14s ease',
-}
-
-const focusFn = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-  e.target.style.borderColor = 'var(--color-am-blue)'
-  e.target.style.boxShadow   = '0 0 0 3px rgba(58,122,184,0.12)'
-}
-const blurFn = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-  e.target.style.borderColor = 'var(--color-am-border)'
-  e.target.style.boxShadow   = 'none'
+  display: 'block', fontSize: 10.5, fontWeight: 600,
+  color: 'var(--color-am-secondary)',
+  letterSpacing: '0.03em', marginBottom: 6,
 }
 
 const primaryBtn: CSSProperties = {
