@@ -462,6 +462,32 @@ async def connect_whatsapp(
             return True
         return False
 
+    def _extrair_qr_code(payload: dict | None) -> str | None:
+        if not isinstance(payload, dict):
+            return None
+
+        qrcode = payload.get("qrcode")
+        if isinstance(qrcode, str) and qrcode:
+            return qrcode
+        if isinstance(qrcode, dict):
+            for chave in ("base64", "code", "qr", "qrcode"):
+                valor = qrcode.get(chave)
+                if isinstance(valor, str) and valor:
+                    return valor
+
+        for chave in ("qr_code", "base64", "qr"):
+            valor = payload.get(chave)
+            if isinstance(valor, str) and valor:
+                return valor
+
+        instance = payload.get("instance")
+        if isinstance(instance, dict):
+            nested = _extrair_qr_code(instance)
+            if nested:
+                return nested
+
+        return None
+
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
 
@@ -557,15 +583,7 @@ async def connect_whatsapp(
             escritorio.onboarding_etapa = 3
         await db.commit()
 
-        qr_code = data.get("qrcode") or data.get("qr_code") or data.get("base64") or data.get("qr")
-        if not qr_code and isinstance(data.get("instance"), dict):
-            inst_data = data.get("instance")
-            qr_code = (
-                inst_data.get("qrcode")
-                or inst_data.get("qr_code")
-                or inst_data.get("base64")
-                or inst_data.get("qr")
-            )
+        qr_code = _extrair_qr_code(data)
         logger.info("onboarding_connect_whatsapp", escritorio_id=escritorio.id)
 
         return {

@@ -18,6 +18,21 @@ function SectionTitle({ title, desc }: { title: string; desc: string }) {
   )
 }
 
+function normalizeQrCode(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    return value.startsWith('data:') ? value : `data:image/png;base64,${value}`
+  }
+  if (typeof value === 'object') {
+    const candidate = value as { base64?: unknown; code?: unknown; qr?: unknown; qrcode?: unknown }
+    const nested = candidate.base64 ?? candidate.code ?? candidate.qr ?? candidate.qrcode
+    if (typeof nested === 'string' && nested) {
+      return nested.startsWith('data:') ? nested : `data:image/png;base64,${nested}`
+    }
+  }
+  return null
+}
+
 export default function WhatsappPage() {
   const qc = useQueryClient()
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -40,8 +55,8 @@ export default function WhatsappPage() {
       return conectarWhatsapp()
     },
     onSuccess: (result) => {
-      const raw = result.qr_code ?? ''
-      setQrCode(raw.startsWith('data:') ? raw : raw ? `data:image/png;base64,${raw}` : null)
+      const normalized = normalizeQrCode(result.qr_code)
+      setQrCode(normalized)
       setStarted(true)
       setApiError(null)
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })

@@ -61,6 +61,21 @@ function getStrength(pass: string) {
   return { score, ...map[score] }
 }
 
+function normalizeQrCode(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    return value.startsWith('data:') ? value : `data:image/png;base64,${value}`
+  }
+  if (typeof value === 'object') {
+    const candidate = value as { base64?: unknown; code?: unknown; qr?: unknown; qrcode?: unknown }
+    const nested = candidate.base64 ?? candidate.code ?? candidate.qr ?? candidate.qrcode
+    if (typeof nested === 'string' && nested) {
+      return nested.startsWith('data:') ? nested : `data:image/png;base64,${nested}`
+    }
+  }
+  return null
+}
+
 /* ── Wave config ─────────────────────────────────────────────────────────── */
 
 const WAVES = [
@@ -137,9 +152,8 @@ export default function OnboardingPage({ onComplete }: Props) {
       try {
         const result = await conectarWhatsapp()
         if (!cancelled) {
-          const raw = result.qr_code ?? ''
-          /* Evolution retorna base64 com ou sem prefixo data URL */
-          setQrCode(raw.startsWith('data:') ? raw : raw ? `data:image/png;base64,${raw}` : null)
+          /* Evolution pode retornar string ou objeto com base64 aninhado */
+          setQrCode(normalizeQrCode(result.qr_code))
         }
       } catch (err) {
         if (!cancelled) {
