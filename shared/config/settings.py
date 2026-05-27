@@ -78,6 +78,24 @@ class Settings(BaseSettings):
     # Sem essa variável o VibeProspectingClient opera em modo degradado (retorna []).
     EXPLORIUM_API_KEY: str | None = None
 
+    # ---------------------------------------------------------------------------
+    # Stripe — Gateway de Pagamento (Feature 5)
+    # ---------------------------------------------------------------------------
+    # Sem STRIPE_SECRET_KEY o módulo de billing opera em modo degradado (sem Stripe).
+    # Em produção: usar chave sk_live_... e configurar webhook no Stripe Dashboard.
+    # Em desenvolvimento: usar chave sk_test_... e stripe listen --forward-to localhost:8000/api/v1/billing/webhook
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None  # whsec_... gerado no Stripe Dashboard
+    # Price IDs dos planos (criar no Stripe Dashboard → Products → Prices)
+    STRIPE_PRICE_ID_BASICO: str | None = None        # R$ 497/mês
+    STRIPE_PRICE_ID_PROFISSIONAL: str | None = None  # R$ 1.997/mês
+    STRIPE_PRICE_ID_ESCRITORIO: str | None = None    # R$ 4.997/mês
+    # URLs de retorno após checkout / cancelamento
+    STRIPE_SUCCESS_URL: str = "https://app.conciergejuridico.com/onboarding?stripe_return=1"
+    STRIPE_CANCEL_URL: str = "https://app.conciergejuridico.com/planos?cancelado=1"
+    # Dias de trial gratuito para novos escritórios (0 = sem trial)
+    STRIPE_TRIAL_DAYS: int = 7
+
     # Modelo de Escalação — Feature Hub do Advogado
     # Modelo Claude usado quando o ConfidenceRouter decide escalar (score baixo ou forçamento).
     # ESCALACAO_HABILITADO=False por padrão; controle por escritório é via banco (escalacao_habilitada).

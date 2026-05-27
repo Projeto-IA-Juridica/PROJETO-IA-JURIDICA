@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut } from 'lucide-react'
+import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut, CreditCard, ExternalLink } from 'lucide-react'
 import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
 import { fetchMe, logout } from '../api/auth'
 import { fetchMetricasHub } from '../api/hub'
+import {
+  getBillingStatus,
+  getPortalUrl,
+  redirectToPortal,
+  labelStatus,
+  isAssinaturaAtiva,
+  PLANOS,
+} from '../api/billing'
 
 const DEFAULT_TEMPLATES = {
   template_boas_vindas:  'Olá {{nome}}, seja bem-vindo(a) ao {{escritorio}}! Sou a {{persona}} e estou aqui para auxiliá-lo(a). Como posso ajudar?',
@@ -135,6 +143,149 @@ function MetricasHubSection() {
           )}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/* ── Seção de Assinatura / Billing ───────────────────────────────────────── */
+
+function BillingSection() {
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: fetchMe, staleTime: 5 * 60_000 })
+  const isAdmin = me?.role === 'admin'
+
+  const { data: billing, isLoading } = useQuery({
+    queryKey: ['billing-status'],
+    queryFn: getBillingStatus,
+    enabled: isAdmin,
+    staleTime: 60_000,
+  })
+
+  const [abrindoPortal, setAbrindoPortal] = useState(false)
+  const [portalErro, setPortalErro] = useState<string | null>(null)
+
+  if (!isAdmin) return null
+
+  async function handleAbrirPortal() {
+    setPortalErro(null)
+    setAbrindoPortal(true)
+    try {
+      const res = await getPortalUrl()
+      if (res.portal_url) {
+        redirectToPortal(res.portal_url)
+      } else if (!res.stripe_habilitado) {
+        setPortalErro('Pagamento não está configurado neste ambiente.')
+      }
+    } catch {
+      setPortalErro('Erro ao abrir o portal. Tente novamente.')
+    } finally {
+      setAbrindoPortal(false)
+    }
+  }
+
+  const planoAtual = PLANOS.find(p => p.id === billing?.plano)
+  const statusAtivo = billing ? isAssinaturaAtiva(billing.assinatura_status) : true
+
+  return (
+    <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
+      <SectionTitle
+        icon={<CreditCard size={14} />}
+        label="Assinatura"
+        desc="Gerencie seu plano e método de pagamento"
+      />
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-16">
+          <Loader2 size={18} className="animate-spin text-am-muted" />
+        </div>
+      ) : billing ? (
+        <div className="space-y-4">
+          {/* Status + plano */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-am-ink">
+                    {planoAtual?.nome ?? billing.plano}
+                  </span>
+                  {planoAtual && (
+                    <span className="text-xs text-am-muted">{planoAtual.preco}/mês</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    style={{
+                      width: 6, height: 6, borderRadius: '50%', display: 'inline-block',
+                      background: statusAtivo ? 'var(--color-am-green)' : '#C83030',
+                    }}
+                  />
+                  <span className="text-[11px]" style={{ color: statusAtivo ? 'var(--color-am-green)' : '#C83030' }}>
+                    {labelStatus(billing.assinatura_status)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Botão portal */}
+            {billing.stripe_habilitado && billing.stripe_customer_id && (
+              <button
+                type="button"
+                onClick={handleAbrirPortal}
+                disabled={abrindoPortal}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-fast border"
+                style={{
+                  color: 'var(--color-am-blue)',
+                  borderColor: 'rgba(18,72,190,0.25)',
+                  background: 'rgba(18,72,190,0.04)',
+                  opacity: abrindoPortal ? 0.7 : 1,
+                  cursor: abrindoPortal ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {abrindoPortal
+                  ? <><Loader2 size={12} className="animate-spin" /> Abrindo…</>
+                  : <><ExternalLink size={12} /> Gerenciar assinatura</>}
+              </button>
+            )}
+          </div>
+
+          {/* Banner de aviso para status problemáticos */}
+          {!statusAtivo && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-xs"
+              style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.20)', color: '#C83030' }}>
+              <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+              <span>
+                {billing.assinatura_status === 'past_due'
+                  ? 'Pagamento em atraso. Clique em "Gerenciar assinatura" para atualizar o cartão.'
+                  : 'Assinatura inativa. Clique em "Gerenciar assinatura" para reativar.'}
+              </span>
+            </div>
+          )}
+
+          {/* Datas */}
+          {billing.trial_expira_em && billing.assinatura_status === 'trialing' && (
+            <p className="text-[11px] text-am-muted">
+              Trial gratuito até{' '}
+              <strong className="text-am-ink">
+                {new Date(billing.trial_expira_em).toLocaleDateString('pt-BR')}
+              </strong>
+            </p>
+          )}
+          {billing.assinatura_expira_em && billing.assinatura_status === 'active' && (
+            <p className="text-[11px] text-am-muted">
+              Próxima cobrança em{' '}
+              <strong className="text-am-ink">
+                {new Date(billing.assinatura_expira_em).toLocaleDateString('pt-BR')}
+              </strong>
+            </p>
+          )}
+
+          {/* Erro ao abrir portal */}
+          {portalErro && (
+            <p className="text-xs text-red-600">{portalErro}</p>
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-am-muted">Não foi possível carregar informações de assinatura.</p>
+      )}
     </div>
   )
 }
@@ -395,6 +546,9 @@ export default function ConfigPage() {
               </div>
             </div>
           </div>
+
+          {/* Assinatura / Billing — admin only */}
+          <BillingSection />
 
           {/* Métricas Hub IA — admin only */}
           <MetricasHubSection />

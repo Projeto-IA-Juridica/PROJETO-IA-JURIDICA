@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis
 import sentry_sdk
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -131,6 +131,7 @@ from feature_1_ia_personalizada.api.middleware.request_logging import (  # noqa:
 from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     admin_import,
     auth,
+    billing,
     chat,
     clientes,
     crm,
@@ -144,6 +145,9 @@ from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     prospeccao,
     rag,
     webhook_whatsapp,
+)
+from feature_1_ia_personalizada.api.routes.billing import (  # noqa: E402
+    require_assinatura_ativa,
 )
 
 _QUERIES_FREQUENTES = [
@@ -266,19 +270,30 @@ app.add_middleware(RequestLoggingMiddleware)
 # ==========================================
 # REGISTRO DE ROTEADORES (ENDPOINTS)
 # ==========================================
+
+# Guard de assinatura — aplicado em routers que exigem assinatura ativa.
+# Escritórios com assinatura_status em ('trialing', 'active') passam livremente.
+# Demais recebem HTTP 402 com instruções de reativação.
+_guard = [Depends(require_assinatura_ativa)]
+
 app.include_router(health)
 app.include_router(metrics)
 app.include_router(auth)
 app.include_router(onboarding)
 app.include_router(escritorios)
-app.include_router(processos)
-app.include_router(clientes.router)
-app.include_router(escalacoes.router)
-app.include_router(prospeccao.router)
-app.include_router(hub_advogado.router)
-app.include_router(crm.router)
-app.include_router(chat)
-app.include_router(rag)
+app.include_router(billing.router)
+
+# Routers de features pagas — protegidos pelo guard de assinatura
+app.include_router(processos,              dependencies=_guard)
+app.include_router(clientes.router,        dependencies=_guard)
+app.include_router(escalacoes.router,      dependencies=_guard)
+app.include_router(prospeccao.router,      dependencies=_guard)
+app.include_router(hub_advogado.router,    dependencies=_guard)
+app.include_router(crm.router,             dependencies=_guard)
+app.include_router(chat,                   dependencies=_guard)
+app.include_router(rag,                    dependencies=_guard)
+
+# Webhook WhatsApp — sem guard (recebe de terceiros, não de usuários logados)
 app.include_router(webhook_whatsapp)
 app.include_router(admin_import)
 

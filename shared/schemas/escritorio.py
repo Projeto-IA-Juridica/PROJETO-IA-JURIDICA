@@ -25,7 +25,7 @@ from shared.utils.validators import (
 # Constantes de schema (específicas deste recurso)
 # ---------------------------------------------------------------------------
 
-_PLANOS_VALIDOS = {"basico", "profissional", "enterprise"}
+_PLANOS_VALIDOS = {"basico", "profissional", "escritorio", "enterprise"}
 _TONS_VALIDOS = {"formal", "amigavel", "neutro"}
 
 # ---------------------------------------------------------------------------
@@ -164,6 +164,10 @@ class EscritorioResponse(BaseModel):
     onboarding_etapa: int | None = 0
     onboarding_completo: bool | None = False
     onboarding_at: datetime | None = None
+    # Billing / Stripe
+    assinatura_status: str = "trialing"
+    trial_expira_em: datetime | None = None
+    assinatura_expira_em: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -26,13 +26,14 @@ from shared.security.jwt import token_esta_revogado, validar_token
 
 # Rotas que não exigem token JWT para serem acessadas
 ROTAS_PUBLICAS = [
-    "/health",  # O health check básico é open
-    "/health/ready",  # O detailed também, para pods k8s conseguirem ler
-    "/auth/login",  # Obviamente, pra gerar o token
-    "/auth/refresh",  # Pra renovar
-    "/auth/csrf-token",  # Pra buscar o token CSRF antes do login
+    "/health",            # O health check básico é open
+    "/health/ready",      # O detailed também, para pods k8s conseguirem ler
+    "/auth/login",        # Obviamente, pra gerar o token
+    "/auth/refresh",      # Pra renovar
+    "/auth/csrf-token",   # Pra buscar o token CSRF antes do login
     "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
-    "/metrics",  # Prometheus scraper não usa JWT
+    "/billing/webhook",   # Stripe manda pra cá (autenticado via stripe-signature HMAC)
+    "/metrics",           # Prometheus scraper não usa JWT
 ]
 
 # Rotas com match EXATO (não prefixo) — evita vazar proteção de sub-rotas.
