@@ -67,6 +67,23 @@ export default function WhatsappPage() {
     },
   })
 
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await fetchCsrfToken().catch(() => null)
+      return (await import('../api/onboarding')).disconnectWhatsapp()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
+      setQrCode(null)
+      setStarted(false)
+      setApiError(null)
+    },
+    onError: (err) => {
+      const detail = (err as any)?.response?.data?.detail || String(err)
+      setApiError(detail || 'Erro ao desconectar o WhatsApp.')
+    },
+  })
+
   const syncStatus = async () => {
     try {
       const next = await statusWhatsapp()
@@ -189,6 +206,18 @@ export default function WhatsappPage() {
               >
                 <RefreshCcw size={13} /> Atualizar status
               </button>
+
+              {connected && (
+                <button
+                  type="button"
+                  onClick={() => disconnectMutation.mutate()}
+                  disabled={disconnectMutation.isPending}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border transition-fast"
+                  style={{ color: '#C83030', borderColor: 'rgba(200,48,48,0.14)', background: 'transparent' }}
+                >
+                  {disconnectMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : 'Desconectar WhatsApp'}
+                </button>
+              )}
             </div>
           </div>
 

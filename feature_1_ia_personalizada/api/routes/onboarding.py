@@ -706,6 +706,67 @@ async def whatsapp_status(
         return {"connected": False, "state": "error"}
 
 
+@router.post(
+    "/disconnect-whatsapp",
+    summary="Desconecta a instância WhatsApp e limpa configuração",
+)
+async def disconnect_whatsapp(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Desconecta/remover a instância no Evolution (quando possível) e limpa o campo
+    `webhook_whatsapp_instance` no banco para o escritório autenticado.
+    """
+    try:
+        escritorio = await _obter_escritorio_do_token(request, db)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("disconnect_whatsapp_auth_erro", erro=str(exc))
+        raise HTTPException(status_code=500, detail="Erro ao validar autenticação.") from exc
+
+    inst = getattr(escritorio, "webhook_whatsapp_instance", None)
+    if not inst:
+        return {"ok": True, "message": "Nenhuma instância configurada."}
+
+    errors = []
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Tenta uma série de endpoints possíveis na Evolution (compatibilidade)
+            endpoints = [
+                ("DELETE", f"{settings.EVOLUTION_API_URL}/instance/delete/{inst}"),
+                ("POST", f"{settings.EVOLUTION_API_URL}/instance/delete/{inst}"),
+                ("POST", f"{settings.EVOLUTION_API_URL}/instance/disconnect/{inst}"),
+                ("POST", f"{settings.EVOLUTION_API_URL}/instance/logout/{inst}"),
+                ("DELETE", f"{settings.EVOLUTION_API_URL}/instance/{inst}"),
+            ]
+            for method, url in endpoints:
+                try:
+                    resp = await client.request(method, url, headers={"apikey": settings.EVOLUTION_API_KEY})
+                    if resp.status_code < 400:
+                        logger.info("evolution_instance_removed", url=url, status=resp.status_code, escritorio_id=escritorio.id)
+                        break
+                    if resp.status_code == 404:
+                        # endpoint/instance não encontrado — continuar tentando outros
+                        continue
+                    errors.append((url, resp.status_code, resp.text[:300]))
+                except Exception as exc:
+                    errors.append((url, str(exc), "exception"))
+    except Exception as exc:
+        logger.error("disconnect_whatsapp_http_error", erro=str(exc), escritorio_id=escritorio.id)
+
+    # Independentemente do resultado externo, limpamos a configuração local
+    try:
+        escritorio.webhook_whatsapp_instance = None
+        await db.commit()
+    except Exception as exc:
+        logger.error("disconnect_whatsapp_persist_error", erro=str(exc), escritorio_id=escritorio.id)
+        raise HTTPException(status_code=500, detail="Erro ao salvar alteração no banco.") from exc
+
+    if errors:
+        logger.warning("disconnect_whatsapp_partial_errors", errors=errors, escritorio_id=escritorio.id)
+
+    return {"ok": True, "message": "Desconectado com sucesso."}
+
+
 # ---------------------------------------------------------------------------
 # Etapa 4 — Configurar Templates
 # ---------------------------------------------------------------------------
