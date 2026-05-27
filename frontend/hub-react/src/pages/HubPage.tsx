@@ -97,8 +97,10 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
             {/* Search */}
             <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" />
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" aria-hidden="true" />
+              <label htmlFor="hub-search" className="sr-only">Buscar cliente</label>
               <input
+                id="hub-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar cliente..."
@@ -230,6 +232,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={onBack}
+                aria-label="Voltar para lista de clientes"
                 className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
                 style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
                 <ArrowLeft size={14} />
@@ -313,13 +316,15 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           </div>
 
           {/* Tab switcher */}
-          <div className="flex gap-1 p-1 rounded-2xl mt-4" style={{ background: 'rgba(12,30,48,0.05)' }}>
+          <div role="tablist" aria-label="Seções do cliente" className="flex gap-1 p-1 rounded-2xl mt-4" style={{ background: 'rgba(12,30,48,0.05)' }}>
             {TABS.map((t) => {
               const disabled = t.id === 'score' && !processo?.score_risco
               const active   = activeTab === t.id
               return (
                 <motion.button
                   key={t.id}
+                  role="tab"
+                  aria-selected={active}
                   disabled={disabled}
                   onClick={() => !disabled && setActiveTab(t.id)}
                   whileHover={{ scale: active || disabled ? 1 : 1.04 }}

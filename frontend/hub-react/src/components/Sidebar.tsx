@@ -81,7 +81,7 @@ export default function Sidebar({ activeSection, onSectionChange, activeClienteI
           </div>
         </div>
         {onClose && (
-          <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg transition-fast"
+          <button onClick={onClose} aria-label="Fechar menu" className="lg:hidden p-1.5 rounded-lg transition-fast"
             style={{ color: s.muted }}>
             <X size={16} />
           </button>
@@ -115,6 +115,7 @@ export default function Sidebar({ activeSection, onSectionChange, activeClienteI
           const active = activeSection === item.id
           return (
             <button key={item.id} onClick={() => onSectionChange(item.id)}
+              aria-current={active ? 'page' : undefined}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left press"
               style={{
                 background:  active ? s.hover : 'transparent',
@@ -145,6 +146,8 @@ export default function Sidebar({ activeSection, onSectionChange, activeClienteI
             {/* Toggle lista */}
             <button
               onClick={() => setClientListOpen((v) => !v)}
+              aria-expanded={clientListOpen}
+              aria-controls="client-list"
               className="w-full flex items-center justify-between px-2 mb-2 transition-fast"
             >
               <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: s.muted }}>
@@ -160,8 +163,9 @@ export default function Sidebar({ activeSection, onSectionChange, activeClienteI
             {/* Busca */}
             {clientListOpen && (
               <div className="relative">
-                <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: s.muted }} />
-                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: s.muted }} aria-hidden="true" />
+                <label htmlFor="sidebar-search" className="sr-only">Buscar clientes</label>
+                <input id="sidebar-search" type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar…"
                   className="w-full pl-8 pr-3 py-2 text-xs rounded-lg outline-none transition-fast"
                   style={{ background: s.surface, border: `1px solid ${s.border}`, color: s.ink }}
@@ -173,7 +177,7 @@ export default function Sidebar({ activeSection, onSectionChange, activeClienteI
           </div>
 
           {clientListOpen && (
-            <div className="flex-1 overflow-y-auto pb-4 scrollbar-dark px-3 space-y-0.5 mt-1">
+            <div id="client-list" className="flex-1 overflow-y-auto pb-4 scrollbar-dark px-3 space-y-0.5 mt-1">
               {isLoading && Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-12 rounded-xl skeleton mx-1"
                   style={{ background: 'rgba(255,255,255,0.04)' }} />

@@ -209,8 +209,16 @@ function Shell({ onReady }: ShellProps) {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-am-bg">
 
+      {/* Skip to content */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[200] focus:px-4 focus:py-2 focus:rounded-lg focus:text-xs focus:font-semibold focus:bg-am-blue focus:text-white"
+      >
+        Pular para o conteúdo
+      </a>
+
       {/* Top bar com logo */}
-      <div className="flex-shrink-0 flex items-center px-5 pt-4 pb-1">
+      <header className="flex-shrink-0 flex items-center px-5 pt-4 pb-1">
         <img src="/logo.png" alt="amicus" style={{ width: 30, height: 30, objectFit: 'contain' }} />
         <span className="ml-2 text-base font-black tracking-tight"
           style={{
@@ -221,21 +229,25 @@ function Shell({ onReady }: ShellProps) {
           }}>
           amicus
         </span>
-      </div>
+      </header>
 
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
-      <PageTransition id={section} className="flex-1 overflow-hidden pb-24">
-        {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
-        {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
-        {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
-        {section === 'hub-ia'     && <HubIAPage />}
-        {section === 'captacao'   && <CaptacaoPage />}
-        {section === 'documentos' && <DocumentosPage />}
-        {section === 'config'     && <ConfigPage />}
-      </PageTransition>
+      <main id="main-content" className="flex-1 overflow-hidden">
+        <PageTransition id={section} className="h-full overflow-hidden pb-24">
+          {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
+          {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
+          {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
+          {section === 'hub-ia'     && <HubIAPage />}
+          {section === 'captacao'   && <CaptacaoPage />}
+          {section === 'documentos' && <DocumentosPage />}
+          {section === 'config'     && <ConfigPage />}
+        </PageTransition>
+      </main>
 
       {/* Floating Dock */}
-      <FloatingDock items={dockItems} />
+      <nav aria-label="Navegação principal">
+        <FloatingDock items={dockItems} />
+      </nav>
     </div>
   )
 }

@@ -54,12 +54,16 @@ function DockIcon({ item, mouseX }: { item: DockItem; mouseX: MotionValue<number
       </motion.div>
 
       {/* Icon button */}
-      <motion.div
+      <motion.button
         ref={ref}
         style={{ width: size, height: size }}
         onHoverStart={() => setTip(true)}
         onHoverEnd={() => setTip(false)}
+        onFocus={() => setTip(true)}
+        onBlur={() => setTip(false)}
         onClick={item.onClick}
+        aria-label={item.title}
+        aria-current={item.active ? 'page' : undefined}
         className="flex items-center justify-center rounded-xl cursor-pointer flex-shrink-0"
         animate={{
           background: item.active ? '#1248BE' : 'rgba(12,30,48,0.07)',
@@ -72,7 +76,7 @@ function DockIcon({ item, mouseX }: { item: DockItem; mouseX: MotionValue<number
         whileTap={{ scale: 0.90 }}
       >
         {item.icon}
-      </motion.div>
+      </motion.button>
     </div>
   )
 }

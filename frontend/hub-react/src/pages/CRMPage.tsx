@@ -136,13 +136,14 @@ export default function CRMPage({ onSelectCliente }: Props) {
         )}
 
         {/* Filtros de nível */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap" role="group" aria-label="Filtrar por nível de risco">
           {NIVEIS.map(n => {
             const cfg   = n === 'todos' || n === 'sem_analise' ? null : NIVEL_CFG[n]
             const count = countFor(n)
             const active = nivel === n
             return (
               <button key={n} onClick={() => setNivel(n)}
+                aria-pressed={active}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold press"
                 style={active
                   ? { background: cfg?.bg ?? 'var(--color-am-surface)', color: cfg?.color ?? 'var(--color-am-blue)', border: `1px solid ${cfg?.border ?? 'var(--color-am-border)'}` }
@@ -158,8 +159,9 @@ export default function CRMPage({ onSelectCliente }: Props) {
 
         {/* Busca */}
         <div className="relative">
-          <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-am-muted" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-am-muted" aria-hidden="true" />
+          <label htmlFor="crm-search" className="sr-only">Buscar cliente</label>
+          <input id="crm-search" type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente…"
             className="am-input am-input-with-icon"
           />

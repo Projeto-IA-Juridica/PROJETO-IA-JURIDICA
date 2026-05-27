@@ -120,7 +120,7 @@ function TipoModal({
         style={{ boxShadow: '0 24px 64px rgba(12,30,48,0.18)' }}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-sm font-bold text-am-ink">Classificar documento</h2>
-          <button onClick={onCancel} className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
+          <button onClick={onCancel} aria-label="Fechar" className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
             style={{ border: '1px solid var(--color-am-border)' }}>
             <X size={13} />
           </button>
