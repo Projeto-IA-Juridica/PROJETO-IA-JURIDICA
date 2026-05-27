@@ -13,6 +13,10 @@ services:
       - DATABASE_BOUNCER_CONNECTION_URI=${DATABASE_BOUNCER_CONNECTION_URI}
       - DATABASE_CONNECTION_URI=${DATABASE_CONNECTION_URI}
       - DATABASE_CONNECTION_CLIENT_NAME=evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=${REDIS_URL}
+      - CACHE_REDIS_PREFIX_KEY=evolution-cache
+      - CACHE_REDIS_TTL=604800
     volumes:
       - ./evolution_data:/app/instances
     command: ["node", "./dist/src/main.js"]
