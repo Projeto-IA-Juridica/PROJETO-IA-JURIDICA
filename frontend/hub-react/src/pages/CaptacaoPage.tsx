@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Target, Search, Dna, List, Building2, User, Star,
-  RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronUp,
-  Phone, CheckCircle, XCircle, Trash2, Sparkles,
+  RefreshCw, Loader2, AlertTriangle, Phone, CheckCircle,
+  XCircle, Trash2, Sparkles, ChevronDown, ChevronUp,
+  Shield, ExternalLink, FileText,
 } from 'lucide-react'
 import {
   fetchDNA, atualizarDNA, descobrirLeads, fetchPipeline,
@@ -23,12 +24,12 @@ const TIPOS_ACAO = [
 
 const TRIBUNAIS = [
   { value: '', label: 'Todos os tribunais' },
-  { value: 'TJSP',  label: 'TJSP — São Paulo'    },
-  { value: 'TJRJ',  label: 'TJRJ — Rio de Janeiro'},
-  { value: 'TJMG',  label: 'TJMG — Minas Gerais' },
-  { value: 'TRT2',  label: 'TRT2 — São Paulo'     },
-  { value: 'TRT15', label: 'TRT15 — Campinas'     },
-  { value: 'STJ',   label: 'STJ'                  },
+  { value: 'TJSP',  label: 'TJSP — São Paulo'      },
+  { value: 'TJRJ',  label: 'TJRJ — Rio de Janeiro' },
+  { value: 'TJMG',  label: 'TJMG — Minas Gerais'   },
+  { value: 'TRT2',  label: 'TRT2 — São Paulo'       },
+  { value: 'TRT15', label: 'TRT15 — Campinas'       },
+  { value: 'STJ',   label: 'STJ'                    },
 ]
 
 const STATUS_CFG: Record<LeadStatus, { label: string; color: string; bg: string }> = {
@@ -45,6 +46,18 @@ function scoreColor(score: number | null) {
   return '#C83030'
 }
 
+/* ─── Aviso LGPD ─────────────────────────────────────────────────────────── */
+
+function AvisoLGPD({ texto }: { texto: string }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-2xl p-3.5"
+      style={{ background: 'rgba(208,128,16,0.06)', border: '1px solid rgba(208,128,16,0.22)' }}>
+      <Shield size={13} className="flex-shrink-0 mt-0.5" style={{ color: '#D08010' }} />
+      <p className="text-[11px] leading-relaxed" style={{ color: '#7A4D00' }}>{texto}</p>
+    </div>
+  )
+}
+
 /* ─── LeadCard ─────────────────────────────────────────────────────────── */
 
 function LeadCard({ lead, onStatusChange, onDelete }: {
@@ -55,138 +68,176 @@ function LeadCard({ lead, onStatusChange, onDelete }: {
   const [expanded, setExpanded] = useState(false)
   const [nota, setNota]         = useState(lead.notas_advogado ?? '')
 
-  const cfg     = STATUS_CFG[lead.status as LeadStatus] ?? STATUS_CFG.novo
-  const isEmp   = lead.tipo_lead === 'empresa'
-  const score   = lead.score_match
-  const sColor  = scoreColor(score)
+  const cfg   = STATUS_CFG[lead.status as LeadStatus] ?? STATUS_CFG.novo
+  const isEmp = lead.tipo_lead === 'empresa'
+  const score = lead.score_match
 
   const accentColor =
     lead.status === 'qualificado' ? '#1A9E78' :
     lead.status === 'descartado'  ? '#C8D8E8' :
-    score && score >= 75          ? '#1A9E78' :
-    score && score >= 40          ? '#D08010' : '#3A7AB8'
+    score !== null && score >= 75  ? '#1A9E78' :
+    score !== null && score >= 40  ? '#D08010' : '#3A7AB8'
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden"
       style={{
         border: '1px solid var(--color-am-border)',
         borderLeft: `3px solid ${accentColor}`,
-        boxShadow: '0 1px 6px rgba(12,30,48,0.05)',
+        boxShadow: '0 1px 4px rgba(12,30,48,0.05)',
       }}>
+      <div className="px-4 pt-3.5 pb-3 space-y-2.5">
 
-      <div className="px-4 py-3.5">
-        {/* Linha principal: nome + score + status */}
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+        {/* ── Linha principal ── */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: isEmp ? 'rgba(58,122,184,0.10)' : 'rgba(26,158,120,0.10)' }}>
             {isEmp
-              ? <Building2 size={11} style={{ color: '#3A7AB8' }} />
-              : <User      size={11} style={{ color: '#1A9E78' }} />}
+              ? <Building2 size={12} style={{ color: '#3A7AB8' }} />
+              : <User      size={12} style={{ color: '#1A9E78' }} />}
           </div>
-
-          <p className="flex-1 text-sm font-bold text-am-ink truncate">{lead.nome}</p>
+          <p className="flex-1 text-sm font-semibold text-am-ink truncate">{lead.nome}</p>
 
           {/* Score */}
           {score !== null && (
             <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md flex-shrink-0"
-              style={{ color: sColor, background: `${sColor}14` }}>
+              style={{ color: scoreColor(score), background: `${scoreColor(score)}14` }}>
               {score}
             </span>
           )}
 
-          {/* Status */}
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
             style={{ color: cfg.color, background: cfg.bg }}>
             {cfg.label}
           </span>
         </div>
 
-        {/* Linha de detalhes */}
-        <div className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[10px] text-am-muted pl-8">
-          {isEmp && lead.empresa_setor && <span>{lead.empresa_setor}</span>}
-          {isEmp && lead.empresa_porte  && <span>· {lead.empresa_porte}</span>}
-          {!isEmp && lead.tipo_acao_origem && <span>{lead.tipo_acao_origem}</span>}
-          {!isEmp && lead.polo_processo    && <span>· Polo {lead.polo_processo}</span>}
-          {lead.fonte_descoberta && <span>· {lead.fonte_descoberta}</span>}
+        {/* ── Detalhe contextual ── */}
+        <div className="pl-9 space-y-2">
+          {/* Meta linha */}
+          {(isEmp
+            ? (lead.empresa_setor || lead.empresa_porte)
+            : (lead.tipo_acao_origem || lead.polo_processo)) && (
+            <p className="text-[11px] text-am-muted leading-snug">
+              {isEmp
+                ? [lead.empresa_setor, lead.empresa_porte].filter(Boolean).join(' · ')
+                : [lead.tipo_acao_origem, lead.polo_processo ? `polo ${lead.polo_processo}` : null].filter(Boolean).join(' · ')}
+              {!isEmp && lead.processos_publicos_count > 1 && (
+                <span className="text-am-border"> · {lead.processos_publicos_count} processos públicos</span>
+              )}
+            </p>
+          )}
+
+          {/* Abordagem sugerida pela IA — principal valor */}
+          {lead.abordagem_sugerida && (
+            <div className="flex items-start gap-1.5">
+              <Sparkles size={9} className="flex-shrink-0 mt-0.5" style={{ color: '#3A7AB8' }} />
+              <p className="text-[11px] leading-snug text-am-secondary">{lead.abordagem_sugerida}</p>
+            </div>
+          )}
+
+          {/* Sócios (empresa B2B) */}
+          {isEmp && lead.socios.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {lead.socios.slice(0, 3).map((s) => (
+                <span key={s.nome} className="text-[10px] px-2 py-0.5 rounded-lg text-am-secondary"
+                  style={{ background: 'rgba(12,30,48,0.04)', border: '1px solid var(--color-am-border)' }}>
+                  {s.nome}
+                </span>
+              ))}
+              {lead.socios.length > 3 && (
+                <span className="text-[10px] text-am-muted self-center">+{lead.socios.length - 3}</span>
+              )}
+            </div>
+          )}
+
+          {/* Contatos LinkedIn */}
+          {isEmp && lead.contatos_linkedin.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {lead.contatos_linkedin.slice(0, 2).map((c) => (
+                <a key={c.url_perfil} href={c.url_perfil} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-lg transition-opacity hover:opacity-70"
+                  style={{ color: '#0077B5', background: 'rgba(0,119,181,0.07)', border: '1px solid rgba(0,119,181,0.18)' }}>
+                  <ExternalLink size={8} />
+                  {c.nome}
+                  {c.cargo && <span className="text-[9px] opacity-70">· {c.cargo}</span>}
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* CNJ de referência (pessoa B2C) */}
+          {!isEmp && lead.numero_cnj_exemplo && (
+            <div className="flex items-center gap-1.5">
+              <FileText size={9} className="text-am-muted flex-shrink-0" />
+              <span className="text-[10px] font-mono text-am-muted">{lead.numero_cnj_exemplo}</span>
+            </div>
+          )}
+
+          {/* Score motivo (expansível) */}
+          {expanded && lead.score_motivo && (
+            <p className="text-[11px] text-am-muted leading-snug italic pt-0.5 border-t border-am-border">
+              {lead.score_motivo}
+            </p>
+          )}
+
+          {/* Notas do advogado */}
+          {expanded && (
+            <textarea
+              rows={2}
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Observações sobre este lead…"
+              className="am-textarea"
+            />
+          )}
         </div>
 
-        {/* Abordagem sugerida */}
-        {lead.abordagem_sugerida && (
-          <div className="mt-2.5 pl-8 flex items-start gap-1.5">
-            <Sparkles size={9} className="flex-shrink-0 mt-0.5" style={{ color: '#3A7AB8' }} />
-            <p className="text-[10px] text-am-secondary leading-relaxed line-clamp-2">
-              {lead.abordagem_sugerida}
-            </p>
-          </div>
-        )}
-
-        {/* Notas expandidas */}
-        <AnimatePresence>
-          {expanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden">
-              <div className="mt-3 pt-3 border-t border-am-border pl-8">
-                <textarea
-                  rows={2}
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                  placeholder="Observações sobre este lead…"
-                  className="am-textarea"
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Ações */}
-        <div className="mt-3 pt-3 border-t border-am-border flex items-center gap-1.5 flex-wrap pl-8">
+        {/* ── Ações ── */}
+        <div className="flex items-center gap-1.5 pt-2.5 border-t border-am-border">
           {lead.status !== 'contatado'   && lead.status !== 'descartado' && (
-            <ActionBtn icon={<Phone size={10} />} label="Contatado" color="#D08010"
-              onClick={() => onStatusChange(lead.id, 'contatado', nota)} />
+            <Chip icon={<Phone size={9} />} label="Contatado" color="#D08010"
+              onClick={() => onStatusChange(lead.id, 'contatado', nota || undefined)} />
           )}
           {lead.status !== 'qualificado' && lead.status !== 'descartado' && (
-            <ActionBtn icon={<CheckCircle size={10} />} label="Qualificado" color="#1A9E78"
-              onClick={() => onStatusChange(lead.id, 'qualificado', nota)} />
+            <Chip icon={<CheckCircle size={9} />} label="Qualificado" color="#1A9E78"
+              onClick={() => onStatusChange(lead.id, 'qualificado', nota || undefined)} />
           )}
           {lead.status !== 'descartado' && (
-            <ActionBtn icon={<XCircle size={10} />} label="Descartar" color="#8AAAC0"
-              onClick={() => onStatusChange(lead.id, 'descartado', nota)} />
+            <Chip icon={<XCircle size={9} />} label="Descartar" color="#8AAAC0"
+              onClick={() => onStatusChange(lead.id, 'descartado', nota || undefined)} />
           )}
           {lead.status === 'descartado' && (
-            <ActionBtn icon={<RefreshCw size={10} />} label="Reabrir" color="#3A7AB8"
-              onClick={() => onStatusChange(lead.id, 'novo', nota)} />
+            <Chip icon={<RefreshCw size={9} />} label="Reabrir" color="#3A7AB8"
+              onClick={() => onStatusChange(lead.id, 'novo', nota || undefined)} />
           )}
 
           <div className="ml-auto flex items-center gap-1">
             <button onClick={() => setExpanded((v) => !v)}
-              className="flex items-center gap-1 text-[10px] text-am-muted px-2.5 py-1.5 rounded-lg transition-colors hover:text-am-secondary"
+              className="flex items-center gap-1 text-[10px] text-am-muted px-2 py-1 rounded-lg transition-colors hover:text-am-secondary"
               style={{ border: '1px solid var(--color-am-border)' }}>
-              {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-              {expanded ? 'Menos' : 'Notas'}
+              {expanded ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
+              {expanded ? 'Menos' : 'Mais'}
             </button>
             <button onClick={() => onDelete(lead.id)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted transition-colors hover:text-red-500"
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted transition-colors hover:text-red-400"
               style={{ border: '1px solid var(--color-am-border)' }}>
-              <Trash2 size={11} />
+              <Trash2 size={10} />
             </button>
           </div>
         </div>
+
       </div>
     </div>
   )
 }
 
-function ActionBtn({ icon, label, color, onClick }: {
+function Chip({ icon, label, color, onClick }: {
   icon: React.ReactNode; label: string; color: string; onClick: () => void
 }) {
   return (
     <button onClick={onClick}
-      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-opacity hover:opacity-80"
-      style={{ color, background: `${color}10`, border: `1px solid ${color}28` }}>
+      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-opacity hover:opacity-75"
+      style={{ color, background: `${color}0f`, border: `1px solid ${color}22` }}>
       {icon} {label}
     </button>
   )
@@ -201,10 +252,7 @@ export default function CaptacaoPage() {
   const [tipoAcao, setTipoAcao] = useState(TIPOS_ACAO[0])
   const [tipoLead, setTipoLead] = useState<TipoLead | 'auto'>('auto')
   const [tribunal, setTribunal] = useState('')
-  const [limite, setLimite]     = useState(5)
-  const [scoreMin, setScoreMin] = useState(40)
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'todos'>('todos')
-  const [filterTipo,   setFilterTipo]   = useState<TipoLead | 'todos'>('todos')
 
   const qc = useQueryClient()
 
@@ -215,10 +263,9 @@ export default function CaptacaoPage() {
   })
 
   const { data: pipeline, isLoading: pipelineLoading } = useQuery({
-    queryKey: ['pipeline', filterStatus, filterTipo],
+    queryKey: ['pipeline', filterStatus],
     queryFn: () => fetchPipeline({
-      status:    filterStatus !== 'todos' ? filterStatus : undefined,
-      tipo_lead: filterTipo   !== 'todos' ? filterTipo   : undefined,
+      status: filterStatus !== 'todos' ? filterStatus : undefined,
     }),
     retry: 1,
   })
@@ -246,13 +293,15 @@ export default function CaptacaoPage() {
 
   const leads        = pipeline?.leads ?? []
   const qualificados = leads.filter((l) => l.status === 'qualificado').length
-  const scoreMedio   = leads.length
-    ? Math.round(leads.reduce((a, l) => a + (l.score_match ?? 0), 0) / leads.length)
-    : 0
+
+  // Se tipo_lead='auto' e DNA não disponível → bloquear busca
+  const dnaOk       = dna && !dna.dados_insuficientes
+  const autoSemDNA  = tipoLead === 'auto' && !dnaOk
+  const podeDiscovrir = !autoSemDNA && !descobrir.isPending
 
   const TABS = [
-    { id: 'dna'      as Tab, icon: <Dna    size={13} />, label: 'Perfil' },
-    { id: 'buscar'   as Tab, icon: <Search size={13} />, label: 'Buscar' },
+    { id: 'dna'      as Tab, icon: <Dna    size={13} />, label: 'Perfil'    },
+    { id: 'buscar'   as Tab, icon: <Search size={13} />, label: 'Buscar'    },
     { id: 'pipeline' as Tab, icon: <List   size={13} />, label: `Pipeline${pipeline?.total ? ` (${pipeline.total})` : ''}` },
   ]
 
@@ -273,7 +322,7 @@ export default function CaptacaoPage() {
             </div>
           </div>
 
-          {/* Tab switcher */}
+          {/* Tabs */}
           <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(12,30,48,0.05)' }}>
             {TABS.map((t) => {
               const active = tab === t.id
@@ -305,14 +354,14 @@ export default function CaptacaoPage() {
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 pb-8 space-y-4">
 
-            {/* ── TAB DNA ───────────────────────────────────────────── */}
+            {/* ── TAB DNA ── */}
             {tab === 'dna' && (
               <>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-bold text-am-ink">Perfil do escritório</p>
                     <p className="text-[11px] text-am-muted mt-0.5">
-                      A IA analisa seus processos e monta seu perfil ideal de captação
+                      A IA analisa seus processos e monta o perfil ideal de captação
                     </p>
                   </div>
                   <button onClick={() => refreshDNA.mutate()}
@@ -329,7 +378,7 @@ export default function CaptacaoPage() {
                   <div className="h-48 rounded-2xl animate-pulse" style={{ background: 'rgba(58,122,184,0.06)' }} />
                 ) : !dna || dna.dados_insuficientes ? (
                   <div className="bg-white rounded-2xl p-10 flex flex-col items-center gap-3 text-center"
-                    style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 6px rgba(12,30,48,0.05)' }}>
+                    style={{ border: '1px solid var(--color-am-border)' }}>
                     <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                       style={{ background: 'rgba(208,128,16,0.08)' }}>
                       <Dna size={22} style={{ color: '#D08010' }} />
@@ -345,7 +394,6 @@ export default function CaptacaoPage() {
                   <div className="bg-white rounded-2xl overflow-hidden"
                     style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 6px rgba(12,30,48,0.05)' }}>
 
-                    {/* Especialidades */}
                     <div className="px-5 py-4 border-b border-am-border">
                       <p className="text-[10px] font-bold text-am-muted uppercase tracking-wider mb-2.5">Especialidades</p>
                       <div className="flex flex-wrap gap-1.5">
@@ -358,7 +406,6 @@ export default function CaptacaoPage() {
                       </div>
                     </div>
 
-                    {/* Setores-alvo */}
                     {dna.setores_alvo.length > 0 && (
                       <div className="px-5 py-4 border-b border-am-border">
                         <p className="text-[10px] font-bold text-am-muted uppercase tracking-wider mb-2.5">Setores-alvo</p>
@@ -373,7 +420,6 @@ export default function CaptacaoPage() {
                       </div>
                     )}
 
-                    {/* Tipo + diferenciais */}
                     <div className="px-5 py-4 flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-bold text-am-muted uppercase tracking-wider">Foco predominante</p>
@@ -419,18 +465,13 @@ export default function CaptacaoPage() {
               </>
             )}
 
-            {/* ── TAB BUSCAR ────────────────────────────────────────── */}
+            {/* ── TAB BUSCAR ── */}
             {tab === 'buscar' && (
               <>
-                {/* Formulário */}
                 <div className="bg-white rounded-2xl overflow-hidden"
                   style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 6px rgba(12,30,48,0.05)' }}>
-                  <div className="px-4 py-3 border-b border-am-border">
-                    <p className="text-[11px] font-bold text-am-secondary">Parâmetros de busca</p>
-                  </div>
 
-                  <div className="px-4 py-4 space-y-4">
-                    {/* Tipo de ação */}
+                  <div className="px-4 py-4 space-y-3">
                     <div>
                       <label className="am-label">Tipo de ação</label>
                       <select value={tipoAcao} onChange={(e) => setTipoAcao(e.target.value)}
@@ -440,7 +481,6 @@ export default function CaptacaoPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
-                      {/* Tribunal */}
                       <div>
                         <label className="am-label">Tribunal</label>
                         <select value={tribunal} onChange={(e) => setTribunal(e.target.value)}
@@ -448,63 +488,47 @@ export default function CaptacaoPage() {
                           {TRIBUNAIS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                       </div>
-
-                      {/* Tipo de lead */}
                       <div>
                         <label className="am-label">Tipo de lead</label>
                         <select value={tipoLead} onChange={(e) => setTipoLead(e.target.value as TipoLead | 'auto')}
                           className="am-select">
-                          <option value="auto">Auto (DNA)</option>
+                          <option value="auto">Auto (via DNA)</option>
                           <option value="empresa">Empresa (B2B)</option>
                           <option value="pessoa">Pessoa (B2C)</option>
                         </select>
                       </div>
                     </div>
 
-                    {/* Score mínimo */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="am-label mb-0">Score mínimo</label>
-                        <span className="text-xs font-extrabold"
-                          style={{ color: scoreColor(scoreMin) }}>{scoreMin}</span>
+                    {/* Aviso: auto sem DNA */}
+                    {autoSemDNA && (
+                      <div className="flex items-start gap-2 rounded-xl p-3"
+                        style={{ background: 'rgba(208,128,16,0.07)', border: '1px solid rgba(208,128,16,0.22)' }}>
+                        <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" style={{ color: '#D08010' }} />
+                        <p className="text-[11px] leading-snug" style={{ color: '#7A4D00' }}>
+                          O modo <strong>Auto</strong> exige que o DNA do escritório esteja gerado.{' '}
+                          <button onClick={() => setTab('dna')} className="font-semibold underline">
+                            Gerar DNA →
+                          </button>
+                        </p>
                       </div>
-                      <input type="range" min={0} max={100} step={5} value={scoreMin}
-                        onChange={(e) => setScoreMin(Number(e.target.value))}
-                        className="am-range" />
-                      <div className="flex justify-between text-[9px] mt-1.5">
-                        <span style={{ color: '#C83030' }}>Frio</span>
-                        <span style={{ color: '#D08010' }}>Morno</span>
-                        <span style={{ color: '#1A9E78' }}>Quente</span>
-                      </div>
-                    </div>
-
-                    {/* Quantidade */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="am-label mb-0">Candidatos</label>
-                        <span className="text-xs font-extrabold text-am-ink">{limite}</span>
-                      </div>
-                      <input type="range" min={1} max={20} step={1} value={limite}
-                        onChange={(e) => setLimite(Number(e.target.value))}
-                        className="am-range" />
-                    </div>
+                    )}
                   </div>
 
                   <div className="px-4 pb-4">
                     <button
                       onClick={() => descobrir.mutate({
-                        tipo_acao: tipoAcao,
-                        tipo_lead: tipoLead,
-                        tribunal:  tribunal || null,
-                        limite,
-                        score_minimo: scoreMin,
+                        tipo_acao:    tipoAcao,
+                        tipo_lead:    tipoLead,
+                        tribunal:     tribunal || null,
+                        limite:       20,
+                        score_minimo: 40,
                       })}
-                      disabled={descobrir.isPending}
+                      disabled={!podeDiscovrir}
                       className="w-full py-3 rounded-xl text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
                       style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)' }}>
                       {descobrir.isPending
                         ? <><Loader2 size={14} className="animate-spin" /> Analisando com IA…</>
-                        : <><Search size={14} /> Buscar leads</>}
+                        : <><Sparkles size={14} /> Buscar leads</>}
                     </button>
                   </div>
                 </div>
@@ -518,9 +542,9 @@ export default function CaptacaoPage() {
                   </div>
                 )}
 
-                {/* Resultado */}
+                {/* Resultados */}
                 {descobrir.isSuccess && descobrir.data && (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold text-am-ink">
                         {descobrir.data.total} lead{descobrir.data.total !== 1 ? 's' : ''} encontrado{descobrir.data.total !== 1 ? 's' : ''}
@@ -530,6 +554,12 @@ export default function CaptacaoPage() {
                         Ver pipeline →
                       </button>
                     </div>
+
+                    {/* Aviso LGPD quando há leads B2C */}
+                    {descobrir.data.aviso_lgpd && (
+                      <AvisoLGPD texto={descobrir.data.aviso_lgpd} />
+                    )}
+
                     {descobrir.data.leads.map((lead) => (
                       <LeadCard key={lead.id} lead={lead}
                         onStatusChange={(id, status, notas) => updateStatus.mutate({ id, status, notas })}
@@ -540,23 +570,25 @@ export default function CaptacaoPage() {
               </>
             )}
 
-            {/* ── TAB PIPELINE ──────────────────────────────────────── */}
+            {/* ── TAB PIPELINE ── */}
             {tab === 'pipeline' && (
               <>
                 {/* KPIs */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Total',        value: pipeline?.total ?? 0, color: '#3A7AB8'             },
-                    { label: 'Qualificados', value: qualificados,         color: '#1A9E78'             },
-                    { label: 'Score médio',  value: scoreMedio || '—',    color: scoreColor(scoreMedio)},
+                    { label: 'Total de leads', value: pipeline?.total ?? 0, color: '#3A7AB8' },
+                    { label: 'Qualificados',   value: qualificados,         color: '#1A9E78' },
                   ].map(({ label, value, color }) => (
                     <div key={label} className="bg-white rounded-xl py-3 px-4 text-center"
                       style={{ border: '1px solid var(--color-am-border)', boxShadow: '0 1px 4px rgba(12,30,48,0.04)' }}>
-                      <p className="text-lg font-extrabold leading-none" style={{ color }}>{value}</p>
+                      <p className="text-xl font-extrabold leading-none" style={{ color }}>{value}</p>
                       <p className="text-[10px] text-am-muted mt-1">{label}</p>
                     </div>
                   ))}
                 </div>
+
+                {/* Aviso LGPD do pipeline */}
+                {pipeline?.aviso_lgpd && <AvisoLGPD texto={pipeline.aviso_lgpd} />}
 
                 {/* Filtros de status */}
                 <div className="flex gap-1.5 flex-wrap">
@@ -573,28 +605,13 @@ export default function CaptacaoPage() {
                       </button>
                     )
                   })}
-
-                  <div className="h-5 w-px mx-1 self-center" style={{ background: 'var(--color-am-border)' }} />
-
-                  {(['todos', 'empresa', 'pessoa'] as const).map((t) => {
-                    const active = filterTipo === t
-                    return (
-                      <button key={t} onClick={() => setFilterTipo(t)}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold rounded-lg transition-all"
-                        style={active
-                          ? { background: 'rgba(58,122,184,0.10)', color: '#3A7AB8', border: '1px solid rgba(58,122,184,0.20)' }
-                          : { background: 'transparent', color: 'var(--color-am-muted)', border: '1px solid transparent' }}>
-                        {t === 'todos' ? 'Todos' : t === 'empresa' ? <><Building2 size={9} /> B2B</> : <><User size={9} /> B2C</>}
-                      </button>
-                    )
-                  })}
                 </div>
 
                 {/* Lista */}
                 {pipelineLoading ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: 'rgba(58,122,184,0.06)' }} />
+                      <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'rgba(58,122,184,0.06)' }} />
                     ))}
                   </div>
                 ) : leads.length === 0 ? (
@@ -614,7 +631,7 @@ export default function CaptacaoPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {leads.map((lead) => (
                       <LeadCard key={lead.id} lead={lead}
                         onStatusChange={(id, status, notas) => updateStatus.mutate({ id, status, notas })}
