@@ -225,7 +225,7 @@ function Shell({ onReady }: ShellProps) {
 
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
       <PageTransition id={section} className="flex-1 overflow-hidden pb-24">
-        {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
+        {section === 'painel'     && <PainelPage />}
         {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
         {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
         {section === 'hub-ia'     && <HubIAPage />}

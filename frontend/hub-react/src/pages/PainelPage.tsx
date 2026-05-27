@@ -3,27 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, FileText, AlertTriangle, Star,
-  ArrowRight, Shield, Zap, Clock,
+  Zap,
   TrendingUp, TrendingDown, Minus, Download,
   Bell, Check, X, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { fetchClientes, fetchResumoCRM } from '../api/crm'
 import { exportarRelatorio } from '../api/chat'
 import { listarEscalacoes, aprovarEscalacao, rejeitarEscalacao, type EscalacaoItem } from '../api/escalacoes'
-import type { CRMClienteCard } from '../types'
-
-/* ── Paleta de risco ── */
-const RISK: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  baixo:    { color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.20)',  label: 'Baixo'    },
-  moderado: { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.20)',  label: 'Moderado' },
-  alto:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.20)',   label: 'Alto'     },
-  critico:  { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.20)',   label: 'Crítico'  },
-}
-
-function ini(nome: string) {
-  return nome.split(' ').slice(0, 2).map((n) => n[0].toUpperCase()).join('')
-}
-
 /* ── Barra animada ── */
 function Bar({ pct, color }: { pct: number; color: string }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -237,9 +223,7 @@ function EscalacoesSection() {
   )
 }
 
-interface Props { onSelectCliente: (id: number) => void }
-
-export default function PainelPage({ onSelectCliente }: Props) {
+export default function PainelPage() {
   const [periodo, setPeriodo] = useState<7 | 30 | 90>(30)
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
 
@@ -266,27 +250,11 @@ export default function PainelPage({ onSelectCliente }: Props) {
   const npsArr     = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
   const npsMedia   = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
 
-  /* Ranking: em risco → sem NPS → ok, ordenado por último contato */
-  const ranking = [...(clientes ?? [])].sort((a, b) => {
-    const rA = a.crm_nivel === 'alto' || a.crm_nivel === 'critico' ? 0 : a.nps_medio === null ? 1 : 2
-    const rB = b.crm_nivel === 'alto' || b.crm_nivel === 'critico' ? 0 : b.nps_medio === null ? 1 : 2
-    if (rA !== rB) return rA - rB
-    return (b.ultimo_contato ?? '').localeCompare(a.ultimo_contato ?? '')
-  })
-
   /* Eficiência estimada (derivada dos dados disponíveis) */
   const semAnalise     = resumo?.sem_analise ?? 0
   const analisados     = total - semAnalise
   const autonomiaPct   = total > 0 ? Math.round((analisados / total) * 100) : 0
   const horasEconomiadas = +(analisados * 0.5).toFixed(1)
-
-  /* Distribuição de risco */
-  const niveis = ['baixo', 'moderado', 'alto', 'critico'] as const
-
-  const daysSince = (iso: string | null) => {
-    if (!iso) return null
-    return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -410,128 +378,6 @@ export default function PainelPage({ onSelectCliente }: Props) {
           </div>
         </Section>
 
-        {/* ── Distribuição de risco ── */}
-        {!isLoading && clientes && clientes.length > 0 && (
-          <Section title="Distribuição de risco" icon={<Shield size={13} />}>
-            <div className="p-4 space-y-3">
-              {niveis.map((nivel) => {
-                const count = resumo ? resumo[nivel] : (clientes.filter((c) => c.crm_nivel === nivel).length)
-                const pct   = total > 0 ? Math.round((count / total) * 100) : 0
-                const r     = RISK[nivel]
-                return (
-                  <div key={nivel} className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold w-16 flex-shrink-0" style={{ color: r.color }}>
-                      {r.label}
-                    </span>
-                    <Bar pct={pct} color={r.color} />
-                    <span className="text-[11px] font-bold text-am-ink w-8 text-right flex-shrink-0">{count}</span>
-                    <span className="text-[10px] text-am-muted w-8 flex-shrink-0">{pct}%</span>
-                  </div>
-                )
-              })}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Ranking de clientes ── */}
-        <Section
-          title="Ranking de clientes"
-          icon={<TrendingUp size={13} />}
-          badge={
-            <span className="text-[10px] text-am-muted">Em risco primeiro</span>
-          }
-        >
-          {isLoading ? (
-            <div className="divide-y divide-am-border">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-7 h-7 rounded-full animate-pulse flex-shrink-0"
-                    style={{ background: 'rgba(12,30,48,0.06)' }} />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-2.5 w-32 rounded animate-pulse" style={{ background: 'rgba(12,30,48,0.06)' }} />
-                    <div className="h-2 w-20 rounded animate-pulse" style={{ background: 'rgba(12,30,48,0.04)' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : ranking.length === 0 ? (
-            <div className="flex flex-col items-center py-10 gap-2 text-am-muted">
-              <Users size={20} strokeWidth={1.5} />
-              <span className="text-xs">Sem clientes cadastrados</span>
-            </div>
-          ) : (
-            <div className="divide-y divide-am-border">
-              {ranking.map((c: CRMClienteCard) => {
-                const emRiscoC = c.crm_nivel === 'alto' || c.crm_nivel === 'critico'
-                const semNps   = c.nps_medio === null
-                const r        = c.crm_nivel ? RISK[c.crm_nivel] : null
-                const dias     = daysSince(c.ultimo_contato)
-
-                return (
-                  <motion.button
-                    key={c.id}
-                    onClick={() => onSelectCliente(c.id)}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left group row-in row-press">
-
-                    {/* Avatar */}
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-                      style={{ background: emRiscoC ? '#C83030' : 'linear-gradient(135deg,#1248BE,#4A8ED4)' }}>
-                      {ini(c.nome)}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-am-ink truncate">{c.nome}</p>
-                        {r && (
-                          <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-                            style={{ color: r.color, background: r.bg, border: `1px solid ${r.border}` }}>
-                            {r.label}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-am-muted">
-                          {c.total_processos} processo{c.total_processos !== 1 ? 's' : ''}
-                        </span>
-                        {dias !== null && (
-                          <>
-                            <span className="text-am-border">·</span>
-                            <span className="flex items-center gap-0.5 text-[10px]"
-                              style={{ color: dias > 14 ? '#C83030' : dias > 7 ? '#D08010' : 'var(--color-am-muted)' }}>
-                              <Clock size={9} />
-                              {dias === 0 ? 'hoje' : `há ${dias}d`}
-                            </span>
-                          </>
-                        )}
-                        {semNps && (
-                          <>
-                            <span className="text-am-border">·</span>
-                            <span className="text-[10px] text-am-muted">sem NPS</span>
-                          </>
-                        )}
-                        {c.nps_medio !== null && (
-                          <>
-                            <span className="text-am-border">·</span>
-                            <span className="flex items-center gap-0.5 text-[10px] text-am-muted">
-                              <Star size={9} style={{ color: '#D08010' }} />
-                              {c.nps_medio.toFixed(1)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <ArrowRight size={12} className="text-am-muted opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" />
-                  </motion.button>
-                )
-              })}
-            </div>
-          )}
-        </Section>
 
       </div>
     </div>
