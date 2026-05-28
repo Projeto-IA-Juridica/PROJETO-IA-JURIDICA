@@ -21,7 +21,7 @@ substituídas por mocks/fakes para que os testes rodem sem infraestrutura.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -30,6 +30,7 @@ from feature_1_ia_personalizada.api.routes.rag import (
     get_rag_retriever,
     get_redis,
 )
+from shared.database.session import get_db
 from shared.models.documento_rag import EMBEDDING_DIM
 
 # ---------------------------------------------------------------------------
@@ -135,6 +136,13 @@ async def rag_http_client():
     fake_redis = _FakeRedis()
     token = criar_token(user_id=99, escritorio_id=1, role="admin")
 
+    mock_db = AsyncMock()
+    mock_db.get.return_value = MagicMock(assinatura_status="trialing")
+
+    async def _fake_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _fake_get_db
     app.dependency_overrides[get_redis] = lambda: fake_redis
 
     async with AsyncClient(
@@ -150,6 +158,7 @@ async def rag_http_client():
         app.state.redis_client = _original_redis
 
     app.dependency_overrides.pop(get_redis, None)
+    app.dependency_overrides.pop(get_db, None)
 
 
 # ---------------------------------------------------------------------------
