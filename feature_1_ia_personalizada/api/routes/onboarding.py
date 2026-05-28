@@ -30,8 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 
 from feature_1_ia_personalizada.services.billing.stripe_service import (
-    LIMITES_POR_PLANO,
-    QUOTAS_POR_PLANO,
+    LIMITES_TRIAL_POR_PLANO,
+    QUOTAS_TRIAL_POR_PLANO,
     stripe_service,
 )
 from feature_1_ia_personalizada.services.import_clientes import processar_csv
@@ -267,8 +267,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             detail="CNPJ já cadastrado. Faça login em /auth/login.",
         )
 
-    # Aplica limites do plano escolhido
-    limites = LIMITES_POR_PLANO.get(body.plano, LIMITES_POR_PLANO["basico"])
+    # Aplica limites de trial — o webhook Stripe atualiza para o plano completo ao converter
+    limites_trial = LIMITES_TRIAL_POR_PLANO.get(body.plano, LIMITES_TRIAL_POR_PLANO["basico"])
 
     # Cria escritório
     escritorio = Escritorio(
@@ -278,9 +278,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         oab_responsavel=body.oab_responsavel,
         nome_responsavel=body.nome_responsavel,
         plano=body.plano,
-        max_processos=limites["max_processos"],
-        max_clientes=limites["max_clientes"],
-        quota_tokens_mes=QUOTAS_POR_PLANO.get(body.plano),
+        max_processos=limites_trial["max_processos"],
+        max_clientes=limites_trial["max_clientes"],
+        quota_tokens_mes=QUOTAS_TRIAL_POR_PLANO.get(body.plano),
         onboarding_etapa=0,
         onboarding_completo=False,
         assinatura_status="trialing",  # começa em trial; ativado pelo webhook Stripe

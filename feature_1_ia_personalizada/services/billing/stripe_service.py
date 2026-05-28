@@ -90,6 +90,22 @@ LIMITES_POR_PLANO: dict[str, dict[str, int]] = {
     "enterprise":   {"max_processos": 99_999, "max_clientes": 99_999},
 }
 
+# Quotas reduzidas durante os 7 dias de trial (~20% do plano pago).
+# Protege contra uso abusivo sem prejudicar a experiência de avaliação.
+QUOTAS_TRIAL_POR_PLANO: dict[str, int | None] = {
+    "basico":       100_000,
+    "profissional": 400_000,
+    "escritorio":   1_000_000,
+    "enterprise":   None,
+}
+
+LIMITES_TRIAL_POR_PLANO: dict[str, dict[str, int]] = {
+    "basico":       {"max_processos": 10,  "max_clientes": 20},
+    "profissional": {"max_processos": 60,  "max_clientes": 100},
+    "escritorio":   {"max_processos": 100, "max_clientes": 500},
+    "enterprise":   {"max_processos": 99_999, "max_clientes": 99_999},
+}
+
 
 # ---------------------------------------------------------------------------
 # Serviço

@@ -28,7 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.billing.stripe_service import (
     LIMITES_POR_PLANO,
+    LIMITES_TRIAL_POR_PLANO,
     QUOTAS_POR_PLANO,
+    QUOTAS_TRIAL_POR_PLANO,
     price_id_para_plano,
     stripe_service,
 )
@@ -66,13 +68,18 @@ async def _buscar_por_subscription_id(db: AsyncSession, subscription_id: str) ->
     return result.scalars().first()
 
 
-def _atualizar_quotas(escritorio: Escritorio, plano: str) -> None:
-    """Atualiza limites e quota de tokens ao mudar de plano."""
-    limites = LIMITES_POR_PLANO.get(plano)
+def _atualizar_quotas(escritorio: Escritorio, plano: str, *, em_trial: bool = False) -> None:
+    """Atualiza limites e quota de tokens ao mudar de plano ou sair do trial."""
+    if em_trial:
+        limites = LIMITES_TRIAL_POR_PLANO.get(plano, LIMITES_POR_PLANO.get(plano))
+        quota = QUOTAS_TRIAL_POR_PLANO.get(plano, QUOTAS_POR_PLANO.get(plano))
+    else:
+        limites = LIMITES_POR_PLANO.get(plano)
+        quota = QUOTAS_POR_PLANO.get(plano)
     if limites:
         escritorio.max_processos = limites["max_processos"]
         escritorio.max_clientes = limites["max_clientes"]
-    escritorio.quota_tokens_mes = QUOTAS_POR_PLANO.get(plano)
+    escritorio.quota_tokens_mes = quota
 
 
 # ---------------------------------------------------------------------------
@@ -318,16 +325,19 @@ async def _on_checkout_completed(*, data: dict, db: AsyncSession) -> None:
                     sub["current_period_end"], tz=UTC
                 )
 
-            # Atualiza plano se detectado via price_id
+            # Atualiza plano se detectado via price_id; sempre sincroniza quotas
             items = sub.get("items", {}).get("data", [])
             if items:
                 price_id = items[0].get("price", {}).get("id")
                 if price_id:
                     novo_plano = price_id_para_plano(price_id)
-                    if novo_plano and novo_plano != escritorio.plano:
-                        escritorio.plano = novo_plano
-                        escritorio.stripe_price_id = price_id
-                        _atualizar_quotas(escritorio, novo_plano)
+                    if novo_plano:
+                        if novo_plano != escritorio.plano:
+                            escritorio.plano = novo_plano
+                            escritorio.stripe_price_id = price_id
+                        _atualizar_quotas(
+                            escritorio, novo_plano, em_trial=(sub_status == "trialing")
+                        )
 
         except Exception as exc:
             logger.warning("billing.checkout_sub_fetch_erro", erro=str(exc))
@@ -408,21 +418,24 @@ async def _on_subscription_updated(*, data: dict, db: AsyncSession) -> None:
             data["current_period_end"], tz=UTC
         )
 
-    # Atualiza plano se o price mudou
+    # Atualiza plano e quotas; sempre sincroniza para refletir trial/active
+    plano_atual = escritorio.plano
     items = data.get("items", {}).get("data", [])
     if items:
         price_id: str | None = items[0].get("price", {}).get("id")
         if price_id:
             novo_plano = price_id_para_plano(price_id)
-            if novo_plano and novo_plano != escritorio.plano:
-                escritorio.plano = novo_plano
-                escritorio.stripe_price_id = price_id
-                _atualizar_quotas(escritorio, novo_plano)
-                logger.info(
-                    "billing.plano_alterado",
-                    escritorio_id=escritorio.id,
-                    plano=novo_plano,
-                )
+            if novo_plano:
+                if novo_plano != escritorio.plano:
+                    escritorio.plano = novo_plano
+                    escritorio.stripe_price_id = price_id
+                    plano_atual = novo_plano
+                    logger.info(
+                        "billing.plano_alterado",
+                        escritorio_id=escritorio.id,
+                        plano=novo_plano,
+                    )
+    _atualizar_quotas(escritorio, plano_atual, em_trial=(novo_status == "trialing"))
 
     await db.commit()
     logger.info(
