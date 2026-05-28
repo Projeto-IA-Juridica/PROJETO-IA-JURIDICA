@@ -14,7 +14,7 @@ export interface CRMClienteCard {
   id: number
   nome: string
   telefone_whatsapp: string
-  crm_nivel: string | null
+  crm_nivel: 'excelente' | 'satisfeito' | 'neutro' | 'em_risco' | 'critico' | null
   crm_score: number | null
   crm_resumo: string | null
   crm_acao_sugerida: string | null

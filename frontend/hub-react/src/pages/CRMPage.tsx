@@ -4,15 +4,15 @@ import { Heart, Search, ArrowRight, Shield, Clock, Star, Zap, RefreshCw, AlertCi
 import { fetchClientes, analisarCliente, analisarEscritorioCompleto } from '../api/crm'
 import type { CRMClienteCard } from '../types'
 
-const NIVEIS = ['todos', 'critico', 'alto', 'moderado', 'baixo', 'sem_analise'] as const
+const NIVEIS = ['todos', 'excelente', 'satisfeito', 'neutro', 'em_risco', 'critico', 'sem_analise'] as const
 type Nivel = typeof NIVEIS[number]
 
 const NIVEL_CFG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  baixo:       { color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.22)',  label: 'Baixo'      },
-  moderado:    { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.22)',  label: 'Moderado'   },
-  alto:        { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Alto'       },
-  critico:     { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Crítico'    },
+  excelente:   { color: '#1A9E78', bg: 'rgba(26,158,120,0.08)',  border: 'rgba(26,158,120,0.22)',  label: 'Excelente'  },
+  satisfeito:  { color: '#2E7D32', bg: 'rgba(46,125,50,0.08)',   border: 'rgba(46,125,50,0.22)',   label: 'Satisfeito' },
+  neutro:      { color: '#D08010', bg: 'rgba(208,128,16,0.08)',  border: 'rgba(208,128,16,0.22)',  label: 'Neutro'     },
   em_risco:    { color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)',   label: 'Atenção'    },
+  critico:     { color: '#8B0000', bg: 'rgba(139,0,0,0.08)',     border: 'rgba(139,0,0,0.22)',     label: 'Crítico'    },
   sem_analise: { color: '#8AAAC0', bg: 'rgba(138,170,192,0.08)', border: 'rgba(138,170,192,0.22)', label: 'Sem análise'},
 }
 

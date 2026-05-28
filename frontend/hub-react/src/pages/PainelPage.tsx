@@ -231,8 +231,8 @@ function ini(nome: string) {
 
 
 const NIVEL_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  alto:    { label: 'Alto',    color: '#C83030', bg: 'rgba(200,48,48,0.08)'   },
-  critico: { label: 'Crítico', color: '#C83030', bg: 'rgba(200,48,48,0.08)'   },
+  em_risco: { label: 'Atenção', color: '#C83030', bg: 'rgba(200,48,48,0.08)' },
+  critico:  { label: 'Crítico', color: '#8B0000', bg: 'rgba(139,0,0,0.08)'   },
 }
 
 interface Props { onSelectCliente: (id: number) => void }
@@ -260,7 +260,7 @@ export default function PainelPage({ onSelectCliente }: Props) {
   /* ── Métricas derivadas ── */
   const total         = clientes?.length ?? 0
   const totalProc     = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
-  const clientesRisco = clientes?.filter((c) => c.crm_nivel === 'alto' || c.crm_nivel === 'critico') ?? []
+  const clientesRisco = clientes?.filter((c) => c.crm_nivel === 'em_risco' || c.crm_nivel === 'critico') ?? []
   const emRisco       = clientesRisco.length
   const npsArr        = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
   const npsMedia      = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
@@ -381,7 +381,7 @@ export default function PainelPage({ onSelectCliente }: Props) {
           >
             <div className="flex-1 overflow-y-auto divide-y divide-am-border">
               {clientesRisco.map((c: CRMClienteCard) => {
-                const cfg = NIVEL_CFG[c.crm_nivel ?? ''] ?? NIVEL_CFG.alto
+                const cfg = NIVEL_CFG[c.crm_nivel ?? ''] ?? NIVEL_CFG.em_risco
 
                 return (
                   <motion.button
