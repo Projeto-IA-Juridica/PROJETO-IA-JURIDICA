@@ -147,6 +147,18 @@ async def seed_data():
                 "crm_resumo": "Comunicação regular, sem engajamento expressivo no WhatsApp recentemente.",
                 "crm_acao_sugerida": None,
             },
+            {
+                "nome": "Gabriel Abel",
+                "telefone_whatsapp": "5531997112684",
+                "cpf": "99988877766",
+                "data_nascimento": date(1998, 1, 1),
+                "profissao": "Desenvolvedor",
+                "empresa": "Teste",
+                "crm_nivel": "excelente",
+                "crm_score": 90,
+                "crm_resumo": "Cliente de teste para validação de envio de mensagens via WhatsApp.",
+                "crm_acao_sugerida": None,
+            },
         ]
 
         clientes = []
