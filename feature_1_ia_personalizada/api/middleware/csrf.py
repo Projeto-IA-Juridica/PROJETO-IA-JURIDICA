@@ -40,6 +40,7 @@ _METODOS_MUTANTES = {"POST", "PUT", "PATCH", "DELETE"}
 # Prefixos de rota isentos de CSRF (não envolvem sessão de browser)
 _ROTAS_ISENTAS = (
     "/webhook/",  # WhatsApp — autenticado via HMAC
+    "/billing/webhook",  # Stripe — autenticado via stripe-signature HMAC
     "/health",  # leitura
     "/metrics",  # leitura
     "/auth/csrf-token",  # emissão do token

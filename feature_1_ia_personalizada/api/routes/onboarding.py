@@ -17,6 +17,7 @@ Fluxo de 5 etapas:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 import httpx
@@ -27,6 +28,11 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.services.billing.stripe_service import (
+    LIMITES_TRIAL_POR_PLANO,
+    QUOTAS_TRIAL_POR_PLANO,
+    stripe_service,
+)
 from feature_1_ia_personalizada.services.import_clientes import processar_csv
 from shared.config.settings import settings
 from shared.database.session import get_db
@@ -48,6 +54,9 @@ router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 # ---------------------------------------------------------------------------
 
 
+_PLANOS_DISPONIVEIS = {"basico", "profissional", "escritorio"}
+
+
 class RegisterRequest(BaseModel):
     nome_escritorio: str = Field(min_length=2, max_length=200)
     cnpj: str = Field(description="CNPJ com ou sem formatação")
@@ -55,6 +64,10 @@ class RegisterRequest(BaseModel):
     senha: str = Field(min_length=8, description="Senha do admin (mínimo 8 caracteres)")
     nome_responsavel: str = Field(min_length=2, max_length=200)
     oab_responsavel: str = Field(description="OAB do responsável — formato UFNNNNN")
+    plano: str = Field(
+        default="basico",
+        description="Plano escolhido: basico | profissional | escritorio",
+    )
 
     @field_validator("cnpj")
     @classmethod
@@ -71,12 +84,21 @@ class RegisterRequest(BaseModel):
             raise ValueError("OAB inválida — formato esperado: UFNNNNN (ex: SP123456)")
         return normalizado
 
+    @field_validator("plano")
+    @classmethod
+    def _validar_plano(cls, v: str) -> str:
+        normalizado = v.lower().strip()
+        if normalizado not in _PLANOS_DISPONIVEIS:
+            raise ValueError(f"Plano inválido — opções: {', '.join(sorted(_PLANOS_DISPONIVEIS))}")
+        return normalizado
+
 
 class RegisterResponse(BaseModel):
     access_token: str
     refresh_token: str
     expires_in: int
     escritorio: EscritorioResponse
+    checkout_url: str | None = None  # URL do Stripe Checkout (None se Stripe não configurado)
 
 
 class ConfigurarIARequest(BaseModel):
@@ -242,6 +264,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             detail="CNPJ já cadastrado. Faça login em /auth/login.",
         )
 
+    # Aplica limites de trial — o webhook Stripe atualiza para o plano completo ao converter
+    limites_trial = LIMITES_TRIAL_POR_PLANO.get(body.plano, LIMITES_TRIAL_POR_PLANO["basico"])
+
     # Cria escritório
     escritorio = Escritorio(
         nome=body.nome_escritorio,
@@ -249,9 +274,13 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         email=body.email_admin,
         oab_responsavel=body.oab_responsavel,
         nome_responsavel=body.nome_responsavel,
-        plano="basico",
+        plano=body.plano,
+        max_processos=limites_trial["max_processos"],
+        max_clientes=limites_trial["max_clientes"],
+        quota_tokens_mes=QUOTAS_TRIAL_POR_PLANO.get(body.plano),
         onboarding_etapa=0,
         onboarding_completo=False,
+        assinatura_status="trialing",  # começa em trial; ativado pelo webhook Stripe
     )
     db.add(escritorio)
     await db.flush()  # gera escritorio.id sem commitar
@@ -271,9 +300,43 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.refresh(escritorio)
     await db.refresh(usuario)
 
-    logger.info("onboarding_registro", escritorio_id=escritorio.id, cnpj=body.cnpj)
+    logger.info(
+        "onboarding_registro", escritorio_id=escritorio.id, cnpj=body.cnpj, plano=body.plano
+    )
 
-    # Gera tokens
+    # ── Integração Stripe ─────────────────────────────────────────────────────
+    # Cria o Customer no Stripe e gera a Checkout Session para o plano escolhido.
+    # Se o Stripe não estiver configurado (dev/staging sem keys), opera em modo
+    # degradado: checkout_url=None e o onboarding continua normalmente.
+    checkout_url: str | None = None
+    if stripe_service.habilitado:
+        try:
+            customer_id = await asyncio.to_thread(
+                stripe_service.criar_customer,
+                email=escritorio.email,
+                nome=escritorio.nome,
+                escritorio_id=escritorio.id,
+                cnpj=escritorio.cnpj,
+            )
+            if customer_id:
+                escritorio.stripe_customer_id = customer_id
+                await db.commit()
+
+                checkout_url = await asyncio.to_thread(
+                    stripe_service.criar_checkout_session,
+                    stripe_customer_id=customer_id,
+                    plano=body.plano,
+                )
+        except Exception as exc:
+            # Stripe falhou — não bloqueia o registro. O checkout pode ser
+            # disparado novamente em /billing/checkout.
+            logger.warning(
+                "onboarding_stripe_checkout_falhou",
+                escritorio_id=escritorio.id,
+                erro=str(exc),
+            )
+
+    # Gera tokens JWT
     access_token = criar_token(
         user_id=usuario.id,
         escritorio_id=escritorio.id,
@@ -286,6 +349,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         refresh_token=refresh_token,
         expires_in=settings.JWT_EXPIRATION_MINUTES * 60,
         escritorio=EscritorioResponse.model_validate(escritorio),
+        checkout_url=checkout_url,
     )
 
 

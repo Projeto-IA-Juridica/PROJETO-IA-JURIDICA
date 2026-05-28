@@ -32,6 +32,7 @@ ROTAS_PUBLICAS = [
     "/auth/refresh",  # Pra renovar
     "/auth/csrf-token",  # Pra buscar o token CSRF antes do login
     "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
+    "/billing/webhook",  # Stripe manda pra cá (autenticado via stripe-signature HMAC)
     "/metrics",  # Prometheus scraper não usa JWT
 ]
 

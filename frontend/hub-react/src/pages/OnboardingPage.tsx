@@ -20,7 +20,8 @@ import { Select } from '../components/Select'
 /* ── Types ───────────────────────────────────────────────────────────────── */
 
 interface S1 { email: string; pass: string; confirm: string }
-interface S2 { nome: string; cnpj: string; oab: string; responsavel: string; advogados: string; areas: string[] }
+type PlanoOnboarding = 'basico' | 'profissional' | 'escritorio'
+interface S2 { nome: string; cnpj: string; oab: string; responsavel: string; advogados: string; areas: string[]; plano: PlanoOnboarding }
 interface S3 { inicio: string; fim: string; dias: string[] }
 interface S4 { assistente: string; tom: string }
 
@@ -80,7 +81,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [s1, setS1] = useState<S1>({ email: '', pass: '', confirm: '' })
-  const [s2, setS2] = useState<S2>({ nome: '', cnpj: '', oab: '', responsavel: '', advogados: '1', areas: [] })
+  const [s2, setS2] = useState<S2>({ nome: '', cnpj: '', oab: '', responsavel: '', advogados: '1', areas: [], plano: 'basico' })
   const [s3, setS3] = useState<S3>({ inicio: '08:00', fim: '18:00', dias: ['Seg','Ter','Qua','Qui','Sex'] })
   const [s4, setS4] = useState<S4>({ assistente: '', tom: '' })
   const [aceite, setAceite] = useState(false)
@@ -99,12 +100,22 @@ export default function OnboardingPage({ onComplete }: Props) {
   /* Resume — se token já existe (usuário voltou após registro parcial) */
   useEffect(() => {
     if (!getAccessToken()) return
+
+    /* Retorno do Stripe após pagamento (?stripe_return=1) */
+    const params = new URLSearchParams(window.location.search)
+    const isStripeReturn = params.get('stripe_return') === '1'
+
     fetchOnboardingStatus()
       .then(async (status) => {
         if (!status.onboarding_completo) {
           try { await fetchCsrfToken() } catch { /* silently fails */ }
           setRegistered(true)
-          setStep(3) // pula registro, começa pelo WhatsApp
+          /* Após retorno do Stripe, pula direto para o WhatsApp (step 3) */
+          setStep(isStripeReturn ? 3 : 3)
+          /* Limpa query params da URL sem reload */
+          if (isStripeReturn) {
+            window.history.replaceState({}, '', window.location.pathname)
+          }
         }
       })
       .catch(() => { /* token inválido/expirado — segue fluxo normal */ })
@@ -215,15 +226,25 @@ export default function OnboardingPage({ onComplete }: Props) {
     if (step === 2 && !registered) {
       setIsLoading(true)
       try {
-        await register({
+        const res = await register({
           nome_escritorio: s2.nome,
           cnpj:            s2.cnpj,
           email_admin:     s1.email,
           senha:           s1.pass,
           nome_responsavel: s2.responsavel,
           oab_responsavel:  s2.oab,
+          plano:            s2.plano,
         })
         setRegistered(true)
+
+        /* Se o Stripe está configurado e retornou URL, redireciona para o checkout.
+           O usuário volta automaticamente via STRIPE_SUCCESS_URL (?stripe_return=1)
+           e continua o onboarding a partir do step 3. */
+        if (res.checkout_url) {
+          window.location.href = res.checkout_url
+          return
+        }
+
         setStep(3)
       } catch (err) {
         const detail = extractDetail(err)
@@ -457,9 +478,50 @@ function Step1({ s1, setS1, errors }: { s1: S1; setS1: Dispatch<SetStateAction<S
 
 /* ── Step 2 — Escritório ─────────────────────────────────────────────────── */
 
+const PLANOS_ONBOARDING: { id: PlanoOnboarding; nome: string; preco: string; desc: string }[] = [
+  { id: 'basico',       nome: 'Starter',       preco: 'R$ 497/mês',    desc: '1 advogado · 30 processos · 50 clientes' },
+  { id: 'profissional', nome: 'Profissional',   preco: 'R$ 1.997/mês',  desc: 'até 5 advogados · 300 processos · 500 clientes' },
+  { id: 'escritorio',   nome: 'Escritório',     preco: 'R$ 4.997/mês',  desc: 'até 15 advogados · 500 processos · ilimitados' },
+]
+
 function Step2({ s2, setS2, errors }: { s2: S2; setS2: Dispatch<SetStateAction<S2>>; errors: Record<string, string> }) {
   return (
     <>
+      {/* Seletor de plano */}
+      <FGroup label="Plano escolhido">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 2 }}>
+          {PLANOS_ONBOARDING.map(p => {
+            const ativo = s2.plano === p.id
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setS2(v => ({ ...v, plano: p.id }))}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 14px', borderRadius: 12, cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', textAlign: 'left',
+                  background: ativo ? 'rgba(18,72,190,0.05)' : '#fff',
+                  border: `${ativo ? 2 : 1}px solid ${ativo ? 'var(--color-am-blue)' : 'var(--color-am-border)'}`,
+                  transition: 'all 0.14s',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: ativo ? 700 : 500, color: ativo ? 'var(--color-am-blue)' : 'var(--color-am-ink)' }}>
+                    {p.nome}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--color-am-muted)', marginTop: 1 }}>{p.desc}</div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: ativo ? 'var(--color-am-blue)' : 'var(--color-am-muted)', whiteSpace: 'nowrap', marginLeft: 12 }}>
+                  {p.preco}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 10, color: 'var(--color-am-muted)', marginTop: 5 }}>7 dias grátis · cancele quando quiser</p>
+      </FGroup>
+
       <FGroup label="Nome do escritório" required error={errors.nome}>
         <input type="text" value={s2.nome} onChange={e => setS2(v => ({ ...v, nome: e.target.value }))} placeholder="Silva & Associados Advogados" className="am-input" />
       </FGroup>

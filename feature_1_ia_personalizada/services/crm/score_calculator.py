@@ -18,7 +18,6 @@ from shared.config.constants import (
     CRM_NIVEL_FAIXAS,
     CRM_NPS_PONTOS,
     CRM_NPS_PONTOS_NULO,
-    CRM_RISCO_PONTOS,
     CRM_SCORE_PESOS,
 )
 
@@ -90,7 +89,6 @@ def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
     """
     p_nps = _pontos_nps(contexto.nps_medio_3m)
     p_contato = _pontos_contato(contexto.dias_desde_ultimo_contato)
-    p_risco = CRM_RISCO_PONTOS.get(contexto.pior_score_risco, 60)
     p_engajamento = _pontos_engajamento(contexto.total_interacoes_30d)
     p_escalacoes = _pontos_escalacoes(
         contexto.escalacoes_pendentes,
@@ -101,7 +99,6 @@ def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
     score_float = (
         p_nps * pesos["nps"]
         + p_contato * pesos["contato"]
-        + p_risco * pesos["risco"]
         + p_engajamento * pesos["engajamento"]
         + p_escalacoes * pesos["escalacoes"]
     )
@@ -117,11 +114,6 @@ def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
             "pontos": p_contato,
             "peso": pesos["contato"],
             "contribuicao": round(p_contato * pesos["contato"], 1),
-        },
-        "risco": {
-            "pontos": p_risco,
-            "peso": pesos["risco"],
-            "contribuicao": round(p_risco * pesos["risco"], 1),
         },
         "engajamento": {
             "pontos": p_engajamento,

@@ -12,9 +12,10 @@ export async function fetchClienteCRM(clienteId: number): Promise<CRMClienteCard
 }
 
 export interface ResumoCRM {
-  baixo: number
-  moderado: number
-  alto: number
+  excelente: number
+  satisfeito: number
+  neutro: number
+  em_risco: number
   critico: number
   score_medio_escritorio: number | null
   sem_analise: number

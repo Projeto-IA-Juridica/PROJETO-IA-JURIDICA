@@ -158,6 +158,49 @@ class Escritorio(Base, TimestampMixin):
         comment="Timestamp do último reset mensal do contador de tokens.",
     )
 
+    # --- Stripe — Billing (Feature 5) ---
+    # stripe_customer_id: ID do Customer no Stripe (cus_xxx). None = sem conta Stripe.
+    # stripe_subscription_id: ID da Subscription ativa (sub_xxx).
+    # stripe_price_id: Price ID do plano corrente (price_xxx).
+    # assinatura_status: estado da cobrança — guard de acesso usa este campo.
+    #   trialing  → trial ativo (card cadastrado, não cobrado ainda)
+    #   active    → assinatura paga e em dia
+    #   past_due  → pagamento mais recente falhou (grace period)
+    #   canceled  → assinatura cancelada pelo usuário ou por inadimplência
+    #   unpaid    → múltiplas falhas; acesso suspenso
+    #   incomplete→ checkout iniciado mas não finalizado
+    stripe_customer_id: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="ID do Customer no Stripe (cus_xxx).",
+    )
+    stripe_subscription_id: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="ID da Subscription ativa no Stripe (sub_xxx).",
+    )
+    stripe_price_id: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="Price ID do plano atual no Stripe (price_xxx).",
+    )
+    assinatura_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default="trialing",
+        comment="trialing | active | past_due | canceled | unpaid | incomplete",
+    )
+    trial_expira_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        comment="Timestamp de expiração do trial.",
+    )
+    assinatura_expira_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        comment="Timestamp de expiração do período de cobrança corrente.",
+    )
+
     # --- Feature 3: Prospecção Inteligente ---
     # Perfil de especialização gerado pelo DNAAdvogadoService.
     # Estrutura: {especialidades, setores_alvo, tipo_lead_predominante,

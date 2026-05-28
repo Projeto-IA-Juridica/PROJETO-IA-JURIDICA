@@ -1,5 +1,8 @@
 -r requirements-base.txt
 
+# Gateway de pagamento
+stripe>=8.0.0
+
 # Força a instalação do PyTorch em versão CPU-only (sem CUDA/NVIDIA) para economizar gigabytes de espaço
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch

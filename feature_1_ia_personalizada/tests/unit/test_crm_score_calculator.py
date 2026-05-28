@@ -20,7 +20,6 @@ import pytest
 from feature_1_ia_personalizada.services.crm.aggregator import (
     CRMContexto,
     NPSRegistro,
-    ProcessoResumo,
 )
 from feature_1_ia_personalizada.services.crm.score_calculator import (
     _pontos_contato,
@@ -210,10 +209,6 @@ def test_cliente_perfeito_score_alto():
         nps_historico=[NPSRegistro(data=datetime.now(UTC), nota=5)],
         dias_desde_ultimo_contato=1,
         total_interacoes_30d=15,
-        pior_score_risco="baixo",
-        processos_ativos=[
-            ProcessoResumo("0000001-00.2024.8.26.0100", "Cobrança", "instrucao", "baixo", None)
-        ],
         escalacoes_pendentes=0,
         escalacoes_rejeitadas_30d=0,
     )
@@ -233,10 +228,6 @@ def test_cliente_critico_score_baixo():
         nps_historico=[NPSRegistro(data=datetime.now(UTC), nota=1)],
         dias_desde_ultimo_contato=90,
         total_interacoes_30d=0,
-        pior_score_risco="critico",
-        processos_ativos=[
-            ProcessoResumo("0000002-00.2024.8.26.0100", "Penal", "recurso", "critico", None)
-        ],
         escalacoes_pendentes=3,
         escalacoes_rejeitadas_30d=2,
     )
@@ -253,7 +244,7 @@ def test_cliente_critico_score_baixo():
 def test_fatores_contem_todos_os_componentes():
     ctx = _ctx()
     resultado = calcular_score_crm(ctx)
-    for chave in ("nps", "contato", "risco", "engajamento", "escalacoes"):
+    for chave in ("nps", "contato", "engajamento", "escalacoes"):
         assert chave in resultado.fatores
         assert "pontos" in resultado.fatores[chave]
         assert "peso" in resultado.fatores[chave]

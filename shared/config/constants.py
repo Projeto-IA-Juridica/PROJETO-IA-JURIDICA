@@ -159,11 +159,10 @@ SCORE_RISCO_SALARIO_MINIMO_REF: Final[float] = 1_518.00
 # ---------------------------------------------------------------------------
 
 CRM_SCORE_PESOS: Final[dict[str, float]] = {
-    "nps": 0.35,
-    "contato": 0.20,
-    "risco": 0.20,
-    "engajamento": 0.10,
-    "escalacoes": 0.15,
+    "nps": 0.40,  # satisfação direta do cliente
+    "contato": 0.25,  # frequência de relacionamento
+    "engajamento": 0.15,  # volume de interações com a IA
+    "escalacoes": 0.20,  # reclamações e escalações abertas
 }
 
 # Pontuação por nota NPS (1–5); None → 40pts (sem dados = neutro)
@@ -177,15 +176,6 @@ CRM_CONTATO_PONTOS: Final[list[tuple[int, int]]] = [
     (60, 30),  # 31–60 dias
     (9999, 0),  # > 60 dias
 ]
-
-# Pontuação por pior score de processo (None = sem processo)
-CRM_RISCO_PONTOS: Final[dict[str | None, int]] = {
-    None: 60,
-    "baixo": 90,
-    "moderado": 70,
-    "alto": 40,
-    "critico": 10,
-}
 
 # Pontuação por interações nos últimos 30 dias.
 # Semântica: se total_30d > limite → pontos. Iterar em ordem decrescente de limite.

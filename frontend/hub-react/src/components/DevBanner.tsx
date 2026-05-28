@@ -33,7 +33,7 @@ export default function DevBanner() {
           <KeyRound size={12} className="text-am-blue" />
           Token de acesso (dev)
         </div>
-        <button onClick={() => setOpen(false)} className="text-am-muted hover:text-am-ink transition-colors">
+        <button onClick={() => setOpen(false)} aria-label="Fechar" className="text-am-muted hover:text-am-ink transition-colors">
           <X size={14} />
         </button>
       </div>
@@ -41,7 +41,9 @@ export default function DevBanner() {
         <p className="text-xs text-am-secondary mb-3">
           Cole aqui o Bearer JWT gerado pelo backend. Salvo em <code className="font-mono text-am-blue">localStorage</code>.
         </p>
+        <label htmlFor="dev-token" className="sr-only">Token JWT</label>
         <textarea
+          id="dev-token"
           className="w-full text-xs font-mono border border-am-border rounded-lg p-2.5 resize-none outline-none
             focus:border-am-blue transition-colors text-am-ink bg-am-bg"
           rows={3}
