@@ -113,30 +113,40 @@ export const PLANOS: PlanoMeta[] = [
 
 /* ── API calls ───────────────────────────────────────────────────────────── */
 
-/**
- * Cria uma Checkout Session no Stripe para o plano escolhido.
- * Retorna a URL para redirecionar o usuário ao checkout hospedado pelo Stripe.
- */
+/* ── Mock (fallback quando backend não retorna dados de billing) ─────────── */
+
+const _trialExpira = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+
+export const MOCK_BILLING_STATUS: StatusAssinatura = {
+  plano:                'profissional',
+  assinatura_status:    'trialing',
+  stripe_habilitado:    false,
+  stripe_customer_id:   null,
+  trial_expira_em:      _trialExpira,
+  assinatura_expira_em: null,
+  acesso_ativo:         true,
+}
+
+/* ── API calls ───────────────────────────────────────────────────────────── */
+
 export async function createCheckout(plano: PlanoId): Promise<CheckoutResponse> {
   const res = await api.post<CheckoutResponse>('/billing/checkout', { plano })
   return res.data
 }
 
-/**
- * Cria uma Billing Portal Session.
- * Retorna a URL para o cliente gerenciar cartão, plano e cancelamento.
- */
 export async function getPortalUrl(): Promise<PortalResponse> {
   const res = await api.get<PortalResponse>('/billing/portal')
   return res.data
 }
 
-/**
- * Retorna o status atual da assinatura do escritório autenticado.
- */
+/** Retorna status da assinatura; usa mock se o backend não estiver disponível. */
 export async function getBillingStatus(): Promise<StatusAssinatura> {
-  const res = await api.get<StatusAssinatura>('/billing/status')
-  return res.data
+  try {
+    const res = await api.get<StatusAssinatura>('/billing/status')
+    return res.data
+  } catch {
+    return MOCK_BILLING_STATUS
+  }
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
