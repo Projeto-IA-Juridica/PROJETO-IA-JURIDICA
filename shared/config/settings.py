@@ -87,9 +87,9 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None  # whsec_... gerado no Stripe Dashboard
     # Price IDs dos planos (criar no Stripe Dashboard → Products → Prices)
-    STRIPE_PRICE_ID_BASICO: str | None = None        # R$ 497/mês
+    STRIPE_PRICE_ID_BASICO: str | None = None  # R$ 497/mês
     STRIPE_PRICE_ID_PROFISSIONAL: str | None = None  # R$ 1.997/mês
-    STRIPE_PRICE_ID_ESCRITORIO: str | None = None    # R$ 4.997/mês
+    STRIPE_PRICE_ID_ESCRITORIO: str | None = None  # R$ 4.997/mês
     # URLs de retorno após checkout / cancelamento
     STRIPE_SUCCESS_URL: str = "https://app.conciergejuridico.com/onboarding?stripe_return=1"
     STRIPE_CANCEL_URL: str = "https://app.conciergejuridico.com/planos?cancelado=1"

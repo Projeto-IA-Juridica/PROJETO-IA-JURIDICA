@@ -87,18 +87,18 @@ def calcular_score_crm(contexto: CRMContexto) -> CRMScore:
     Calcula o score CRM a partir de um CRMContexto.
     Função pura — sem I/O, sem efeitos colaterais.
     """
-    p_nps         = _pontos_nps(contexto.nps_medio_3m)
-    p_contato     = _pontos_contato(contexto.dias_desde_ultimo_contato)
+    p_nps = _pontos_nps(contexto.nps_medio_3m)
+    p_contato = _pontos_contato(contexto.dias_desde_ultimo_contato)
     p_engajamento = _pontos_engajamento(contexto.total_interacoes_30d)
-    p_escalacoes  = _pontos_escalacoes(
+    p_escalacoes = _pontos_escalacoes(
         contexto.escalacoes_pendentes,
         contexto.escalacoes_rejeitadas_30d,
     )
 
     pesos = CRM_SCORE_PESOS
     score_float = (
-        p_nps         * pesos["nps"]
-        + p_contato   * pesos["contato"]
+        p_nps * pesos["nps"]
+        + p_contato * pesos["contato"]
         + p_engajamento * pesos["engajamento"]
         + p_escalacoes * pesos["escalacoes"]
     )

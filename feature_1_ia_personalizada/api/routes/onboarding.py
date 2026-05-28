@@ -17,6 +17,7 @@ Fluxo de 5 etapas:
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 import httpx
@@ -26,8 +27,6 @@ from jose import JWTError
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import asyncio
 
 from feature_1_ia_personalizada.services.billing.stripe_service import (
     LIMITES_TRIAL_POR_PLANO,
@@ -90,9 +89,7 @@ class RegisterRequest(BaseModel):
     def _validar_plano(cls, v: str) -> str:
         normalizado = v.lower().strip()
         if normalizado not in _PLANOS_DISPONIVEIS:
-            raise ValueError(
-                f"Plano inválido — opções: {', '.join(sorted(_PLANOS_DISPONIVEIS))}"
-            )
+            raise ValueError(f"Plano inválido — opções: {', '.join(sorted(_PLANOS_DISPONIVEIS))}")
         return normalizado
 
 
@@ -303,7 +300,9 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.refresh(escritorio)
     await db.refresh(usuario)
 
-    logger.info("onboarding_registro", escritorio_id=escritorio.id, cnpj=body.cnpj, plano=body.plano)
+    logger.info(
+        "onboarding_registro", escritorio_id=escritorio.id, cnpj=body.cnpj, plano=body.plano
+    )
 
     # ── Integração Stripe ─────────────────────────────────────────────────────
     # Cria o Customer no Stripe e gera a Checkout Session para o plano escolhido.

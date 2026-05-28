@@ -159,9 +159,9 @@ SCORE_RISCO_SALARIO_MINIMO_REF: Final[float] = 1_518.00
 # ---------------------------------------------------------------------------
 
 CRM_SCORE_PESOS: Final[dict[str, float]] = {
-    "nps":        0.40,  # satisfação direta do cliente
-    "contato":    0.25,  # frequência de relacionamento
-    "engajamento": 0.15, # volume de interações com a IA
+    "nps": 0.40,  # satisfação direta do cliente
+    "contato": 0.25,  # frequência de relacionamento
+    "engajamento": 0.15,  # volume de interações com a IA
     "escalacoes": 0.20,  # reclamações e escalações abertas
 }
 

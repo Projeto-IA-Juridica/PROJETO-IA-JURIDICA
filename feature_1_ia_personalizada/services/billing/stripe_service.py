@@ -35,9 +35,11 @@ logger = structlog.get_logger(__name__)
 # instalado (ambiente mínimo sem requirements-f1.txt).
 # ---------------------------------------------------------------------------
 
+
 def _get_stripe():
     try:
         import stripe as _stripe
+
         return _stripe
     except ImportError:
         return None
@@ -47,12 +49,13 @@ def _get_stripe():
 # Mapeamento plano → Price ID
 # ---------------------------------------------------------------------------
 
+
 def _price_id_para_plano(plano: str) -> str | None:
     """Retorna o Stripe Price ID para um dado plano interno."""
     mapa = {
-        "basico":       settings.STRIPE_PRICE_ID_BASICO,
+        "basico": settings.STRIPE_PRICE_ID_BASICO,
         "profissional": settings.STRIPE_PRICE_ID_PROFISSIONAL,
-        "escritorio":   settings.STRIPE_PRICE_ID_ESCRITORIO,
+        "escritorio": settings.STRIPE_PRICE_ID_ESCRITORIO,
     }
     return mapa.get(plano)
 
@@ -65,9 +68,9 @@ def plano_para_price_id(plano: str) -> str | None:
 def price_id_para_plano(price_id: str) -> str | None:
     """Reverse-map: Stripe Price ID → nome do plano interno."""
     mapa = {
-        settings.STRIPE_PRICE_ID_BASICO:       "basico",
+        settings.STRIPE_PRICE_ID_BASICO: "basico",
         settings.STRIPE_PRICE_ID_PROFISSIONAL: "profissional",
-        settings.STRIPE_PRICE_ID_ESCRITORIO:   "escritorio",
+        settings.STRIPE_PRICE_ID_ESCRITORIO: "escritorio",
     }
     return mapa.get(price_id)
 
@@ -77,39 +80,40 @@ def price_id_para_plano(price_id: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 QUOTAS_POR_PLANO: dict[str, int | None] = {
-    "basico":       500_000,
+    "basico": 500_000,
     "profissional": 2_000_000,
-    "escritorio":   5_000_000,
-    "enterprise":   None,  # sem limite
+    "escritorio": 5_000_000,
+    "enterprise": None,  # sem limite
 }
 
 LIMITES_POR_PLANO: dict[str, dict[str, int]] = {
-    "basico":       {"max_processos": 30,  "max_clientes": 50},
+    "basico": {"max_processos": 30, "max_clientes": 50},
     "profissional": {"max_processos": 300, "max_clientes": 500},
-    "escritorio":   {"max_processos": 500, "max_clientes": 10_000},
-    "enterprise":   {"max_processos": 99_999, "max_clientes": 99_999},
+    "escritorio": {"max_processos": 500, "max_clientes": 10_000},
+    "enterprise": {"max_processos": 99_999, "max_clientes": 99_999},
 }
 
 # Quotas reduzidas durante os 7 dias de trial (~20% do plano pago).
 # Protege contra uso abusivo sem prejudicar a experiência de avaliação.
 QUOTAS_TRIAL_POR_PLANO: dict[str, int | None] = {
-    "basico":       100_000,
+    "basico": 100_000,
     "profissional": 400_000,
-    "escritorio":   1_000_000,
-    "enterprise":   None,
+    "escritorio": 1_000_000,
+    "enterprise": None,
 }
 
 LIMITES_TRIAL_POR_PLANO: dict[str, dict[str, int]] = {
-    "basico":       {"max_processos": 10,  "max_clientes": 20},
-    "profissional": {"max_processos": 60,  "max_clientes": 100},
-    "escritorio":   {"max_processos": 100, "max_clientes": 500},
-    "enterprise":   {"max_processos": 99_999, "max_clientes": 99_999},
+    "basico": {"max_processos": 10, "max_clientes": 20},
+    "profissional": {"max_processos": 60, "max_clientes": 100},
+    "escritorio": {"max_processos": 100, "max_clientes": 500},
+    "enterprise": {"max_processos": 99_999, "max_clientes": 99_999},
 }
 
 
 # ---------------------------------------------------------------------------
 # Serviço
 # ---------------------------------------------------------------------------
+
 
 class StripeService:
     """
@@ -156,7 +160,9 @@ class StripeService:
                 },
                 preferred_locales=["pt-BR"],
             )
-            logger.info("stripe.customer_criado", customer_id=customer.id, escritorio_id=escritorio_id)
+            logger.info(
+                "stripe.customer_criado", customer_id=customer.id, escritorio_id=escritorio_id
+            )
             return customer.id
         except Exception as exc:
             logger.error("stripe.criar_customer_erro", erro=str(exc), escritorio_id=escritorio_id)
@@ -232,7 +238,9 @@ class StripeService:
     # Billing Portal
     # ------------------------------------------------------------------
 
-    def criar_portal_session(self, *, stripe_customer_id: str, return_url: str | None = None) -> str | None:
+    def criar_portal_session(
+        self, *, stripe_customer_id: str, return_url: str | None = None
+    ) -> str | None:
         """
         Cria uma Billing Portal Session para auto-serviço do cliente.
 

@@ -125,10 +125,7 @@ async def require_assinatura_ativa(
             "Acesse /api/v1/billing/portal para atualizar o método de pagamento."
         )
     elif sub_status in ("canceled", "unpaid"):
-        detail = (
-            "Assinatura inativa. "
-            "Acesse /api/v1/billing/checkout para reativar sua conta."
-        )
+        detail = "Assinatura inativa. " "Acesse /api/v1/billing/checkout para reativar sua conta."
     else:
         detail = f"Assinatura com status '{sub_status}'. Contate o suporte."
 
@@ -242,7 +239,7 @@ async def stripe_webhook(
         return {"received": True, "processed": False}
     except Exception as exc:
         logger.warning("billing.webhook_assinatura_invalida", erro=str(exc))
-        raise HTTPException(status_code=400, detail="Assinatura do webhook inválida.")
+        raise HTTPException(status_code=400, detail="Assinatura do webhook inválida.") from exc
 
     event_type: str = event["type"]
     data = event["data"]["object"]
@@ -312,14 +309,13 @@ async def _on_checkout_completed(*, data: dict, db: AsyncSession) -> None:
         # Busca detalhes da subscription para saber se está em trial
         try:
             import stripe as _stripe
+
             sub = await asyncio.to_thread(_stripe.Subscription.retrieve, subscription_id)
             sub_status: str = sub.get("status", "active")
             escritorio.assinatura_status = sub_status
 
             if sub_status == "trialing" and sub.get("trial_end"):
-                escritorio.trial_expira_em = datetime.fromtimestamp(
-                    sub["trial_end"], tz=UTC
-                )
+                escritorio.trial_expira_em = datetime.fromtimestamp(sub["trial_end"], tz=UTC)
             if sub.get("current_period_end"):
                 escritorio.assinatura_expira_em = datetime.fromtimestamp(
                     sub["current_period_end"], tz=UTC
@@ -414,9 +410,7 @@ async def _on_subscription_updated(*, data: dict, db: AsyncSession) -> None:
 
     # Atualiza período corrente
     if data.get("current_period_end"):
-        escritorio.assinatura_expira_em = datetime.fromtimestamp(
-            data["current_period_end"], tz=UTC
-        )
+        escritorio.assinatura_expira_em = datetime.fromtimestamp(data["current_period_end"], tz=UTC)
 
     # Atualiza plano e quotas; sempre sincroniza para refletir trial/active
     plano_atual = escritorio.plano
