@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 const PROD_URL = 'https://projeto-ia-juridica-production-4bb1.up.railway.app'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  const env = loadEnv(mode, '.', '')
   const apiUrl = env.VITE_API_URL ?? PROD_URL
 
   return {

@@ -97,6 +97,13 @@ export async function statusWhatsapp(): Promise<WhatsappStatus> {
   return data
 }
 
+/* ── Desconectar WhatsApp (requer JWT + CSRF) ───────────────────── */
+export async function disconnectWhatsapp(): Promise<{ ok: boolean; message: string }> {
+  await fetchCsrfToken().catch(() => null)
+  const { data } = await api.post<{ ok: boolean; message: string }>('/onboarding/disconnect-whatsapp')
+  return data
+}
+
 /* ── Etapa 2 — Importar processos via CSV (requer JWT admin) ─────── */
 export interface ImportErro {
   linha: number

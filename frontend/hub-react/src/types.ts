@@ -3,6 +3,7 @@ export type Section =
   | 'clientes'
   | 'crm'
   | 'hub-ia'
+  | 'whatsapp'
   | 'captacao'
   | 'documentos'
   | 'planos'

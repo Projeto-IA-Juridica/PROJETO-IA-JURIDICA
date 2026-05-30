@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  LayoutDashboard, Users, Heart, Brain,
+  LayoutDashboard, Users, Heart, Brain, MessageSquare,
   Target, FolderOpen, CreditCard, Settings,
 } from 'lucide-react'
 import DevBanner from './components/DevBanner'
@@ -25,6 +25,7 @@ import CaptacaoPage   from './pages/CaptacaoPage'
 import DocumentosPage from './pages/DocumentosPage'
 import PlanosPage     from './pages/PlanosPage'
 import ConfigPage     from './pages/ConfigPage'
+import WhatsappPage   from './pages/WhatsappPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -178,6 +179,7 @@ interface ShellProps { onReady?: () => void }
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'painel',     label: 'Painel',          icon: <LayoutDashboard size={18} /> },
   { id: 'hub-ia',     label: 'Hub IA',           icon: <Brain      size={18} /> },
+  { id: 'whatsapp',   label: 'WhatsApp',        icon: <MessageSquare size={18} /> },
   { id: 'clientes',   label: 'Clientes',         icon: <Users      size={18} /> },
   { id: 'crm',        label: 'Relacionamento',   icon: <Heart      size={18} /> },
   { id: 'captacao',   label: 'Captação',         icon: <Target     size={18} /> },
@@ -240,6 +242,7 @@ function Shell({ onReady }: ShellProps) {
           {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
           {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
           {section === 'hub-ia'     && <HubIAPage />}
+          {section === 'whatsapp'   && <WhatsappPage />}
           {section === 'captacao'   && <CaptacaoPage />}
           {section === 'documentos' && <DocumentosPage />}
           {section === 'planos'     && <PlanosPage />}
