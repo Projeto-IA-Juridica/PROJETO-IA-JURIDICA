@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Send, BookOpen, AlertTriangle, FileText, History, ChevronDown, ChevronUp } from 'lucide-react'
+import { Send, BookOpen, AlertTriangle, History, ChevronDown, ChevronUp } from 'lucide-react'
 import { consultar } from '../api/hub'
 import { fetchProcessos } from '../api/processos'
 import { fetchChatHistory, type InteracaoItem } from '../api/chat'
@@ -209,37 +209,6 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-
-      {/* ── Status IA ── */}
-      <div className="flex items-center gap-2.5 px-4 sm:px-5 py-2.5 flex-shrink-0"
-        style={{ background: 'rgba(26,158,120,0.06)', borderBottom: '1px solid rgba(26,158,120,0.18)' }}>
-        <span className="w-1.5 h-1.5 rounded-full glow-green flex-shrink-0" style={{ background: '#1A9E78' }} />
-        <span className="text-xs text-am-secondary">
-          IA configurada como <strong className="text-am-ink">Dra. Camila</strong>
-          <span className="mx-1.5 text-am-muted">·</span>
-          Tom formal · Verifica fatos
-        </span>
-      </div>
-
-      {/* ── Contexto RAG ── */}
-      {processo && (
-        <div className="px-4 sm:px-5 py-2.5 flex-shrink-0 bg-am-bg border-b border-am-border">
-          <div className="flex items-center gap-1.5 text-[9px] font-bold text-am-muted uppercase tracking-widest mb-2">
-            <BookOpen size={9} className="text-am-blue" />
-            Contexto ativo — {cliente.nome.split(' ')[0]}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {[processo.tipo_acao, processo.tribunal, processo.status].filter(Boolean).map((v) => (
-              <span key={v}
-                className="flex items-center gap-1 text-[10px] font-semibold rounded-md"
-                style={{ color: 'var(--color-am-blue)', background: 'rgba(58,122,184,0.08)', border: '1px solid rgba(58,122,184,0.18)', padding: '2px 7px' }}>
-                <FileText size={8} />
-                {v}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── Histórico WhatsApp ── */}
       <HistoricoPanel clienteId={cliente.id} />

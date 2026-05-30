@@ -74,22 +74,18 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
     return (
       <div className="flex flex-col h-full overflow-hidden bg-am-bg">
-        <div className="flex flex-col h-full w-full max-w-3xl mx-auto">
+        <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
 
           {/* Header */}
-          <div className="flex-shrink-0 px-4 pt-5 pb-3">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 4px 12px rgba(18,72,190,0.22)' }}>
-                <Users size={16} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <h1 className="text-sm font-bold text-am-ink">Clientes</h1>
-                <p className="text-[11px] text-am-muted">{clientes?.length ?? 0} cadastrados</p>
+          <div className="flex-shrink-0 px-6 pt-3 pb-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h1 className="text-sm font-bold text-am-ink tracking-tight">Clientes</h1>
+                <p className="text-xs text-am-muted mt-0.5">{clientes?.length ?? 0} cadastrados</p>
               </div>
               <button
                 onClick={() => setShowCSV(true)}
-                className="press flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white flex-shrink-0"
+                className="press flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
                 <Upload size={12} /> Importar CSV
               </button>
@@ -97,8 +93,10 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
             {/* Search */}
             <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" />
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" aria-hidden="true" />
+              <label htmlFor="hub-search" className="sr-only">Buscar cliente</label>
               <input
+                id="hub-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar cliente..."
@@ -108,7 +106,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           </div>
 
           {/* Lista */}
-          <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+          <div className="flex-1 overflow-y-auto px-6 pb-4">
             {isLoading && (
               <div className="flex items-center justify-center h-32">
                 <div className="w-5 h-5 rounded-full border-2 border-am-blue border-t-transparent animate-spin" />
@@ -141,6 +139,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 <p className="text-xs text-am-muted">Nenhum cliente encontrado</p>
               </div>
             )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
             {filtered.map((c) => {
               const initials = c.nome.split(' ').slice(0, 2).map((n: string) => n[0].toUpperCase()).join('')
               return (
@@ -211,6 +210,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                 </motion.button>
               )
             })}
+            </div>{/* /grid */}
           </div>
         </div>
       </div>
@@ -223,13 +223,14 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-am-bg">
-      <div className="flex flex-col h-full w-full max-w-3xl mx-auto">
+      <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-4 pt-5 pb-4">
+        <div className="flex-shrink-0 px-6 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button onClick={onBack}
+                aria-label="Voltar para lista de clientes"
                 className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
                 style={{ border: '1px solid var(--color-am-border)', background: 'white' }}>
                 <ArrowLeft size={14} />
@@ -313,13 +314,15 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           </div>
 
           {/* Tab switcher */}
-          <div className="flex gap-1 p-1 rounded-2xl mt-4" style={{ background: 'rgba(12,30,48,0.05)' }}>
+          <div role="tablist" aria-label="Seções do cliente" className="flex gap-1 p-1 rounded-2xl mt-4" style={{ background: 'rgba(12,30,48,0.05)' }}>
             {TABS.map((t) => {
               const disabled = t.id === 'score' && !processo?.score_risco
               const active   = activeTab === t.id
               return (
                 <motion.button
                   key={t.id}
+                  role="tab"
+                  aria-selected={active}
                   disabled={disabled}
                   onClick={() => !disabled && setActiveTab(t.id)}
                   whileHover={{ scale: active || disabled ? 1 : 1.04 }}

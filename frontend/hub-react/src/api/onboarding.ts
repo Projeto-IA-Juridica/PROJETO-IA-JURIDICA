@@ -30,6 +30,8 @@ export function mapTom(ton: string): 'formal' | 'amigavel' | 'neutro' {
 
 /* ── Tipos ───────────────────────────────────────────────────────── */
 
+export type PlanoOnboarding = 'basico' | 'profissional' | 'escritorio'
+
 export interface RegisterPayload {
   nome_escritorio: string
   cnpj: string
@@ -37,6 +39,7 @@ export interface RegisterPayload {
   senha: string
   nome_responsavel: string
   oab_responsavel: string
+  plano?: PlanoOnboarding
 }
 
 export interface RegisterResponse {
@@ -44,6 +47,8 @@ export interface RegisterResponse {
   refresh_token: string
   expires_in: number
   escritorio: { id: number; nome: string; cnpj: string }
+  /** URL do Stripe Checkout. null se Stripe não configurado. */
+  checkout_url: string | null
 }
 
 export interface ConfigurarIAPayload {

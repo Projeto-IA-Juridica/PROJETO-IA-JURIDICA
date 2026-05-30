@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   LayoutDashboard, Users, Heart, Brain, MessageSquare,
-  Target, FolderOpen, Settings,
+  Target, FolderOpen, CreditCard, Settings,
 } from 'lucide-react'
 import DevBanner from './components/DevBanner'
 import PageTransition from './components/PageTransition'
@@ -23,6 +23,7 @@ import CRMPage        from './pages/CRMPage'
 import HubIAPage      from './pages/HubIAPage'
 import CaptacaoPage   from './pages/CaptacaoPage'
 import DocumentosPage from './pages/DocumentosPage'
+import PlanosPage     from './pages/PlanosPage'
 import ConfigPage     from './pages/ConfigPage'
 import WhatsappPage   from './pages/WhatsappPage'
 
@@ -183,6 +184,7 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'crm',        label: 'Relacionamento',   icon: <Heart      size={18} /> },
   { id: 'captacao',   label: 'Captação',         icon: <Target     size={18} /> },
   { id: 'documentos', label: 'Documentos',       icon: <FolderOpen size={18} /> },
+  { id: 'planos',     label: 'Planos',           icon: <CreditCard size={18} /> },
   { id: 'config',     label: 'Configurações',    icon: <Settings   size={18} /> },
 ]
 
@@ -211,10 +213,18 @@ function Shell({ onReady }: ShellProps) {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-am-bg">
 
-      {/* Top bar com logo */}
-      <div className="flex-shrink-0 flex items-center px-5 pt-4 pb-1">
-        <img src="/logo.png" alt="amicus" style={{ width: 30, height: 30, objectFit: 'contain' }} />
-        <span className="ml-2 text-base font-black tracking-tight"
+      {/* Skip to content */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[200] focus:px-4 focus:py-2 focus:rounded-lg focus:text-xs focus:font-semibold focus:bg-am-blue focus:text-white"
+      >
+        Pular para o conteúdo
+      </a>
+
+      {/* Top bar */}
+      <header className="flex-shrink-0 flex items-center px-6 pt-5 pb-2">
+        <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 28, height: 28, objectFit: 'contain', opacity: 0.85 }} />
+        <span className="ml-2.5 text-xl font-black tracking-tight select-none"
           style={{
             background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)',
             WebkitBackgroundClip: 'text',
@@ -223,22 +233,27 @@ function Shell({ onReady }: ShellProps) {
           }}>
           amicus
         </span>
-      </div>
+      </header>
 
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
-      <PageTransition id={section} className="flex-1 overflow-hidden pb-24">
-        {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
-        {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
-        {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
-        {section === 'hub-ia'     && <HubIAPage />}
-        {section === 'whatsapp'   && <WhatsappPage />}
-        {section === 'captacao'   && <CaptacaoPage />}
-        {section === 'documentos' && <DocumentosPage />}
-        {section === 'config'     && <ConfigPage />}
-      </PageTransition>
+      <main id="main-content" className="flex-1 overflow-hidden">
+        <PageTransition id={section} className="h-full overflow-hidden pb-20">
+          {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
+          {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
+          {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
+          {section === 'hub-ia'     && <HubIAPage />}
+          {section === 'whatsapp'   && <WhatsappPage />}
+          {section === 'captacao'   && <CaptacaoPage />}
+          {section === 'documentos' && <DocumentosPage />}
+          {section === 'planos'     && <PlanosPage />}
+          {section === 'config'     && <ConfigPage />}
+        </PageTransition>
+      </main>
 
       {/* Floating Dock */}
-      <FloatingDock items={dockItems} />
+      <nav aria-label="Navegação principal">
+        <FloatingDock items={dockItems} />
+      </nav>
     </div>
   )
 }

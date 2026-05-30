@@ -12,7 +12,7 @@ Estratégia:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -106,6 +106,9 @@ async def app_client():
 
     mock_db = AsyncMock()
     mock_db.execute.return_value = AsyncMock(all=lambda: [])
+    mock_escritorio = MagicMock()
+    mock_escritorio.assinatura_status = "trialing"
+    mock_db.get.return_value = mock_escritorio
     redis_store = _FakeAnalyticsRedis()
 
     async def _override_db():

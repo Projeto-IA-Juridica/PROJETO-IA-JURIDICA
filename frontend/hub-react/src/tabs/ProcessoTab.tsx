@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Scale, Clock, AlertCircle, Phone, Star, Gavel, User,
+  Scale, Clock, AlertCircle, MessageCircle, Phone, Star, Gavel, User,
   ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search,
 } from 'lucide-react'
 import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
@@ -259,6 +259,23 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
 
   return (
     <div className="space-y-3 p-4">
+
+      {/* ── Recomendação de relacionamento ── */}
+      {cliente.crm_acao_sugerida && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22 }}
+          className="flex items-start gap-3 px-4 py-3.5 rounded-2xl"
+          style={{ background: 'rgba(18,72,190,0.05)', border: '1.5px solid rgba(18,72,190,0.18)', borderLeft: '4px solid var(--color-am-blue)' }}
+        >
+          <MessageCircle size={16} style={{ color: 'var(--color-am-blue)' }} className="flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--color-am-blue)' }}>Recomendação para o advogado</p>
+            <p className="text-sm font-medium text-am-ink leading-snug">{cliente.crm_acao_sugerida}</p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Card do cliente */}
       <Card>
@@ -525,18 +542,6 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
           style={{ border: '1px dashed var(--color-am-border)', background: 'transparent', cursor: 'pointer' }}>
           <Plus size={12} /> Adicionar outro processo
         </button>
-      )}
-
-      {/* Ação sugerida */}
-      {cliente.crm_acao_sugerida && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl"
-          style={{ background: 'rgba(208,128,16,0.05)', border: '1px solid rgba(208,128,16,0.20)', borderLeft: '3px solid #D08010' }}>
-          <AlertCircle size={14} style={{ color: '#D08010' }} className="flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-[10px] font-bold mb-0.5" style={{ color: '#D08010' }}>Ação sugerida pela IA</p>
-            <p className="text-xs text-am-secondary leading-relaxed">{cliente.crm_acao_sugerida}</p>
-          </div>
-        </div>
       )}
 
       {/* Modais */}

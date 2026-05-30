@@ -189,7 +189,7 @@ async def test_output_claude_parseado_corretamente():
     """Resposta JSON do Claude é convertida em CRMAnaliseResult."""
     ctx = _ctx_base()
     payload = {
-        "resumo": "Cliente engajado com NPS alto e processos sem alerta.",
+        "resumo": "Cliente engajado com NPS alto e bom histórico de conversas.",
         "acao_sugerida": "Nenhuma ação necessária",
     }
 
@@ -229,13 +229,13 @@ async def test_output_claude_parseado_corretamente():
 
 
 @pytest.mark.asyncio
-async def test_cliente_sem_processos_gera_acao_sugerida():
-    """Cliente sem processos ativos não deve falhar — ação sugerida deve ser retornada."""
-    ctx = _ctx_base(processos_ativos=[], pior_score_risco=None)
+async def test_cliente_sem_interacoes_recentes_gera_acao_sugerida():
+    """Cliente com baixo engajamento não deve falhar — ação sugerida deve ser retornada."""
+    ctx = _ctx_base(total_interacoes_30d=0, dias_desde_ultimo_contato=45)
 
     payload = {
-        "resumo": "Cliente sem processos ativos no momento.",
-        "acao_sugerida": "Verificar necessidade de novo processo ou re-engajar cliente.",
+        "resumo": "Cliente com baixo engajamento nos últimos 30 dias.",
+        "acao_sugerida": "Entrar em contato para re-engajar o cliente.",
     }
     mock_msg = MagicMock()
     mock_msg.content = [MagicMock(text=json.dumps(payload))]

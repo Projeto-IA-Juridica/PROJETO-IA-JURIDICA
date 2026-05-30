@@ -51,14 +51,6 @@ class CRMAnaliseResult:
 
 
 def _construir_input_claude(ctx: CRMContexto, nivel: str, score: int) -> str:
-    processos_txt = (
-        ", ".join(
-            f"{p.numero_cnj} ({p.fase_processual or 'fase desconhecida'}, risco {p.score_nivel or 'não avaliado'})"
-            for p in ctx.processos_ativos
-        )
-        or "Nenhum processo ativo"
-    )
-
     msgs_txt = (
         "\n".join(
             f"  Cliente: {m.pergunta_cliente}\n  IA: {m.resposta_ia}" for m in ctx.ultimas_mensagens
@@ -70,15 +62,14 @@ def _construir_input_claude(ctx: CRMContexto, nivel: str, score: int) -> str:
         f"Cliente: {ctx.nome}"
         + (f", {ctx.profissao}" if ctx.profissao else "")
         + (f" em {ctx.empresa}" if ctx.empresa else "")
-        + f"\nNível calculado: {nivel} (score {score}/100)"
+        + f"\nNível de satisfação: {nivel} (score {score}/100)"
         + f"\nNPS médio 3 meses: {ctx.nps_medio_3m if ctx.nps_medio_3m is not None else 'sem dados'}"
         + f" ({len(ctx.nps_historico)} avaliações)"
         + f"\nÚltimo contato: {ctx.dias_desde_ultimo_contato} dias atrás"
-        + f"\nInterações últimos 30 dias: {ctx.total_interacoes_30d}"
-        + f"\nProcessos: {processos_txt}"
+        + f"\nInterações com a IA nos últimos 30 dias: {ctx.total_interacoes_30d}"
         + f"\nEscalações: {ctx.escalacoes_pendentes} pendente(s),"
         + f" {ctx.escalacoes_rejeitadas_30d} rejeitada(s) nos últimos 30 dias"
-        + f"\nÚltimas mensagens do cliente:\n{msgs_txt}"
+        + f"\nHistórico de conversas:\n{msgs_txt}"
     )
 
 

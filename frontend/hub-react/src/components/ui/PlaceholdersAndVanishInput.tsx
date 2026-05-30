@@ -155,7 +155,9 @@ export function PlaceholdersAndVanishInput({
       </div>
 
       {/* Input */}
+      <label htmlFor="hub-ia-input" className="sr-only">Mensagem para o assistente</label>
       <input
+        id="hub-ia-input"
         ref={inputRef}
         value={animating ? '' : value}
         onChange={(e) => {
@@ -182,6 +184,7 @@ export function PlaceholdersAndVanishInput({
       {/* Botão enviar */}
       <motion.button
         type="submit"
+        aria-label="Enviar mensagem"
         disabled={!value.trim() || disabled || animating}
         className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center
           justify-center rounded-lg text-white transition-fast
