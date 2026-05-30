@@ -493,7 +493,7 @@ async def connect_whatsapp(
         ) from exc
 
     instance_name = f"escritorio_{escritorio.id}"
-    configured_base = settings.EVOLUTION_API_URL.rstrip("/")
+    configured_base = (settings.EVOLUTION_API_URL or "").rstrip("/")
     current_api_base = str(request.base_url).rstrip("/")
 
     # Falha comum em produção: EVOLUTION_API_URL apontando para a própria API.
@@ -561,7 +561,7 @@ async def connect_whatsapp(
                     resp_connect = await client.request(
                         metodo,
                         f"{settings.EVOLUTION_API_URL}/instance/connect/{instance_name}",
-                        headers={"apikey": settings.EVOLUTION_API_KEY},
+                        headers={"apikey": settings.EVOLUTION_API_KEY or ""},
                     )
                     if resp_connect.status_code in (200, 201):
                         return resp_connect.json()
@@ -582,7 +582,7 @@ async def connect_whatsapp(
             # 1. Cria a instância
             resp = await client.post(
                 f"{settings.EVOLUTION_API_URL}/instance/create",
-                headers={"apikey": settings.EVOLUTION_API_KEY},
+                headers={"apikey": settings.EVOLUTION_API_KEY or ""},
                 json={
                     "instanceName": instance_name,
                     "qrcode": True,
@@ -634,7 +634,9 @@ async def connect_whatsapp(
                     except Exception:
                         pass
                     logger.warning(
-                        "evolution_create_erro", status=resp.status_code, escritorio_id=escritorio.id
+                        "evolution_create_erro",
+                        status=resp.status_code,
+                        escritorio_id=escritorio.id,
                     )
                     raise HTTPException(status_code=502, detail=detail)
             else:
@@ -733,7 +735,7 @@ async def whatsapp_status(
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 f"{settings.EVOLUTION_API_URL}/instance/connectionState/{escritorio.webhook_whatsapp_instance}",
-                headers={"apikey": settings.EVOLUTION_API_KEY},
+                headers={"apikey": settings.EVOLUTION_API_KEY or ""},
             )
 
             if resp.status_code >= 500:
@@ -791,7 +793,7 @@ async def disconnect_whatsapp(request: Request, db: AsyncSession = Depends(get_d
     if not inst:
         return {"ok": True, "message": "Nenhuma instância configurada."}
 
-    errors = []
+    errors: list[tuple[str, str | int, str]] = []
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             # Tenta uma série de endpoints possíveis na Evolution (compatibilidade)
@@ -804,9 +806,16 @@ async def disconnect_whatsapp(request: Request, db: AsyncSession = Depends(get_d
             ]
             for method, url in endpoints:
                 try:
-                    resp = await client.request(method, url, headers={"apikey": settings.EVOLUTION_API_KEY})
+                    resp = await client.request(
+                        method, url, headers={"apikey": settings.EVOLUTION_API_KEY or ""}
+                    )
                     if resp.status_code < 400:
-                        logger.info("evolution_instance_removed", url=url, status=resp.status_code, escritorio_id=escritorio.id)
+                        logger.info(
+                            "evolution_instance_removed",
+                            url=url,
+                            status=resp.status_code,
+                            escritorio_id=escritorio.id,
+                        )
                         break
                     if resp.status_code == 404:
                         # endpoint/instance não encontrado — continuar tentando outros
@@ -822,11 +831,15 @@ async def disconnect_whatsapp(request: Request, db: AsyncSession = Depends(get_d
         escritorio.webhook_whatsapp_instance = None
         await db.commit()
     except Exception as exc:
-        logger.error("disconnect_whatsapp_persist_error", erro=str(exc), escritorio_id=escritorio.id)
+        logger.error(
+            "disconnect_whatsapp_persist_error", erro=str(exc), escritorio_id=escritorio.id
+        )
         raise HTTPException(status_code=500, detail="Erro ao salvar alteração no banco.") from exc
 
     if errors:
-        logger.warning("disconnect_whatsapp_partial_errors", errors=errors, escritorio_id=escritorio.id)
+        logger.warning(
+            "disconnect_whatsapp_partial_errors", errors=errors, escritorio_id=escritorio.id
+        )
 
     return {"ok": True, "message": "Desconectado com sucesso."}
 
