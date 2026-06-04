@@ -526,7 +526,7 @@ class TestCacheAside:
         cache_com_todos = [
             {"texto": "Antigo 1", "data": "2023-06-01T08:00:00.000Z"},
             {"texto": "Antigo 2", "data": "2024-01-20T00:00:00.000Z"},  # igual à ref → excluído
-            {"texto": "Novo",     "data": "2024-03-15T10:00:00.000Z"},
+            {"texto": "Novo", "data": "2024-03-15T10:00:00.000Z"},
         ]
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=cache_com_todos),
@@ -551,9 +551,9 @@ class TestCacheAside:
         (mais antigo), causando re-processamento no próximo ciclo.
         """
         andamentos_fora_de_ordem = [
-            {"texto": "Conclusão",  "data": "2024-01-25T12:00:00.000Z"},  # mais novo
-            {"texto": "Distribuído","data": "2024-01-10T09:00:00.000Z"},  # mais antigo
-            {"texto": "Despacho",   "data": "2024-01-20T08:00:00.000Z"},  # intermediário
+            {"texto": "Conclusão", "data": "2024-01-25T12:00:00.000Z"},  # mais novo
+            {"texto": "Distribuído", "data": "2024-01-10T09:00:00.000Z"},  # mais antigo
+            {"texto": "Despacho", "data": "2024-01-20T08:00:00.000Z"},  # intermediário
         ]
         with (
             patch(f"{MODULE}.get_andamentos_sync", return_value=None),
@@ -566,6 +566,6 @@ class TestCacheAside:
 
         mock_update.assert_called_once()
         _id, _texto, data_salva = mock_update.call_args.args
-        assert data_salva == "2024-01-25T12:00:00.000Z", (
-            f"Esperado data mais recente, recebido: {data_salva}"
-        )
+        assert (
+            data_salva == "2024-01-25T12:00:00.000Z"
+        ), f"Esperado data mais recente, recebido: {data_salva}"
