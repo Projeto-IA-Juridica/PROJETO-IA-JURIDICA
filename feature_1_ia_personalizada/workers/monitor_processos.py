@@ -23,7 +23,10 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import (
     LegalDataCleaner as DataCleaner,
 )
-from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
+from feature_1_ia_personalizada.services.legal_data.datajud_client import (
+    DataJudClient,
+    _parse_iso_dt,
+)
 from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ScoreRiscoCalculator,
 )
@@ -86,6 +89,33 @@ def extrair_texto_e_data_do_andamento(
     return str(texto), converter_para_iso(data)
 
 
+def _filtrar_andamentos_por_data(
+    andamentos: list[Any],
+    data_referencia_iso: Any,
+) -> list[Any]:
+    """Aplica o mesmo filtro de data de buscar_novos_andamentos ao cache.
+
+    O cache compartilhado (orchestrator + worker) contém TODOS os movimentos
+    sem filtro. Sem esta função, o worker re-notificaria andamentos já vistos
+    toda vez que houvesse um cache hit do orchestrator.
+    """
+    if not data_referencia_iso:
+        return andamentos
+    ref_dt = _parse_iso_dt(str(data_referencia_iso))
+    if ref_dt is None:
+        return andamentos
+
+    filtrados = []
+    for a in andamentos:
+        data_hora = extrair_valor(a, "data", None)
+        if data_hora:
+            mov_dt = _parse_iso_dt(str(data_hora))
+            if mov_dt and mov_dt <= ref_dt:
+                continue
+        filtrados.append(a)
+    return filtrados
+
+
 @_datajud_breaker
 def buscar_andamentos_datajud(
     numero_processo: str,
@@ -107,10 +137,15 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     polo_cliente = dados_processo.get("polo_cliente") or "autor"
 
     # 1️⃣ Buscar andamentos: Redis (cache) → DataJud (fallback)
+    # O cache é compartilhado com o orchestrator, que salva TODOS os movimentos
+    # sem filtro de data. O worker DEVE aplicar o filtro ao ler do cache para
+    # evitar re-notificar movimentos já vistos (falso positivo).
     fonte_utilizada = "cache"
-    lista_andamentos = get_andamentos_sync(numero_processo)
+    raw_cache = get_andamentos_sync(numero_processo)
 
-    if lista_andamentos is None:
+    if raw_cache is not None:
+        lista_andamentos = _filtrar_andamentos_por_data(raw_cache, data_ultimo_andamento_salvo)
+    else:
         cliente_datajud = DataJudClient(api_key=settings.DATAJUD_API_KEY)
         fonte_utilizada = "datajud"
         lista_andamentos = buscar_andamentos_datajud(
@@ -131,8 +166,9 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         }
 
     quantidade_novos = 0
-    ultima_data_encontrada = None
-    ultimo_texto_limpo = None
+    ultima_data_encontrada: str | None = None
+    _ultima_data_dt: datetime | None = None  # para comparação correta com timezone
+    ultimo_texto_limpo: str | None = None
 
     state_manager = ProcessoStateManager()
 
@@ -159,8 +195,16 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         )
 
         quantidade_novos += 1
-        ultima_data_encontrada = data_iso
         ultimo_texto_limpo = texto_limpo
+
+        # Mantém a data MAIS RECENTE entre todos os andamentos do ciclo.
+        # DataJud não garante ordem; sobrescrever a cada iteração salvaria a
+        # data mais ANTIGA, fazendo o próximo ciclo re-processar os mesmos andamentos.
+        if data_iso:
+            mov_dt = _parse_iso_dt(data_iso)
+            if mov_dt and (_ultima_data_dt is None or mov_dt > _ultima_data_dt):
+                _ultima_data_dt = mov_dt
+                ultima_data_encontrada = data_iso
 
     # 2️⃣ Atualizar banco e recalcular score em paralelo — operações independentes entre si.
     # ThreadPoolExecutor: seguro porque cada função usa sua própria sessão síncrona de DB.
