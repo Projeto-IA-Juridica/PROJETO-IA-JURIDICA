@@ -83,7 +83,7 @@ async def node_buscar_dados(state: ConversationState, deps: NodeDeps) -> dict[st
                 contexto_rag = ""
 
         ultimo_andamento = (
-            andamentos[0].get("descricao", "")
+            andamentos[0].get("texto", "")
             if andamentos
             else (processo.ultimo_andamento or "sem movimentação recente")
         )
@@ -105,9 +105,9 @@ async def node_buscar_dados(state: ConversationState, deps: NodeDeps) -> dict[st
                 glossario_andamento[termo] = trad.split("\n\n")[0]
 
         andamentos_recentes = [
-            {"descricao": a.get("descricao", ""), "data": a.get("data", "")}
+            {"descricao": a.get("texto", ""), "data": a.get("data", "")}
             for a in andamentos[:5]
-            if a.get("descricao")
+            if a.get("texto")
         ]
         outros_processos = [
             {"numero_cnj": p.numero_cnj, "tipo_acao": getattr(p, "tipo_acao", None) or "N/D"}

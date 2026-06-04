@@ -16,6 +16,7 @@ O índice do tribunal é derivado dos campos J e TT do número CNJ:
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -88,6 +89,20 @@ class DataJudClientError(Exception):
     """Exceção para erros originários da API Pública do CNJ / DataJud."""
 
     pass
+
+
+def _parse_iso_dt(iso_str: str | None) -> datetime | None:
+    """Converte string ISO 8601 (Z ou +HH:MM) em datetime timezone-aware.
+
+    Necessário porque DataJud retorna .000Z e o banco pode persistir +00:00,
+    tornando a comparação lexicográfica incorreta quando há milissegundos.
+    """
+    if not iso_str:
+        return None
+    try:
+        return datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _normalizar_cnj(numero_cnj: str) -> str:
@@ -234,6 +249,11 @@ class DataJudClient:
         movimentos = hits[0].get("_source", {}).get("movimentos", [])
         andamentos = []
 
+        # Converte a referência para datetime para comparação correta entre formatos
+        # ISO 8601: DataJud usa .000Z, banco pode persistir +00:00 sem milissegundos.
+        # Comparação lexicográfica falha nesses casos — datetime resolve corretamente.
+        ref_dt = _parse_iso_dt(data_referencia_iso)
+
         for m in movimentos:
             nome = m.get("nome", "")
             complementos = m.get("complementosTabelados", [])
@@ -247,8 +267,10 @@ class DataJudClient:
             data_hora = m.get("dataHora")
 
             # Exclui movimentos anteriores ou iguais ao último andamento salvo
-            if data_referencia_iso and data_hora and data_hora <= data_referencia_iso:
-                continue
+            if ref_dt and data_hora:
+                mov_dt = _parse_iso_dt(data_hora)
+                if mov_dt and mov_dt <= ref_dt:
+                    continue
 
             andamentos.append({"texto": nome, "data": data_hora})
 
@@ -287,7 +309,7 @@ class DataJudClient:
                 )
                 if valores:
                     nome = f"{nome}: {valores}"
-            andamentos.append({"descricao": nome, "data": m.get("dataHora")})
+            andamentos.append({"texto": nome, "data": m.get("dataHora")})
 
         logger.info("datajud_async_andamentos", cnj=numero_cnj, total=len(andamentos))
         return andamentos

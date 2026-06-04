@@ -158,3 +158,109 @@ class TestDataJudClientError:
 
     def test_herda_de_exception(self):
         assert issubclass(DataJudClientError, Exception)
+
+
+class TestBuscarNovosAndamentos:
+    """Testes para filtragem de andamentos e normalização de timezone."""
+
+    def _make_movimentos(self) -> list[dict]:
+        return [
+            {"nome": "Sentença", "dataHora": "2024-03-15T10:00:00.000Z"},
+            {"nome": "Despacho", "dataHora": "2024-02-01T08:00:00.000Z"},
+            {"nome": "Distribuído", "dataHora": "2024-01-10T09:00:00.000Z"},
+            {"nome": "Sem data", "dataHora": None},
+        ]
+
+    def _payload_com_movimentos(self, movimentos: list[dict]) -> dict:
+        return {
+            "hits": {
+                "hits": [{"_source": {"movimentos": movimentos}}],
+                "total": {"value": 1},
+            }
+        }
+
+    def test_sem_referencia_retorna_todos(self):
+        client = DataJudClient()
+        movimentos = self._make_movimentos()
+        with patch.object(
+            client,
+            "consultar_processo",
+            return_value=self._payload_com_movimentos(movimentos),
+        ):
+            import asyncio
+
+            with patch(
+                "feature_1_ia_personalizada.services.legal_data.datajud_client._datajud_cb"
+            ) as cb_mock:
+                cb_mock.call.side_effect = lambda fn, *args: asyncio.run(*args)
+                result = client.buscar_novos_andamentos(_CNJ_TJSP)
+        assert len(result) == 4  # inclui o sem data
+
+    def test_referencia_Z_filtra_corretamente(self):
+        client = DataJudClient()
+        movimentos = self._make_movimentos()
+        with patch.object(
+            client,
+            "consultar_processo",
+            return_value=self._payload_com_movimentos(movimentos),
+        ):
+            import asyncio
+
+            with patch(
+                "feature_1_ia_personalizada.services.legal_data.datajud_client._datajud_cb"
+            ) as cb_mock:
+                cb_mock.call.side_effect = lambda fn, *args: asyncio.run(*args)
+                result = client.buscar_novos_andamentos(
+                    _CNJ_TJSP, data_referencia_iso="2024-02-01T08:00:00.000Z"
+                )
+        nomes = [a["texto"] for a in result]
+        assert "Sentença" in nomes
+        assert "Despacho" not in nomes  # igual à referência → excluído
+        assert "Sem data" in nomes  # sem data → sempre inclui
+
+    def test_timezone_Z_vs_utc_offset_nao_gera_falso_positivo(self):
+        """Mesmo instante representado com Z e +00:00 não deve gerar falso positivo."""
+        client = DataJudClient()
+        movimentos = [
+            {"nome": "Despacho", "dataHora": "2024-02-01T08:00:00.000Z"},
+        ]
+        with patch.object(
+            client,
+            "consultar_processo",
+            return_value=self._payload_com_movimentos(movimentos),
+        ):
+            import asyncio
+
+            with patch(
+                "feature_1_ia_personalizada.services.legal_data.datajud_client._datajud_cb"
+            ) as cb_mock:
+                cb_mock.call.side_effect = lambda fn, *args: asyncio.run(*args)
+                # Referência em +00:00 — mesmo instante que .000Z
+                result = client.buscar_novos_andamentos(
+                    _CNJ_TJSP, data_referencia_iso="2024-02-01T08:00:00+00:00"
+                )
+        assert result == [], f"Falso positivo: {result}"
+
+    def test_andamentos_retornam_chave_texto(self):
+        """buscar_novos_andamentos e buscar_andamentos_async devem usar a mesma chave 'texto'."""
+        client = DataJudClient()
+        movimentos = [{"nome": "Audiência", "dataHora": "2024-05-10T09:00:00.000Z"}]
+        with patch.object(
+            client,
+            "consultar_processo",
+            return_value=self._payload_com_movimentos(movimentos),
+        ):
+            import asyncio
+
+            with patch(
+                "feature_1_ia_personalizada.services.legal_data.datajud_client._datajud_cb"
+            ) as cb_mock:
+                cb_mock.call.side_effect = lambda fn, *args: asyncio.run(*args)
+                sync_result = client.buscar_novos_andamentos(_CNJ_TJSP)
+
+            async_result = asyncio.run(client.buscar_andamentos_async(_CNJ_TJSP))
+
+        assert "texto" in sync_result[0], "buscar_novos_andamentos deve retornar chave 'texto'"
+        assert "texto" in async_result[0], "buscar_andamentos_async deve retornar chave 'texto'"
+        assert "descricao" not in sync_result[0]
+        assert "descricao" not in async_result[0]

@@ -19,7 +19,7 @@ class DataJudRealClient:
         # mas o alias '_all' busca em todos os índices disponíveis na API pública para pesquisa estruturada)
         self.base_url = "https://api-publica.datajud.cnj.jus.br/api_publica_"
         self.headers = {
-            "Authorization": f"APIKey {self.api_key}",
+            "Authorization": f"ApiKey {self.api_key}",
             "Content-Type": "application/json",
         }
 
