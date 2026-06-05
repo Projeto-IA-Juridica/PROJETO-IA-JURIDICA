@@ -203,7 +203,7 @@ function ArchLogo() {
     <img
       src="/logo.png"
       alt="amicus"
-      style={{ display: 'block', margin: '0 auto 16px', width: 56, height: 56, objectFit: 'contain' }}
+      style={{ display: 'block', margin: '0 auto 20px', width: 84, height: 84, objectFit: 'contain' }}
     />
   )
 }
