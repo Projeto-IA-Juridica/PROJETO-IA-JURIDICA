@@ -51,7 +51,7 @@
     /* HERO — fundo branco quadriculado */
     .hero{min-height:100vh;display:flex;align-items:center;padding:100px 0 80px;position:relative;overflow:hidden;background-color:#D8E8F5;background-image:linear-gradient(rgba(58,122,184,.45) 1px,transparent 1px),linear-gradient(90deg,rgba(58,122,184,.45) 1px,transparent 1px);background-size:52px 52px}
     .hero::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 65% 75% at 28% 50%,rgba(255,255,255,.88) 0%,rgba(255,255,255,.45) 55%,transparent 100%);pointer-events:none;z-index:1}
-    #hero-canvas{display:none}
+    #hero-canvas{display:block;position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
     .hero-orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(90px);z-index:2}
     .orb1{width:700px;height:700px;background:radial-gradient(circle,rgba(18,72,190,.09) 0%,transparent 70%);top:-200px;right:-150px;animation:float1 14s ease-in-out infinite alternate}
     .orb2{width:500px;height:500px;background:radial-gradient(circle,rgba(58,122,184,.07) 0%,transparent 70%);bottom:-100px;left:-100px;animation:float2 10s ease-in-out infinite alternate}
@@ -384,15 +384,24 @@
     .pbtn-dark{background:rgba(58,122,184,.15);color:var(--blue-light);border:1px solid rgba(58,122,184,.3)}
     .pbtn-dark:hover{background:rgba(58,122,184,.25)}
     .pbtn-muted{background:transparent;color:var(--secondary);border:1.5px solid var(--border-s)}
-    .value-note{margin-top:32px;padding:18px 24px;background:var(--white);border-radius:14px;border:1px solid var(--border-s);display:flex;align-items:center;gap:12px}
-    .value-note p{font-size:.81rem;color:var(--secondary);line-height:1.55}
-    .value-note strong{color:var(--ink)}
+    /* VALUE NOTE — glass card com glow */
+    .value-note{margin-top:32px;padding:22px 28px;background:rgba(10,18,38,.72);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:16px;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:16px;position:relative;overflow:hidden;box-shadow:0 0 0 1px rgba(18,72,190,.2),0 20px 60px rgba(12,30,48,.4)}
+    .value-note::before{content:'';position:absolute;width:280px;height:280px;background:radial-gradient(circle,rgba(18,72,190,.35) 0%,transparent 65%);top:-120px;right:60px;pointer-events:none}
+    .value-note::after{content:'';position:absolute;width:180px;height:180px;background:radial-gradient(circle,rgba(26,158,120,.2) 0%,transparent 65%);bottom:-80px;left:40px;pointer-events:none}
+    .value-note svg{color:#4AE0B0;flex-shrink:0;position:relative;z-index:1}
+    .value-note p{font-size:.83rem;color:rgba(255,255,255,.7);line-height:1.65;position:relative;z-index:1}
+    .value-note strong{color:#fff}
 
-    /* COMPLIANCE */
-    .compliance{background:var(--blue-pale);padding:44px 0;border-top:1px solid var(--border-s);border-bottom:1px solid var(--border-s)}
-    .comp-inner{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
-    .comp-item{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--white);border-radius:10px;border:1px solid var(--border-s);font-size:.78rem;font-weight:600;color:var(--secondary)}
-    .comp-item svg{color:var(--green)}
+    /* COMPLIANCE — dark mesh gradient */
+    .compliance{background:#060c18;padding:40px 0;position:relative;overflow:hidden}
+    .compliance::before{content:'';position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(18,72,190,.22) 0%,transparent 60%);top:-250px;left:15%;pointer-events:none}
+    .compliance::after{content:'';position:absolute;width:400px;height:400px;background:radial-gradient(circle,rgba(26,158,120,.15) 0%,transparent 60%);bottom:-200px;right:20%;pointer-events:none}
+    .comp-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+    .comp-inner{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+    .comp-item{display:flex;align-items:center;gap:8px;padding:12px 28px;background:none;border:none;border-right:1px solid rgba(255,255,255,.07);font-size:.78rem;font-weight:600;color:rgba(255,255,255,.55);letter-spacing:.01em;transition:color .2s}
+    .comp-item:last-child{border-right:none}
+    .comp-item:hover{color:rgba(255,255,255,.85)}
+    .comp-item svg{color:#4AE0B0;flex-shrink:0}
 
     /* CTA */
     .cta-section{background:linear-gradient(140deg,#0C1E30 0%,#1248BE 55%,#1A4ED8 100%);padding:100px 0;text-align:center;position:relative;overflow:hidden}
@@ -1216,6 +1225,7 @@
 <!-- COMPLIANCE -->
 <div class="compliance">
   <div class="wrap">
+    <div class="comp-grid"></div>
     <div class="comp-inner">
       <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>OAB Provimento 205/2021</div>
       <div class="comp-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>LGPD by Design</div>
@@ -1278,45 +1288,62 @@
 </footer>
 
 <script>
-  // Wave canvas — igual ao login/hub
+  // Partículas geométricas — inspirado no Dala
   ;(function() {
     const cv = document.getElementById('hero-canvas')
     if (!cv) return
     const cx = cv.getContext('2d')
-    let t = 0, raf
-    const LINES = 55
-    const waves = [
-      { A: 50, f: 0.0030, s: 0.010, p: 0.0 },
-      { A: 32, f: 0.0054, s: 0.016, p: 1.4 },
-      { A: 20, f: 0.0090, s: 0.023, p: 2.9 },
-      { A: 12, f: 0.0140, s: 0.019, p: 0.8 },
-    ]
-    function lerp(a,b,n){return Math.round(a+(b-a)*n)}
-    function resize(){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight}
+    function resize() { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight }
     resize()
     window.addEventListener('resize', resize)
-    function loop(){
+
+    const COLORS = ['#1248BE','#2A6ADA','#3A7AB8','#A8C8E8','#6AAEE8','#1A4ED8']
+    const rand = (a,b) => Math.random()*(b-a)+a
+    const N = 65
+    const particles = []
+
+    function rotate(pts, cos, sin, ox, oy) {
+      return pts.map(([px,py]) => [px*cos - py*sin + ox, px*sin + py*cos + oy])
+    }
+
+    for (let i = 0; i < N; i++) {
+      particles.push({
+        x: rand(0, window.innerWidth), y: rand(0, window.innerHeight),
+        vx: rand(-.2,.2), vy: rand(-.2,.2),
+        rot: rand(0, Math.PI*2), rs: rand(-.007,.007),
+        size: rand(5,18),
+        color: COLORS[Math.floor(Math.random()*COLORS.length)],
+        alpha: rand(.06,.22),
+        type: Math.random()>.45 ? 'tri' : 'dia',
+        filled: Math.random()>.65
+      })
+    }
+
+    function drawShape(p) {
+      const s=p.size, cos=Math.cos(p.rot), sin=Math.sin(p.rot)
+      const raw = p.type==='tri'
+        ? [[0,-s],[s*.866,s*.5],[-s*.866,s*.5]]
+        : [[0,-s],[s*.55,0],[0,s],[-s*.55,0]]
+      const pts = rotate(raw, cos, sin, p.x, p.y)
+      cx.beginPath()
+      pts.forEach(([x,y],i) => i===0 ? cx.moveTo(x,y) : cx.lineTo(x,y))
+      cx.closePath()
+      cx.globalAlpha = p.alpha
+      if (p.filled) { cx.fillStyle = p.color; cx.fill() }
+      else { cx.strokeStyle = p.color; cx.lineWidth = 1; cx.stroke() }
+    }
+
+    function loop() {
       const W=cv.width, H=cv.height
       cx.clearRect(0,0,W,H)
-      for(let i=0;i<LINES;i++){
-        const frac=i/(LINES-1)
-        const baseY=frac*H
-        const mid=Math.abs(frac-.5)*2
-        const n2=frac<.5?frac*2:(1-frac)*2
-        cx.beginPath()
-        cx.strokeStyle=`rgb(${lerp(234,58,n2)},${lerp(242,122,n2)},${lerp(250,184,n2)})`
-        cx.globalAlpha=0.09+(1-mid)*0.26
-        cx.lineWidth=0.35+(1-mid)*0.85
-        for(let x=0;x<=W;x+=3){
-          let dy=0
-          waves.forEach(w=>{dy+=w.A*Math.sin(x*w.f+t*w.s+i*0.19+w.p)})
-          x===0?cx.moveTo(x,baseY+dy):cx.lineTo(x,baseY+dy)
-        }
-        cx.stroke()
+      for (const p of particles) {
+        p.x+=p.vx; p.y+=p.vy; p.rot+=p.rs
+        if(p.x<-30)p.x=W+30; if(p.x>W+30)p.x=-30
+        if(p.y<-30)p.y=H+30; if(p.y>H+30)p.y=-30
+        drawShape(p)
       }
       cx.globalAlpha=1
-      t+=0.5
-      raf=requestAnimationFrame(loop)
+      requestAnimationFrame(loop)
     }
     loop()
   })()
