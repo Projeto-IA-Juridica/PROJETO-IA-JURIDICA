@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
@@ -187,7 +188,8 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
         espera = segundos_ate_proximo_horario(momento)
         raise self.retry(countdown=espera)
 
-    chave_bloqueio = chave_limite("bloqueio_andamento", id_processo, hash(descricao_andamento))
+    _desc_hash = hashlib.sha256(descricao_andamento.encode()).hexdigest()[:16]
+    chave_bloqueio = chave_limite("bloqueio_andamento", id_processo, _desc_hash)
     if not adquirir_bloqueio(chave_bloqueio, TEMPO_5_MINUTOS):
         return {"status": "ignorado"}
 
