@@ -267,7 +267,8 @@ class AdvogadoAutenticado(HttpUser):
             name="/chat/history/{cliente_id}",
             catch_response=True,
         ) as resp:
-            if resp.status_code in (200, 401, 403, 404):
+            if resp.status_code in (200, 401, 403, 404, 429):
+                # 429: em CI todos os VUs usam o mesmo user_id → bucket único, rate limit esperado
                 resp.success()
             else:
                 resp.failure(f"HTTP {resp.status_code}")
@@ -283,7 +284,7 @@ class AdvogadoAutenticado(HttpUser):
             name="/chat/stats/dashboard",
             catch_response=True,
         ) as resp:
-            if resp.status_code in (200, 401, 403):
+            if resp.status_code in (200, 401, 403, 429):
                 resp.success()
             else:
                 resp.failure(f"HTTP {resp.status_code}")
@@ -306,7 +307,7 @@ class AdvogadoAutenticado(HttpUser):
             name="/chat/send/{cliente_id}",
             catch_response=True,
         ) as resp:
-            if resp.status_code in (202, 401, 403, 404):
+            if resp.status_code in (202, 401, 403, 404, 429):
                 resp.success()
             else:
                 resp.failure(f"HTTP {resp.status_code}")
