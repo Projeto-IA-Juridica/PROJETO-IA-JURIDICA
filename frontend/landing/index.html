@@ -7,6 +7,7 @@
   <meta name="description" content="Assistente de IA para escritórios de advocacia. Atenda clientes no WhatsApp 24h, monitore processos e capte leads qualificados." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cormorant+Garamond:wght@400;500;600&display=swap" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <style>
     :root {
       --bg:#F4F8FC; --surface:#EAF2FA; --white:#FFFFFF;
@@ -74,6 +75,10 @@
     .hero-stats>div:first-child{padding-left:0}
     .stat-val{font-size:2rem;font-weight:800;color:var(--ink);letter-spacing:-.04em;line-height:1}
     .stat-lbl{font-size:.71rem;color:var(--secondary);margin-top:6px;line-height:1.4}
+
+    /* BRAIN CONTAINER */
+    #brain-container{width:100%;height:500px;position:relative;cursor:grab}
+    #brain-container canvas{display:block;width:100%!important;height:100%!important}
 
     /* MOCKUP HERO — WhatsApp */
     .mockup-wrap{position:relative;z-index:2;animation:floatPhone 7s ease-in-out infinite alternate}
@@ -524,55 +529,9 @@
           <div><div class="stat-val">30min</div><div class="stat-lbl">para estar operacional</div></div>
         </div>
       </div>
-      <!-- WhatsApp Mockup -->
+      <!-- Brain Particles -->
       <div class="hero-right">
-        <div class="mockup-wrap">
-          <div class="mockup-glow"></div>
-          <div class="mockup-phone">
-            <!-- WhatsApp header -->
-            <div class="wa-header">
-              <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M8 1L1.5 7.5L8 14" stroke="rgba(255,255,255,.65)" stroke-width="1.6" stroke-linecap="round"/></svg>
-              <div class="wa-avatar-wrap">
-                <div class="wa-avatar">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,.92)"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
-                </div>
-              </div>
-              <div class="wa-info">
-                <div class="wa-name">Camila · amicus</div>
-                <div class="wa-status">online</div>
-              </div>
-              <div class="wa-action-icons">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="rgba(255,255,255,.5)"/><circle cx="12" cy="12" r="1" fill="rgba(255,255,255,.5)"/><circle cx="12" cy="19" r="1" fill="rgba(255,255,255,.5)"/></svg>
-              </div>
-            </div>
-            <!-- Chat -->
-            <div class="wa-chat">
-              <div class="wa-msg wa-msg-out m1">
-                Tem novidade no meu processo?
-                <div class="wa-msg-time">09:41 <span class="wa-ticks">✓✓</span></div>
-              </div>
-              <div class="wa-msg wa-msg-in m2">
-                <div class="wa-msg-sender">Camila · amicus</div>
-                Olá, João! Há uma movimentação nova: o juiz proferiu despacho ordenando a citação da parte contrária. Seu processo segue normalmente. Alguma dúvida?
-                <div class="wa-msg-time">09:42</div>
-              </div>
-              <div class="wa-msg wa-msg-out m3">
-                O que significa "citação"?
-                <div class="wa-msg-time">09:43 <span class="wa-ticks">✓</span></div>
-              </div>
-              <div class="wa-typing" style="animation:msgin .4s 2.2s both;opacity:0">
-                <span class="td"></span><span class="td"></span><span class="td"></span>
-              </div>
-            </div>
-            <!-- Input -->
-            <div class="wa-input-bar">
-              <div class="wa-emoji-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8696A0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 13.5s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9.5" r="1" fill="#8696A0"/><circle cx="15" cy="9.5" r="1" fill="#8696A0"/></svg></div>
-              <div class="wa-input-box">Mensagem</div>
-              <div class="wa-send-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
-            </div>
-          </div>
-        </div>
+        <div id="brain-container"></div>
       </div>
     </div>
   </div>
@@ -1476,6 +1435,111 @@
     }, { threshold: 0.5 })
     secObs.observe(statsSec)
   }
+
+  // Brain Three.js — inspirado no Dala
+  ;(function() {
+    if (typeof THREE === 'undefined') return
+    const container = document.getElementById('brain-container')
+    if (!container) return
+
+    const W = container.offsetWidth || 480
+    const H = container.offsetHeight || 500
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+    renderer.setSize(W, H)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setClearColor(0x000000, 0)
+    container.appendChild(renderer.domElement)
+
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 100)
+    camera.position.z = 3.6
+
+    const N = 6000
+    const pos = new Float32Array(N * 3)
+    const col = new Float32Array(N * 3)
+
+    // Paleta: azuis + acentos amber/teal/roxo
+    const palette = [
+      [0.07, 0.28, 0.75],  // #1248BE
+      [0.16, 0.42, 0.85],  // #2A6ADA
+      [0.23, 0.48, 0.72],  // #3A7AB8
+      [0.66, 0.79, 0.91],  // #A8C8E8
+      [0.91, 0.63, 0.13],  // amber
+      [0.29, 0.88, 0.69],  // teal
+      [0.42, 0.29, 0.88],  // roxo
+      [1.00, 1.00, 1.00],  // branco
+    ]
+
+    for (let i = 0; i < N; i++) {
+      // Shell distribution — maioria na superfície
+      const onShell = Math.random() > 0.12
+      const r = onShell ? 1.0 + (Math.random() - 0.5) * 0.14 : Math.random() * 0.85
+
+      // Dois hemisférios levemente separados
+      const side = i < N * 0.5 ? -0.26 : 0.26
+
+      const phi = Math.acos(2 * Math.random() - 1)
+      const theta = Math.random() * Math.PI * 2
+
+      pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta) + side
+      pos[i * 3 + 1] = r * Math.cos(phi) * 0.78
+      pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) * 0.90
+
+      // Cor por posição + aleatório
+      const rnd = Math.random()
+      let c
+      if      (rnd < 0.04) c = palette[4] // amber
+      else if (rnd < 0.08) c = palette[5] // teal
+      else if (rnd < 0.11) c = palette[6] // roxo
+      else if (rnd < 0.13) c = palette[7] // branco
+      else {
+        const h = (pos[i * 3 + 1] + 0.8) / 1.6
+        if      (h > 0.65) c = palette[2]
+        else if (h > 0.35) c = palette[1]
+        else               c = palette[0]
+      }
+      col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2]
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3))
+
+    const mat = new THREE.PointsMaterial({
+      size: 0.020,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.88,
+      sizeAttenuation: true,
+    })
+
+    const brain = new THREE.Points(geo, mat)
+    scene.add(brain)
+
+    // Mouse parallax
+    let tX = 0, tY = 0, autoY = 0
+    document.addEventListener('mousemove', e => {
+      tX = (e.clientY / window.innerHeight - 0.5) * 0.5
+      tY = (e.clientX / window.innerWidth  - 0.5) * 0.8
+    })
+
+    ;(function loop() {
+      requestAnimationFrame(loop)
+      autoY += 0.004
+      brain.rotation.y = autoY + tY * 0.4
+      brain.rotation.x += (tX * 0.4 - brain.rotation.x) * 0.04
+      renderer.render(scene, camera)
+    })()
+
+    window.addEventListener('resize', () => {
+      const nW = container.offsetWidth
+      const nH = container.offsetHeight
+      camera.aspect = nW / nH
+      camera.updateProjectionMatrix()
+      renderer.setSize(nW, nH)
+    })
+  })()
 </script>
 </body>
 </html>
