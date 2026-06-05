@@ -1455,11 +1455,10 @@
     const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 100)
     camera.position.z = 3.6
 
-    const N = 6000
+    const N = 9000
     const pos = new Float32Array(N * 3)
     const col = new Float32Array(N * 3)
 
-    // Paleta: azuis + acentos amber/teal/roxo
     const palette = [
       [0.07, 0.28, 0.75],  // #1248BE
       [0.16, 0.42, 0.85],  // #2A6ADA
@@ -1472,34 +1471,52 @@
     ]
 
     for (let i = 0; i < N; i++) {
-      // Shell distribution — maioria na superfície
-      const onShell = Math.random() > 0.12
-      const r = onShell ? 1.0 + (Math.random() - 0.5) * 0.14 : Math.random() * 0.85
-
-      // Dois hemisférios levemente separados
-      const side = i < N * 0.5 ? -0.26 : 0.26
-
-      const phi = Math.acos(2 * Math.random() - 1)
+      const phi   = Math.acos(2 * Math.random() - 1)
       const theta = Math.random() * Math.PI * 2
+      const sinP  = Math.sin(phi), cosP = Math.cos(phi)
+      const cosT  = Math.cos(theta), sinT = Math.sin(theta)
 
-      pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta) + side
-      pos[i * 3 + 1] = r * Math.cos(phi) * 0.78
-      pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) * 0.90
+      // Ruído sinusoidal multicamada para giros cerebrais
+      const gyri = 1
+        + 0.13 * Math.sin(5*phi)     * Math.cos(4*theta)
+        + 0.09 * Math.sin(9*phi+.5)  * Math.cos(8*theta+1.2)
+        + 0.06 * Math.cos(7*phi)     * Math.sin(6*theta+.8)
+        + 0.04 * Math.sin(14*phi+1.5)* Math.cos(12*theta)
+        + 0.02 * Math.sin(20*phi)    * Math.cos(18*theta+2.1)
 
-      // Cor por posição + aleatório
+      const r = Math.random() > .1 ? gyri : Math.random() * .65
+
+      // Elipsoide: mais largo que alto
+      let x = 1.1  * r * sinP * cosT
+      let y = 0.83 * r * cosP
+      let z = 0.95 * r * sinP * sinT
+
+      // Separar hemisférios
+      x += x > 0 ? 0.24 : -0.24
+
+      // Fissura longitudinal: deprimir y perto do centro no topo
+      const absX = Math.abs(x)
+      if (absX < 0.42 && y > 0) {
+        const g = (0.42 - absX) / 0.42
+        y -= g * g * 0.55
+      }
+
+      // Achatar base
+      if (y < 0) y *= 0.68
+
+      pos[i*3] = x; pos[i*3+1] = y; pos[i*3+2] = z
+
       const rnd = Math.random()
       let c
-      if      (rnd < 0.04) c = palette[4] // amber
-      else if (rnd < 0.08) c = palette[5] // teal
-      else if (rnd < 0.11) c = palette[6] // roxo
-      else if (rnd < 0.13) c = palette[7] // branco
+      if      (rnd < 0.05) c = palette[4]
+      else if (rnd < 0.09) c = palette[5]
+      else if (rnd < 0.12) c = palette[6]
+      else if (rnd < 0.14) c = palette[7]
       else {
-        const h = (pos[i * 3 + 1] + 0.8) / 1.6
-        if      (h > 0.65) c = palette[2]
-        else if (h > 0.35) c = palette[1]
-        else               c = palette[0]
+        const h = (y + 0.8) / 1.5
+        c = h > 0.6 ? palette[2] : h > 0.3 ? palette[1] : palette[0]
       }
-      col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2]
+      col[i*3] = c[0]; col[i*3+1] = c[1]; col[i*3+2] = c[2]
     }
 
     const geo = new THREE.BufferGeometry()
