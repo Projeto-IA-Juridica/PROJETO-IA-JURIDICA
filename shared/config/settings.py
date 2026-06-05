@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: list[str] = [
         "https://app.conciergejuridico.com",
         "https://admin.conciergejuridico.com",
-        "projeto-ia-juridica-production-4bb1.up.railway.app",
+        "https://projeto-ia-juridica-production-4bb1.up.railway.app",
     ]
 
     APP_NAME: str = "Concierge Jurídico Digital"
