@@ -181,7 +181,9 @@ async def processar_csv(
             )
             continue
 
-        cpf_para_salvar = cpf_raw if cpf_raw else f"sem_cpf_{telefone}"
+        # Para não estourar a coluna VARCHAR(100) do banco de dados (Fernet string > 100 se input > 15 chars),
+        # salvamos o CPF apenas com dígitos (11 chars) e usamos um CPF zerado para quem não tem.
+        cpf_para_salvar = re.sub(r"\D", "", cpf_raw) if cpf_raw else "00000000000"
         cpf_criptografado = criptografar(cpf_para_salvar)
 
         data_nasc = _parsear_data(row_norm.get("data_nascimento", ""))
