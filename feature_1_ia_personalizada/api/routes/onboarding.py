@@ -461,13 +461,28 @@ async def import_processos(
             status_code=400,
             detail="Erro de encoding no arquivo. Salve o CSV com encoding UTF-8.",
         ) from exc
+    except Exception as exc:
+        import traceback
+        tb = traceback.format_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro fatal: {str(exc)}\nTraceback: {tb}"
+        ) from exc
 
     # Avança etapa somente em importação real
     if not preview:
         escritorio = await db.get(Escritorio, escritorio_id)
         if escritorio and (escritorio.onboarding_etapa or 0) < 2:
             escritorio.onboarding_etapa = 2
-        await db.commit()
+        try:
+            await db.commit()
+        except Exception as exc:
+            import traceback
+            tb = traceback.format_exc()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro fatal no commit: {str(exc)}\nTraceback: {tb}"
+            ) from exc
 
     logger.info("onboarding_import_processos", escritorio_id=escritorio_id, preview=preview)
     return {"etapa": 2 if not preview else None, **resultado}
