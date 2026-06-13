@@ -467,7 +467,7 @@ async def import_processos(
         escritorio = await db.get(Escritorio, escritorio_id)
         if escritorio and (escritorio.onboarding_etapa or 0) < 2:
             escritorio.onboarding_etapa = 2
-            await db.commit()
+        await db.commit()
 
     logger.info("onboarding_import_processos", escritorio_id=escritorio_id, preview=preview)
     return {"etapa": 2 if not preview else None, **resultado}

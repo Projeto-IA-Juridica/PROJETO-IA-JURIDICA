@@ -101,6 +101,8 @@ async def importar_clientes(
             db=db,
             preview=preview,
         )
+        if not preview:
+            await db.commit()
     except UnicodeDecodeError as exc:
         raise HTTPException(
             status_code=400,

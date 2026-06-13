@@ -304,6 +304,7 @@ async def processar_csv(
                 )
                 db.add(novo_processo)
                 processos_novos += 1
+                await db.flush()
 
     if not preview:
         await db.flush()
