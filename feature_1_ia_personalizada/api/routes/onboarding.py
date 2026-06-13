@@ -257,11 +257,20 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     # Idempotência — CNPJ único
     stmt_cnpj = select(Escritorio).where(Escritorio.cnpj == body.cnpj)
-    existente = (await db.execute(stmt_cnpj)).scalars().first()
-    if existente:
+    existente_cnpj = (await db.execute(stmt_cnpj)).scalars().first()
+    if existente_cnpj:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="CNPJ já cadastrado. Faça login em /auth/login.",
+        )
+
+    # Idempotência — E-mail único
+    stmt_email = select(Usuario).where(Usuario.email == body.email_admin)
+    existente_email = (await db.execute(stmt_email)).scalars().first()
+    if existente_email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="E-mail já cadastrado. Faça login em /auth/login ou use outro e-mail.",
         )
 
     # Aplica limites de trial — o webhook Stripe atualiza para o plano completo ao converter
