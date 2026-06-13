@@ -859,7 +859,7 @@ function StepImport({ csvFile, setCsvFile, importDone, setImportDone }: StepImpo
       )}
 
       <InfoBox>
-        CSV com colunas: <strong>nome</strong>, <strong>telefone_whatsapp</strong> e (opcional) <strong>numero_processo</strong>.
+        CSV com colunas: <strong>nome</strong>, <strong>telefone</strong> e (opcional) <strong>numero_processo</strong>.
       </InfoBox>
     </>
   )
