@@ -129,6 +129,7 @@ class TestRegisterEndpoint:
         mock_usuario.role = "admin"
 
         with (
+            patch("feature_1_ia_personalizada.api.routes.onboarding.select"),
             patch(
                 "feature_1_ia_personalizada.api.routes.onboarding.hash_senha", return_value="hashed"
             ),
@@ -220,6 +221,7 @@ class TestRegisterEndpoint:
                     setattr(self, k, v)
 
         with (
+            patch("feature_1_ia_personalizada.api.routes.onboarding.select"),
             patch(
                 "feature_1_ia_personalizada.api.routes.onboarding.Usuario",
                 side_effect=_CapturadorUsuario,

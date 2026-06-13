@@ -1,7 +1,9 @@
 import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy import text
 import traceback
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
 
 async def test_db():
     url = "postgresql+asyncpg://postgres.ojrrbtwivkatwitfwgao:projetoIAjuridica@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
@@ -12,9 +14,10 @@ async def test_db():
             result = await conn.execute(text("SELECT version_num FROM alembic_version;"))
             for row in result:
                 print("Alembic version:", row.version_num)
-    except Exception as e:
+    except Exception:
         print("Error:")
         traceback.print_exc()
     await engine.dispose()
+
 
 asyncio.run(test_db())
