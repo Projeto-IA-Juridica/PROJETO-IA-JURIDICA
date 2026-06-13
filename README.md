@@ -7,7 +7,7 @@
 ![Deploy](https://img.shields.io/badge/deploy-Railway-purple)
 ![Cobertura](https://img.shields.io/badge/cobertura-70%25%20mínimo-brightgreen)
 
----
+--- 
 
 ## O Problema
 

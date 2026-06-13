@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from typing import Any, Protocol
 
 import structlog
@@ -71,10 +72,15 @@ class RepositorioWhatsApp(Protocol):
 # Config de horário
 
 
+_FUSO_HORARIO_PADRAO = int(os.getenv("FUSO_HORARIO_PADRAO", "-3"))
+_HORA_INICIO_ENVIO = int(os.getenv("HORA_INICIO_ENVIO", "8"))
+_HORA_FIM_ENVIO = int(os.getenv("HORA_FIM_ENVIO", "20"))
+
+
 @dataclass(frozen=True)
 class JanelaComercial:
-    inicio: time = time(8, 0)
-    fim: time = time(18, 0)
+    inicio: time = time(_HORA_INICIO_ENVIO, 0)
+    fim: time = time(_HORA_FIM_ENVIO, 0)
 
 
 # Service
@@ -153,7 +159,7 @@ class WhatsAppService:
         Resolve instância do escritório e envia ao cliente.
         Se fora do horário comercial ou rate limit excedido, agenda (se permitir_agendamento).
         """
-        agora = datetime.now()
+        agora = datetime.now(tz=timezone(timedelta(hours=_FUSO_HORARIO_PADRAO)))
         pode, motivo_bloqueio = await self._pode_enviar_agora(cliente_id, agora)
 
         if not pode:

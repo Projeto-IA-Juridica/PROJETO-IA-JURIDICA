@@ -514,3 +514,58 @@ class TestCacheAside:
         # Lista vazia também é cacheada (is not None)
         mock_set.assert_called_once()
         assert r["novos_andamentos"] == 0
+
+    def test_cache_hit_filtra_andamentos_ja_vistos(self, fase3):
+        """Cache do orchestrator salva TODOS os movimentos sem filtro.
+
+        O worker deve aplicar filtro de data ao ler do cache para não re-notificar
+        andamentos anteriores à data_ultimo_andamento do banco (falso positivo).
+        """
+        # Cache contém 3 movimentos: 2 antigos (já vistos) + 1 novo
+        processo = {**PROCESSO, "data_ultimo_andamento": "2024-01-20T00:00:00+00:00"}
+        cache_com_todos = [
+            {"texto": "Antigo 1", "data": "2023-06-01T08:00:00.000Z"},
+            {"texto": "Antigo 2", "data": "2024-01-20T00:00:00.000Z"},  # igual à ref → excluído
+            {"texto": "Novo", "data": "2024-03-15T10:00:00.000Z"},
+        ]
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=cache_com_todos),
+            patch(f"{MODULE}.set_andamentos_sync"),
+            patch(f"{MODULE}.buscar_andamentos_datajud") as mock_api,
+            patch(f"{MODULE}.celery_app") as mock_celery,
+            patch(f"{MODULE}.update_ultimo_andamento"),
+        ):
+            r = processar_processo_individual(processo)
+
+        # API DataJud NÃO deve ser chamada (cache hit)
+        mock_api.assert_not_called()
+        # Apenas 1 andamento novo deve gerar notificação
+        assert r["novos_andamentos"] == 1
+        assert mock_celery.send_task.call_count == 1
+
+    def test_ultima_data_salva_e_a_mais_recente(self, fase3):
+        """data_ultimo_andamento no banco deve ser a data MAIS RECENTE dos andamentos
+        processados, mesmo que a ordem no array não seja a cronológica.
+
+        Bug anterior: sobrescrevia a cada iteração → salvava a data do ÚLTIMO elemento
+        (mais antigo), causando re-processamento no próximo ciclo.
+        """
+        andamentos_fora_de_ordem = [
+            {"texto": "Conclusão", "data": "2024-01-25T12:00:00.000Z"},  # mais novo
+            {"texto": "Distribuído", "data": "2024-01-10T09:00:00.000Z"},  # mais antigo
+            {"texto": "Despacho", "data": "2024-01-20T08:00:00.000Z"},  # intermediário
+        ]
+        with (
+            patch(f"{MODULE}.get_andamentos_sync", return_value=None),
+            patch(f"{MODULE}.set_andamentos_sync"),
+            patch(f"{MODULE}.buscar_andamentos_datajud", return_value=andamentos_fora_de_ordem),
+            patch(f"{MODULE}.celery_app"),
+            patch(f"{MODULE}.update_ultimo_andamento") as mock_update,
+        ):
+            processar_processo_individual(PROCESSO)
+
+        mock_update.assert_called_once()
+        _id, _texto, data_salva = mock_update.call_args.args
+        assert (
+            data_salva == "2024-01-25T12:00:00.000Z"
+        ), f"Esperado data mais recente, recebido: {data_salva}"

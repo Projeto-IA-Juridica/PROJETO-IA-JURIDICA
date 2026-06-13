@@ -182,7 +182,7 @@ def _mock_cache(andamentos=None) -> MagicMock:
 
 def _mock_datajud(andamentos=None) -> MagicMock:
     j = MagicMock()
-    default = [{"descricao": "Despacho proferido.", "data": "2024-06-01T10:00:00"}]
+    default = [{"texto": "Despacho proferido.", "data": "2024-06-01T10:00:00"}]
     j.buscar_andamentos_async = AsyncMock(
         return_value=andamentos if andamentos is not None else default
     )
@@ -367,7 +367,7 @@ class TestNodeBuscarDados:
         assert result["processo_id"] == 1
 
     async def test_cache_hit_nao_chama_datajud(self):
-        andamentos_cache = [{"descricao": "Andamento do cache.", "data": "2024-01-01"}]
+        andamentos_cache = [{"texto": "Andamento do cache.", "data": "2024-01-01"}]
         cache = _mock_cache(andamentos=andamentos_cache)
         datajud = _mock_datajud()
         orq = _make_orchestrator(cache=cache, datajud=datajud)
@@ -377,7 +377,7 @@ class TestNodeBuscarDados:
 
     async def test_cache_miss_chama_datajud_e_salva_cache(self):
         cache = _mock_cache(andamentos=None)
-        datajud = _mock_datajud([{"descricao": "Despacho judicial.", "data": "2024-06-01"}])
+        datajud = _mock_datajud([{"texto": "Despacho judicial.", "data": "2024-06-01"}])
         orq = _make_orchestrator(cache=cache, datajud=datajud)
         result = await orq._node_buscar_dados(_base_state())
         datajud.buscar_andamentos_async.assert_called_once()
@@ -425,7 +425,7 @@ class TestNodeBuscarDados:
         translator = _mock_translator(termos=["despacho", "tutela"], traducoes=traducoes)
         andamentos = [
             {
-                "descricao": "Despacho concedendo tutela antecipada.",
+                "texto": "Despacho concedendo tutela antecipada.",
                 "data": "2024-06-01",
             }
         ]

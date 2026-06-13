@@ -23,7 +23,10 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
 from feature_1_ia_personalizada.services.legal_data.data_cleaner import (
     LegalDataCleaner as DataCleaner,
 )
-from feature_1_ia_personalizada.services.legal_data.datajud_client import DataJudClient
+from feature_1_ia_personalizada.services.legal_data.datajud_client import (
+    DataJudClient,
+    _parse_iso_dt,
+)
 from feature_1_ia_personalizada.services.legal_data.score_risco import (
     ScoreRiscoCalculator,
 )
@@ -86,6 +89,33 @@ def extrair_texto_e_data_do_andamento(
     return str(texto), converter_para_iso(data)
 
 
+def _filtrar_andamentos_por_data(
+    andamentos: list[Any],
+    data_referencia_iso: Any,
+) -> list[Any]:
+    """Aplica o mesmo filtro de data de buscar_novos_andamentos ao cache.
+
+    O cache compartilhado (orchestrator + worker) contém TODOS os movimentos
+    sem filtro. Sem esta função, o worker re-notificaria andamentos já vistos
+    toda vez que houvesse um cache hit do orchestrator.
+    """
+    if not data_referencia_iso:
+        return andamentos
+    ref_dt = _parse_iso_dt(str(data_referencia_iso))
+    if ref_dt is None:
+        return andamentos
+
+    filtrados = []
+    for a in andamentos:
+        data_hora = extrair_valor(a, "data", None)
+        if data_hora:
+            mov_dt = _parse_iso_dt(str(data_hora))
+            if mov_dt and mov_dt <= ref_dt:
+                continue
+        filtrados.append(a)
+    return filtrados
+
+
 @_datajud_breaker
 def buscar_andamentos_datajud(
     numero_processo: str,
@@ -107,11 +137,15 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     polo_cliente = dados_processo.get("polo_cliente") or "autor"
 
     # 1️⃣ Buscar andamentos: Redis (cache) → DataJud (fallback)
+    # O cache é compartilhado com o orchestrator, que salva TODOS os movimentos
+    # sem filtro de data. O worker DEVE aplicar o filtro ao ler do cache para
+    # evitar re-notificar movimentos já vistos (falso positivo).
     fonte_utilizada = "cache"
-    lista_andamentos = get_andamentos_sync(numero_processo)
-    datajud_data: dict[str, Any] | None = None
+    raw_cache = get_andamentos_sync(numero_processo)
 
-    if lista_andamentos is None:
+    if raw_cache is not None:
+        lista_andamentos = _filtrar_andamentos_por_data(raw_cache, data_ultimo_andamento_salvo)
+    else:
         cliente_datajud = DataJudClient(api_key=settings.DATAJUD_API_KEY)
         fonte_utilizada = "datajud"
         lista_andamentos = buscar_andamentos_datajud(
@@ -119,17 +153,11 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
             data_ultimo_andamento_salvo,
             cliente_datajud,
         )
-        # Extrai metadados da vara para o score enquanto temos o objeto do cliente
-        # (reutiliza a mesma conexão — sem segunda chamada HTTP)
-        datajud_data = _extrair_datajud_data(cliente_datajud, numero_processo)
 
         if lista_andamentos is not None:
             set_andamentos_sync(numero_processo, lista_andamentos)
 
     if not lista_andamentos:
-        # Mesmo sem novos andamentos, recalcula o score se tiver dados do DataJud
-        if datajud_data is not None:
-            _atualizar_score(dados_processo, datajud_data)
         return {
             "id_processo": id_processo,
             "sucesso": True,
@@ -138,8 +166,9 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         }
 
     quantidade_novos = 0
-    ultima_data_encontrada = None
-    ultimo_texto_limpo = None
+    ultima_data_encontrada: str | None = None
+    _ultima_data_dt: datetime | None = None  # para comparação correta com timezone
+    ultimo_texto_limpo: str | None = None
 
     state_manager = ProcessoStateManager()
 
@@ -166,8 +195,16 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
         )
 
         quantidade_novos += 1
-        ultima_data_encontrada = data_iso
         ultimo_texto_limpo = texto_limpo
+
+        # Mantém a data MAIS RECENTE entre todos os andamentos do ciclo.
+        # DataJud não garante ordem; sobrescrever a cada iteração salvaria a
+        # data mais ANTIGA, fazendo o próximo ciclo re-processar os mesmos andamentos.
+        if data_iso:
+            mov_dt = _parse_iso_dt(data_iso)
+            if mov_dt and (_ultima_data_dt is None or mov_dt > _ultima_data_dt):
+                _ultima_data_dt = mov_dt
+                ultima_data_encontrada = data_iso
 
     # 2️⃣ Atualizar banco e recalcular score em paralelo — operações independentes entre si.
     # ThreadPoolExecutor: seguro porque cada função usa sua própria sessão síncrona de DB.
@@ -180,7 +217,7 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
                 ultimo_texto_limpo or "",
                 ultima_data_encontrada,
             )
-        futures["score"] = executor.submit(_atualizar_score, dados_processo, datajud_data)
+        futures["score"] = executor.submit(_atualizar_score, dados_processo)
 
     # Propaga exceções de update_ultimo_andamento (crítico); score já tem graceful degradation interna
     if "andamento" in futures:
@@ -195,25 +232,8 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     }
 
 
-def _extrair_datajud_data(
-    cliente_datajud: DataJudClient,
-    numero_processo: str,
-) -> dict[str, Any] | None:
-    """
-    Extrai metadados da vara do objeto DataJudClient já instanciado.
-    Reutiliza a conexão aberta — não faz nova chamada HTTP.
-    Retorna None silenciosamente se o cliente não expuser esses dados.
-    """
-    try:
-        return cliente_datajud.get_metadados_vara(numero_processo)
-    except Exception:
-        # Score não é crítico — continua sem metadados da vara
-        return None
-
-
 def _atualizar_score(
     dados_processo: dict[str, Any],
-    datajud_data: dict[str, Any] | None,
 ) -> None:
     """
     Calcula e persiste o score de risco no banco.
@@ -228,17 +248,17 @@ def _atualizar_score(
             fase_processual = dados_processo.get("fase_processual")
             polo_cliente = dados_processo.get("polo_cliente") or "autor"
 
-        score_obj = _score_calculator.calcular(_ProcessoProxy(), datajud_data)
+        score_obj = _score_calculator.calcular(_ProcessoProxy(), None)
 
         from shared.database.worker_queries import update_score_risco
 
         update_score_risco(
-            processo_id=int(dados_processo["id"]),
-            score=score_obj.score,
-            nivel=score_obj.nivel,
-            componentes=score_obj.componentes.model_dump(),
-            interpretacao=score_obj.interpretacao,
-            atualizado_em=score_obj.atualizado_em,
+            int(dados_processo["id"]),
+            score_obj.score,
+            score_obj.nivel,
+            score_obj.componentes.model_dump(),
+            score_obj.interpretacao,
+            score_obj.atualizado_em,
         )
 
     except Exception as exc:

@@ -22,7 +22,9 @@ class _Datetime22h:
     """Simula datetime.now() retornando 22h (fora do horário comercial)."""
 
     @staticmethod
-    def now() -> datetime:
+    def now(tz=None) -> datetime:
+        if tz is not None:
+            return datetime(2024, 6, 10, 22, 0, tzinfo=tz)
         return datetime(2024, 6, 10, 22, 0)
 
 
@@ -228,7 +230,7 @@ class TestConstantes:
         assert JanelaComercial().inicio == time(8, 0)
 
     def test_janela_comercial_padrao_fim(self):
-        assert JanelaComercial().fim == time(18, 0)
+        assert JanelaComercial().fim == time(20, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +261,7 @@ class TestJanelaComercial:
 
     def test_depois_do_horario_comercial(self):
         svc = self._svc()
-        assert svc._esta_na_janela_comercial(datetime(2024, 6, 10, 18, 1)) is False
+        assert svc._esta_na_janela_comercial(datetime(2024, 6, 10, 20, 1)) is False
 
     def test_meia_noite_fora(self):
         svc = self._svc()
@@ -327,7 +329,7 @@ class TestPodeEnviarAgora:
 
     async def test_comercial_fora_horario_nao_pode(self):
         svc, _, _ = _service(preferencia="comercial", mensagens_hoje=0)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 20, 0))
+        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 21, 0))
         assert pode is False
         assert motivo == "fora_horario_comercial"
 
@@ -340,7 +342,7 @@ class TestPodeEnviarAgora:
     async def test_comercial_fora_horario_e_rate_limit_retorna_horario_primeiro(self):
         # preferência "comercial" + fora do horário: horário é verificado antes do rate limit
         svc, _, _ = _service(preferencia="comercial", mensagens_hoje=5)
-        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 20, 0))
+        pode, motivo = await svc._pode_enviar_agora(CLIENTE_ID, datetime(2024, 6, 10, 21, 0))
         assert pode is False
         assert motivo == "fora_horario_comercial"
 
