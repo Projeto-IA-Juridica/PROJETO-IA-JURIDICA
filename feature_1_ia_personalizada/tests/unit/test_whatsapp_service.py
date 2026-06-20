@@ -146,6 +146,7 @@ class _FakeRepositorio:
         processo_id: int | None,
         status: str,
         payload_resposta: dict[str, Any] | None = None,
+        metadata_extra: dict[str, Any] | None = None,
     ) -> None:
         self.interacoes_salvas.append(
             {
@@ -155,6 +156,7 @@ class _FakeRepositorio:
                 "processo_id": processo_id,
                 "status": status,
                 "payload_resposta": payload_resposta,
+                "metadata_extra": metadata_extra,
             }
         )
 
@@ -596,6 +598,11 @@ class TestEnviarPesquisaSatisfacao:
         svc, ev, rp = _service()
         await svc.enviar_pesquisa_satisfacao(ESCRITORIO_ID, CLIENTE_ID)
         assert rp.interacoes_salvas[0]["status"] == "enviado:nps"
+
+    async def test_salva_interacao_com_aguardando_nps_true(self):
+        svc, ev, rp = _service()
+        await svc.enviar_pesquisa_satisfacao(ESCRITORIO_ID, CLIENTE_ID)
+        assert rp.interacoes_salvas[0]["metadata_extra"] == {"aguardando_nps": True}
 
     async def test_evolution_error_retorna_ok_false(self):
         svc = WhatsAppService(_FakeEvolutionClientError(), _FakeRepositorio())

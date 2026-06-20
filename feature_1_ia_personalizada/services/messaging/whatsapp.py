@@ -52,6 +52,7 @@ class RepositorioWhatsApp(Protocol):
         processo_id: int | None,
         status: str,
         payload_resposta: dict[str, Any] | None = None,
+        metadata_extra: dict[str, Any] | None = None,
     ) -> None: ...
 
     async def agendar_envio_mensagem(
@@ -318,6 +319,7 @@ class WhatsAppService:
                 processo_id=None,
                 status="enviado:nps",
                 payload_resposta=resposta,
+                metadata_extra={"aguardando_nps": True},
             )
             return {"ok": True, "resposta": resposta}
         except EvolutionError as e:
@@ -406,10 +408,13 @@ class SQLWhatsAppRepository:
         processo_id: int | None,
         status: str,
         payload_resposta: dict[str, Any] | None = None,
+        metadata_extra: dict[str, Any] | None = None,
     ) -> None:
         metadata: dict[str, Any] = {"status": status}
         if payload_resposta:
             metadata["payload_resposta"] = payload_resposta
+        if metadata_extra:
+            metadata.update(metadata_extra)
 
         async with async_session_factory() as session:
             interacao = Interacao(

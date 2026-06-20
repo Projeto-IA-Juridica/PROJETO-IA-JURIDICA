@@ -81,6 +81,7 @@ from feature_1_ia_personalizada.services.messaging.evolution_client import Evolu
 from feature_1_ia_personalizada.services.messaging.templates import TEMPLATE_ERRO_GENERICO
 from feature_1_ia_personalizada.services.rag.retriever import RAGRetriever
 from shared.config.constants import MENSAGENS_FALLBACK
+from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.processo import Processo
 
@@ -194,6 +195,23 @@ class ConversationOrchestrator:
         try:
             await self._verificar_quota_tokens(escritorio_id)
         except QuotaExcedidaError:
+            try:
+                async with self._session_factory() as session:
+                    escritorio = await session.get(Escritorio, escritorio_id)
+                    cliente = await session.get(Cliente, cliente_id)
+                    if (
+                        escritorio
+                        and cliente
+                        and escritorio.webhook_whatsapp_instance
+                        and cliente.telefone_whatsapp
+                    ):
+                        await self._deps.evolution.enviar_texto(
+                            escritorio.webhook_whatsapp_instance,
+                            cliente.telefone_whatsapp,
+                            MSG_QUOTA_CLIENTE,
+                        )
+            except Exception:
+                pass
             return {
                 "resposta": MSG_QUOTA_CLIENTE,
                 "intencao": "outro",
