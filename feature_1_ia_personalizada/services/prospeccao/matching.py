@@ -109,13 +109,27 @@ class MatchingService:
 
     async def calcular_score(
         self,
-        dna: DNAEscritorio,
+        dna: DNAEscritorio | None,
         inteligencia: EmpresaInteligencia | PessoaInteligencia,
     ) -> ResultadoMatch:
         """
         Detecta o tipo do lead e delega para o método privado correto.
         Se o score heurístico for < 30, retorna sem chamar a Claude.
         """
+        tipo_lead = "empresa" if isinstance(inteligencia, EmpresaInteligencia) else "pessoa"
+
+        if dna is None or getattr(dna, "dados_insuficientes", False):
+            return ResultadoMatch(
+                score=40,
+                motivo="DNA do escritório não disponível — score genérico baseado nos dados do lead.",
+                abordagem_sugerida=(
+                    "Gere o DNA do escritório (POST /prospeccao/dna/atualizar) "
+                    "para obter análise personalizada e abordagem sugerida."
+                ),
+                gerado_por_ia=False,
+                tipo_lead=tipo_lead,
+            )
+
         if isinstance(inteligencia, EmpresaInteligencia):
             score_bruto, componentes = self._score_heuristico_empresa(dna, inteligencia)
             tipo_lead = "empresa"
