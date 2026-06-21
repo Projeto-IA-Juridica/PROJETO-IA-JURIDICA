@@ -17,7 +17,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from shared.schemas.response import PaginatedResponse
 from shared.utils.validators import validar_numero_processo
@@ -33,6 +33,14 @@ _NIVEIS_SCORE_VALIDOS = {"baixo", "moderado", "alto", "critico"}
 # ---------------------------------------------------------------------------
 # Schemas auxiliares
 # ---------------------------------------------------------------------------
+
+
+class AndamentoSimples(BaseModel):
+    """Andamento processual simplificado — populado a partir de estado_atual.ultimos_andamentos."""
+
+    descricao: str
+    data: str | None = None
+
 
 TipoAndamento = Literal[
     "despacho", "sentença", "decisão", "petição", "certidão", "audiência", "outro"
@@ -181,6 +189,43 @@ class ProcessoResponse(BaseModel):
         description="Texto explicativo para o advogado",
     )
     score_atualizado_em: datetime | None = Field(default=None)
+
+    # --- Andamentos (últimos 5 do estado_atual) ---
+    # estado_atual é lido do ORM mas excluído da resposta JSON.
+    estado_atual: dict | None = Field(default=None, exclude=True)
+    andamentos: list[AndamentoSimples] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _populate_andamentos(self) -> "ProcessoResponse":
+        """Constrói a lista de andamentos a partir de estado_atual.ultimos_andamentos."""
+        ultimos: list[str] = []
+        if self.estado_atual:
+            ultimos = self.estado_atual.get("ultimos_andamentos", [])
+
+        if not ultimos:
+            # Fallback: usa o último andamento salvo como único item
+            if self.ultimo_andamento:
+                data_str = (
+                    self.data_ultimo_andamento.isoformat()
+                    if self.data_ultimo_andamento
+                    else None
+                )
+                self.andamentos = [
+                    AndamentoSimples(descricao=self.ultimo_andamento, data=data_str)
+                ]
+            return self
+
+        # ultimos está ordenado do mais antigo ao mais recente; inverte para exibir do mais novo
+        itens: list[AndamentoSimples] = []
+        for i, texto in enumerate(reversed(ultimos)):
+            # Apenas o mais recente (i == 0) tem data confiável
+            data_str = None
+            if i == 0 and self.data_ultimo_andamento:
+                data_str = self.data_ultimo_andamento.isoformat()
+            itens.append(AndamentoSimples(descricao=texto, data=data_str))
+
+        self.andamentos = itens
+        return self
 
 
 class ProcessoComAndamentos(ProcessoResponse):

@@ -26,9 +26,9 @@ export interface CRMClienteCard {
 }
 
 export interface Andamento {
-  data: string
+  data: string | null
   descricao: string
-  tipo: string
+  tipo?: string
 }
 
 export interface Processo {

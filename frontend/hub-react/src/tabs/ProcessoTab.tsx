@@ -487,9 +487,11 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
                           {i < processo.andamentos.length - 1 && <div className="w-px flex-1 mt-1.5 bg-am-border" />}
                         </div>
                         <div className="pb-1 min-w-0">
-                          <time className="text-[10px] font-bold text-am-muted block mb-0.5">
-                            {new Date(a.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                          </time>
+                          {a.data && (
+                            <time className="text-[10px] font-bold text-am-muted block mb-0.5">
+                              {new Date(a.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </time>
+                          )}
                           <p className={`text-xs leading-relaxed ${i === 0 ? 'font-semibold text-am-ink' : 'text-am-secondary'}`}>
                             {a.descricao}
                           </p>

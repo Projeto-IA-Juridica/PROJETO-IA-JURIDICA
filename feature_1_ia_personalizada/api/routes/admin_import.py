@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.import_clientes import processar_csv
+from feature_1_ia_personalizada.workers.celery_app import celery_app
 from shared.database.session import get_db
 
 router = APIRouter(prefix="/admin/import", tags=["Admin — Importação"])
@@ -103,6 +104,17 @@ async def importar_clientes(
         )
         if not preview:
             await db.commit()
+            # Dispara enriquecimento DataJud imediato para cada processo novo criado.
+            # A task roda na fila "monitoramento" e não bloqueia a resposta HTTP.
+            for pid in resultado.get("novos_processo_ids", []):
+                try:
+                    celery_app.send_task(
+                        "workers.monitorar_processo_individual",
+                        args=[pid],
+                        queue="monitoramento",
+                    )
+                except Exception:
+                    pass  # Celery indisponível não deve travar a importação
     except UnicodeDecodeError as exc:
         raise HTTPException(
             status_code=400,

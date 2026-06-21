@@ -141,6 +141,7 @@ async def processar_csv(
     processos_atualizados = 0
     erros: list[dict] = []
     clientes_preview: list[dict] = []
+    novos_processo_ids: list[int] = []
 
     for i, row in enumerate(reader, start=2):
         row_norm: dict[str, str] = {
@@ -319,6 +320,7 @@ async def processar_csv(
                 db.add(novo_processo)
                 processos_novos += 1
                 await db.flush()
+                novos_processo_ids.append(novo_processo.id)
 
     if not preview:
         await db.flush()
@@ -331,4 +333,5 @@ async def processar_csv(
         "ignorados": 0,
         "erros": erros,
         "preview": clientes_preview,
+        "novos_processo_ids": novos_processo_ids,
     }

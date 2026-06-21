@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +6,7 @@ from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     invalidar_cache_dna_async,
     invalidar_caches_processo_async,
 )
+from feature_1_ia_personalizada.workers.celery_app import celery_app
 from shared.database.session import get_db
 from shared.models.processo import Processo
 from shared.schemas.processo import (
@@ -128,9 +129,24 @@ async def list_processos(
         ) from exc
 
 
+def _disparar_monitoramento(processo_id: int) -> None:
+    """Envia task Celery de enriquecimento DataJud. Silencia erros (Celery pode estar indisponível)."""
+    try:
+        celery_app.send_task(
+            "workers.monitorar_processo_individual",
+            args=[processo_id],
+            queue="monitoramento",
+        )
+    except Exception:
+        pass
+
+
 @router.post("", response_model=ProcessoResponse, status_code=status.HTTP_201_CREATED)
 async def create_processo(
-    payload: ProcessoCreate, request: Request, db: AsyncSession = Depends(get_db)
+    payload: ProcessoCreate,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Cadastra um novo processo para acompanhamento.
@@ -174,6 +190,9 @@ async def create_processo(
     redis = _get_redis(request)
     if redis:
         await invalidar_cache_dna_async(redis, escritorio_id)
+
+    # Dispara enriquecimento DataJud imediato após a sessão ser commitada
+    background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
 
     return novo_processo
 
