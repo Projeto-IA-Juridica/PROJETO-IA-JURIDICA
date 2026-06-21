@@ -236,6 +236,18 @@ async def processar_csv(
                 atualizados += 1
             else:
                 importados += 1
+
+            if numero_cnj:
+                stmt_proc = select(Processo).where(
+                    Processo.numero_cnj == numero_cnj,
+                    Processo.escritorio_id == escritorio_id,
+                )
+                result_proc = await db.execute(stmt_proc)
+                if result_proc.scalars().first():
+                    processos_atualizados += 1
+                else:
+                    processos_novos += 1
+
             continue
 
         # ----------------------------------------------------------------
