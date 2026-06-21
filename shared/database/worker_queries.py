@@ -103,6 +103,7 @@ async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
                 "data_ultimo_andamento": p.data_ultimo_andamento,
                 "tipo_acao": p.tipo_acao,
                 "polo_cliente": p.polo_cliente,
+                "tribunal": p.tribunal,
                 # Campos usados pelo ScoreRiscoCalculator (Feature 2)
                 "fase_processual": p.fase_processual,
                 "valor_causa": float(p.valor_causa) if p.valor_causa is not None else None,
@@ -128,6 +129,7 @@ async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
             "data_ultimo_andamento": p.data_ultimo_andamento,
             "tipo_acao": p.tipo_acao,
             "polo_cliente": p.polo_cliente,
+            "tribunal": p.tribunal,
             # Campos usados pelo ScoreRiscoCalculator (Feature 2)
             "fase_processual": p.fase_processual,
             "valor_causa": float(p.valor_causa) if p.valor_causa is not None else None,
@@ -157,6 +159,47 @@ async def _update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) 
 def update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) -> None:
     """UPDATE processos SET ultimo_andamento, data_ultimo_andamento WHERE id."""
     _run(_update_ultimo_andamento(id_processo, texto, data_iso))
+
+
+async def _update_metadados_processo(
+    id_processo: int,
+    metadados: dict[str, Any],
+) -> None:
+    """Salva tribunal, vara, comarca, data_distribuicao e tipo_acao quando ainda não preenchidos."""
+    campos: dict[str, Any] = {}
+
+    if metadados.get("tribunal"):
+        campos["tribunal"] = metadados["tribunal"]
+    if metadados.get("vara"):
+        campos["vara"] = metadados["vara"]
+    if metadados.get("comarca"):
+        campos["comarca"] = metadados["comarca"]
+    if metadados.get("tipo_acao"):
+        campos["tipo_acao"] = metadados["tipo_acao"]
+    if metadados.get("data_distribuicao"):
+        try:
+            campos["data_distribuicao"] = datetime.fromisoformat(
+                str(metadados["data_distribuicao"]).replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            pass
+
+    if not campos:
+        return
+
+    async with async_session_factory() as session:
+        await session.execute(
+            update(ProcessoModel).where(ProcessoModel.id == id_processo).values(**campos)
+        )
+        await session.commit()
+
+
+def update_metadados_processo(id_processo: int, metadados: dict[str, Any]) -> None:
+    """
+    UPDATE processos SET tribunal, vara, comarca, data_distribuicao, tipo_acao
+    com os dados vindos do DataJud. Só atualiza campos presentes em metadados.
+    """
+    _run(_update_metadados_processo(id_processo, metadados))
 
 
 async def _update_score_risco(

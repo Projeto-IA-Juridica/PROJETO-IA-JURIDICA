@@ -34,6 +34,7 @@ from shared.config.settings import settings
 from shared.database.worker_queries import (
     query_processo_por_id,
     query_processos_monitorados,
+    update_metadados_processo,
     update_ultimo_andamento,
 )
 
@@ -142,17 +143,32 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     # evitar re-notificar movimentos já vistos (falso positivo).
     fonte_utilizada = "cache"
     raw_cache = get_andamentos_sync(numero_processo)
+    tribunal_preenchido = bool(dados_processo.get("tribunal"))
 
-    if raw_cache is not None:
+    if raw_cache is not None and tribunal_preenchido:
         lista_andamentos = _filtrar_andamentos_por_data(raw_cache, data_ultimo_andamento_salvo)
     else:
         cliente_datajud = DataJudClient(api_key=settings.DATAJUD_API_KEY)
         fonte_utilizada = "datajud"
-        lista_andamentos = buscar_andamentos_datajud(
-            numero_processo,
-            data_ultimo_andamento_salvo,
-            cliente_datajud,
-        )
+
+        # Quando tribunal ainda não foi preenchido, usa buscar_dados_completos
+        # para extrair metadados e andamentos numa única chamada à API.
+        if not tribunal_preenchido:
+            lista_andamentos, metadados = cliente_datajud.buscar_dados_completos(
+                numero_processo,
+                data_ultimo_andamento_salvo,
+            )
+            if metadados:
+                try:
+                    update_metadados_processo(id_processo, metadados)
+                except Exception as exc:
+                    logger.warning("update_metadados_falhou", processo_id=id_processo, erro=str(exc))
+        else:
+            lista_andamentos = buscar_andamentos_datajud(
+                numero_processo,
+                data_ultimo_andamento_salvo,
+                cliente_datajud,
+            )
 
         if lista_andamentos is not None:
             set_andamentos_sync(numero_processo, lista_andamentos)

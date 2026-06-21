@@ -214,6 +214,103 @@ class DataJudClient:
 
         return data  # type: ignore[no-any-return]
 
+    @staticmethod
+    def _extrair_metadados(source: dict[str, Any]) -> dict[str, Any]:
+        """
+        Extrai tribunal, vara, comarca, data_distribuicao e tipo_acao do _source DataJud.
+        Retorna apenas os campos com valor (ignora None/vazios).
+        """
+        metadados: dict[str, Any] = {}
+
+        tribunal = source.get("tribunal")
+        if tribunal:
+            metadados["tribunal"] = str(tribunal).upper()
+
+        orgao = source.get("orgaoJulgador") or {}
+        vara = orgao.get("nome")
+        if vara:
+            metadados["vara"] = str(vara)
+
+        # DataJud não expõe comarca diretamente — usa o nome do órgão como fallback
+        # quando ele contém a cidade (ex: "3ª Vara Cível de Campinas")
+        comarca_raw = source.get("comarca") or source.get("municipio")
+        if comarca_raw:
+            metadados["comarca"] = str(comarca_raw)
+
+        data_ajuiz = source.get("dataAjuizamento")
+        if data_ajuiz:
+            metadados["data_distribuicao"] = str(data_ajuiz)
+
+        classe = source.get("classe") or {}
+        tipo_acao = classe.get("nome")
+        if tipo_acao:
+            metadados["tipo_acao"] = str(tipo_acao)
+
+        return metadados
+
+    def buscar_dados_completos(
+        self,
+        numero_cnj: str,
+        data_referencia_iso: str | None = None,
+    ) -> tuple[list[dict], dict[str, Any]]:
+        """
+        Wrapper síncrono que consulta DataJud UMA ÚNICA VEZ e retorna:
+          - lista de andamentos filtrados por data_referencia_iso
+          - dicionário com metadados do processo (tribunal, vara, comarca, etc.)
+
+        Usado pelo worker na primeira execução para preencher campos do processo.
+        Retorna ([], {}) quando o circuit breaker está aberto.
+        """
+        import asyncio
+
+        try:
+            data = _datajud_cb.call(asyncio.run, self.consultar_processo(numero_cnj))
+        except pybreaker.CircuitBreakerError:
+            logger.warning(
+                "datajud_circuit_aberto",
+                cnj=numero_cnj,
+                msg="DataJud indisponível — retornando fallback vazio",
+            )
+            return [], {}
+
+        hits = data.get("hits", {}).get("hits", [])
+        if not hits:
+            return [], {}
+
+        source = hits[0].get("_source", {})
+        metadados = self._extrair_metadados(source)
+
+        movimentos = source.get("movimentos", [])
+        ref_dt = _parse_iso_dt(data_referencia_iso)
+        andamentos: list[dict] = []
+
+        for m in movimentos:
+            nome = m.get("nome", "")
+            complementos = m.get("complementosTabelados", [])
+            if complementos:
+                valores = "; ".join(
+                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
+                )
+                if valores:
+                    nome = f"{nome}: {valores}"
+
+            data_hora = m.get("dataHora")
+
+            if ref_dt and data_hora:
+                mov_dt = _parse_iso_dt(data_hora)
+                if mov_dt and mov_dt <= ref_dt:
+                    continue
+
+            andamentos.append({"texto": nome, "data": data_hora})
+
+        logger.info(
+            "datajud_dados_completos",
+            cnj=numero_cnj,
+            andamentos=len(andamentos),
+            tribunal=metadados.get("tribunal"),
+        )
+        return andamentos, metadados
+
     def buscar_novos_andamentos(
         self,
         numero_cnj: str,
