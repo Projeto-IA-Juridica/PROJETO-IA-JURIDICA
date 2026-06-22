@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Scale, Clock, AlertCircle, MessageCircle, Phone, Star, Gavel, User,
-  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search,
+  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search, RefreshCw,
 } from 'lucide-react'
-import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
+import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, enriquecerProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
 import type { CRMClienteCard, Processo } from '../types'
 import Skeleton from '../components/Skeleton'
 import RiskChip from '../components/RiskChip'
@@ -247,6 +247,14 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['processos', cliente.id] }),
   })
 
+  const enriquecerMut = useMutation({
+    mutationFn: enriquecerProcesso,
+    onSuccess: () => {
+      // Aguarda 3s para o background task do servidor completar, então recarrega
+      setTimeout(() => qc.invalidateQueries({ queryKey: ['processos', cliente.id] }), 3000)
+    },
+  })
+
   function toggleAndamentos(id: number) {
     setAndamentosAbertos(prev => {
       const next = new Set(prev)
@@ -402,6 +410,15 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
                         : { color: '#C83030', background: 'rgba(200,48,48,0.08)',  border: '1px solid rgba(200,48,48,0.18)' }}>
                       {processo.polo_cliente === 'autor' ? 'Autor' : processo.polo_cliente === 'reu' ? 'Réu' : 'Terceiro'}
                     </span>
+                    {!processo.tribunal && (
+                      <button
+                        onClick={() => enriquecerMut.mutate(processo.id)}
+                        disabled={enriquecerMut.isPending && enriquecerMut.variables === processo.id}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
+                        title="Buscar dados do processo no DataJud">
+                        <RefreshCw size={11} className={enriquecerMut.isPending && enriquecerMut.variables === processo.id ? 'animate-spin' : ''} />
+                      </button>
+                    )}
                     <button onClick={() => setEditandoProc(processo)}
                       className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
                       title="Editar">

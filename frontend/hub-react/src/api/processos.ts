@@ -40,3 +40,8 @@ export async function atualizarProcesso(id: number, payload: ProcessoUpdate): Pr
 export async function deletarProcesso(id: number): Promise<void> {
   await api.delete(`/processos/${id}`)
 }
+
+export async function enriquecerProcesso(id: number): Promise<Processo> {
+  const { data } = await api.post<Processo>(`/processos/${id}/enriquecer`)
+  return data
+}

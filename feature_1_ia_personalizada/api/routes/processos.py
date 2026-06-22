@@ -1,12 +1,21 @@
+from datetime import datetime
+
+import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.legal_data.cache_manager import (
     invalidar_cache_dna_async,
     invalidar_caches_processo_async,
 )
+from feature_1_ia_personalizada.services.legal_data.datajud_client import (
+    DataJudClient,
+    DataJudClientError,
+)
 from feature_1_ia_personalizada.workers.celery_app import celery_app
+from shared.config.settings import settings
+from shared.database.connection import async_session_factory
 from shared.database.session import get_db
 from shared.models.processo import Processo
 from shared.schemas.processo import (
@@ -17,6 +26,8 @@ from shared.schemas.processo import (
     ProcessoUpdate,
 )
 from shared.utils.lgpd import registrar_acesso
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/processos", tags=["Processos Jurídicos"])
 
@@ -129,8 +140,61 @@ async def list_processos(
         ) from exc
 
 
+async def _enriquecer_processo_async(processo_id: int, numero_cnj: str) -> None:
+    """Busca tribunal, vara, comarca e tipo_ação no DataJud e salva no banco imediatamente."""
+    try:
+        client = DataJudClient(api_key=settings.DATAJUD_API_KEY)
+        data = await client.consultar_processo(numero_cnj)
+    except DataJudClientError as exc:
+        logger.warning("enriquecimento_datajud_falhou", processo_id=processo_id, erro=str(exc))
+        return
+    except Exception as exc:
+        logger.warning("enriquecimento_inesperado", processo_id=processo_id, erro=str(exc))
+        return
+
+    hits = data.get("hits", {}).get("hits", [])
+    if not hits:
+        logger.info("enriquecimento_sem_hits", processo_id=processo_id, cnj=numero_cnj)
+        return
+
+    source = hits[0].get("_source", {})
+    metadados = DataJudClient._extrair_metadados(source)
+    if not metadados:
+        return
+
+    campos: dict = {}
+    if metadados.get("tribunal"):
+        campos["tribunal"] = metadados["tribunal"]
+    if metadados.get("vara"):
+        campos["vara"] = metadados["vara"]
+    if metadados.get("comarca"):
+        campos["comarca"] = metadados["comarca"]
+    if metadados.get("tipo_acao"):
+        campos["tipo_acao"] = metadados["tipo_acao"]
+    if metadados.get("data_distribuicao"):
+        try:
+            campos["data_distribuicao"] = datetime.fromisoformat(
+                str(metadados["data_distribuicao"]).replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            pass
+
+    if not campos:
+        return
+
+    try:
+        async with async_session_factory() as session:
+            await session.execute(
+                update(Processo).where(Processo.id == processo_id).values(**campos)
+            )
+            await session.commit()
+        logger.info("enriquecimento_salvo", processo_id=processo_id, campos=list(campos.keys()))
+    except Exception as exc:
+        logger.warning("enriquecimento_db_falhou", processo_id=processo_id, erro=str(exc))
+
+
 def _disparar_monitoramento(processo_id: int) -> None:
-    """Envia task Celery de enriquecimento DataJud. Silencia erros (Celery pode estar indisponível)."""
+    """Envia task Celery de monitoramento periódico. Silencia erros (Celery pode estar indisponível)."""
     try:
         celery_app.send_task(
             "workers.monitorar_processo_individual",
@@ -191,7 +255,9 @@ async def create_processo(
     if redis:
         await invalidar_cache_dna_async(redis, escritorio_id)
 
-    # Dispara enriquecimento DataJud imediato após a sessão ser commitada
+    # Enriquece com DataJud diretamente (sem Celery) — garante tribunal/vara/comarca na resposta
+    background_tasks.add_task(_enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj)
+    # Dispara também via Celery para o ciclo de monitoramento periódico
     background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
 
     return novo_processo
@@ -247,6 +313,27 @@ async def update_processo(
         if "tipo_acao" in update_data:
             await invalidar_cache_dna_async(redis, escritorio_id)
 
+    return processo
+
+
+@router.post("/{processo_id}/enriquecer", response_model=ProcessoResponse)
+async def enriquecer_processo(
+    processo_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Re-busca tribunal, vara, comarca e tipo_ação no DataJud para um processo já cadastrado.
+    Útil para processos criados antes desta funcionalidade ou cujo enriquecimento falhou.
+    """
+    escritorio_id = _get_escritorio_id(request)
+
+    processo = await db.get(Processo, processo_id)
+    if not processo or processo.escritorio_id != escritorio_id:
+        raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
+
+    background_tasks.add_task(_enriquecer_processo_async, processo.id, processo.numero_cnj)
     return processo
 
 

@@ -227,19 +227,30 @@ class DataJudClient:
             metadados["tribunal"] = str(tribunal).upper()
 
         orgao = source.get("orgaoJulgador") or {}
-        vara = orgao.get("nome")
-        if vara:
-            metadados["vara"] = str(vara)
+        vara_nome = orgao.get("nome")
+        if vara_nome:
+            metadados["vara"] = str(vara_nome)
 
-        # DataJud não expõe comarca diretamente — usa o nome do órgão como fallback
-        # quando ele contém a cidade (ex: "3ª Vara Cível de Campinas")
+        # DataJud raramente expõe comarca diretamente — tenta campo direto primeiro,
+        # depois extrai do nome do órgão julgador (ex: "7ª Vara Cível da comarca de Uberlândia")
         comarca_raw = source.get("comarca") or source.get("municipio")
+        if not comarca_raw and vara_nome:
+            m = re.search(r"comarca\s+de\s+(.+)", vara_nome, re.IGNORECASE)
+            if m:
+                comarca_raw = m.group(1).strip()
         if comarca_raw:
             metadados["comarca"] = str(comarca_raw)
 
         data_ajuiz = source.get("dataAjuizamento")
         if data_ajuiz:
-            metadados["data_distribuicao"] = str(data_ajuiz)
+            # DataJud pode retornar YYYYMMDDHHMMSS (14 dígitos) ou ISO 8601
+            data_str = str(data_ajuiz)
+            if len(data_str) == 14 and data_str.isdigit():
+                data_str = (
+                    f"{data_str[:4]}-{data_str[4:6]}-{data_str[6:8]}"
+                    f"T{data_str[8:10]}:{data_str[10:12]}:{data_str[12:14]}"
+                )
+            metadados["data_distribuicao"] = data_str
 
         classe = source.get("classe") or {}
         tipo_acao = classe.get("nome")

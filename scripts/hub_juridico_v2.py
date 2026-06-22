@@ -56,6 +56,23 @@ import streamlit as st
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 DATAJUD_API_KEY = os.environ.get("DATAJUD_API_KEY", "")
 
+# ── Stubs de variáveis para o demo (sem infra real) ──────────────────────────
+# Settings() é instanciado no módulo shared/config/settings.py, então precisamos
+# definir antes dos imports do projeto para evitar ValidationError.
+_DEMO_STUBS = {
+    "DATABASE_URL": "sqlite:///demo_hub.db",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "JWT_SECRET_KEY": "demo-hub-juridico-v2-chave-local-abc123xyz",
+    # Fernet key válida (32 bytes de zeros em base64url)
+    "ENCRYPTION_KEY": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "CELERY_BROKER_URL": "redis://localhost:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://localhost:6379/0",
+    # Placeholder para permitir o import; chamadas reais de IA falharão sem chave real
+    "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY or "sk-ant-demo-placeholder-sem-chave-real",
+}
+for _k, _v in _DEMO_STUBS.items():
+    os.environ.setdefault(_k, _v)
+
 # ── Imports do projeto ────────────────────────────────────────────────────────
 
 import anthropic as _anthropic
