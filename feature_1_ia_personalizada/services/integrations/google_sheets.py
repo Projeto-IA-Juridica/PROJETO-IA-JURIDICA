@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from typing import Any
 
 import structlog
 from google.oauth2 import service_account
@@ -22,7 +23,7 @@ _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _MAX_TENTATIVAS = 3
 
 
-def _retry_http(fn, max_tentativas: int = _MAX_TENTATIVAS):
+def _retry_http(fn: Any, max_tentativas: int = _MAX_TENTATIVAS) -> Any:
     """
     Executa fn com retry e backoff exponencial (1s, 2s, 4s).
 
@@ -102,7 +103,7 @@ class GoogleSheetsClient:
     def _ler_intervalo(self, intervalo: str) -> list[list[str]]:
         """Lê um intervalo e retorna lista de linhas (lista de strings)."""
 
-        def _fetch():
+        def _fetch() -> Any:
             resposta = (
                 self._sheet.values()
                 .get(spreadsheetId=self._spreadsheet_id, range=intervalo)
@@ -231,7 +232,7 @@ class GoogleSheetsClient:
             erro or detalhe,
         ]
 
-        def _append():
+        def _append() -> None:
             self._sheet.values().append(
                 spreadsheetId=self._spreadsheet_id,
                 range="Log!A:E",

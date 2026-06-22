@@ -200,7 +200,9 @@ def buscar_processo_ativo_do_cliente(id_cliente: int) -> Processo | None:
     )
 
 
-def salvar_interacao(*, id_cliente: int, id_processo: int | None, texto: str, metadata_json: dict):
+def salvar_interacao(
+    *, id_cliente: int, id_processo: int | None, texto: str, metadata_json: dict
+) -> None:
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -213,7 +215,7 @@ def salvar_interacao(*, id_cliente: int, id_processo: int | None, texto: str, me
 
 
 @shared_task(bind=True)
-def verificar_aniversarios_diarios(self) -> dict:
+def verificar_aniversarios_diarios(self: Any) -> dict[str, Any]:
     clientes = GoogleSheetsClient.get_clientes()
     clientes_ativos = clientes  # query já filtra ativo=True
 
@@ -304,7 +306,7 @@ def verificar_aniversarios_diarios(self) -> dict:
 
 
 @shared_task(bind=True)
-def verificar_datas_comemorativas(self) -> dict:
+def verificar_datas_comemorativas(self: Any) -> dict[str, Any]:
     clientes_ativos = GoogleSheetsClient.get_clientes()  # query já filtra ativo=True
 
     datas = GoogleSheetsClient.get_datas_comemorativas()
@@ -414,7 +416,7 @@ def verificar_datas_comemorativas(self) -> dict:
 
 
 @shared_task(bind=True)
-def verificar_clientes_sem_contato(self) -> dict:
+def verificar_clientes_sem_contato(self: Any) -> dict[str, Any]:
     clientes_ativos = GoogleSheetsClient.get_clientes()  # query já filtra ativo=True
 
     limite_maximo = 10
@@ -508,7 +510,7 @@ TEMPO_30_DIAS_NPS = 30 * 24 * 60 * 60  # TTL Redis: 30 dias
 
 
 @shared_task(bind=True)
-def solicitar_nps_cliente(self) -> dict:
+def solicitar_nps_cliente(self: Any) -> dict[str, Any]:
     """
     Roda diariamente. Identifica clientes cujo processo teve andamento há
     exatamente 7 dias e envia pesquisa de NPS via WhatsApp.
@@ -582,7 +584,7 @@ def solicitar_nps_cliente(self) -> dict:
 
 
 @shared_task(bind=True)
-def verificar_escalacoes_pendentes(self) -> dict:
+def verificar_escalacoes_pendentes(self: Any) -> dict[str, Any]:
     import asyncio
 
     from sqlalchemy import select
@@ -593,7 +595,7 @@ def verificar_escalacoes_pendentes(self) -> dict:
 
     agora = agora_local()
 
-    async def _processar():
+    async def _processar() -> dict[str, Any]:
         async with async_session_factory() as session:
             stmt = (
                 select(Interacao)

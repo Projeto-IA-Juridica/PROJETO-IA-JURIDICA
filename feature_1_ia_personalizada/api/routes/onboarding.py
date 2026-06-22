@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import structlog
@@ -249,7 +250,7 @@ def _preview_boas_vindas(persona_nome: str, persona_tom: str, nome_escritorio: s
     status_code=status.HTTP_201_CREATED,
     summary="Cria escritório e usuário admin (público)",
 )
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) -> RegisterResponse:
     """
     Cria o escritório e o usuário admin em uma única transação.
     Retorna JWT pronto para uso nas próximas etapas do onboarding.
@@ -375,7 +376,7 @@ async def configure_ia(
     body: ConfigurarIARequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Salva nome, tom e horários da IA. Retorna preview da mensagem de apresentação.
     Avança onboarding_etapa para 1.
@@ -433,7 +434,7 @@ async def import_processos(
     file: UploadFile = File(..., description="Arquivo CSV com clientes e processos"),
     preview: bool = False,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Reutiliza a lógica de admin_import.py para importação em massa.
     Avança onboarding_etapa para 2 após importação bem-sucedida (preview=false).
@@ -500,7 +501,7 @@ async def import_processos(
 async def connect_whatsapp(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Cria a instância na Evolution API e retorna o QR Code base64 para o cliente escanear.
     Ao conectar, o frontend deve fazer polling em GET /onboarding/whatsapp-status.
@@ -739,7 +740,7 @@ async def connect_whatsapp(
 async def whatsapp_status(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Endpoint de polling para o frontend verificar se o WhatsApp foi conectado.
     Retorna `connected=true` quando a instância estiver online.
@@ -800,7 +801,9 @@ async def whatsapp_status(
     "/disconnect-whatsapp",
     summary="Desconecta a instância WhatsApp e limpa configuração",
 )
-async def disconnect_whatsapp(request: Request, db: AsyncSession = Depends(get_db)):
+async def disconnect_whatsapp(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
     """
     Desconecta/remover a instância no Evolution (quando possível) e limpa o campo
     `webhook_whatsapp_instance` no banco para o escritório autenticado.
@@ -881,7 +884,7 @@ async def configure_templates(
     body: ConfigurarTemplatesRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Salva os templates personalizados. Se não informados, o sistema usará os defaults.
     Avança onboarding_etapa para 4.
@@ -915,7 +918,7 @@ async def configure_templates(
 async def go_live(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     - Ativa `monitoramento_ativo=True` para todos os processos importados.
     - Dispara task Celery de ingestão de jurisprudência pública (RAG).
@@ -984,7 +987,7 @@ async def go_live(
 async def onboarding_status(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Retorna a etapa atual e o checklist completo do onboarding.
     """

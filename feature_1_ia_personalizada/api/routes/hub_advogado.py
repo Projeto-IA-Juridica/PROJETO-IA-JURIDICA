@@ -17,6 +17,7 @@ import json
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 from uuid import UUID
 
 import structlog
@@ -168,7 +169,7 @@ async def analisar_peticao(
     arquivo: UploadFile = File(..., description="Arquivo PDF da petição (máx. 10 MB)"),
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
-):
+) -> dict[str, Any]:
     """
     Enfileira análise de petição PDF com Claude Opus.
 
@@ -253,7 +254,7 @@ async def status_job_hub(
     job_id: str,
     request: Request,
     advogado_id: int = Depends(get_advogado_id),
-):
+) -> dict[str, Any]:
     """
     Consulta o estado de um job assíncrono de análise de petição.
 
@@ -273,7 +274,7 @@ async def status_job_hub(
             detail="Job não encontrado ou expirado.",
         )
 
-    return json.loads(raw)
+    return cast(dict[str, Any], json.loads(raw))
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +291,7 @@ async def consultar(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
     escalacao_client: EscalacaoClient = Depends(get_escalacao_client),
-):
+) -> ConsultaHubResponse:
     """
     Consulta jurídica livre com Claude Opus.
 
@@ -410,7 +411,7 @@ async def listar_historico(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[SessaoAdvogadoListItem]:
     """
     Lista o histórico de sessões do Hub do advogado autenticado.
 
@@ -459,7 +460,7 @@ async def detalhar_sessao(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> SessaoAdvogadoResponse:
     """
     Retorna uma sessão do Hub em detalhe completo.
 
@@ -516,7 +517,7 @@ async def listar_conversas(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[ConversaListItem]:
     """
     Lista conversas (threads de múltiplas trocas Q&A) do advogado autenticado.
 
@@ -600,7 +601,7 @@ async def detalhar_conversa(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[ConversaMensagem]:
     """
     Retorna todas as mensagens de uma conversa em ordem cronológica.
 
@@ -663,9 +664,9 @@ def _require_admin(payload: dict = Depends(_get_payload)) -> dict:
     status_code=status.HTTP_200_OK,
 )
 async def metricas_hub(
-    payload: dict = Depends(_require_admin),
+    payload: dict[str, Any] = Depends(_require_admin),
     db: AsyncSession = Depends(get_db),
-):
+) -> MetricasHubResponse:
     """
     Métricas agregadas do Hub do Advogado para o mês atual.
 

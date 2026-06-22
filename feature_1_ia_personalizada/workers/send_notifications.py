@@ -145,23 +145,23 @@ def adquirir_bloqueio(chave: str, tempo_segundos: int) -> bool:
     return bool(get_redis().set(chave, "1", nx=True, ex=tempo_segundos))
 
 
-def buscar_processo_e_cliente(id_processo: int):
+def buscar_processo_e_cliente(id_processo: int) -> Any:
     return query_processo_e_cliente(id_processo)
 
 
-def buscar_processos_sem_movimentacao():
+def buscar_processos_sem_movimentacao() -> Any:
     return query_processos_sem_movimentacao()
 
 
-def buscar_clientes_para_pesquisa():
+def buscar_clientes_para_pesquisa() -> Any:
     return query_clientes_para_pesquisa()
 
 
-def buscar_clientes_ativos_por_escritorio(escritorio_id: int):
+def buscar_clientes_ativos_por_escritorio(escritorio_id: int) -> Any:
     return query_clientes_ativos_por_escritorio(escritorio_id)
 
 
-def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dados: dict):
+def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dados: dict) -> None:
     insert_interacao(
         id_cliente=id_cliente,
         id_processo=id_processo,
@@ -181,7 +181,9 @@ def registrar_interacao(id_cliente: int, id_processo: int | None, tipo: str, dad
     retry_backoff_max=600,
     max_retries=5,
 )
-def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: str):
+def enviar_notificacao_andamento(
+    self: Any, id_processo: int, descricao_andamento: str
+) -> dict[str, Any]:
 
     momento = agora_local()
 
@@ -196,7 +198,7 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
 
     service = _get_whatsapp_service()
 
-    async def _enviar():
+    async def _enviar() -> Any:
         resp = await service.enviar_notificacao_andamento(id_processo, descricao_andamento)
         await service.evolution_client.close()
         return resp
@@ -207,7 +209,7 @@ def enviar_notificacao_andamento(self, id_processo: int, descricao_andamento: st
 
 
 @shared_task(bind=True)
-def enviar_lote_sem_movimentacao(self):
+def enviar_lote_sem_movimentacao(self: Any) -> dict[str, Any]:
 
     momento = agora_local()
 
@@ -237,7 +239,7 @@ def enviar_lote_sem_movimentacao(self):
 
 
 @shared_task(bind=True)
-def enviar_pesquisa_satisfacao(self):
+def enviar_pesquisa_satisfacao(self: Any) -> dict[str, Any]:
 
     momento = agora_local()
 
@@ -278,14 +280,14 @@ def enviar_pesquisa_satisfacao(self):
     max_retries=3,
 )
 def processar_mensagem_recebida(
-    self,
+    self: Any,
     id_escritorio: int,
     id_cliente: int,
     mensagem: str,
     tipo: str,
     instance_nome: str | None = None,
     audio_message_id: str | None = None,
-):
+) -> dict[str, Any]:
     # Import lazy: evita importar asyncpg e SQLAlchemy no boot do módulo.
     # O orchestrator já envia a resposta via EvolutionClient em _node_enviar_resposta,
     # portanto esta task NÃO deve reenviar pelo WhatsApp.
@@ -399,7 +401,7 @@ def processar_mensagem_recebida(
 
 
 @shared_task(bind=True)
-def enviar_boas_vindas_escritorio(self, escritorio_id: int):
+def enviar_boas_vindas_escritorio(self: Any, escritorio_id: int) -> dict[str, Any]:
     """
     Disparada quando o WhatsApp do escritório conecta (evento connection.update/open).
 
@@ -457,8 +459,12 @@ def enviar_boas_vindas_escritorio(self, escritorio_id: int):
     max_retries=3,
 )
 def processar_resposta_advogado(
-    self, id_escritorio: int, id_advogado: int, texto_resposta: str, msg_context: dict
-):
+    self: Any,
+    id_escritorio: int,
+    id_advogado: int,
+    texto_resposta: str,
+    msg_context: dict[str, Any],
+) -> dict[str, Any]:
     """
     Processa a resposta de um advogado a uma escalação e envia ao cliente final.
     """
@@ -467,7 +473,7 @@ def processar_resposta_advogado(
     from shared.database.connection import async_session_factory
     from shared.models.interacao import Interacao
 
-    async def _processar():
+    async def _processar() -> None:
         async with async_session_factory() as session:
             interacao_id = None
             import re

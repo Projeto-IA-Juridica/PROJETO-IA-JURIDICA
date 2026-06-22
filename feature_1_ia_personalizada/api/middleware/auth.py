@@ -20,7 +20,8 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 from shared.config.settings import settings
 from shared.security.jwt import token_esta_revogado, validar_token
@@ -82,7 +83,7 @@ def _checar_basic_auth(request: Request) -> bool:
 
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
 
         # 0. Preflight CORS (OPTIONS) — sempre autoriza sem JWT

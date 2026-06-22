@@ -16,6 +16,7 @@ Uso:
 """
 
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from sqlalchemy import select
@@ -28,7 +29,7 @@ from shared.models.processo import Processo
 logger = structlog.get_logger(__name__)
 
 
-def _iso_or_none(value):
+def _iso_or_none(value: Any) -> str | None:
     return value.isoformat() if value else None
 
 

@@ -13,6 +13,7 @@ Query param:
 """
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -28,7 +29,7 @@ _STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
 @router.get("", include_in_schema=False)
-async def pagina_importacao():
+async def pagina_importacao() -> FileResponse:
     """Serve o mini-frontend de importação (HTML puro, sem autenticação)."""
     html_path = _STATIC_DIR / "import.html"
     if not html_path.exists():
@@ -42,7 +43,7 @@ async def importar_clientes(
     file: UploadFile = File(..., description="Arquivo CSV exportado do Google Sheets"),
     preview: bool = True,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Importa clientes a partir de um arquivo CSV.
 

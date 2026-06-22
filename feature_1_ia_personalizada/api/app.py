@@ -9,7 +9,9 @@ registra todos os roteadores de domínio e define tratadores de eventos de ciclo
 
 import asyncio
 import re
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import redis.asyncio as redis
 import sentry_sdk
@@ -160,7 +162,7 @@ _QUERIES_FREQUENTES = [
 ]
 
 
-async def _warmup_embeddings(redis_client) -> None:
+async def _warmup_embeddings(redis_client: Any) -> None:
     """
     Pré-aquece embeddings das queries mais comuns no cache Redis (TTL 24h).
     Falha silenciosamente — nunca deve travar o startup.
@@ -185,7 +187,7 @@ async def _warmup_embeddings(redis_client) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Executado ao iniciar o servidor (Startup)
     print("🚀 Iniciando o Concierge Jurídico Digital...")
 
@@ -314,7 +316,7 @@ Instrumentator(
 # ERROR HANDLER GLOBAL
 # ==========================================
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # Captura explícita necessária: o handler impede que o Sentry capture automaticamente
     sentry_sdk.capture_exception(exc)
     logger.error("erro_nao_tratado", path=request.url.path, erro=str(exc), exc_info=True)

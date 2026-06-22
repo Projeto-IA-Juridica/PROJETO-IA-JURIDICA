@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -158,7 +159,7 @@ async def criar_checkout(
     body: CheckoutRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> CheckoutResponse:
     """
     Cria uma Checkout Session no Stripe e retorna a URL para redirecionamento.
 
@@ -214,7 +215,7 @@ async def criar_checkout(
 async def stripe_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Recebe eventos do Stripe via webhook.
 
@@ -469,7 +470,7 @@ class PortalResponse(BaseModel):
 async def criar_portal(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> PortalResponse:
     """
     Cria uma Billing Portal Session e retorna a URL para o cliente
     gerenciar sua assinatura (cartão, plano, cancelamento, faturas).
@@ -519,7 +520,7 @@ class StatusAssinaturaResponse(BaseModel):
 async def status_assinatura(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> StatusAssinaturaResponse:
     """
     Retorna o status atual da assinatura do escritório autenticado.
     Usado pelo frontend para exibir banners de pagamento pendente.

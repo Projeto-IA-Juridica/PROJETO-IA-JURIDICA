@@ -14,6 +14,8 @@ Rate limits LGPD (por user_id — não por IP):
   - Deletar:    5 por hora (operação irreversível)
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
@@ -39,7 +41,7 @@ router = APIRouter(prefix="/clientes", tags=["Clientes — LGPD"])
 # ---------------------------------------------------------------------------
 
 
-def _make_lgpd_rate_limit(action: str, limit: int, window_s: int):
+def _make_lgpd_rate_limit(action: str, limit: int, window_s: int) -> Any:
     """
     Retorna uma FastAPI dependency que aplica rate limit por user_id no Redis.
     Falha aberta se Redis estiver indisponível (não bloqueia o usuário).
@@ -126,7 +128,7 @@ async def exportar_dados(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     user_id: int = Depends(get_advogado_id),
     _: None = Depends(_rl_exportar),
-):
+) -> JSONResponse:
     """
     Retorna todos os dados pessoais armazenados sobre o cliente em formato JSON.
 
@@ -177,7 +179,7 @@ async def deletar_dados(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     user_id: int = Depends(get_advogado_id),
     _: None = Depends(_rl_deletar),
-):
+) -> None:
     """
     Anonimiza todos os dados pessoais do cliente (direito ao esquecimento).
 

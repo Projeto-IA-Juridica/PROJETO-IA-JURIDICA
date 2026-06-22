@@ -104,7 +104,7 @@ async def listar_escalacoes(
     limit: int = Query(25, ge=1, le=100),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[EscalacaoItem]:
     """
     Lista escalações do escritório filtradas por status.
 
@@ -167,7 +167,7 @@ async def aprovar_escalacao(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Aprova a escalação enviando a resposta ao cliente via WhatsApp.
 
@@ -244,7 +244,7 @@ async def rejeitar_escalacao(
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Rejeita a escalação sem enviar resposta ao cliente.
     Útil para escalações inválidas ou duplicadas.

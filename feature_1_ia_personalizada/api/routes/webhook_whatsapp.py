@@ -45,14 +45,18 @@ async def receive_message(
     request: Request,
     apikey: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """
     Recebe os eventos da Evolution API.
     Filtra as mensagens recebidas de clientes (messages.upsert),
     localiza o Escritório e o Cliente correspondentes no banco de dados,
     e envia a tarefa pesada de I.A. para a fila do Celery.
     """
-    if not apikey or not settings.EVOLUTION_API_KEY or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY):
+    if (
+        not apikey
+        or not settings.EVOLUTION_API_KEY
+        or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY)
+    ):
         logger.warning("webhook_auth_failed", apikey_received=bool(apikey))
         raise HTTPException(status_code=401, detail="Unauthorized")
 

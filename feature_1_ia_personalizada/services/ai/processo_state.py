@@ -88,7 +88,7 @@ def _classificar_fase(texto: str) -> str:
     return "conhecimento"
 
 
-def _run(coro) -> Any:
+def _run(coro: Any) -> Any:
     """Executa corrotina bloqueante. Seguro em workers Celery."""
     return asyncio.run(coro)
 

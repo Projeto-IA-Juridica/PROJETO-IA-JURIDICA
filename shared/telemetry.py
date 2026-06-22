@@ -21,6 +21,7 @@ trace_id nos logs:
 """
 
 import os
+from typing import Any
 
 import structlog
 from opentelemetry import trace
@@ -37,7 +38,7 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 logger = structlog.get_logger(__name__)
 
 
-def setup_telemetry(app=None) -> None:
+def setup_telemetry(app: Any = None) -> None:
     """
     Inicializa OpenTelemetry.
 

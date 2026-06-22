@@ -5,7 +5,9 @@ Configuração de autorização, roles e permissionamento de rotas.
 Fornece dependências (Dependencies) do FastAPI para injetar o usuário atual.
 """
 
+from collections.abc import Callable
 from enum import StrEnum
+from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -82,7 +84,7 @@ async def get_current_user(
     return user
 
 
-def require_role(roles_permitidas: list[Role]):
+def require_role(roles_permitidas: list[Role]) -> Callable[..., Any]:
     """
     Decorator / Dependency provider para FastAPI.
     Filtra o acesso à rota apenas para usuários que tenham uma das roles permitidas.

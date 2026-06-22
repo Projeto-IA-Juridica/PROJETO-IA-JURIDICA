@@ -10,6 +10,7 @@ PUT  /escritorios/config  — atualiza campos editáveis pelo admin
 from __future__ import annotations
 
 from datetime import datetime as _dt
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -39,7 +40,7 @@ def _get_escritorio_id(request: Request) -> int:
     return int(payload["escritorio_id"])
 
 
-def _time_to_str(t) -> str | None:
+def _time_to_str(t: Any) -> str | None:
     return t.strftime("%H:%M") if t else None
 
 
@@ -119,7 +120,7 @@ def _escritorio_to_response(e: Escritorio) -> ConfigResponse:
 async def get_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> ConfigResponse:
     """Retorna a configuração atual do escritório autenticado."""
     escritorio_id = _get_escritorio_id(request)
     escritorio: Escritorio | None = await db.get(Escritorio, escritorio_id)
@@ -138,7 +139,7 @@ async def put_config(
     body: ConfigUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> ConfigResponse:
     """Atualiza campos editáveis do escritório. CNPJ e plano são imutáveis."""
     escritorio_id = _get_escritorio_id(request)
     escritorio: Escritorio | None = await db.get(Escritorio, escritorio_id)

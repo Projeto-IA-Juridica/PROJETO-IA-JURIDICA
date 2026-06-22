@@ -21,6 +21,7 @@ import redis
 import structlog
 
 from feature_1_ia_personalizada.services.ai.escalation_client import (
+    AnalisePecaResponse,
     EscalacaoClient,
     TipoAnalise,
 )
@@ -62,7 +63,7 @@ def hub_analisar_peticao_task(
     log.info("hub_worker.analisar_peticao.iniciando")
     r = _redis()
 
-    async def _run():
+    async def _run() -> AnalisePecaResponse:
         client = EscalacaoClient()
         analise = await client.analisar_peca(
             conteudo_peca=conteudo_texto,

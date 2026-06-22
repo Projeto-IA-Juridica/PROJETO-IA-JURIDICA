@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
@@ -51,7 +52,7 @@ def _get_user_id(request: Request) -> int:
         return 0
 
 
-def _get_redis(request: Request):
+def _get_redis(request: Request) -> Any:
     """Retorna o redis_client do app.state, ou None se indisponível."""
     return getattr(request.app.state, "redis_client", None)
 
@@ -76,7 +77,7 @@ async def list_processos(
         None,
         description="Filtra por nível de risco: baixo | moderado | alto | critico",
     ),
-):
+) -> ProcessoList:
     """
     Lista os processos do escritório logado (paginado).
     - Exclusivo: Oculta dados de outros escritórios (Multi-tenant).
@@ -211,7 +212,7 @@ async def create_processo(
     request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-):
+) -> Processo:
     """
     Cadastra um novo processo para acompanhamento.
     Verifica se o CNJ já foi cadastrado neste escritório.
@@ -266,7 +267,9 @@ async def create_processo(
 
 
 @router.get("/{processo_id}", response_model=ProcessoResponse)
-async def get_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+) -> Processo:
     """
     Detalha um processo específico, garantindo que pertença ao escritório do usuário.
     Inclui score de risco quando calculado (null se o worker ainda não processou).
@@ -290,7 +293,7 @@ async def update_processo(
     payload: ProcessoUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> Processo:
     """Edita dados manuais de um processo (Polo, Advogado, Frequencia de Monitoramento)."""
     escritorio_id = _get_escritorio_id(request)
 
@@ -324,7 +327,7 @@ async def enriquecer_processo(
     request: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-):
+) -> Processo:
     """
     Re-busca tribunal, vara, comarca e tipo_ação no DataJud para um processo já cadastrado.
     Útil para processos criados antes desta funcionalidade ou cujo enriquecimento falhou.
@@ -340,7 +343,9 @@ async def enriquecer_processo(
 
 
 @router.delete("/{processo_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_processo(processo_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+async def delete_processo(
+    processo_id: int, request: Request, db: AsyncSession = Depends(get_db)
+) -> None:
     """
     Soft delete: arquiva o processo e desativa o monitoramento.
     """

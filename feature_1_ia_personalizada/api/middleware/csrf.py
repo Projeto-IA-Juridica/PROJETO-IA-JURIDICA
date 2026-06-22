@@ -30,7 +30,8 @@ import secrets
 import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 logger = structlog.get_logger(__name__)
 
@@ -67,7 +68,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     Valida o token CSRF em todas as requisições mutantes que não estão na lista de isenção.
     """
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method in _METODOS_MUTANTES and not _rota_isenta(request.url.path):
             token_cookie = request.cookies.get(_COOKIE_NAME)
             token_header = request.headers.get(_HEADER_NAME)

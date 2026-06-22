@@ -5,11 +5,14 @@ Protege a API contra ataques de força bruta, flood ou spam.
 Usa Redis para criar um Sliding Window / Fixed Window counter.
 """
 
+from typing import Any
+
 import redis.asyncio as redis
 import structlog
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 
 logger = structlog.get_logger(__name__)
 
@@ -62,10 +65,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Controla o limite de requisições por IP ou por Usuário.
     """
 
-    def __init__(self, app):
+    def __init__(self, app: Any) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Se o redis não estiver instanciado pelas configurações do app no startup, skipa
         if not hasattr(request.app.state, "redis_client"):
             return await call_next(request)

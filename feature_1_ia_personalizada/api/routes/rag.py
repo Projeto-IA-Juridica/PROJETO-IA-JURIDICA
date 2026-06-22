@@ -129,7 +129,7 @@ async def upload_documento(
     tipo: str = Query(..., description=f"Um de: {', '.join(sorted(TIPOS_VALIDOS))}"),
     escritorio_id: int = Depends(get_escritorio_id),
     redis: Redis = Depends(get_redis),
-):
+) -> dict[str, Any]:
     """
     Faz upload de um documento jurídico e dispara ingestão assíncrona via Celery.
     Retorna imediatamente com um `job_id` para acompanhar o status.
@@ -207,7 +207,7 @@ async def status_ingestao(
     job_id: str,
     escritorio_id: int = Depends(get_escritorio_id),
     redis: Redis = Depends(get_redis),
-):
+) -> dict[str, Any]:
     """Retorna o status atual de um job de ingestão."""
     raw = await redis.get(f"{_JOB_KEY_PREFIX}{job_id}")
     if not raw:
@@ -232,7 +232,7 @@ async def listar_documentos(
     tipo: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-):
+) -> DocumentoListResponse:
     """Lista os documentos ingeridos pelo escritório, agrupados por doc_hash."""
     if tipo and tipo not in TIPOS_VALIDOS:
         raise HTTPException(status_code=422, detail=f"Tipo inválido: {tipo}")
@@ -304,7 +304,7 @@ async def deletar_documento(
     db: AsyncSession = Depends(get_db),
     escritorio_id: int = Depends(get_escritorio_id),
     store: VectorStore = Depends(get_vector_store),
-):
+) -> dict[str, Any]:
     """Soft delete de todos os chunks de um documento pelo doc_hash."""
     existe = (
         await db.execute(
@@ -335,7 +335,7 @@ async def buscar_semantico(
     body: BuscarRequest,
     escritorio_id: int = Depends(get_escritorio_id),
     retriever: RAGRetriever = Depends(get_rag_retriever),
-):
+) -> dict[str, Any]:
     """Busca semântica direta — para testes e debug internos."""
     filtros: dict[str, Any] | None = None
     if body.tipo or body.tribunal:

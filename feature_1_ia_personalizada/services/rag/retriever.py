@@ -223,7 +223,7 @@ def _mmr(candidatos: list[ResultadoBusca], k: int) -> list[ResultadoBusca]:
         else:
             tokens_sel = [tokens_por_id[s.id] for s in selecionados]
 
-            def _score(c: ResultadoBusca, _tokens_sel=tokens_sel) -> float:
+            def _score(c: ResultadoBusca, _tokens_sel: list[frozenset[str]] = tokens_sel) -> float:
                 max_sim = max(_jaccard(tokens_por_id[c.id], t) for t in _tokens_sel)
                 return relevancia[c.id] - max_sim
 

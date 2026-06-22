@@ -22,7 +22,8 @@ import uuid
 
 import structlog
 from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 from shared.telemetry import get_trace_id
@@ -31,7 +32,7 @@ logger = structlog.get_logger(__name__)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # 1. Limpa contexto do request anterior (contextvars são por task asyncio)
         clear_contextvars()
 

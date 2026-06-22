@@ -2,7 +2,7 @@ import json
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -130,7 +130,7 @@ async def get_history(
     request: Request,
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, le=200),
-):
+) -> list[InteracaoResponse]:
     """Retorna o histórico de conversas recentes de um cliente."""
     escritorio_id = _get_escritorio_id(request)
 
@@ -175,7 +175,7 @@ async def send_proactive_message(
     payload: SendMessageRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Envia uma mensagem ativamente (proativa) para um cliente da base via Celery."""
     escritorio_id = _get_escritorio_id(request)
 
@@ -208,7 +208,7 @@ async def get_chat_stats(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),
     dias: Annotated[int, Query(description="Janela de análise em dias (7, 30 ou 90)")] = 30,
-):
+) -> ChatStatsDashboardResponse:
     """
     Dashboard completo de analytics do escritório.
     Resultado cacheado no Redis por 15 minutos por (escritorio_id, dias).
@@ -314,7 +314,7 @@ async def exportar_relatorio(
     db: AsyncSession = Depends(get_db),
     mes: Annotated[str, Query(description="Mês no formato YYYY-MM (ex: 2026-03)")] = "",
     formato: Annotated[str, Query(description="Formato de exportação")] = "csv",
-):
+) -> Response:
     """
     Exporta todas as interações do mês indicado.
     Suporta formato=csv (padrão). PDF em backlog.

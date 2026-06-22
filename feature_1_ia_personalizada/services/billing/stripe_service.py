@@ -23,6 +23,8 @@ Mapeamento de planos:
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from shared.config.settings import settings
@@ -36,7 +38,7 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _get_stripe():
+def _get_stripe() -> Any:
     try:
         import stripe as _stripe
 
@@ -270,7 +272,7 @@ class StripeService:
     # Webhook
     # ------------------------------------------------------------------
 
-    def construir_evento(self, *, payload: bytes, sig_header: str):
+    def construir_evento(self, *, payload: bytes, sig_header: str) -> Any:
         """
         Valida a assinatura do webhook e retorna o objeto Event do Stripe.
 

@@ -79,7 +79,7 @@ class ProcessoWorker:
 # ---------------------------------------------------------------------------
 
 
-def _run(coro):
+def _run(coro: Any) -> Any:
     """Executa uma corrotina bloqueante. Seguro em workers Celery."""
     return asyncio.run(coro)
 

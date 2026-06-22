@@ -72,7 +72,7 @@ def _atualizar_job(job_id: str, updates: dict[str, Any]) -> None:
         logger.warning("ingest_job_update_falhou", job_id=job_id, erro=str(exc))
 
 
-def _deletar_tmp(arquivo_path: str, log) -> bool:
+def _deletar_tmp(arquivo_path: str, log: Any) -> bool:
     """
     Deleta o arquivo temporário. Retorna True se deletado com sucesso.
     Falha silenciosa com log para não mascarar outros erros.
@@ -103,7 +103,7 @@ def _deletar_tmp(arquivo_path: str, log) -> bool:
     retry_jitter=True,
 )
 def ingest_documento(
-    self,
+    self: Any,
     arquivo_path: str,
     escritorio_id: int,
     titulo: str,
@@ -208,7 +208,7 @@ async def _ingerir_async(
     titulo: str,
     tipo: str,
     metadata: dict[str, Any],
-):
+) -> Any:
     """Coroutine que instancia os serviços e executa a ingestão."""
     import redis.asyncio as redis_async
 
@@ -250,7 +250,7 @@ async def _ingerir_async(
     retry_backoff=60,
 )
 def ingest_jurisprudencia_publica(
-    self,
+    self: Any,
     tipo_acao: str,
     tribunal: str,
     escritorio_id: int,

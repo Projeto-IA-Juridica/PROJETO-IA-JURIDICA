@@ -9,6 +9,8 @@ nunca do body — para garantir isolamento multi-tenant.
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
@@ -43,7 +45,7 @@ def _escritorio_id(request: Request) -> int:
     return int(request.state.user_payload["escritorio_id"])
 
 
-def _redis(request: Request):
+def _redis(request: Request) -> Any:
     return getattr(request.app.state, "redis_client", None)
 
 
@@ -127,7 +129,7 @@ async def listar_clientes_crm(
     sem_analise: bool = Query(False, description="Retorna apenas clientes sem crm_nivel"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-):
+) -> list[CRMClienteCard]:
     eid = _escritorio_id(request)
 
     if nivel and nivel not in _NIVEIS_VALIDOS:
@@ -220,7 +222,7 @@ async def detalhe_cliente_crm(
     cliente_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> CRMClienteCard:
     eid = _escritorio_id(request)
     return await _get_crm_card(db, cliente_id, eid)
 
@@ -235,7 +237,7 @@ async def analisar_cliente(
     cliente_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     eid = _escritorio_id(request)
     r = _redis(request)
 
@@ -278,7 +280,7 @@ async def analisar_cliente(
 
 
 @router.post("/analisar-escritorio", status_code=status.HTTP_202_ACCEPTED)
-async def analisar_escritorio(request: Request):
+async def analisar_escritorio(request: Request) -> dict[str, Any]:
     eid = _escritorio_id(request)
     r = _redis(request)
 
@@ -306,7 +308,7 @@ async def analisar_escritorio(request: Request):
 async def resumo_crm(
     request: Request,
     db: AsyncSession = Depends(get_db),
-):
+) -> dict[str, Any]:
     eid = _escritorio_id(request)
 
     # Contagens por nível + média de score + sem análise

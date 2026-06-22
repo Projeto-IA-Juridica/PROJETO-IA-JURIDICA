@@ -80,7 +80,9 @@ def _hoje() -> str:
     soft_time_limit=120,
     time_limit=150,
 )
-def processar_mensagem_advogado(self, payload: dict[str, Any], usuario_id: int) -> dict:
+def processar_mensagem_advogado(
+    self: Any, payload: dict[str, Any], usuario_id: int
+) -> dict[str, Any]:
     """
     Processa uma mensagem do advogado no Hub.
 

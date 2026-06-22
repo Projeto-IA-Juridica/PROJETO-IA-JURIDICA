@@ -39,7 +39,9 @@ _LOGIN_LOCKOUT_S = 900  # 15 min — duração do bloqueio
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(request: Request, credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)):
+async def login(
+    request: Request, credentials: UsuarioLogin, db: AsyncSession = Depends(get_db)
+) -> TokenResponse:
     """
     Autentica um usuário (advogado, assistente, admin) com e-mail e senha.
     Retorna o Access Token (curta duração) e o Refresh Token (longa duração).
@@ -105,7 +107,7 @@ async def login(request: Request, credentials: UsuarioLogin, db: AsyncSession = 
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(request: Request, db: AsyncSession = Depends(get_db)):
+async def refresh(request: Request, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     """
     Renova o Access Token usando um Refresh Token válido.
     Espera receber o refresh token no Authorization header (Bearer).
@@ -162,7 +164,7 @@ class LogoutRequest(BaseModel):
 
 
 @router.post("/logout", status_code=204)
-async def logout(request: Request, body: LogoutRequest | None = None):
+async def logout(request: Request, body: LogoutRequest | None = None) -> None:
     """
     Invalida o Access Token (Authorization header) e o Refresh Token (body).
     Ambos são adicionados à blacklist do Redis com TTL até a expiração natural.
@@ -176,7 +178,7 @@ async def logout(request: Request, body: LogoutRequest | None = None):
 
 
 @router.get("/csrf-token", include_in_schema=True)
-async def csrf_token():
+async def csrf_token() -> JSONResponse:
     """
     Emite um novo token CSRF.
 
@@ -203,7 +205,7 @@ async def csrf_token():
 
 
 @router.get("/me", response_model=UsuarioResponse)
-async def get_me(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_me(request: Request, db: AsyncSession = Depends(get_db)) -> Usuario:
     """
     Retorna os dados do próprio usuário logado (Meu Perfil).
     Esta rota é protegida pelo JWTAuthMiddleware, logo request.state.user_payload vai existir.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import structlog
 from celery import Celery, Task
@@ -234,7 +235,9 @@ class DLQTask(Task):
 
     abstract = True
 
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
+    def on_failure(
+        self, exc: Exception, task_id: str, args: list, kwargs: dict, einfo: Any
+    ) -> None:
         max_retries = self.max_retries if self.max_retries is not None else 0
 
         if self.request.retries >= max_retries:
@@ -276,7 +279,7 @@ class DLQTask(Task):
 # Inicializa o JuridicalTranslator (singleton síncrono seguro) em cada processo worker.
 # Clientes assíncronos (Redis, Claude, Evolution) são criados por task — ver orchestrator.py.
 @worker_process_init.connect
-def _init_worker_process(**kwargs):
+def _init_worker_process(**kwargs: Any) -> None:
     from feature_1_ia_personalizada.services.ai.orchestrator import (
         inicializar_orchestrador_worker,
     )

@@ -8,6 +8,8 @@ Acesso: exclusivo para advogado e admin (require_advogado).
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +20,10 @@ from feature_1_ia_personalizada.api.middleware.auth import (
 from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
     DataJudProspeccaoClient,
 )
-from feature_1_ia_personalizada.services.prospeccao.dna_advogado import DNAAdvogadoService
+from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
+    DNAAdvogadoService,
+    DNAEscritorio,
+)
 from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import (
     EmpresaIntelligenceService,
 )
@@ -60,7 +65,7 @@ _matching_svc = MatchingService()
 async def get_dna(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> DNAEscritorio | DNAEscritorioResponse:
     """
     Retorna o DNA atual do escritório.
     Se não houver processos suficientes, retorna dados_insuficientes=True.
@@ -80,7 +85,7 @@ async def get_dna(
 async def atualizar_dna(
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> DNAEscritorio:
     """
     Força a regeneração do DNA do escritório.
     Lê os processos mais recentes e chama Claude para reclassificar especialidades.
@@ -100,7 +105,7 @@ async def descobrir_leads(
     body: DescobertaRequest,
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> PipelineResponse:
     """
     Motor principal de prospecção.
 
@@ -195,7 +200,7 @@ async def listar_pipeline(
     por_pagina: int = Query(default=20, ge=1, le=100),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> PipelineResponse:
     """Lista leads salvos com filtros opcionais."""
     from sqlalchemy import select
 
@@ -238,7 +243,7 @@ async def atualizar_status(
     body: LeadStatusUpdate,
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> LeadProspeccaoResponse:
     """Atualiza status e notas de um lead. Rejeita leads de outro escritório."""
     lead = await _get_lead_ou_403(lead_id=lead_id, escritorio_id=escritorio_id, db=db)
     lead.status = body.status
@@ -259,7 +264,7 @@ async def deletar_lead(
     lead_id: int,
     escritorio_id: int = Depends(get_escritorio_id_advogado),
     db: AsyncSession = Depends(get_db),
-):
+) -> None:
     """Remove um lead. Rejeita leads de outro escritório."""
     lead = await _get_lead_ou_403(lead_id=lead_id, escritorio_id=escritorio_id, db=db)
     await db.delete(lead)
@@ -271,7 +276,7 @@ async def deletar_lead(
 # ---------------------------------------------------------------------------
 
 
-async def _get_lead_ou_403(lead_id: int, escritorio_id: int, db: AsyncSession):
+async def _get_lead_ou_403(lead_id: int, escritorio_id: int, db: AsyncSession) -> Any:
     """Busca o lead e verifica propriedade. Levanta 403 se não pertencer ao escritório."""
     from sqlalchemy import select
 
@@ -290,9 +295,9 @@ async def _get_lead_ou_403(lead_id: int, escritorio_id: int, db: AsyncSession):
 
 async def _salvar_lead(
     escritorio_id: int,
-    litigante,
-    inteligencia,
-    resultado,
+    litigante: Any,
+    inteligencia: Any,
+    resultado: Any,
     tipo_lead: str,
     fonte: str,
     db: AsyncSession,

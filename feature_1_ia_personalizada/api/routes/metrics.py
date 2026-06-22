@@ -179,7 +179,7 @@ def _verificar_token(request: Request) -> None:
 
 
 @router.get("/metrics", include_in_schema=False)
-async def prometheus_metrics(request: Request):
+async def prometheus_metrics(request: Request) -> Response:
     """
     Expõe métricas no formato text/plain para o Prometheus scraper.
     Protegido por Bearer token (METRICS_TOKEN) + restrição de IP na infra.

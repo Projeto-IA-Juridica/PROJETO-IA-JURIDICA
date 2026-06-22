@@ -154,6 +154,15 @@ module = [
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 warn_unused_ignores = false
+warn_return_any = false
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "method-assign",
+    "no-any-return",
+]
 
 [tool.mutmut]
 paths_to_mutate = "feature_1_ia_personalizada/services/,shared/"

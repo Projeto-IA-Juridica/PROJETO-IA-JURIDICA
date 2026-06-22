@@ -11,6 +11,8 @@ Um lead é único por (escritorio_id, cnpj) — mesmo CNPJ pesquisado duas vezes
 → atualiza o registro existente. Para B2C, 'cnpj' armazena o número CNJ do processo.
 """
 
+from typing import Any
+
 from sqlalchemy import (
     Boolean,
     Integer,
@@ -94,10 +96,10 @@ class LeadProspeccao(Base, TimestampMixin, TenantMixin):
     fonte_descoberta: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     @property
-    def criado_em(self):
+    def criado_em(self) -> Any:
         """Alias de created_at para compatibilidade com o schema Pydantic."""
         return self.created_at
 
     @criado_em.setter
-    def criado_em(self, value):
+    def criado_em(self, value: Any) -> None:
         self.created_at = value

@@ -1,5 +1,7 @@
 # webhook_whatsapp.py
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -18,7 +20,7 @@ class WebhookWhatsAppEntrada(BaseModel):
 
 
 @router.post("/webhook/whatsapp")
-async def webhook_whatsapp(payload: WebhookWhatsAppEntrada, request: Request):
+async def webhook_whatsapp(payload: WebhookWhatsAppEntrada, request: Request) -> dict[str, Any]:
     if not payload.mensagem or not payload.tipo:
         raise HTTPException(status_code=400, detail="Payload inválido")
 

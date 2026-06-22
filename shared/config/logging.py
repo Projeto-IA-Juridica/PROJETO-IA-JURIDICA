@@ -63,7 +63,7 @@ from structlog.contextvars import merge_contextvars
 from shared.config.settings import settings
 
 
-def configure_logging():
+def configure_logging() -> None:
     logging.basicConfig(level=logging.INFO)
 
     structlog.configure(

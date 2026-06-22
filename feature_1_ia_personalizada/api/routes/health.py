@@ -179,13 +179,15 @@ async def _check_google_sheets() -> dict[str, Any]:
 
 
 @router.get("")
-async def health_basic():
+async def health_basic() -> dict[str, str]:
     """Health check superfícial — apenas verifica se a API está no ar."""
     return {"status": "ok", "service": "concierge-juridico"}
 
 
-@router.get("/ready")
-async def health_ready(request: Request, db: AsyncSession = Depends(get_db)):
+@router.get("/ready", response_model=None)
+async def health_ready(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any] | JSONResponse:
     """
     Verifica se a API está pronta: testa PostgreSQL e Redis.
     Retorna 503 se algum dos dois falhar.
@@ -202,8 +204,10 @@ async def health_ready(request: Request, db: AsyncSession = Depends(get_db)):
     return health
 
 
-@router.get("/detailed")
-async def health_detailed(request: Request, db: AsyncSession = Depends(get_db)):
+@router.get("/detailed", response_model=None)
+async def health_detailed(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> dict[str, Any] | JSONResponse:
     """
     Health check exaustivo — verifica todos os serviços:
       - PostgreSQL e Redis (críticos: falha → 503)
