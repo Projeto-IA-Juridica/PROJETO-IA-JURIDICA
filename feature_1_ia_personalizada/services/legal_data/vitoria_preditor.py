@@ -349,13 +349,13 @@ class VitoriaPreditor:
 
         classe = source.get("classe", {})
         if isinstance(classe, dict) and classe.get("nome"):
-            return classe["nome"]
+            return str(classe["nome"])
 
         assuntos = source.get("assuntos", [])
         if assuntos and isinstance(assuntos, list):
             primeiro = assuntos[0]
             if isinstance(primeiro, dict) and primeiro.get("nome"):
-                return primeiro["nome"]
+                return str(primeiro["nome"])
 
         return None
 

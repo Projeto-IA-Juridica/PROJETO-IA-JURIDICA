@@ -20,7 +20,7 @@ Fluxo:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -82,10 +82,11 @@ class AprovarRequest(BaseModel):
 def _extrair_escalacao(metadata: dict | None) -> dict[str, Any]:
     if not metadata:
         return {}
-    return metadata.get("escalacao", {})
+    return cast(dict[str, Any], metadata.get("escalacao", {}))
 
 
 def _get_evolution() -> EvolutionClient:
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     return EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
 
 

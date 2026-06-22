@@ -111,6 +111,7 @@ def downgrade() -> None:
 
     # Recria processos_publicos (órfã)
     from sqlalchemy.dialects.postgresql import JSONB
+
     op.add_column(
         "leads_prospeccao",
         sa.Column("processos_publicos", JSONB(), server_default="[]", nullable=False),

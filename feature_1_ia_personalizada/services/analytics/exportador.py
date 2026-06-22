@@ -40,8 +40,11 @@ def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
         ) from e
 
     inicio = dt.replace(tzinfo=UTC)
-    fim = inicio.replace(year=inicio.year + 1, month=1) if inicio.month == 12 \
+    fim = (
+        inicio.replace(year=inicio.year + 1, month=1)
+        if inicio.month == 12
         else inicio.replace(month=inicio.month + 1)
+    )
     return inicio, fim
 
 
@@ -91,8 +94,7 @@ class ExportadorAnalytics:
                 Processo.score_nivel,
                 Processo.ultimo_andamento,
                 Processo.data_ultimo_andamento,
-            )
-            .join(sub, (Processo.cliente_id == sub.c.cliente_id) & (Processo.id == sub.c.max_id))
+            ).join(sub, (Processo.cliente_id == sub.c.cliente_id) & (Processo.id == sub.c.max_id))
         )
         processos = {row.cliente_id: row for row in proc_result.all()}
 
@@ -129,7 +131,8 @@ class ExportadorAnalytics:
             andamento = (proc.ultimo_andamento or "Sem andamentos") if proc else "—"
             data_and = (
                 proc.data_ultimo_andamento.strftime("%d/%m/%Y")
-                if proc and proc.data_ultimo_andamento else "—"
+                if proc and proc.data_ultimo_andamento
+                else "—"
             )
 
             nps = float(ints.nps_medio) if ints and ints.nps_medio is not None else None
@@ -146,15 +149,17 @@ class ExportadorAnalytics:
             horas = round(total_msgs * _MIN_POR_INTERACAO / 60, 1)
             economia = _fmt_brl(round(horas * _VALOR_HORA_ADV_BRL, 2))
 
-            writer.writerow([
-                cliente.nome,
-                cnj,
-                tipo,
-                risco,
-                andamento,
-                data_and,
-                satisfacao,
-                economia,
-            ])
+            writer.writerow(
+                [
+                    cliente.nome,
+                    cnj,
+                    tipo,
+                    risco,
+                    andamento,
+                    data_and,
+                    satisfacao,
+                    economia,
+                ]
+            )
 
         return buf.getvalue().encode("utf-8-sig")

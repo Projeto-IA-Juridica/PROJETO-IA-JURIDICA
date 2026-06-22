@@ -11,6 +11,8 @@ Uso em runtime:
 
 from __future__ import annotations
 
+from typing import cast
+
 # -----------------------------------------------------------
 # BOAS-VINDAS
 # -----------------------------------------------------------
@@ -148,7 +150,7 @@ async def carregar_templates(
         try:
             cached = await redis_client.get(cache_key)
             if cached:
-                return json.loads(cached)
+                return cast(dict[str, str], json.loads(cached))
         except Exception:
             pass  # Redis indisponível — segue
 

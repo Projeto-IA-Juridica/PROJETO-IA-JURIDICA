@@ -146,8 +146,9 @@ class VibeProspectingClient:
             "id": 1,
         }
 
+        headers_clean: dict[str, str] = {k: str(v) for k, v in headers.items() if v is not None}
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(_MCP_URL, headers=headers, json=payload)
+            resp = await client.post(_MCP_URL, headers=headers_clean, json=payload)
             resp.raise_for_status()
             data = resp.json()
 

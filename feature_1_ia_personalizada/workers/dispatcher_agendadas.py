@@ -84,6 +84,7 @@ async def _processar_lote() -> tuple[int, int]:
     # Obtém instância do WhatsApp e envia cada mensagem fora da transação principal
     # (cada envio tem seu próprio try/except para não abortar o lote inteiro)
     repo = SQLWhatsAppRepository()
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     evolution = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
 
     try:

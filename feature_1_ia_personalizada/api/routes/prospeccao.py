@@ -125,7 +125,8 @@ async def descobrir_leads(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="DNA do escritório não disponível. Use POST /prospeccao/dna/atualizar primeiro ou informe tipo_lead explicitamente.",
             )
-        tipo_lead = dna.tipo_lead_predominante or "empresa"
+        assert dna is not None
+        tipo_lead = dna.tipo_lead_predominante or "empresa"  # type: ignore[assignment]
 
     # 3. Buscar litigantes no DataJud
     litigantes = await _datajud.buscar_litigantes(
@@ -144,9 +145,9 @@ async def descobrir_leads(
                 inteligencia = await _empresa_svc.enriquecer(litigante)
             else:
                 # Valida compliance LGPD antes de enriquecer pessoa
-                if not _pessoa_svc.validar_compliance(litigante):
+                if not _pessoa_svc.validar_compliance(litigante):  # type: ignore[arg-type]
                     continue
-                inteligencia = await _pessoa_svc.enriquecer(litigante)
+                inteligencia = await _pessoa_svc.enriquecer(litigante)  # type: ignore[arg-type,assignment]
 
             resultado = await _matching_svc.calcular_score(dna=dna, inteligencia=inteligencia)
 

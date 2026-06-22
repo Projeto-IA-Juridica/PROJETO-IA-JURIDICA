@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import structlog
@@ -221,7 +221,7 @@ class EmbeddingGenerator:
 
     async def _redis_mget(self, chaves: list[str]) -> list[Any]:
         try:
-            return await self._redis.mget(*chaves)
+            return cast(list[Any], await self._redis.mget(*chaves))
         except Exception as exc:
             logger.debug("embedding_cache_mget_erro", erro=str(exc))
             return [None] * len(chaves)

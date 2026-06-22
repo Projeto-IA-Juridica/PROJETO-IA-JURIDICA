@@ -53,6 +53,7 @@ logger = structlog.get_logger(__name__)
 
 
 def _get_whatsapp_service() -> WhatsAppService:
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     client = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
     repo = SQLWhatsAppRepository()
     return WhatsAppService(evolution_client=client, repositorio=repo)
@@ -331,7 +332,7 @@ async def _handler_status_escritorio(
         .where(
             Processo.escritorio_id == escritorio.id,
             Processo.monitoramento_ativo.is_(True),
-            Processo.proximo_prazo.between(hoje, amanha_7d),
+            Processo.proximo_prazo.between(hoje, amanha_7d),  # type: ignore[attr-defined]
         )
     )
     processos_prazo = (await session.execute(stmt_prazo)).scalar() or 0
@@ -380,6 +381,7 @@ async def _handler_analise_peticao(
     )
 
     # Baixar PDF via Evolution API
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     evo = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
     try:
         conteudo_bytes = await evo.baixar_media(instance, message_id)
@@ -557,6 +559,7 @@ async def _handler_insight_cliente(
             nome_cliente = cliente.nome
             try:
                 aggregator = CRMDataAggregator(session)
+                assert cliente_id is not None
                 ctx = await aggregator.coletar_contexto_cliente(cliente_id, escritorio.id)
                 crm_score = str(ctx.crm_score_anterior or "N/D")
                 ultima_acao = ctx.crm_acao_sugerida_anterior or "Nenhuma"
@@ -877,6 +880,7 @@ async def _enviar_whatsapp(
     if not numero or not instance:
         logger.warning("hub_envio_sem_numero", usuario_id=usuario.id)
         return
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     evo = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
     try:
         await evo.enviar_texto(instance, numero, resposta)

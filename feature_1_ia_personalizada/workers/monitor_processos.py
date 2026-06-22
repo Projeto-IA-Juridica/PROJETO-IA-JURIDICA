@@ -162,7 +162,9 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
                 try:
                     update_metadados_processo(id_processo, metadados)
                 except Exception as exc:
-                    logger.warning("update_metadados_falhou", processo_id=id_processo, erro=str(exc))
+                    logger.warning(
+                        "update_metadados_falhou", processo_id=id_processo, erro=str(exc)
+                    )
         else:
             lista_andamentos = buscar_andamentos_datajud(
                 numero_processo,

@@ -256,7 +256,9 @@ async def create_processo(
         await invalidar_cache_dna_async(redis, escritorio_id)
 
     # Enriquece com DataJud diretamente (sem Celery) — garante tribunal/vara/comarca na resposta
-    background_tasks.add_task(_enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj)
+    background_tasks.add_task(
+        _enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj
+    )
     # Dispara também via Celery para o ciclo de monitoramento periódico
     background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
 

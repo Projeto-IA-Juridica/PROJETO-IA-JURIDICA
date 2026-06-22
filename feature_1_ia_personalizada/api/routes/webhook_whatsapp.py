@@ -52,7 +52,7 @@ async def receive_message(
     localiza o Escritório e o Cliente correspondentes no banco de dados,
     e envia a tarefa pesada de I.A. para a fila do Celery.
     """
-    if not apikey or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY):
+    if not apikey or not settings.EVOLUTION_API_KEY or not hmac.compare_digest(apikey, settings.EVOLUTION_API_KEY):
         logger.warning("webhook_auth_failed", apikey_received=bool(apikey))
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -356,6 +356,7 @@ async def _processar_resposta_nps(
     from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
     from shared.config.settings import settings
 
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     evo = EvolutionClient(
         base_url=settings.EVOLUTION_API_URL,
         api_key=settings.EVOLUTION_API_KEY,
@@ -366,7 +367,7 @@ async def _processar_resposta_nps(
             "Seu feedback é muito importante para continuarmos melhorando o atendimento. 🙏"
         )
         await evo.enviar_texto(
-            escritorio.webhook_whatsapp_instance,
+            escritorio.webhook_whatsapp_instance,  # type: ignore[arg-type]
             cliente.telefone_whatsapp,
             agradecimento,
         )
@@ -390,8 +391,8 @@ async def _processar_resposta_nps(
             )
             for adv in advogados:
                 await evo.enviar_texto(
-                    escritorio.webhook_whatsapp_instance,
-                    adv.whatsapp_numero,
+                    escritorio.webhook_whatsapp_instance,  # type: ignore[arg-type]
+                    adv.whatsapp_numero,  # type: ignore[arg-type]
                     alerta,
                 )
             logger.info(

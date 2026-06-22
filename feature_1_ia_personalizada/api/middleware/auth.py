@@ -14,6 +14,7 @@ Também expõe dependências FastAPI para controle de acesso por role:
 """
 
 import secrets
+from typing import Any, cast
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -165,14 +166,14 @@ _bearer = HTTPBearer(auto_error=False)
 def _get_payload(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> dict:
+) -> dict[Any, Any]:
     """Extrai e valida o JWT da requisição, retornando o payload."""
     token: str | None = None
     if credentials:
         token = credentials.credentials
     elif hasattr(request.state, "user_payload"):
         # Já validado pelo middleware — reaproveita
-        return request.state.user_payload
+        return cast(dict[Any, Any], request.state.user_payload)
 
     if not token:
         raise HTTPException(

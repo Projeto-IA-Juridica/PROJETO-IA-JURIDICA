@@ -23,6 +23,7 @@ from typing import Any
 
 import structlog
 from anthropic import AsyncAnthropic
+from anthropic.types import TextBlock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -299,7 +300,8 @@ class DocumentoIngester:
             )
             import json
 
-            raw = resp.content[0].text
+            text_blocks = [block.text for block in resp.content if isinstance(block, TextBlock)]
+            raw = text_blocks[0] if text_blocks else ""
 
             # Extrai o objeto JSON usando regex — robusto contra filler conversacional
             # e markdown (ex: "Aqui está o JSON: {...}").

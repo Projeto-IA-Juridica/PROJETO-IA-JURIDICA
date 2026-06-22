@@ -125,10 +125,10 @@ async def importar_clientes(
         ) from exc
     except Exception as exc:
         import traceback
+
         tb = traceback.format_exc()
         raise HTTPException(
-            status_code=500,
-            detail=f"Erro fatal: {str(exc)}\nTraceback: {tb}"
+            status_code=500, detail=f"Erro fatal: {str(exc)}\nTraceback: {tb}"
         ) from exc
 
     return resultado

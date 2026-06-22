@@ -559,6 +559,7 @@ async def _enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) 
         )
         return
 
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     client = EvolutionClient(
         base_url=settings.EVOLUTION_API_URL,
         api_key=settings.EVOLUTION_API_KEY,

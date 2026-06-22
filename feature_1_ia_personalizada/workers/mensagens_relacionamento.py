@@ -611,7 +611,7 @@ def verificar_escalacoes_pendentes(self) -> dict:
             alertas_criticos = 0
 
             for interacao in interacoes:
-                meta = dict(interacao.metadata_json)
+                meta = dict(interacao.metadata_json) if interacao.metadata_json is not None else {}
                 esc_meta = dict(meta.get("escalacao", {}))
 
                 if esc_meta.get("status") != "pendente":
@@ -623,7 +623,7 @@ def verificar_escalacoes_pendentes(self) -> dict:
 
                 try:
                     # ts_criacao tem o formato ISO. Pode ter Z no final.
-                    from dateutil.parser import isoparse
+                    from dateutil.parser import isoparse  # type: ignore[import-untyped]
 
                     ts_criacao = isoparse(criacao_str)
                     if ts_criacao.tzinfo is None:
@@ -662,6 +662,7 @@ def verificar_escalacoes_pendentes(self) -> dict:
                             f"ID: #{interacao.id}\n\n"
                             f"Por favor aprovar a sugestão ou responder para não prejudicarmos o atendimento jurídico."
                         )
+                        assert adv.whatsapp_numero is not None
                         WhatsAppService.enviar_mensagem(
                             id_cliente=interacao.cliente_id,
                             telefone=adv.whatsapp_numero,

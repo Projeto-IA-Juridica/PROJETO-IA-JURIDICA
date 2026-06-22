@@ -282,7 +282,7 @@ class MatchingService:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(
                     _ANTHROPIC_API_URL,
-                    headers={
+                    headers={  # type: ignore[arg-type]
                         "x-api-key": self._api_key,
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json",

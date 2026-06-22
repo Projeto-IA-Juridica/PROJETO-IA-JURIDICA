@@ -216,7 +216,8 @@ class DataJudProspeccaoClient:
                     error=str(res),
                 )
                 continue
-            brutos.extend(res)
+            if isinstance(res, list):
+                brutos.extend(res)
 
         logger.info(
             "datajud_prosp.busca_concluida",

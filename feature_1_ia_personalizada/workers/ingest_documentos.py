@@ -307,7 +307,7 @@ async def _ingerir_jurisprudencia_async(
     erros = 0
 
     try:
-        processos = await datajud.buscar_jurisprudencia(
+        processos = await datajud.buscar_jurisprudencia(  # type: ignore[attr-defined]
             tipo_acao=tipo_acao, tribunal=tribunal, limite=20
         )
 

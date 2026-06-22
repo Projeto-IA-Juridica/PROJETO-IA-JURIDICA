@@ -206,13 +206,9 @@ class ProcessoResponse(BaseModel):
             # Fallback: usa o último andamento salvo como único item
             if self.ultimo_andamento:
                 data_str = (
-                    self.data_ultimo_andamento.isoformat()
-                    if self.data_ultimo_andamento
-                    else None
+                    self.data_ultimo_andamento.isoformat() if self.data_ultimo_andamento else None
                 )
-                self.andamentos = [
-                    AndamentoSimples(descricao=self.ultimo_andamento, data=data_str)
-                ]
+                self.andamentos = [AndamentoSimples(descricao=self.ultimo_andamento, data=data_str)]
             return self
 
         # ultimos está ordenado do mais antigo ao mais recente; inverte para exibir do mais novo
@@ -234,7 +230,7 @@ class ProcessoComAndamentos(ProcessoResponse):
     Retornada em GET /processos/{id}.
     """
 
-    andamentos: list[AndamentoSchema] = Field(
+    andamentos: list[AndamentoSchema] = Field(  # type: ignore[assignment]
         default_factory=list,
         description="Últimos andamentos do processo (máx. 10), ordenados do mais recente",
     )

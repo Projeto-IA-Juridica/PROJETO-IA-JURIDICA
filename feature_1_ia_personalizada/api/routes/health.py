@@ -90,7 +90,7 @@ async def _check_evolution_api() -> dict[str, Any]:
         t = time.perf_counter()
         async with httpx.AsyncClient(
             timeout=_CHECK_TIMEOUT,
-            headers={"apikey": settings.EVOLUTION_API_KEY},
+            headers={"apikey": settings.EVOLUTION_API_KEY},  # type: ignore[arg-type]
         ) as client:
             resp = await client.get(f"{settings.EVOLUTION_API_URL}/instance/fetchInstances")
         latency_ms = round((time.perf_counter() - t) * 1000, 2)

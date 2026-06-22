@@ -165,7 +165,7 @@ class EvolutionClient:
     def _calcular_backoff(self, tentativa: int) -> float:
         # tentativa=1 => backoff_base*1, tentativa=2 => *2, tentativa=3 => *4
         delay = self._config.backoff_base_seconds * (2 ** (tentativa - 1))
-        return float(min(delay, self._config.backoff_max_seconds))  # type: ignore[no-any-return]
+        return float(min(delay, self._config.backoff_max_seconds))
 
     # Métodos do enunciado
 

@@ -165,7 +165,7 @@ class LinkedInClient:
             try:
                 token = await self._redis.get(cache_key)
                 if token:
-                    return token
+                    return str(token)
             except Exception:
                 pass
 
@@ -188,7 +188,7 @@ class LinkedInClient:
                     await self._redis.setex(cache_key, _CACHE_TTL_TOKEN_S, token)
                 except Exception:
                     pass
-            return token
+            return str(token) if token else None
 
         except Exception as exc:
             logger.warning("linkedin.token_request_error", error=str(exc))

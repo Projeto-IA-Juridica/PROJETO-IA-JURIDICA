@@ -194,6 +194,7 @@ async def criar_checkout(
         await db.refresh(escritorio)
 
     # Cria a Checkout Session
+    assert escritorio.stripe_customer_id is not None
     checkout_url = await asyncio.to_thread(
         stripe_service.criar_checkout_session,
         stripe_customer_id=escritorio.stripe_customer_id,

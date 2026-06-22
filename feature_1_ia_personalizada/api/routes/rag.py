@@ -63,7 +63,7 @@ _JOB_TTL = 60 * 60 * 24  # 24 horas
 
 
 def get_redis(request: Request) -> Redis:
-    return request.app.state.redis_client
+    return request.app.state.redis_client  # type: ignore[no-any-return]
 
 
 def get_escritorio_id(request: Request) -> int:

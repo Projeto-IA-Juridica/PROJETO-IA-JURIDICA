@@ -91,6 +91,7 @@ MENSAGEM_BOAS_VINDAS = (
 
 
 def _get_whatsapp_service() -> WhatsAppService:
+    assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
     client = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
     repo = SQLWhatsAppRepository()
     return WhatsAppService(evolution_client=client, repositorio=repo)
@@ -309,6 +310,7 @@ def processar_mensagem_recebida(
                 validar_duracao_audio,
             )
 
+            assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
             evo = EvolutionClient(settings.EVOLUTION_API_URL, settings.EVOLUTION_API_KEY)
             try:
                 ogg_bytes = await evo.baixar_media(instance_nome, audio_message_id)
@@ -323,7 +325,7 @@ def processar_mensagem_recebida(
                 audio_transcritos_total as _ctr_audio,
             )
         except Exception:
-            _ctr_audio = None  # métricas opcionais
+            _ctr_audio: Any = None  # type: ignore[no-redef]  # métricas opcionais
 
         try:
             mensagem = asyncio.run(_transcrever())

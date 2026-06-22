@@ -35,7 +35,7 @@ _MAX_SIMULTANEAS = 10  # máx análises paralelas por escritório (chord)
 
 
 def _redis_client() -> redis.Redis:
-    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------

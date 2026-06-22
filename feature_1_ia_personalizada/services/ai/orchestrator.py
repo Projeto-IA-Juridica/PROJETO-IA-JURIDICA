@@ -688,6 +688,7 @@ def executar_fluxo_orquestrador(
 
     async def _run() -> dict[str, Any]:
         redis_client = aioredis.from_url(settings.REDIS_URL)
+        assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
         try:
             orchestrador = ConversationOrchestrator(
                 claude_client=ClaudeClient(api_key=settings.ANTHROPIC_API_KEY),

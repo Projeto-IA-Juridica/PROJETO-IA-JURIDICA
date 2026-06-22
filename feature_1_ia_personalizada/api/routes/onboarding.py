@@ -463,10 +463,10 @@ async def import_processos(
         ) from exc
     except Exception as exc:
         import traceback
+
         tb = traceback.format_exc()
         raise HTTPException(
-            status_code=500,
-            detail=f"Erro fatal: {str(exc)}\nTraceback: {tb}"
+            status_code=500, detail=f"Erro fatal: {str(exc)}\nTraceback: {tb}"
         ) from exc
 
     # Avança etapa somente em importação real
@@ -478,10 +478,10 @@ async def import_processos(
             await db.commit()
         except Exception as exc:
             import traceback
+
             tb = traceback.format_exc()
             raise HTTPException(
-                status_code=500,
-                detail=f"Erro fatal no commit: {str(exc)}\nTraceback: {tb}"
+                status_code=500, detail=f"Erro fatal no commit: {str(exc)}\nTraceback: {tb}"
             ) from exc
 
     logger.info("onboarding_import_processos", escritorio_id=escritorio_id, preview=preview)
@@ -588,7 +588,7 @@ async def connect_whatsapp(
                         headers={"apikey": settings.EVOLUTION_API_KEY or ""},
                     )
                     if resp_connect.status_code in (200, 201):
-                        return resp_connect.json()
+                        return resp_connect.json()  # type: ignore[no-any-return]
                     ultima_resposta = resp_connect
 
                 detail = "Instância criada/existente, mas falhou ao iniciar conexão para gerar QR."

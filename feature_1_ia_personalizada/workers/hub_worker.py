@@ -36,7 +36,7 @@ _JOB_TTL = 3600  # 1 hora
 
 
 def _redis() -> redis.Redis:
-    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)  # type: ignore[no-any-return]
 
 
 def _set_job(r: redis.Redis, job_id: str, payload: dict) -> None:

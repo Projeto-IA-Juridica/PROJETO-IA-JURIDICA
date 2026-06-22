@@ -163,7 +163,7 @@ class StripeService:
             logger.info(
                 "stripe.customer_criado", customer_id=customer.id, escritorio_id=escritorio_id
             )
-            return customer.id
+            return str(customer.id)
         except Exception as exc:
             logger.error("stripe.criar_customer_erro", erro=str(exc), escritorio_id=escritorio_id)
             raise
@@ -229,7 +229,7 @@ class StripeService:
                 customer_id=stripe_customer_id,
                 plano=plano,
             )
-            return session.url
+            return str(session.url) if session.url is not None else None
         except Exception as exc:
             logger.error("stripe.checkout_session_erro", erro=str(exc))
             raise
@@ -261,7 +261,7 @@ class StripeService:
                 return_url=return_url or settings.STRIPE_SUCCESS_URL,
             )
             logger.info("stripe.portal_session_criada", customer_id=stripe_customer_id)
-            return session.url
+            return str(session.url) if session.url is not None else None
         except Exception as exc:
             logger.error("stripe.portal_session_erro", erro=str(exc))
             raise

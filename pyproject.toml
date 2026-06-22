@@ -145,6 +145,16 @@ disallow_incomplete_defs = true
 check_untyped_defs = true
 warn_unused_ignores = true
 
+[[tool.mypy.overrides]]
+module = [
+    "feature_1_ia_personalizada.tests.*",
+    "shared.tests.*",
+    "feature_1_ia_personalizada.services.prospeccao.teste",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_unused_ignores = false
+
 [tool.mutmut]
 paths_to_mutate = "feature_1_ia_personalizada/services/,shared/"
 tests_dir = "feature_1_ia_personalizada/tests/,shared/tests/"

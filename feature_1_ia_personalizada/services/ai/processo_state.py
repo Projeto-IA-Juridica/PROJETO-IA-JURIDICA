@@ -17,7 +17,7 @@ com workers Celery que não possuem event loop ativo.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from sqlalchemy import desc, select, update
@@ -115,7 +115,7 @@ async def _get_state(processo_id: int) -> dict[str, Any]:
     if estado_atual is None:
         return _estado_inicial()
 
-    return estado_atual
+    return cast(dict[str, Any], estado_atual)
 
 
 async def _update_state(processo_id: int, novo_andamento: str) -> dict[str, Any]:
