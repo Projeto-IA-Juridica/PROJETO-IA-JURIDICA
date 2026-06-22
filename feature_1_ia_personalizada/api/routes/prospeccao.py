@@ -259,7 +259,7 @@ async def atualizar_status(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def deletar_lead(
     lead_id: int,
     escritorio_id: int = Depends(get_escritorio_id_advogado),

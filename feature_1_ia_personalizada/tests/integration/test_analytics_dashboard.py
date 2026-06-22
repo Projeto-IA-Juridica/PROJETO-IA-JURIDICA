@@ -317,5 +317,5 @@ async def test_export_csv_retorna_arquivo(app_client):
 
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
-    assert "relatorio_interacoes_2026-03.csv" in response.headers["content-disposition"]
+    assert "resumo_clientes_2026-03.csv" in response.headers["content-disposition"]
     assert response.content == csv_bytes

@@ -36,6 +36,7 @@ PROCESSO_COBRANCA = {
     "data_ultimo_andamento": "2024-01-10",
     "tipo_acao": "Ação de Cobrança",
     "polo_cliente": "autor",
+    "tribunal": "TJSP",
 }
 
 ANDAMENTO_INSTRUCAO = {

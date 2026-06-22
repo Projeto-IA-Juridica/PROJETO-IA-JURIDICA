@@ -41,6 +41,7 @@ PROCESSO = {
     "id": 1,
     "numero": "0001234-12.2023.8.26.0100",
     "data_ultimo_andamento": "2024-01-10",
+    "tribunal": "TJSP",
 }
 
 ANDAMENTO_A = {"texto": "Despacho ordinatório", "data": "2024-01-20"}
