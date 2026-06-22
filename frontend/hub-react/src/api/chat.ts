@@ -8,7 +8,7 @@ export async function exportarRelatorio(mes: string): Promise<void> {
   const url = URL.createObjectURL(data)
   const a = document.createElement('a')
   a.href = url
-  a.download = `relatorio_interacoes_${mes}.csv`
+  a.download = `resumo_clientes_${mes}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }

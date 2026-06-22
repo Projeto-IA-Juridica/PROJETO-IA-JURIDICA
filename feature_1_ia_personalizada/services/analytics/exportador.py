@@ -1,39 +1,37 @@
 """
 feature_1_ia_personalizada/services/analytics/exportador.py
 ============================================================
-Exportação de relatórios de interações em CSV.
-Usa apenas a stdlib (csv, io) — sem dependências extras.
+Exportação de relatório executivo do advogado em CSV.
+Uma linha por cliente — foco no que gera valor para o advogado.
 """
 
 import csv
 import io
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.models.cliente import Cliente
 from shared.models.interacao import Interacao
+from shared.models.processo import Processo
+
+_VALOR_HORA_ADV_BRL = 350.0
+_MIN_POR_INTERACAO = 3.0
 
 _CABECALHO_CSV = [
-    "id",
-    "data",
-    "tipo",
-    "direcao",
-    "mensagem_cliente",
-    "mensagem_ia",
-    "tokens_input",
-    "tokens_output",
-    "custo_estimado_usd",
-    "satisfacao_nps",
-    "tempo_resposta_ms",
+    "Cliente",
+    "Processo (CNJ)",
+    "Tipo de Ação",
+    "Risco",
+    "Último Andamento",
+    "Data do Andamento",
+    "Satisfação",
+    "Economia Estimada no Mês",
 ]
 
 
 def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
-    """
-    Converte 'YYYY-MM' em (inicio_mes, inicio_mes_seguinte) UTC.
-    Levanta ValueError se o formato for inválido.
-    """
     try:
         dt = datetime.strptime(mes_ano, "%Y-%m")
     except ValueError as e:
@@ -42,13 +40,13 @@ def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
         ) from e
 
     inicio = dt.replace(tzinfo=UTC)
-    # Avança para o primeiro dia do mês seguinte
-    if inicio.month == 12:
-        fim = inicio.replace(year=inicio.year + 1, month=1)
-    else:
-        fim = inicio.replace(month=inicio.month + 1)
-
+    fim = inicio.replace(year=inicio.year + 1, month=1) if inicio.month == 12 \
+        else inicio.replace(month=inicio.month + 1)
     return inicio, fim
+
+
+def _fmt_brl(valor: float) -> str:
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 class ExportadorAnalytics:
@@ -57,61 +55,106 @@ class ExportadorAnalytics:
         self.escritorio_id = escritorio_id
 
     async def gerar_csv(self, mes_ano: str) -> bytes:
-        """
-        Exporta todas as interações do mês indicado em formato CSV.
-
-        Args:
-            mes_ano: Mês no formato 'YYYY-MM' (ex: '2026-03').
-
-        Returns:
-            Bytes do arquivo CSV com encoding UTF-8-BOM (compatível com Excel).
-        """
         inicio, fim = _parse_mes_ano(mes_ano)
 
-        stmt = (
+        # Clientes do escritório
+        clientes_result = await self.db.execute(
+            select(Cliente.id, Cliente.nome)
+            .where(Cliente.escritorio_id == self.escritorio_id)
+            .order_by(Cliente.nome.asc())
+        )
+        clientes = clientes_result.all()
+
+        if not clientes:
+            buf = io.StringIO()
+            csv.writer(buf, quoting=csv.QUOTE_ALL).writerow(_CABECALHO_CSV)
+            return buf.getvalue().encode("utf-8-sig")
+
+        cliente_ids = [c.id for c in clientes]
+
+        # Processo ativo mais recente por cliente
+        sub = (
+            select(Processo.cliente_id, func.max(Processo.id).label("max_id"))
+            .where(
+                Processo.escritorio_id == self.escritorio_id,
+                Processo.cliente_id.in_(cliente_ids),
+                Processo.status == "ativo",
+            )
+            .group_by(Processo.cliente_id)
+            .subquery()
+        )
+        proc_result = await self.db.execute(
             select(
-                Interacao.id,
-                Interacao.created_at,
-                Interacao.tipo,
-                Interacao.direcao,
-                Interacao.mensagem_cliente,
-                Interacao.mensagem_ia,
-                Interacao.tokens_input,
-                Interacao.tokens_output,
-                Interacao.custo_estimado,
-                Interacao.satisfacao,
-                Interacao.tempo_resposta_ms,
+                Processo.cliente_id,
+                Processo.numero_cnj,
+                Processo.tipo_acao,
+                Processo.score_nivel,
+                Processo.ultimo_andamento,
+                Processo.data_ultimo_andamento,
+            )
+            .join(sub, (Processo.cliente_id == sub.c.cliente_id) & (Processo.id == sub.c.max_id))
+        )
+        processos = {row.cliente_id: row for row in proc_result.all()}
+
+        # Interações da IA no mês: contagem e NPS médio por cliente
+        int_result = await self.db.execute(
+            select(
+                Interacao.cliente_id,
+                func.count(Interacao.id).label("total"),
+                func.avg(Interacao.satisfacao).label("nps_medio"),
             )
             .where(
                 Interacao.escritorio_id == self.escritorio_id,
+                Interacao.cliente_id.in_(cliente_ids),
                 Interacao.created_at >= inicio,
                 Interacao.created_at < fim,
+                Interacao.direcao == "saida",
             )
-            .order_by(Interacao.created_at.asc())
+            .group_by(Interacao.cliente_id)
         )
-        result = await self.db.execute(stmt)
-        rows = result.all()
+        interacoes = {row.cliente_id: row for row in int_result.all()}
 
-        buffer = io.StringIO()
-        writer = csv.writer(buffer, quoting=csv.QUOTE_ALL)
+        # Montar CSV
+        buf = io.StringIO()
+        writer = csv.writer(buf, quoting=csv.QUOTE_ALL)
         writer.writerow(_CABECALHO_CSV)
 
-        for row in rows:
-            writer.writerow(
-                [
-                    row.id,
-                    row.created_at.isoformat() if row.created_at else "",
-                    row.tipo,
-                    row.direcao,
-                    row.mensagem_cliente or "",
-                    row.mensagem_ia or "",
-                    row.tokens_input,
-                    row.tokens_output,
-                    float(row.custo_estimado) if row.custo_estimado is not None else 0.0,
-                    row.satisfacao if row.satisfacao is not None else "",
-                    row.tempo_resposta_ms if row.tempo_resposta_ms is not None else "",
-                ]
+        for cliente in clientes:
+            proc = processos.get(cliente.id)
+            ints = interacoes.get(cliente.id)
+
+            cnj = proc.numero_cnj if proc else "Sem processo"
+            tipo = proc.tipo_acao or "—" if proc else "—"
+            risco = (proc.score_nivel or "—").capitalize() if proc else "—"
+            andamento = (proc.ultimo_andamento or "Sem andamentos") if proc else "—"
+            data_and = (
+                proc.data_ultimo_andamento.strftime("%d/%m/%Y")
+                if proc and proc.data_ultimo_andamento else "—"
             )
 
-        # UTF-8-BOM para compatibilidade com Excel
-        return buffer.getvalue().encode("utf-8-sig")
+            nps = float(ints.nps_medio) if ints and ints.nps_medio is not None else None
+            if nps is None:
+                satisfacao = "N/D"
+            elif nps >= 4.0:
+                satisfacao = "Satisfeito"
+            elif nps >= 3.0:
+                satisfacao = "Neutro"
+            else:
+                satisfacao = "Insatisfeito"
+
+            total_msgs = ints.total if ints else 0
+            horas = round(total_msgs * _MIN_POR_INTERACAO / 60, 1)
+            economia = _fmt_brl(round(horas * _VALOR_HORA_ADV_BRL, 2))
+
+            writer.writerow([
+                cliente.nome,
+                cnj,
+                tipo,
+                risco,
+                andamento,
+                data_and,
+                satisfacao,
+                economia,
+            ])
+
+        return buf.getvalue().encode("utf-8-sig")

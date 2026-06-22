@@ -335,7 +335,7 @@ async def exportar_relatorio(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    nome_arquivo = f"relatorio_interacoes_{mes}.csv"
+    nome_arquivo = f"resumo_clientes_{mes}.csv"
     return Response(
         content=conteudo,
         media_type="text/csv; charset=utf-8",
