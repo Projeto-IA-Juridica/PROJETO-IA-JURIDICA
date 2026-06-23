@@ -41,12 +41,14 @@ export default function DocumentosTab() {
     queryKey: ['rag-job', pendingJob?.id],
     queryFn: () => statusJob(pendingJob!.id),
     enabled: pendingJob !== null,
-    refetchInterval: (q) =>
-      q.state.data?.status === 'concluido' || q.state.data?.status === 'erro' ? false : 2000,
+    refetchInterval: (q) => {
+      const done = ['concluido', 'erro', 'duplicata']
+      return done.includes(q.state.data?.status ?? '') ? false : 2000
+    },
   })
 
   useEffect(() => {
-    if (jobStatus?.status === 'concluido' || jobStatus?.status === 'erro') {
+    if (['concluido', 'erro', 'duplicata'].includes(jobStatus?.status ?? '')) {
       qc.invalidateQueries({ queryKey: ['rag-documentos'] })
       setPendingJob(null)
     }

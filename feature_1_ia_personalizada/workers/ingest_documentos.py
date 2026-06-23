@@ -9,19 +9,14 @@ Tasks:
 Fila: "ia" (definida em celery_app.py)
 Base: DLQTask — em caso de falha após retries, encaminha para dead_letter.
 
-Gerenciamento de arquivo temporário:
-  O arquivo em /tmp é deletado IMEDIATAMENTE após leitura para memória, antes
-  de qualquer processamento async. Isso garante que o disco é liberado cedo e
-  que retries do Celery não falham por "arquivo não encontrado" (o arquivo já
-  não é necessário após a leitura).
+Transferência de arquivo:
+  O arquivo é armazenado pelo endpoint de upload no Redis (chave f1:rag:file:{job_id},
+  TTL 30 min) e lido pelo worker a partir daí — sem dependência de /tmp compartilhado
+  entre containers (web e worker rodam em containers separados no Railway).
 
-  O finally é um safety-net para o caso em que a leitura falha antes da deleção.
-
-Retry × arquivo:
-  Como o arquivo é deletado antes do asyncio.run(), um retry causado por falha
-  no processamento (ex.: DB timeout) recebe arquivo_path inexistente. O handler
-  detecta isso via self.request.retries > 0 e retorna sem nova tentativa, evitando
-  cascata de FileNotFoundError.
+  O worker deleta a chave Redis imediatamente após a leitura (antes do processamento
+  assíncrono). Em caso de retry, a chave já não existe; o handler detecta isso via
+  self.request.retries > 0 e encerra sem nova tentativa.
 
 Async em Celery:
   DocumentoIngester usa AsyncSession — executado via asyncio.run() dentro
@@ -33,7 +28,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from typing import Any
 
 import redis as _redis_sync
@@ -45,25 +39,32 @@ from shared.database.connection import async_session_factory
 
 logger = structlog.get_logger(__name__)
 
-# Cliente Redis síncrono — apenas para atualizar status dos jobs
+# Cliente Redis síncrono — leitura de bytes do arquivo e atualização de status
 _redis_sync_client = _redis_sync.from_url(
     settings.REDIS_URL,
-    decode_responses=True,
+    decode_responses=False,  # bytes para poder ler o conteúdo do arquivo
+    socket_connect_timeout=2,
+    socket_timeout=2,
+)
+_redis_sync_str = _redis_sync.from_url(
+    settings.REDIS_URL,
+    decode_responses=True,  # strings para status dos jobs
     socket_connect_timeout=2,
     socket_timeout=2,
 )
 
 _JOB_KEY_PREFIX = "f1:rag:job:"
+_FILE_KEY_PREFIX = "f1:rag:file:"
 _JOB_TTL = 60 * 60 * 24  # 24 horas
 
 
 def _atualizar_job(job_id: str, updates: dict[str, Any]) -> None:
     """Atualiza campos do job no Redis (sync — dentro de task Celery)."""
     try:
-        raw = _redis_sync_client.get(f"{_JOB_KEY_PREFIX}{job_id}")
+        raw = _redis_sync_str.get(f"{_JOB_KEY_PREFIX}{job_id}")
         dados: dict[str, Any] = json.loads(raw) if raw else {}
         dados.update(updates)
-        _redis_sync_client.setex(
+        _redis_sync_str.setex(
             f"{_JOB_KEY_PREFIX}{job_id}",
             _JOB_TTL,
             json.dumps(dados),
@@ -72,19 +73,20 @@ def _atualizar_job(job_id: str, updates: dict[str, Any]) -> None:
         logger.warning("ingest_job_update_falhou", job_id=job_id, erro=str(exc))
 
 
-def _deletar_tmp(arquivo_path: str, log: Any) -> bool:
+def _ler_e_deletar_arquivo_redis(job_id: str, log: Any) -> bytes | None:
     """
-    Deleta o arquivo temporário. Retorna True se deletado com sucesso.
-    Falha silenciosa com log para não mascarar outros erros.
+    Lê os bytes do arquivo do Redis e deleta a chave.
+    Retorna None se a chave não existir (retry sem arquivo).
     """
+    key = f"{_FILE_KEY_PREFIX}{job_id}"
     try:
-        if os.path.exists(arquivo_path):
-            os.unlink(arquivo_path)
-            log.debug("ingest_tmp_deletado", path=arquivo_path)
-            return True
-    except Exception as exc_del:
-        log.warning("ingest_tmp_delete_falhou", path=arquivo_path, erro=str(exc_del))
-    return False
+        conteudo: bytes | None = _redis_sync_client.getdel(key)
+        if conteudo:
+            log.debug("ingest_arquivo_lido_do_redis", bytes=len(conteudo))
+        return conteudo
+    except Exception as exc:
+        log.warning("ingest_arquivo_redis_falhou", erro=str(exc))
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -104,11 +106,11 @@ def _deletar_tmp(arquivo_path: str, log: Any) -> bool:
 )
 def ingest_documento(
     self: Any,
-    arquivo_path: str,
     escritorio_id: int,
     titulo: str,
     tipo: str,
     job_id: str,
+    extensao: str = "pdf",
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
@@ -116,48 +118,34 @@ def ingest_documento(
 
     Fluxo:
       1. Marca job como "em_andamento" no Redis.
-      2. Lê o arquivo de /tmp para memória.
-      3. Deleta o arquivo de /tmp imediatamente após leitura.
-      4. Chama DocumentoIngester.ingerir_pdf() (async via asyncio.run).
-      5. Marca job como "concluido" ou "erro".
+      2. Lê os bytes do arquivo da chave Redis f1:rag:file:{job_id} e a deleta.
+      3. Chama DocumentoIngester.ingerir_pdf() (async via asyncio.run).
+      4. Marca job como "concluido", "duplicata" ou "erro".
 
-    Em caso de retry após falha no passo 4, o arquivo já não existe.
-    O handler detecta self.request.retries > 0 e retorna sem nova tentativa.
+    Em caso de retry após falha no passo 3, a chave Redis já foi deletada.
+    O handler detecta self.request.retries > 0 e encerra sem nova tentativa.
     """
     log = logger.bind(job_id=job_id, escritorio_id=escritorio_id, titulo=titulo)
     log.info("ingest_documento_iniciado", tentativa=self.request.retries)
 
     _atualizar_job(job_id, {"status": "em_andamento"})
 
-    tmp_deletado = False
+    arquivo_bytes = _ler_e_deletar_arquivo_redis(job_id, log)
+
+    if arquivo_bytes is None:
+        if self.request.retries > 0:
+            log.warning("ingest_retry_arquivo_ausente", tentativa=self.request.retries)
+            _atualizar_job(
+                job_id,
+                {
+                    "status": "erro",
+                    "erro": "Processamento falhou e arquivo já foi removido do Redis (retry impossível).",
+                },
+            )
+            return {"job_id": job_id, "status": "erro"}
+        raise FileNotFoundError(f"Arquivo não encontrado no Redis para job_id={job_id}")
 
     try:
-        # Arquivo ausente num retry significa que foi limpo após a tentativa anterior.
-        # O erro original já foi registrado — encerra sem nova tentativa.
-        if not os.path.exists(arquivo_path):
-            if self.request.retries > 0:
-                log.warning(
-                    "ingest_retry_arquivo_ausente",
-                    path=arquivo_path,
-                    tentativa=self.request.retries,
-                )
-                _atualizar_job(
-                    job_id,
-                    {
-                        "status": "erro",
-                        "erro": "Processamento falhou e arquivo temporário já foi removido (retry impossível).",
-                    },
-                )
-                return {"job_id": job_id, "status": "erro"}
-            raise FileNotFoundError(f"Arquivo temporário não encontrado: {arquivo_path}")
-
-        with open(arquivo_path, "rb") as f:
-            arquivo_bytes = f.read()
-
-        # Deleta o arquivo IMEDIATAMENTE após leitura — libera disco cedo
-        # e garante que retries não falhem com FileNotFoundError.
-        tmp_deletado = _deletar_tmp(arquivo_path, log)
-
         resultado = asyncio.run(
             _ingerir_async(
                 arquivo_bytes=arquivo_bytes,
@@ -189,17 +177,13 @@ def ingest_documento(
                 },
             )
 
-        return {"job_id": job_id, "status": "concluido", "chunks": resultado.chunks_gerados}
+        status_final = "duplicata" if resultado.duplicata else "concluido"
+        return {"job_id": job_id, "status": status_final, "chunks": resultado.chunks_gerados}
 
     except Exception as exc:
         log.error("ingest_documento_excecao", erro=str(exc))
         _atualizar_job(job_id, {"status": "erro", "erro": str(exc)})
         raise  # DLQTask / autoretry_for captura e faz retry
-
-    finally:
-        # Safety-net: deleta o arquivo se a leitura falhou antes de tmp_deletado = True
-        if not tmp_deletado:
-            _deletar_tmp(arquivo_path, log)
 
 
 async def _ingerir_async(

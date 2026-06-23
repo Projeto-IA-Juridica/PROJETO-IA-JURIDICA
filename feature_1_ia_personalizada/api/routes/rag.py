@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import uuid
 from typing import Any
 
@@ -54,7 +53,9 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/rag", tags=["RAG Jurisprudencial"])
 
 _JOB_KEY_PREFIX = "f1:rag:job:"
+_FILE_KEY_PREFIX = "f1:rag:file:"
 _JOB_TTL = 60 * 60 * 24  # 24 horas
+_FILE_TTL = 60 * 30  # 30 minutos
 
 
 # ---------------------------------------------------------------------------
@@ -156,12 +157,12 @@ async def upload_documento(
             detail=f"Arquivo muito grande ({tamanho_mb:.1f} MB). Máximo: {RAG_MAX_FILE_SIZE_MB} MB.",
         )
 
-    # Salva em /tmp — a task Celery deleta ao final (sucesso ou erro)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{extensao}") as tmp:
-        tmp.write(conteudo)
-        tmp_path = tmp.name
-
     job_id = str(uuid.uuid4())
+
+    # Guarda os bytes do arquivo no Redis para que o worker (container separado)
+    # possa acessá-los sem precisar de /tmp compartilhado.
+    await redis.setex(f"{_FILE_KEY_PREFIX}{job_id}", _FILE_TTL, conteudo)
+
     job_data = {
         "status": "pendente",
         "escritorio_id": escritorio_id,
@@ -177,11 +178,11 @@ async def upload_documento(
 
     ingest_documento.apply_async(
         kwargs={
-            "arquivo_path": tmp_path,
             "escritorio_id": escritorio_id,
             "titulo": titulo,
             "tipo": tipo,
             "job_id": job_id,
+            "extensao": extensao,
         },
         queue="ia",
     )
