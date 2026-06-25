@@ -96,8 +96,10 @@ class EmbeddingGenerator:
         # Timeout conservador: embeddings são rápidos; 20s é mais que suficiente
         self._http = httpx.AsyncClient(timeout=20.0)
 
-        # Cliente OpenAI persistente (usa httpx internamente)
-        self._openai = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        # Cliente OpenAI — só instanciado se a chave estiver disponível
+        # (OpenAI é fallback; sem VOYAGE_API_KEY e sem OPENAI_API_KEY, a ingestão falha)
+        openai_key = getattr(settings, "OPENAI_API_KEY", None)
+        self._openai: AsyncOpenAI | None = AsyncOpenAI(api_key=openai_key) if openai_key else None
 
         provedor = "voyage-law-2" if self._voyage_key else _OPENAI_MODEL
         logger.info("embedding_provedor_ativo", provedor=provedor)
@@ -105,7 +107,8 @@ class EmbeddingGenerator:
     async def aclose(self) -> None:
         """Fecha os clientes HTTP persistentes. Chamar no shutdown da aplicação."""
         await self._http.aclose()
-        await self._openai.close()
+        if self._openai:
+            await self._openai.close()
 
     # -----------------------------------------------------------------------
     # API pública
@@ -181,6 +184,11 @@ class EmbeddingGenerator:
                     n_textos=len(textos),
                 )
 
+        if not self._openai:
+            raise RuntimeError(
+                "Nenhum provedor de embeddings disponível. "
+                "Configure VOYAGE_API_KEY ou OPENAI_API_KEY."
+            )
         return await self._openai_batch(textos)
 
     async def _voyage_batch(self, textos: list[str]) -> list[list[float]]:
@@ -203,6 +211,7 @@ class EmbeddingGenerator:
 
     async def _openai_batch(self, textos: list[str]) -> list[list[float]]:
         """Uma única chamada OpenAI com todos os textos e dimensions=1024."""
+        assert self._openai is not None  # garantido por _gerar_provedor_batch
         with _latencia.labels(provedor="openai").time():
             resp = await self._openai.embeddings.create(
                 model=_OPENAI_MODEL,
