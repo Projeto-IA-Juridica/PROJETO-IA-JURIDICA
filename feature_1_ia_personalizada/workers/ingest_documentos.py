@@ -35,7 +35,7 @@ import structlog
 
 from feature_1_ia_personalizada.workers.celery_app import DLQTask, celery_app
 from shared.config.settings import settings
-from shared.database.connection import async_session_factory
+from shared.database.connection import create_worker_session_factory
 
 logger = structlog.get_logger(__name__)
 
@@ -201,9 +201,10 @@ async def _ingerir_async(
 
     redis_client = redis_async.from_url(settings.REDIS_URL, decode_responses=True)
     emb = EmbeddingGenerator(redis_client=redis_client)
+    session_factory, db_engine = create_worker_session_factory()
     ingester = DocumentoIngester(
         embedding_generator=emb,
-        session_factory=async_session_factory,
+        session_factory=session_factory,
     )
 
     try:
@@ -217,6 +218,7 @@ async def _ingerir_async(
     finally:
         await emb.aclose()
         await redis_client.aclose()
+        await db_engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -280,9 +282,10 @@ async def _ingerir_jurisprudencia_async(
 
     redis_client = redis_async.from_url(settings.REDIS_URL, decode_responses=True)
     emb = EmbeddingGenerator(redis_client=redis_client)
+    session_factory, db_engine = create_worker_session_factory()
     ingester = DocumentoIngester(
         embedding_generator=emb,
-        session_factory=async_session_factory,
+        session_factory=session_factory,
     )
     datajud = DataJudClient()
 
@@ -328,6 +331,7 @@ async def _ingerir_jurisprudencia_async(
     finally:
         await emb.aclose()
         await redis_client.aclose()
+        await db_engine.dispose()
 
     return {
         "tipo_acao": tipo_acao,

@@ -7,7 +7,10 @@ Utiliza a engine assíncrona do SQLAlchemy (asyncpg) para garantir alta performa
 na aplicação FastAPI, permitindo concorrência sem bloquear a thread principal.
 """
 
+from typing import Any
+
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from shared.config.settings import settings
 
@@ -43,3 +46,24 @@ async_session_factory = async_sessionmaker(
     expire_on_commit=False,  # Evita expirar objetos da memória após o commit
     autoflush=False,  # Só envia as mudanças pro banco quando damos commit() explícito
 )
+
+
+def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:  # type: ignore[type-arg]
+    """
+    Cria engine + session factory frescos para uso em Celery workers.
+
+    asyncio.run() cria um novo event loop a cada task — o engine global (criado
+    no import) fica vinculado ao loop anterior, causando "Future attached to a
+    different loop". NullPool evita o problema: sem conexões em pool entre tasks.
+    """
+    worker_engine = create_async_engine(
+        db_url,
+        connect_args=connect_args,
+        poolclass=NullPool,
+    )
+    factory = async_sessionmaker(
+        bind=worker_engine,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+    return factory, worker_engine
