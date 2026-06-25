@@ -57,7 +57,7 @@ REGEX_NUMERO_PROCESSO: Final[re.Pattern[str]] = re.compile(FORMATO_NUMERO_PROCES
 RAG_MAX_FILE_SIZE_MB: Final[int] = 50
 RAG_ALLOWED_EXTENSIONS: Final[frozenset[str]] = frozenset({"pdf", "docx", "txt"})
 
-RAG_MIN_SIMILARITY: Final[float] = 0.60
+RAG_MIN_SIMILARITY: Final[float] = 0.0
 RAG_TOP_K_CANDIDATOS: Final[int] = 10
 RAG_TOP_K_FINAL: Final[int] = 3
 
