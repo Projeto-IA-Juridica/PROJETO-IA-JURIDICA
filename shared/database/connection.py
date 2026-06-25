@@ -52,13 +52,23 @@ def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:  # type: 
     """
     Cria engine + session factory frescos para uso em Celery workers.
 
-    asyncio.run() cria um novo event loop a cada task — o engine global (criado
-    no import) fica vinculado ao loop anterior, causando "Future attached to a
-    different loop". NullPool evita o problema: sem conexões em pool entre tasks.
+    Dois problemas resolvidos aqui:
+    1. asyncio.run() cria um novo event loop a cada task — NullPool evita
+       "Future attached to a different loop" (sem conexões reaproveitadas).
+    2. Supabase session mode (5432) tem limite de 15 conexões; workers usam
+       transaction mode (6543), que suporta centenas. PgBouncer em transaction
+       mode não suporta prepared statements — desabilitados via connect_args.
     """
+    worker_url = db_url
+    worker_connect_args = dict(connect_args)
+
+    if "supabase.com" in worker_url:
+        worker_url = worker_url.replace(":5432/", ":6543/")
+        worker_connect_args["prepared_statement_cache_size"] = 0
+
     worker_engine = create_async_engine(
-        db_url,
-        connect_args=connect_args,
+        worker_url,
+        connect_args=worker_connect_args,
         poolclass=NullPool,
     )
     factory = async_sessionmaker(
