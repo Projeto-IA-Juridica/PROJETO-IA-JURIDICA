@@ -47,7 +47,7 @@ _rag_vazio = Counter(
 )
 
 # Limiar de distância coseno equivalente a RAG_MIN_SIMILARITY
-_MAX_DISTANCIA = 1.0 - RAG_MIN_SIMILARITY  # 0.25
+_MAX_DISTANCIA = 1.0 - RAG_MIN_SIMILARITY  # 0.65 com RAG_MIN_SIMILARITY=0.35
 
 
 # ---------------------------------------------------------------------------

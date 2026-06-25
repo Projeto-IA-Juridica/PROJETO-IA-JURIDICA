@@ -64,11 +64,11 @@ def _make_store_mock(retornos: list[ResultadoBusca]) -> AsyncMock:
 
 @pytest.mark.asyncio
 async def test_retorna_vazio_quando_sem_resultado_relevante():
-    """Quando todos os candidatos têm distância > 0.25, retorna string vazia."""
+    """Quando todos os candidatos têm distância > 0.65, retorna string vazia."""
     candidatos = [
-        _resultado(1, "texto irrelevante A", distancia=0.30),
-        _resultado(2, "texto irrelevante B", distancia=0.40),
-        _resultado(3, "texto irrelevante C", distancia=0.50),
+        _resultado(1, "texto irrelevante A", distancia=0.70),
+        _resultado(2, "texto irrelevante B", distancia=0.80),
+        _resultado(3, "texto irrelevante C", distancia=0.90),
     ]
     store = _make_store_mock(candidatos)
     retriever = RAGRetriever(vector_store=store)
@@ -80,7 +80,7 @@ async def test_retorna_vazio_quando_sem_resultado_relevante():
 
 @pytest.mark.asyncio
 async def test_retorna_contexto_quando_ha_resultado_relevante():
-    """Candidatos com distância ≤ 0.25 devem gerar bloco de contexto."""
+    """Candidatos com distância ≤ 0.65 devem gerar bloco de contexto."""
     candidatos = [
         _resultado(1, "Sentença condenando ao pagamento de danos morais.", distancia=0.10),
         _resultado(2, "Recurso desprovido. Mantida a sentença.", distancia=0.15),
@@ -98,9 +98,9 @@ async def test_retorna_contexto_quando_ha_resultado_relevante():
 
 @pytest.mark.asyncio
 async def test_threshold_exato_incluido():
-    """Candidato com distância exatamente igual a _MAX_DISTANCIA (0.25) deve ser incluído."""
+    """Candidato com distância exatamente igual a _MAX_DISTANCIA (0.65) deve ser incluído."""
     candidatos = [
-        _resultado(1, "Tese jurídica sobre prescrição.", distancia=0.25),
+        _resultado(1, "Tese jurídica sobre prescrição.", distancia=0.65),
     ]
     store = _make_store_mock(candidatos)
     retriever = RAGRetriever(vector_store=store)
