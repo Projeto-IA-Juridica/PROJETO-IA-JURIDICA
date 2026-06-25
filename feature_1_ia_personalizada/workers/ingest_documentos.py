@@ -152,6 +152,7 @@ def ingest_documento(
                 escritorio_id=escritorio_id,
                 titulo=titulo,
                 tipo=tipo,
+                extensao=extensao,
                 metadata=metadata or {},
             )
         )
@@ -186,11 +187,26 @@ def ingest_documento(
         raise  # DLQTask / autoretry_for captura e faz retry
 
 
+def _extrair_texto_por_extensao(arquivo_bytes: bytes, extensao: str) -> str:
+    if extensao == "txt":
+        return arquivo_bytes.decode("utf-8", errors="replace")
+    if extensao == "docx":
+        import io
+
+        from docx import Document
+
+        doc = Document(io.BytesIO(arquivo_bytes))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    # pdf — delega ao PyMuPDF via ingerir_pdf
+    return ""
+
+
 async def _ingerir_async(
     arquivo_bytes: bytes,
     escritorio_id: int,
     titulo: str,
     tipo: str,
+    extensao: str,
     metadata: dict[str, Any],
 ) -> Any:
     """Coroutine que instancia os serviços e executa a ingestão."""
@@ -208,8 +224,17 @@ async def _ingerir_async(
     )
 
     try:
-        return await ingester.ingerir_pdf(
-            arquivo_bytes=arquivo_bytes,
+        if extensao == "pdf":
+            return await ingester.ingerir_pdf(
+                arquivo_bytes=arquivo_bytes,
+                escritorio_id=escritorio_id,
+                titulo=titulo,
+                tipo=tipo,
+                metadata=metadata,
+            )
+        texto = _extrair_texto_por_extensao(arquivo_bytes, extensao)
+        return await ingester.ingerir_texto(
+            texto=texto,
             escritorio_id=escritorio_id,
             titulo=titulo,
             tipo=tipo,
