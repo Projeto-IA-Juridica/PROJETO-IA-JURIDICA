@@ -17,8 +17,8 @@ from feature_1_ia_personalizada.api.middleware.auth import (
     get_escritorio_id_advogado,
     require_advogado,
 )
-from feature_1_ia_personalizada.services.prospeccao.datajud_prospeccao import (
-    DataJudProspeccaoClient,
+from feature_1_ia_personalizada.services.prospeccao.trackjud_client import (
+    TrackJudProspeccaoClient,
 )
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
     DNAAdvogadoService,
@@ -31,6 +31,7 @@ from feature_1_ia_personalizada.services.prospeccao.matching import MatchingServ
 from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import (
     PessoaIntelligenceService,
 )
+from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.schemas.prospeccao import (
     DescobertaRequest,
@@ -50,7 +51,7 @@ router = APIRouter(
 # Instâncias dos serviços (stateless — seguro compartilhar)
 # ---------------------------------------------------------------------------
 _dna_service = DNAAdvogadoService()
-_datajud = DataJudProspeccaoClient()
+_datajud = TrackJudProspeccaoClient(api_key=settings.TRACKJUD_API_KEY)
 _empresa_svc = EmpresaIntelligenceService()
 _pessoa_svc = PessoaIntelligenceService()
 _matching_svc = MatchingService()

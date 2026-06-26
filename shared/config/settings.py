@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # Sem essa variável o VibeProspectingClient opera em modo degradado (retorna []).
     EXPLORIUM_API_KEY: str | None = None
 
+    # TrackJud — Motor de descoberta de leads por partes processuais (Feature 3)
+    # Pay-per-use: R$ 0,10/tribunal. 5 créditos grátis em https://app.trackjud.com.br
+    # Sem essa variável o TrackJudProspeccaoClient retorna lista vazia com aviso de log.
+    TRACKJUD_API_KEY: str | None = None
+
     # ---------------------------------------------------------------------------
     # Stripe — Gateway de Pagamento (Feature 5)
     # ---------------------------------------------------------------------------
