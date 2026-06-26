@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import structlog
@@ -58,10 +58,26 @@ _PALAVRAS_TRABALHISTA = frozenset(
 # Sufixos de razão social para inferir pessoa jurídica por heurística
 _SUFIXOS_PJ = frozenset(
     {
-        "LTDA", "S.A.", "S/A", "S.A ", " SA", " ME", "ME ", "EPP", "EIRELI",
-        "ASSOCIAÇÃO", "FUNDAÇÃO", "INSTITUTO", "CONDOMÍNIO", "COOPERATIVA",
-        "BANCO ", "SEGURADORA", "CONSTRUTORA", "INCORPORADORA",
-        "DISTRIBUIDORA", "TRANSPORTADORA",
+        "LTDA",
+        "S.A.",
+        "S/A",
+        "S.A ",
+        " SA",
+        " ME",
+        "ME ",
+        "EPP",
+        "EIRELI",
+        "ASSOCIAÇÃO",
+        "FUNDAÇÃO",
+        "INSTITUTO",
+        "CONDOMÍNIO",
+        "COOPERATIVA",
+        "BANCO ",
+        "SEGURADORA",
+        "CONSTRUTORA",
+        "INCORPORADORA",
+        "DISTRIBUIDORA",
+        "TRANSPORTADORA",
     }
 )
 
@@ -147,8 +163,7 @@ class VigilantClient:
             cpf=cpf[:3] + "***",
             tribunais=courts,
             processos_encontrados=sum(
-                len(court.get("processes", []))
-                for court in data.get("courts", [])
+                len(court.get("processes", [])) for court in data.get("courts", [])
             ),
             litigantes=len(litigantes),
         )
@@ -190,7 +205,7 @@ class VigilantClient:
     # Internos — ciclo de vida da consulta
     # ------------------------------------------------------------------
 
-    async def _consultar(self, cpf: str, courts: list[str]) -> dict:
+    async def _consultar(self, cpf: str, courts: list[str]) -> dict[str, Any]:
         """
         Cria a consulta e aguarda o resultado.
         Retorna o dict `data` da resposta (mesma estrutura para 200 e resultado de polling).
@@ -204,7 +219,7 @@ class VigilantClient:
 
         if resp.status_code == 200:
             # Cache hit — dados imediatos
-            return resp.json()["data"]
+            return cast(dict[str, Any], resp.json()["data"])
 
         if resp.status_code == 202:
             # Cache miss — coleta em background, fazer polling
@@ -213,17 +228,16 @@ class VigilantClient:
 
         if resp.status_code == 402:
             raise RuntimeError(
-                "Vigilant: créditos insuficientes. "
-                "Recarregue em https://app.trackjud.com.br."
+                "Vigilant: créditos insuficientes. " "Recarregue em https://app.trackjud.com.br."
             )
         if resp.status_code == 422:
             detalhe = resp.json().get("detail", resp.text[:200])
             raise ValueError(f"CPF ou tribunal inválido: {detalhe}")
 
         resp.raise_for_status()
-        return resp.json()["data"]  # never reached, raise_for_status acima
+        return cast(dict[str, Any], resp.json()["data"])  # never reached, raise_for_status acima
 
-    async def _aguardar_consulta(self, consult_id: str) -> dict:
+    async def _aguardar_consulta(self, consult_id: str) -> dict[str, Any]:
         """
         Polling de GET /api/v1/consults/{id} até status='done' ou timeout.
         API diz: execução típica < 60s.
@@ -239,7 +253,7 @@ class VigilantClient:
                     headers=self._headers(),
                 )
             resp.raise_for_status()
-            data = resp.json()["data"]
+            data = cast(dict[str, Any], resp.json()["data"])
 
             if data.get("status") == "done":
                 return data
@@ -249,9 +263,7 @@ class VigilantClient:
                     f"Consulta Vigilant {consult_id} encerrou com status={data['status']}"
                 )
 
-        raise TimeoutError(
-            f"Consulta Vigilant {consult_id} não concluiu em {_POLL_TIMEOUT_S}s"
-        )
+        raise TimeoutError(f"Consulta Vigilant {consult_id} não concluiu em {_POLL_TIMEOUT_S}s")
 
     # ------------------------------------------------------------------
     # Internos — extração e conversão

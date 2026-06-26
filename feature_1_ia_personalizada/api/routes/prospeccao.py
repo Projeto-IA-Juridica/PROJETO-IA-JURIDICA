@@ -17,9 +17,6 @@ from feature_1_ia_personalizada.api.middleware.auth import (
     get_escritorio_id_advogado,
     require_advogado,
 )
-from feature_1_ia_personalizada.services.prospeccao.trackjud_client import (
-    VigilantClient,
-)
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
     DNAAdvogadoService,
     DNAEscritorio,
@@ -30,6 +27,9 @@ from feature_1_ia_personalizada.services.prospeccao.empresa_intelligence import 
 from feature_1_ia_personalizada.services.prospeccao.matching import MatchingService
 from feature_1_ia_personalizada.services.prospeccao.pessoa_intelligence import (
     PessoaIntelligenceService,
+)
+from feature_1_ia_personalizada.services.prospeccao.trackjud_client import (
+    VigilantClient,
 )
 from shared.config.settings import settings
 from shared.database.session import get_db
@@ -166,7 +166,7 @@ async def descobrir_leads(
                 inteligencia=inteligencia,
                 resultado=resultado,
                 tipo_lead=tipo_lead,
-                fonte=body.tipo_acao,
+                fonte=body.tipo_acao or body.tipo_acao_filtro or litigante.tipo_acao,
                 db=db,
             )
             leads_salvos.append(lead_salvo)

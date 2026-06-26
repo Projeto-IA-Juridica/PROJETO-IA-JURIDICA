@@ -24,7 +24,7 @@ if not db_url.startswith("postgresql+asyncpg://"):
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
-connect_args = {}
+connect_args: dict[str, Any] = {}
 if "supabase.com" in db_url:
     connect_args["ssl"] = "require"
 
@@ -48,7 +48,7 @@ async_session_factory = async_sessionmaker(
 )
 
 
-def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:  # type: ignore[type-arg]
+def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     """
     Cria engine + session factory frescos para uso em Celery workers.
 
