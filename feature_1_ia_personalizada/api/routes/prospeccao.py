@@ -18,7 +18,7 @@ from feature_1_ia_personalizada.api.middleware.auth import (
     require_advogado,
 )
 from feature_1_ia_personalizada.services.prospeccao.trackjud_client import (
-    TrackJudProspeccaoClient,
+    VigilantClient,
 )
 from feature_1_ia_personalizada.services.prospeccao.dna_advogado import (
     DNAAdvogadoService,
@@ -51,7 +51,7 @@ router = APIRouter(
 # Instâncias dos serviços (stateless — seguro compartilhar)
 # ---------------------------------------------------------------------------
 _dna_service = DNAAdvogadoService()
-_datajud = TrackJudProspeccaoClient(api_key=settings.TRACKJUD_API_KEY)
+_datajud = VigilantClient(api_key=settings.TRACKJUD_API_KEY)
 _empresa_svc = EmpresaIntelligenceService()
 _pessoa_svc = PessoaIntelligenceService()
 _matching_svc = MatchingService()
@@ -113,7 +113,7 @@ async def descobrir_leads(
     Fluxo:
     1. Carrega o DNA do escritório
     2. Resolve o tipo_lead ("auto" → usa DNA)
-    3. Busca litigantes no DataJud pelo tipo_acao
+    3. Consulta cada CPF na API Vigilant (TrackJud) e extrai litigantes
     4. Enriquece cada litigante (empresa ou pessoa)
     5. Calcula score via MatchingService
     6. Salva leads com score ≥ score_minimo
@@ -134,12 +134,11 @@ async def descobrir_leads(
         assert dna is not None
         tipo_lead = dna.tipo_lead_predominante or "empresa"  # type: ignore[assignment]
 
-    # 3. Buscar litigantes no DataJud
-    litigantes = await _datajud.buscar_litigantes(
-        tipo_acao=body.tipo_acao,
-        tribunal=body.tribunal,
-        limite=body.limite,
-        tipo_lead=tipo_lead,
+    # 3. Buscar litigantes na Vigilant por CPF
+    litigantes = await _datajud.buscar_multiplos_cpfs(
+        cpfs=body.cpfs,
+        tribunais=body.tribunais or None,
+        tipo_acao_filtro=body.tipo_acao_filtro,
     )
 
     # 4 + 5. Enriquecer e calcular score

@@ -268,7 +268,7 @@ class TestDescobrirLeads:
 
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=_dna())),
-            "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[_litigante_pj()])),
+            "_datajud": MagicMock(buscar_multiplos_cpfs=AsyncMock(return_value=[_litigante_pj()])),
             "_empresa_svc": MagicMock(
                 enriquecer=AsyncMock(return_value=_empresa_intel()),
                 linkedin_disponivel=AsyncMock(return_value=False),
@@ -282,6 +282,7 @@ class TestDescobrirLeads:
         try:
             body = DescobertaRequest(
                 tipo_lead="empresa",
+                cpfs=["529.982.247-25"],
                 tipo_acao="Reclamação Trabalhista",
                 tribunal="TRT2",
                 limite=10,
@@ -303,7 +304,7 @@ class TestDescobrirLeads:
 
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=_dna())),
-            "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[_litigante_pj()])),
+            "_datajud": MagicMock(buscar_multiplos_cpfs=AsyncMock(return_value=[_litigante_pj()])),
             "_empresa_svc": MagicMock(
                 enriquecer=AsyncMock(return_value=_empresa_intel()),
                 linkedin_disponivel=AsyncMock(return_value=False),
@@ -318,6 +319,7 @@ class TestDescobrirLeads:
         try:
             body = DescobertaRequest(
                 tipo_lead="empresa",
+                cpfs=["529.982.247-25"],
                 tipo_acao="Reclamação Trabalhista",
                 limite=10,
                 score_minimo=40,
@@ -411,7 +413,7 @@ class TestPipelineB2C:
         )
         mocks = {
             "_dna_service": MagicMock(obter_dna_salvo=AsyncMock(return_value=dna_b2c)),
-            "_datajud": MagicMock(buscar_litigantes=AsyncMock(return_value=[litigante_b2c])),
+            "_datajud": MagicMock(buscar_multiplos_cpfs=AsyncMock(return_value=[litigante_b2c])),
             "_pessoa_svc": MagicMock(
                 validar_compliance=MagicMock(return_value=True),
                 enriquecer=AsyncMock(return_value=pessoa),
@@ -426,6 +428,7 @@ class TestPipelineB2C:
         try:
             body = DescobertaRequest(
                 tipo_lead="pessoa",
+                cpfs=["529.982.247-25"],
                 tipo_acao="Reclamação Trabalhista",
                 limite=10,
                 score_minimo=40,

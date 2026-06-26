@@ -22,14 +22,25 @@ class DescobertaRequest(BaseModel):
     tipo_lead: Literal["empresa", "pessoa", "auto"] = Field(
         description="'auto' usa o tipo_lead_predominante do DNA do escritório"
     )
-    tipo_acao: str = Field(
-        description="Tipo de ação a buscar no DataJud. Ex: 'reclamação trabalhista'"
+    # Vigilant API — lista de CPFs a enriquecer (formato NNN.NNN.NNN-NN ou 11 dígitos)
+    cpfs: list[str] = Field(
+        min_length=1,
+        max_length=50,
+        description="CPFs a pesquisar na API Vigilant. Ex: ['529.982.247-25', '123.456.789-09']",
     )
-    tribunal: str | None = Field(
-        default=None, description="Tribunal alvo. Ex: 'TRT15'. None = todos os tribunais"
+    tribunais: list[str] = Field(
+        default_factory=list,
+        description="Tribunais alvo. Ex: ['TJSP', 'TRT2']. Vazio = padrão por tipo de ação.",
     )
-    limite: int = Field(default=20, ge=1, le=100)
+    tipo_acao_filtro: str | None = Field(
+        default=None,
+        description="Filtrar processos pelo tipo de ação. None = todos os processos do CPF.",
+    )
     score_minimo: int = Field(default=40, ge=0, le=100)
+    # Mantidos para compatibilidade com testes existentes — não usados na rota Vigilant
+    tipo_acao: str | None = None
+    tribunal: str | None = None
+    limite: int = Field(default=20, ge=1, le=100)
 
 
 class LeadStatusUpdate(BaseModel):
