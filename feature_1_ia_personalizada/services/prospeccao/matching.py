@@ -90,7 +90,7 @@ Responda APENAS em JSON com a estrutura:
 logger = logging.getLogger(__name__)
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-_MODELO_CLAUDE = "claude-sonnet-4-20250514"
+_MODELO_CLAUDE = "claude-sonnet-4-6"
 _SCORE_MINIMO_IA = 30
 
 

@@ -251,7 +251,7 @@ type Tab = 'dna' | 'buscar' | 'pipeline'
 export default function CaptacaoPage() {
   const [tab, setTab]           = useState<Tab>('buscar')
   const [tipoAcao, setTipoAcao] = useState(TIPOS_ACAO[0])
-  const [tipoLead, setTipoLead] = useState<TipoLead | 'auto'>('auto')
+  const [tipoLead, setTipoLead] = useState<TipoLead | 'auto'>('empresa')
   const [tribunal, setTribunal] = useState('')
   const [filterStatus, setFilterStatus] = useState<LeadStatus | 'todos'>('todos')
 
