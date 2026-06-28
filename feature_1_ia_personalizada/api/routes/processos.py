@@ -330,12 +330,11 @@ async def update_processo(
 async def enriquecer_processo(
     processo_id: int,
     request: Request,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> Processo:
     """
     Re-busca tribunal, vara, comarca e tipo_ação no DataJud para um processo já cadastrado.
-    Útil para processos criados antes desta funcionalidade ou cujo enriquecimento falhou.
+    Aguarda o enriquecimento completar antes de retornar os dados atualizados.
     """
     escritorio_id = _get_escritorio_id(request)
 
@@ -343,7 +342,8 @@ async def enriquecer_processo(
     if not processo or processo.escritorio_id != escritorio_id:
         raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
 
-    background_tasks.add_task(_enriquecer_processo_async, processo.id, processo.numero_cnj)
+    await _enriquecer_processo_async(processo.id, processo.numero_cnj)
+    await db.refresh(processo)
     return processo
 
 

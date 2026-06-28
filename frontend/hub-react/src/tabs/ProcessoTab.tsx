@@ -250,8 +250,7 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
   const enriquecerMut = useMutation({
     mutationFn: enriquecerProcesso,
     onSuccess: () => {
-      // Aguarda 3s para o background task do servidor completar, então recarrega
-      setTimeout(() => qc.invalidateQueries({ queryKey: ['processos', cliente.id] }), 3000)
+      qc.invalidateQueries({ queryKey: ['processos', cliente.id] })
     },
   })
 
@@ -410,15 +409,13 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
                         : { color: '#C83030', background: 'rgba(200,48,48,0.08)',  border: '1px solid rgba(200,48,48,0.18)' }}>
                       {processo.polo_cliente === 'autor' ? 'Autor' : processo.polo_cliente === 'reu' ? 'Réu' : 'Terceiro'}
                     </span>
-                    {!processo.tribunal && (
-                      <button
-                        onClick={() => enriquecerMut.mutate(processo.id)}
-                        disabled={enriquecerMut.isPending && enriquecerMut.variables === processo.id}
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
-                        title="Buscar dados do processo no DataJud">
-                        <RefreshCw size={11} className={enriquecerMut.isPending && enriquecerMut.variables === processo.id ? 'animate-spin' : ''} />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => enriquecerMut.mutate(processo.id)}
+                      disabled={enriquecerMut.isPending && enriquecerMut.variables === processo.id}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
+                      title="Atualizar dados do processo no DataJud">
+                      <RefreshCw size={11} className={enriquecerMut.isPending && enriquecerMut.variables === processo.id ? 'animate-spin' : ''} />
+                    </button>
                     <button onClick={() => setEditandoProc(processo)}
                       className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors"
                       title="Editar">
