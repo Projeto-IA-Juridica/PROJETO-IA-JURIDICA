@@ -361,7 +361,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           {activeTab === 'processo'   && <ProcessoTab   cliente={cliente} />}
           {activeTab === 'score'      && <ScoreTab      cliente={cliente} />}
           {activeTab === 'chat'       && <ChatTab       cliente={cliente} />}
-          {activeTab === 'documentos' && <DocumentosTab />}
+          {activeTab === 'documentos' && <DocumentosTab cliente={cliente} />}
         </div>
 
       </div>

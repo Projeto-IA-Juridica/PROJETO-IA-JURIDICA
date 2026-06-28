@@ -17,8 +17,17 @@ Rate limits LGPD (por user_id — não por IP):
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,8 +39,14 @@ from feature_1_ia_personalizada.api.routes.processos import (
     _disparar_monitoramento,
     _enriquecer_processo_async,
 )
+from pydantic import BaseModel
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
+from shared.models.documento_cliente import (
+    TIPOS_DOCUMENTO_CLIENTE,
+    MAX_TAMANHO_BYTES,
+    DocumentoCliente,
+)
 from shared.models.processo import Processo
 from shared.schemas.cliente import ClienteCreateManual, ClienteCreateManualResponse
 from shared.utils.lgpd import (
@@ -292,4 +307,215 @@ async def deletar_dados(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Schemas para documentos do cliente
+# ---------------------------------------------------------------------------
+
+
+class DocumentoClienteItem(BaseModel):
+    id: int
+    nome: str
+    arquivo_nome: str
+    mime_type: str
+    tamanho_bytes: int
+    tipo: str
+    processo_id: int | None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# GET /clientes/{cliente_id}/documentos
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{cliente_id}/documentos", response_model=list[DocumentoClienteItem])
+async def listar_documentos_cliente(
+    cliente_id: int,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> list[DocumentoClienteItem]:
+    """Lista documentos de um cliente (sem o conteúdo binário)."""
+    await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
+
+    rows = (
+        await db.execute(
+            select(
+                DocumentoCliente.id,
+                DocumentoCliente.nome,
+                DocumentoCliente.arquivo_nome,
+                DocumentoCliente.mime_type,
+                DocumentoCliente.tamanho_bytes,
+                DocumentoCliente.tipo,
+                DocumentoCliente.processo_id,
+                DocumentoCliente.created_at,
+            )
+            .where(
+                DocumentoCliente.cliente_id == cliente_id,
+                DocumentoCliente.escritorio_id == escritorio_id,
+                DocumentoCliente.ativo.is_(True),
+            )
+            .order_by(DocumentoCliente.created_at.desc())
+        )
+    ).all()
+
+    return [
+        DocumentoClienteItem(
+            id=r.id,
+            nome=r.nome,
+            arquivo_nome=r.arquivo_nome,
+            mime_type=r.mime_type,
+            tamanho_bytes=r.tamanho_bytes,
+            tipo=r.tipo,
+            processo_id=r.processo_id,
+            created_at=r.created_at.isoformat(),
+        )
+        for r in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# POST /clientes/{cliente_id}/documentos
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/{cliente_id}/documentos",
+    response_model=DocumentoClienteItem,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_documento_cliente(
+    cliente_id: int,
+    file: UploadFile = File(...),
+    nome: str = "",
+    tipo: str = "outro",
+    processo_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> DocumentoClienteItem:
+    """Faz upload de um documento para um cliente específico."""
+    await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
+
+    if tipo not in TIPOS_DOCUMENTO_CLIENTE:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Tipo inválido. Use: {', '.join(sorted(TIPOS_DOCUMENTO_CLIENTE))}",
+        )
+
+    conteudo = await file.read()
+    if len(conteudo) > MAX_TAMANHO_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Arquivo muito grande. Máximo: {MAX_TAMANHO_BYTES // (1024 * 1024)} MB.",
+        )
+    if not conteudo:
+        raise HTTPException(status_code=422, detail="Arquivo vazio.")
+
+    arquivo_nome = file.filename or "arquivo"
+    nome_final = nome.strip() or arquivo_nome.rsplit(".", 1)[0]
+    mime = file.content_type or "application/octet-stream"
+
+    doc = DocumentoCliente(
+        escritorio_id=escritorio_id,
+        cliente_id=cliente_id,
+        processo_id=processo_id,
+        nome=nome_final,
+        arquivo_nome=arquivo_nome,
+        mime_type=mime,
+        tamanho_bytes=len(conteudo),
+        tipo=tipo,
+        conteudo=conteudo,
+        ativo=True,
+    )
+    db.add(doc)
+    await db.flush()
+    await db.refresh(doc)
+
+    logger.info(
+        "documento_cliente_upload",
+        cliente_id=cliente_id,
+        doc_id=doc.id,
+        tipo=tipo,
+        tamanho=len(conteudo),
+    )
+
+    return DocumentoClienteItem(
+        id=doc.id,
+        nome=doc.nome,
+        arquivo_nome=doc.arquivo_nome,
+        mime_type=doc.mime_type,
+        tamanho_bytes=doc.tamanho_bytes,
+        tipo=doc.tipo,
+        processo_id=doc.processo_id,
+        created_at=doc.created_at.isoformat(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /clientes/{cliente_id}/documentos/{doc_id}/download
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{cliente_id}/documentos/{doc_id}/download")
+async def download_documento_cliente(
+    cliente_id: int,
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> Response:
+    """Faz download do conteúdo binário de um documento."""
+    await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
+
+    doc = await db.get(DocumentoCliente, doc_id)
+    if (
+        not doc
+        or not doc.ativo
+        or doc.cliente_id != cliente_id
+        or doc.escritorio_id != escritorio_id
+    ):
+        raise HTTPException(status_code=404, detail="Documento não encontrado.")
+
+    return Response(
+        content=doc.conteudo,
+        media_type=doc.mime_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{doc.arquivo_nome}"',
+            "Content-Length": str(doc.tamanho_bytes),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# DELETE /clientes/{cliente_id}/documentos/{doc_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/{cliente_id}/documentos/{doc_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def deletar_documento_cliente(
+    cliente_id: int,
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> None:
+    """Soft delete de um documento do cliente."""
+    await _get_cliente_do_escritorio(cliente_id, escritorio_id, db)
+
+    doc = await db.get(DocumentoCliente, doc_id)
+    if (
+        not doc
+        or not doc.ativo
+        or doc.cliente_id != cliente_id
+        or doc.escritorio_id != escritorio_id
+    ):
+        raise HTTPException(status_code=404, detail="Documento não encontrado.")
+
+    doc.ativo = False
+    await db.flush()
     return None

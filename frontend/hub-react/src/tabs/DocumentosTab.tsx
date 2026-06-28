@@ -1,135 +1,231 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, FileText, Database, Trash2, Loader2, AlertTriangle } from 'lucide-react'
-import { listarDocumentos, uploadDocumento, statusJob, deletarDocumento, type DocItem } from '../api/rag'
+import { Upload, FileText, Trash2, Loader2, AlertTriangle, Download, X } from 'lucide-react'
+import {
+  listarDocumentosCliente,
+  uploadDocumentoCliente,
+  deletarDocumentoCliente,
+  downloadDocumentoCliente,
+  TIPOS_DOC_CLIENTE,
+  type DocClienteItem,
+  type TipoDocCliente,
+} from '../api/documentosCliente'
 
-const TIPO_BADGE: Record<string, { color: string }> = {
-  Tese:           { color: 'var(--color-am-blue)'      },
-  Jurisprudência: { color: 'var(--color-am-green)'     },
-  Petição:        { color: 'var(--color-am-amber)'     },
-  PDF:            { color: 'var(--color-am-secondary)' },
-  TXT:            { color: 'var(--color-am-secondary)' },
+interface Cliente {
+  id: number
+  nome: string
 }
 
-function TipoBadge({ tipo }: { tipo: string }) {
-  const color = TIPO_BADGE[tipo]?.color ?? 'var(--color-am-secondary)'
+function TipoBadge({ tipo }: { tipo: TipoDocCliente }) {
+  const cfg = TIPOS_DOC_CLIENTE[tipo] ?? TIPOS_DOC_CLIENTE.outro
   return (
     <span
       className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-px rounded"
-      style={{ color, background: `color-mix(in srgb, ${color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 22%, transparent)` }}
+      style={{
+        color: cfg.color,
+        background: `${cfg.color}14`,
+        border: `1px solid ${cfg.color}28`,
+      }}
     >
-      {tipo}
+      {cfg.label}
     </span>
   )
 }
 
-export default function DocumentosTab() {
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+/* ── Modal de classificação do documento ── */
+function UploadModal({
+  file,
+  onConfirm,
+  onCancel,
+}: {
+  file: File
+  onConfirm: (nome: string, tipo: TipoDocCliente) => void
+  onCancel: () => void
+}) {
+  const [nome, setNome] = useState(file.name.replace(/\.[^.]+$/, ''))
+  const [tipo, setTipo] = useState<TipoDocCliente>('outro')
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(12,30,48,0.45)', backdropFilter: 'blur(4px)' }}
+    >
+      <div
+        className="w-full max-w-sm bg-white rounded-3xl p-5"
+        style={{ boxShadow: '0 24px 64px rgba(12,30,48,0.18)' }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold text-am-ink">Classificar documento</h2>
+          <button
+            onClick={onCancel}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
+            style={{ border: '1px solid var(--color-am-border)' }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        <div className="mb-3">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">
+            Nome
+          </label>
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            className="am-input"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-2">
+            Tipo
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(Object.keys(TIPOS_DOC_CLIENTE) as TipoDocCliente[]).map((t) => {
+              const cfg = TIPOS_DOC_CLIENTE[t]
+              const active = tipo === t
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipo(t)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all"
+                  style={
+                    active
+                      ? { background: `${cfg.color}0F`, border: `1.5px solid ${cfg.color}`, color: cfg.color }
+                      : { background: 'transparent', border: '1px solid var(--color-am-border)', color: 'var(--color-am-secondary)' }
+                  }
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+                  <span className="text-xs font-semibold">{cfg.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <button
+          onClick={() => nome.trim() && onConfirm(nome.trim(), tipo)}
+          disabled={!nome.trim()}
+          className="w-full py-2.5 rounded-xl text-xs font-bold text-white"
+          style={{
+            background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
+            opacity: nome.trim() ? 1 : 0.5,
+            cursor: nome.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Adicionar documento
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Componente principal ── */
+export default function DocumentosTab({ cliente }: { cliente: Cliente }) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [dragging, setDragging]     = useState(false)
-  const [pendingJob, setPendingJob] = useState<{ id: string; titulo: string } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [uploadErro, setUploadErro] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['rag-documentos'],
-    queryFn: () => listarDocumentos(),
+  const { data: docs = [], isLoading } = useQuery({
+    queryKey: ['docs-cliente', cliente.id],
+    queryFn: () => listarDocumentosCliente(cliente.id),
     staleTime: 30_000,
   })
-  const docs: DocItem[] = data?.items ?? []
-  const totalChunks = docs.reduce((a, d) => a + d.chunks, 0)
-
-  const { data: jobStatus } = useQuery({
-    queryKey: ['rag-job', pendingJob?.id],
-    queryFn: () => statusJob(pendingJob!.id),
-    enabled: pendingJob !== null,
-    refetchInterval: (q) => {
-      const done = ['concluido', 'erro', 'duplicata']
-      return done.includes(q.state.data?.status ?? '') ? false : 2000
-    },
-  })
-
-  useEffect(() => {
-    if (['concluido', 'erro', 'duplicata'].includes(jobStatus?.status ?? '')) {
-      qc.invalidateQueries({ queryKey: ['rag-documentos'] })
-      setPendingJob(null)
-    }
-  }, [jobStatus, qc])
 
   const uploadMut = useMutation({
-    mutationFn: (file: File) => {
-      const titulo = file.name.replace(/\.[^.]+$/, '')
-      const tipo   = file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'TXT'
-      return uploadDocumento(file, titulo, tipo)
+    mutationFn: ({ file, nome, tipo }: { file: File; nome: string; tipo: TipoDocCliente }) =>
+      uploadDocumentoCliente(cliente.id, file, nome, tipo),
+    onSuccess: () => {
+      setUploadErro(null)
+      qc.invalidateQueries({ queryKey: ['docs-cliente', cliente.id] })
     },
-    onSuccess: (result, file) => {
-      const titulo = file.name.replace(/\.[^.]+$/, '')
-      setPendingJob({ id: result.job_id, titulo })
+    onError: (e: unknown) => {
+      const msg =
+        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        'Erro ao enviar documento'
+      setUploadErro(msg)
     },
   })
 
   const deleteMut = useMutation({
-    mutationFn: (hash: string) => deletarDocumento(hash),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rag-documentos'] }),
+    mutationFn: (docId: number) => deletarDocumentoCliente(cliente.id, docId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['docs-cliente', cliente.id] }),
+  })
+
+  const downloadMut = useMutation({
+    mutationFn: (doc: DocClienteItem) =>
+      downloadDocumentoCliente(cliente.id, doc.id, doc.arquivo_nome),
   })
 
   function handleFiles(files: FileList | null) {
-    if (!files || uploadMut.isPending || pendingJob !== null) return
-    const file = Array.from(files).find(
-      (f) => f.type === 'application/pdf' || f.name.endsWith('.txt'),
-    )
-    if (file) uploadMut.mutate(file)
+    if (!files?.length) return
+    const f = files[0]
+    setPendingFile(f)
+    setUploadErro(null)
   }
 
-  const isUploading = uploadMut.isPending || pendingJob !== null
+  function handleConfirm(nome: string, tipo: TipoDocCliente) {
+    if (!pendingFile) return
+    setPendingFile(null)
+    uploadMut.mutate({ file: pendingFile, nome, tipo })
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { val: isLoading ? '…' : docs.length,      lbl: 'Documentos',       color: 'var(--color-am-blue)'  },
-          { val: isLoading ? '…' : totalChunks,       lbl: 'Blocos indexados', color: 'var(--color-am-green)' },
-          { val: isUploading ? '↑' : '—',             lbl: 'Processando',      color: 'var(--color-am-amber)' },
-        ].map(({ val, lbl, color }) => (
-          <div key={lbl}
-            className="flex flex-col items-center py-3 sm:py-4 rounded-xl bg-white card-shadow border border-am-border">
-            <span className="text-xl sm:text-2xl font-extrabold leading-none" style={{ color }}>{val}</span>
-            <span className="text-[9px] font-semibold mt-1 text-center px-1" style={{ color }}>{lbl}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Job em andamento */}
-      {isUploading && (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs"
-          style={{ background: 'rgba(18,72,190,0.06)', border: '1px solid rgba(18,72,190,0.18)', color: 'var(--color-am-blue)' }}>
-          <Loader2 size={13} className="animate-spin flex-shrink-0" />
-          {uploadMut.isPending
-            ? 'Enviando arquivo…'
-            : `Indexando "${pendingJob?.titulo}"…`}
-        </div>
-      )}
-
       {/* Erro de upload */}
-      {uploadMut.isError && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs"
-          style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.18)', color: '#C83030' }}>
+      {uploadErro && (
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs"
+          style={{ background: 'rgba(200,48,48,0.06)', border: '1px solid rgba(200,48,48,0.18)', color: '#C83030' }}
+        >
           <AlertTriangle size={13} className="flex-shrink-0" />
-          Erro ao enviar. Verifique o formato do arquivo (PDF ou TXT).
+          {uploadErro}
+          <button onClick={() => setUploadErro(null)} className="ml-auto">
+            <X size={12} />
+          </button>
         </div>
       )}
 
-      {/* Lista de documentos */}
+      {/* Processando */}
+      {uploadMut.isPending && (
+        <div
+          className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs"
+          style={{ background: 'rgba(18,72,190,0.06)', border: '1px solid rgba(18,72,190,0.18)', color: 'var(--color-am-blue)' }}
+        >
+          <Loader2 size={13} className="animate-spin flex-shrink-0" />
+          Enviando documento…
+        </div>
+      )}
+
+      {/* Lista */}
       <div className="bg-white rounded-xl overflow-hidden card-shadow border border-am-border">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 bg-am-bg border-b border-am-border">
           <div className="flex items-center gap-2">
-            <Database size={13} className="text-am-blue" />
+            <FileText size={13} className="text-am-blue" />
             <span className="text-[10px] font-bold text-am-secondary uppercase tracking-wider">
-              Base de Conhecimento
+              Documentos do cliente
             </span>
           </div>
           <span className="text-[10px] text-am-muted font-medium">
-            {docs.length} doc{docs.length !== 1 ? 's' : ''} · {totalChunks} blocos
+            {docs.length} arquivo{docs.length !== 1 ? 's' : ''}
           </span>
         </div>
 
@@ -140,60 +236,83 @@ export default function DocumentosTab() {
         ) : docs.length === 0 ? (
           <div className="flex flex-col items-center py-10 gap-2 text-am-muted">
             <FileText size={22} strokeWidth={1.5} />
-            <span className="text-xs">Nenhum documento na base</span>
+            <span className="text-xs">Nenhum documento enviado ainda</span>
           </div>
         ) : (
           <div className="divide-y divide-am-border">
-            {docs.map((d: DocItem) => (
-              <div key={d.doc_hash}
-                className="flex items-center gap-3 px-4 sm:px-5 py-3.5 group hover:bg-am-bg transition-fast">
-                <div className="w-7 h-7 rounded-lg bg-am-surface flex items-center justify-center flex-shrink-0 border border-am-border">
-                  <FileText size={12} className="text-am-blue" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-am-ink truncate">{d.titulo}</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <TipoBadge tipo={d.tipo} />
-                    <span className="text-[10px] text-am-muted">{d.chunks} blocos</span>
+            {docs.map((doc) => {
+              const cfg = TIPOS_DOC_CLIENTE[doc.tipo] ?? TIPOS_DOC_CLIENTE.outro
+              return (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 px-4 sm:px-5 py-3.5 group hover:bg-am-bg transition-fast"
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${cfg.color}12`, border: `1px solid ${cfg.color}24` }}
+                  >
+                    <FileText size={13} style={{ color: cfg.color }} />
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {deleteMut.isPending && deleteMut.variables === d.doc_hash ? (
-                    <Loader2 size={12} className="animate-spin text-am-muted" />
-                  ) : (
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-am-ink truncate">{doc.nome}</div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <TipoBadge tipo={doc.tipo} />
+                      <span className="text-[10px] text-am-muted">{formatBytes(doc.tamanho_bytes)}</span>
+                      <span className="text-[10px] text-am-muted">{formatDate(doc.created_at)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-fast">
                     <button
-                      onClick={() => deleteMut.mutate(d.doc_hash)}
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-am-muted transition-fast"
+                      onClick={() => downloadMut.mutate(doc)}
+                      disabled={downloadMut.isPending}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-fast"
+                      title="Baixar"
+                    >
+                      {downloadMut.isPending && downloadMut.variables?.id === doc.id
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <Download size={12} />}
+                    </button>
+                    <button
+                      onClick={() => deleteMut.mutate(doc.id)}
+                      disabled={deleteMut.isPending && deleteMut.variables === doc.id}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted transition-fast"
                       onMouseEnter={(e) => { e.currentTarget.style.color = '#C83030'; e.currentTarget.style.background = 'rgba(200,48,48,0.07)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.color = ''; e.currentTarget.style.background = '' }}
+                      title="Remover"
                     >
-                      <Trash2 size={12} />
+                      {deleteMut.isPending && deleteMut.variables === doc.id
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <Trash2 size={12} />}
                     </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
 
       {/* Zona de upload */}
       <div
-        className="relative rounded-xl border-2 border-dashed p-6 sm:p-8 text-center transition-fast"
+        className="relative rounded-xl border-2 border-dashed p-6 text-center transition-fast"
         style={{
           borderColor: dragging ? 'var(--color-am-blue)' : 'var(--color-am-blue-light)',
-          background:  dragging ? 'rgba(58,122,184,0.05)' : 'var(--color-am-bg)',
-          cursor: isUploading ? 'not-allowed' : 'pointer',
-          opacity: isUploading ? 0.6 : 1,
+          background: dragging ? 'rgba(58,122,184,0.05)' : 'var(--color-am-bg)',
+          cursor: uploadMut.isPending ? 'not-allowed' : 'pointer',
+          opacity: uploadMut.isPending ? 0.6 : 1,
         }}
-        onDragOver={(e) => { if (!isUploading) { e.preventDefault(); setDragging(true) } }}
+        onDragOver={(e) => { if (!uploadMut.isPending) { e.preventDefault(); setDragging(true) } }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
-        onClick={() => { if (!isUploading) inputRef.current?.click() }}
+        onClick={() => { if (!uploadMut.isPending) inputRef.current?.click() }}
       >
-        <input ref={inputRef} type="file" accept=".pdf,.txt" className="hidden"
-          onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }} />
-
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,.txt"
+          className="hidden"
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = '' }}
+        />
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-11 h-11 rounded-xl flex items-center justify-center transition-fast"
@@ -202,20 +321,19 @@ export default function DocumentosTab() {
               border: dragging ? 'none' : '1px solid var(--color-am-border)',
             }}
           >
-            {isUploading
+            {uploadMut.isPending
               ? <Loader2 size={18} className="animate-spin" style={{ color: 'var(--color-am-blue)' }} />
-              : <Upload size={18} style={{ color: dragging ? '#fff' : 'var(--color-am-blue)' }} />
-            }
+              : <Upload size={18} style={{ color: dragging ? '#fff' : 'var(--color-am-blue)' }} />}
           </div>
           <div>
             <div className="text-sm font-semibold text-am-secondary mb-1">
-              {isUploading ? 'Processando…' : dragging ? 'Solte o arquivo aqui' : 'Adicionar documento à base'}
+              {uploadMut.isPending ? 'Enviando…' : dragging ? 'Solte o arquivo aqui' : 'Adicionar documento'}
             </div>
             <div className="text-xs text-am-muted">
-              {isUploading ? 'Aguarde a indexação terminar' : 'Arraste ou clique — PDF ou TXT'}
+              PDF, imagem ou DOCX · máx. 10 MB
             </div>
           </div>
-          {!isUploading && (
+          {!uploadMut.isPending && (
             <button
               className="px-4 py-2 text-white text-xs font-bold rounded-lg transition-fast"
               style={{ background: 'var(--color-am-blue)' }}
@@ -230,8 +348,17 @@ export default function DocumentosTab() {
       </div>
 
       <p className="text-[10px] text-am-muted text-center">
-        Documentos indexados ficam disponíveis para consulta da IA em todos os atendimentos do escritório.
+        Documentos enviados aqui ficam visíveis apenas para este cliente.
       </p>
+
+      {/* Modal de classificação */}
+      {pendingFile && (
+        <UploadModal
+          file={pendingFile}
+          onConfirm={handleConfirm}
+          onCancel={() => setPendingFile(null)}
+        />
+      )}
     </div>
   )
 }

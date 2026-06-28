@@ -12,6 +12,7 @@ Uso:
 
 from shared.models.base import Base, TenantMixin, TimestampMixin
 from shared.models.cliente import Cliente
+from shared.models.documento_cliente import DocumentoCliente
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.models.lead_prospeccao import LeadProspeccao
@@ -34,4 +35,5 @@ __all__ = [
     "LeadProspeccao",
     "MensagemAgendada",
     "SessaoAdvogado",
+    "DocumentoCliente",
 ]
