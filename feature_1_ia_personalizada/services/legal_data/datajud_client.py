@@ -311,7 +311,7 @@ class DataJudClient:
             complementos = m.get("complementosTabelados", [])
             if complementos:
                 valores = "; ".join(
-                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
+                    (c.get("nome") or str(c.get("valor", ""))) for c in complementos if c.get("nome") or c.get("valor") is not None
                 )
                 if valores:
                     nome = f"{nome}: {valores}"
@@ -378,7 +378,7 @@ class DataJudClient:
             complementos = m.get("complementosTabelados", [])
             if complementos:
                 valores = "; ".join(
-                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
+                    (c.get("nome") or str(c.get("valor", ""))) for c in complementos if c.get("nome") or c.get("valor") is not None
                 )
                 if valores:
                     nome = f"{nome}: {valores}"
@@ -424,7 +424,7 @@ class DataJudClient:
             complementos = m.get("complementosTabelados", [])
             if complementos:
                 valores = "; ".join(
-                    str(c.get("valor", "")) for c in complementos if c.get("valor") is not None
+                    (c.get("nome") or str(c.get("valor", ""))) for c in complementos if c.get("nome") or c.get("valor") is not None
                 )
                 if valores:
                     nome = f"{nome}: {valores}"
