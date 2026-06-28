@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Scale, Clock, AlertCircle, MessageCircle, Phone, Star, Gavel, User,
-  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search, RefreshCw,
+  ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search, RefreshCw, WifiOff,
 } from 'lucide-react'
 import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, enriquecerProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
 import type { CRMClienteCard, Processo } from '../types'
@@ -224,6 +224,7 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
   const [andamentosAbertos, setAndamentosAbertos] = useState<Set<number>>(new Set())
   const [showNovoModal,  setShowNovoModal]  = useState(false)
   const [editandoProc,   setEditandoProc]   = useState<Processo | null>(null)
+  const [enrichErros, setEnrichErros]       = useState<Record<number, string>>({})
 
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState<'ativo' | 'arquivado' | ''>('')
@@ -249,8 +250,14 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
 
   const enriquecerMut = useMutation({
     mutationFn: enriquecerProcesso,
-    onSuccess: () => {
+    onSuccess: (_data, processoId) => {
+      setEnrichErros(prev => { const n = { ...prev }; delete n[processoId]; return n })
       qc.invalidateQueries({ queryKey: ['processos', cliente.id] })
+    },
+    onError: (e: unknown, processoId) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        ?? 'Erro ao consultar DataJud'
+      setEnrichErros(prev => ({ ...prev, [processoId]: msg }))
     },
   })
 
@@ -431,6 +438,25 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
                 }
               />
               <div className="px-4 py-4 space-y-4">
+
+                {/* Erro de enriquecimento */}
+                {enrichErros[processo.id] && (
+                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
+                    style={{ background: 'rgba(200,48,48,0.07)', border: '1px solid rgba(200,48,48,0.22)', color: '#C83030' }}>
+                    <WifiOff size={13} className="flex-shrink-0 mt-0.5" />
+                    <span>{enrichErros[processo.id]}</span>
+                  </div>
+                )}
+
+                {/* Aviso: dados ainda não carregados */}
+                {!processo.tribunal && !enrichErros[processo.id] && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                    style={{ background: 'rgba(208,128,16,0.07)', border: '1px solid rgba(208,128,16,0.22)', color: '#D08010' }}>
+                    <AlertCircle size={12} className="flex-shrink-0" />
+                    <span>Dados do processo ainda não carregados. Clique em ↻ para buscar no DataJud.</span>
+                  </div>
+                )}
+
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Número CNJ</p>
                   <p className="text-xs font-bold font-mono text-am-blue">{processo.numero_cnj}</p>

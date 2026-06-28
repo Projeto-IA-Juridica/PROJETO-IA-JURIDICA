@@ -141,27 +141,44 @@ async def list_processos(
         ) from exc
 
 
-async def _enriquecer_processo_async(processo_id: int, numero_cnj: str) -> None:
-    """Busca tribunal, vara, comarca e tipo_ação no DataJud e salva no banco imediatamente."""
+_EnriquecimentoStatus = dict[str, Any]
+# Retornos possíveis de _enriquecer_processo_async:
+#   {"status": "ok",            "campos": [...]}
+#   {"status": "nao_encontrado"}
+#   {"status": "cnj_invalido",  "detalhe": str}
+#   {"status": "erro",          "detalhe": str}
+
+
+async def _enriquecer_processo_async(processo_id: int, numero_cnj: str) -> _EnriquecimentoStatus:
+    """Busca tribunal, vara, comarca e tipo_ação no DataJud e salva no banco.
+
+    Retorna um dict com 'status' indicando o resultado — usado pelo endpoint
+    /enriquecer para propagar erros ao frontend. Quando chamada como BackgroundTask
+    o valor de retorno é ignorado, mas o comportamento permanece seguro.
+    """
     try:
         client = DataJudClient(api_key=settings.DATAJUD_API_KEY)
         data = await client.consultar_processo(numero_cnj)
     except DataJudClientError as exc:
-        logger.warning("enriquecimento_datajud_falhou", processo_id=processo_id, erro=str(exc))
-        return
+        detalhe = str(exc)
+        logger.warning("enriquecimento_datajud_falhou", processo_id=processo_id, erro=detalhe)
+        if "inválido" in detalhe.lower() or "não mapeado" in detalhe.lower():
+            return {"status": "cnj_invalido", "detalhe": detalhe}
+        return {"status": "erro", "detalhe": detalhe}
     except Exception as exc:
-        logger.warning("enriquecimento_inesperado", processo_id=processo_id, erro=str(exc))
-        return
+        detalhe = str(exc)
+        logger.warning("enriquecimento_inesperado", processo_id=processo_id, erro=detalhe)
+        return {"status": "erro", "detalhe": detalhe}
 
     hits = data.get("hits", {}).get("hits", [])
     if not hits:
         logger.info("enriquecimento_sem_hits", processo_id=processo_id, cnj=numero_cnj)
-        return
+        return {"status": "nao_encontrado"}
 
     source = hits[0].get("_source", {})
     metadados = DataJudClient._extrair_metadados(source)
     if not metadados:
-        return
+        return {"status": "nao_encontrado"}
 
     campos: dict = {}
     if metadados.get("tribunal"):
@@ -186,7 +203,7 @@ async def _enriquecer_processo_async(processo_id: int, numero_cnj: str) -> None:
             pass
 
     if not campos:
-        return
+        return {"status": "nao_encontrado"}
 
     try:
         async with async_session_factory() as session:
@@ -195,8 +212,11 @@ async def _enriquecer_processo_async(processo_id: int, numero_cnj: str) -> None:
             )
             await session.commit()
         logger.info("enriquecimento_salvo", processo_id=processo_id, campos=list(campos.keys()))
+        return {"status": "ok", "campos": list(campos.keys())}
     except Exception as exc:
-        logger.warning("enriquecimento_db_falhou", processo_id=processo_id, erro=str(exc))
+        detalhe = str(exc)
+        logger.warning("enriquecimento_db_falhou", processo_id=processo_id, erro=detalhe)
+        return {"status": "erro", "detalhe": detalhe}
 
 
 def _disparar_monitoramento(processo_id: int) -> None:
@@ -342,7 +362,28 @@ async def enriquecer_processo(
     if not processo or processo.escritorio_id != escritorio_id:
         raise HTTPException(status_code=404, detail="Processo não encontrado ou sem permissão.")
 
-    await _enriquecer_processo_async(processo.id, processo.numero_cnj)
+    resultado = await _enriquecer_processo_async(processo.id, processo.numero_cnj)
+
+    status_enriquecimento = resultado.get("status")
+    if status_enriquecimento == "cnj_invalido":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Número CNJ inválido ou tribunal não suportado: {resultado.get('detalhe', '')}",
+        )
+    if status_enriquecimento == "nao_encontrado":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Processo não encontrado no DataJud (CNJ). "
+                "Verifique se o número está correto e se o processo já foi distribuído."
+            ),
+        )
+    if status_enriquecimento == "erro":
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Erro ao consultar DataJud: {resultado.get('detalhe', 'serviço indisponível')}",
+        )
+
     await db.refresh(processo)
     return processo
 
