@@ -16,7 +16,8 @@ Rate limits LGPD (por user_id — não por IP):
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import structlog
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,13 +26,21 @@ from feature_1_ia_personalizada.api.middleware.auth import (
     get_advogado_id,
     get_escritorio_id_advogado,
 )
+from feature_1_ia_personalizada.api.routes.processos import (
+    _disparar_monitoramento,
+    _enriquecer_processo_async,
+)
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
+from shared.models.processo import Processo
+from shared.schemas.cliente import ClienteCreateManual, ClienteCreateManualResponse
 from shared.utils.lgpd import (
     anonimizar_dados_cliente,
     exportar_dados_cliente,
     registrar_acesso,
 )
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/clientes", tags=["Clientes — LGPD"])
 
@@ -109,6 +118,84 @@ async def _get_cliente_do_escritorio(
             detail="Cliente não encontrado ou sem permissão de acesso.",
         )
     return cliente
+
+
+# ---------------------------------------------------------------------------
+# POST /clientes  — cadastro manual pelo advogado
+# ---------------------------------------------------------------------------
+
+
+@router.post("", response_model=ClienteCreateManualResponse, status_code=status.HTTP_201_CREATED)
+async def criar_cliente_manual(
+    payload: ClienteCreateManual,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> ClienteCreateManualResponse:
+    """
+    Cadastra um cliente manualmente com nome + telefone + processo opcional.
+    Diferente do fluxo WhatsApp (automático) e CSV (bulk), este endpoint é
+    voltado para o advogado registrar um cliente de forma pontual na interface.
+
+    Fluxo:
+    1. Verifica duplicata de telefone no mesmo escritório.
+    2. Cria o cliente (sem CPF — pode ser adicionado depois via edição).
+    3. Se numero_cnj informado, cria o processo vinculado e dispara enriquecimento.
+    """
+    # 1. Duplicata por telefone
+    existente = await db.execute(
+        select(Cliente).where(
+            Cliente.escritorio_id == escritorio_id,
+            Cliente.telefone_whatsapp == payload.telefone_whatsapp,
+        )
+    )
+    if existente.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Já existe um cliente com este número de telefone no escritório.",
+        )
+
+    # 2. Criar cliente
+    novo_cliente = Cliente(
+        escritorio_id=escritorio_id,
+        nome=payload.nome,
+        telefone_whatsapp=payload.telefone_whatsapp,
+        ativo=True,
+        aceite_lgpd=False,
+    )
+    db.add(novo_cliente)
+    await db.flush()
+
+    logger.info("cliente_manual_criado", cliente_id=novo_cliente.id, escritorio_id=escritorio_id)
+
+    # 3. Processo opcional
+    processo_id: int | None = None
+    if payload.numero_cnj:
+        novo_processo = Processo(
+            escritorio_id=escritorio_id,
+            numero_cnj=payload.numero_cnj,
+            cliente_id=novo_cliente.id,
+            polo_cliente=payload.polo_cliente,
+            tipo_acao=payload.tipo_acao,
+            status="ativo",
+            monitoramento_ativo=True,
+        )
+        db.add(novo_processo)
+        await db.flush()
+        processo_id = novo_processo.id
+
+        background_tasks.add_task(
+            _enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj
+        )
+        background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
+
+    return ClienteCreateManualResponse(
+        id=novo_cliente.id,
+        nome=novo_cliente.nome,
+        telefone_whatsapp=novo_cliente.telefone_whatsapp,
+        processo_id=processo_id,
+    )
 
 
 # ---------------------------------------------------------------------------

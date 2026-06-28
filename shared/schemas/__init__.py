@@ -16,6 +16,8 @@ Uso:
 from shared.schemas.cliente import (
     ClienteAceiteLGPD,
     ClienteCreate,
+    ClienteCreateManual,
+    ClienteCreateManualResponse,
     ClienteList,
     ClienteResponse,
     ClienteUpdate,
@@ -59,6 +61,8 @@ __all__ = [
     "EscritorioList",
     # Cliente
     "ClienteCreate",
+    "ClienteCreateManual",
+    "ClienteCreateManualResponse",
     "ClienteUpdate",
     "ClienteResponse",
     "ClienteAceiteLGPD",

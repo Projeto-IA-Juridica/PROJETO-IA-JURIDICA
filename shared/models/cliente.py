@@ -52,14 +52,14 @@ class Cliente(Base, TimestampMixin, TenantMixin):
 
     # --- Dados Pessoais ---
     nome: Mapped[str] = mapped_column(String(200), nullable=False)
-    cpf: Mapped[str] = mapped_column(
+    cpf: Mapped[str | None] = mapped_column(
         String(100),  # maior que 14 pois o valor é criptografado
-        nullable=False,
-        comment="CPF armazenado criptografado (AES-256 Fernet)",
+        nullable=True,
+        comment="CPF armazenado criptografado (AES-256 Fernet). Nullable para cadastro manual sem CPF.",
     )
-    cpf_version: Mapped[int] = mapped_column(
+    cpf_version: Mapped[int | None] = mapped_column(
         SmallInteger,
-        nullable=False,
+        nullable=True,
         default=1,
         server_default="1",
         comment=(

@@ -222,9 +222,13 @@ class DataJudClient:
         """
         metadados: dict[str, Any] = {}
 
-        tribunal = source.get("tribunal")
-        if tribunal:
-            metadados["tribunal"] = str(tribunal).upper()
+        tribunal_raw = source.get("tribunal")
+        if isinstance(tribunal_raw, dict):
+            tribunal_sigla = tribunal_raw.get("sigla") or tribunal_raw.get("nome", "")
+            if tribunal_sigla:
+                metadados["tribunal"] = str(tribunal_sigla).upper()
+        elif tribunal_raw:
+            metadados["tribunal"] = str(tribunal_raw).upper()
 
         orgao = source.get("orgaoJulgador") or {}
         vara_nome = orgao.get("nome")
@@ -256,6 +260,13 @@ class DataJudClient:
         tipo_acao = classe.get("nome")
         if tipo_acao:
             metadados["tipo_acao"] = str(tipo_acao)
+
+        valor_causa = source.get("valorCausa")
+        if valor_causa is not None:
+            try:
+                metadados["valor_causa"] = float(valor_causa)
+            except (TypeError, ValueError):
+                pass
 
         return metadados
 

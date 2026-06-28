@@ -183,6 +183,11 @@ async def _update_metadados_processo(
             )
         except (ValueError, TypeError):
             pass
+    if metadados.get("valor_causa") is not None:
+        try:
+            campos["valor_causa"] = float(metadados["valor_causa"])
+        except (TypeError, ValueError):
+            pass
 
     if not campos:
         return

@@ -1,5 +1,25 @@
 import { api } from './client'
 
+export interface ClienteCreateManual {
+  nome: string
+  telefone_whatsapp: string
+  numero_cnj?: string | null
+  polo_cliente?: 'autor' | 'reu' | 'terceiro'
+  tipo_acao?: string | null
+}
+
+export interface ClienteCreateManualResponse {
+  id: number
+  nome: string
+  telefone_whatsapp: string
+  processo_id: number | null
+}
+
+export async function criarClienteManual(payload: ClienteCreateManual): Promise<ClienteCreateManualResponse> {
+  const { data } = await api.post<ClienteCreateManualResponse>('/clientes', payload)
+  return data
+}
+
 export async function exportarCliente(clienteId: number): Promise<void> {
   const { data } = await api.get<Blob>(`/clientes/${clienteId}/exportar`, {
     responseType: 'blob',

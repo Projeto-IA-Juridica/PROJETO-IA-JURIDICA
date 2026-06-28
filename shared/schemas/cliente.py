@@ -17,6 +17,7 @@ Notas sobre CPF:
 
 import re
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -221,6 +222,48 @@ class CRMClienteCard(BaseModel):
     total_processos: int
     nps_medio: float | None
     ultimo_contato: datetime | None
+
+
+class ClienteCreateManual(BaseModel):
+    """Cadastro simplificado pelo advogado na interface — CPF opcional."""
+
+    nome: str = Field(min_length=2, max_length=200)
+    telefone_whatsapp: str = Field(
+        description="Telefone com DDD. Aceita qualquer formato: 11999999999, (11) 99999-9999, +5511999999999"
+    )
+    numero_cnj: str | None = Field(
+        default=None,
+        description="Número CNJ do processo a vincular (opcional — pode ser adicionado depois)",
+    )
+    polo_cliente: Literal["autor", "reu", "terceiro"] = Field(
+        default="autor",
+        description="Polo do cliente no processo (ignorado se numero_cnj não for informado)",
+    )
+    tipo_acao: str | None = Field(default=None, max_length=200)
+
+    @field_validator("telefone_whatsapp")
+    @classmethod
+    def normalizar_telefone(cls, v: str) -> str:
+        digits = re.sub(r"[^0-9]", "", v)
+        # Adiciona DDI 55 se ausente
+        if len(digits) in (10, 11):
+            digits = "55" + digits
+        if not validar_telefone_whatsapp(digits):
+            raise ValueError(
+                "Telefone inválido — informe DDD + número (ex: 11999999999 ou (11) 99999-9999)"
+            )
+        return digits
+
+
+class ClienteCreateManualResponse(BaseModel):
+    """Retorno do POST /clientes após cadastro manual."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    nome: str
+    telefone_whatsapp: str
+    processo_id: int | None = None
 
 
 # Alias tipado para listagens paginadas de clientes
