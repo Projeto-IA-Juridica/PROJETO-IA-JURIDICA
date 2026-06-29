@@ -80,6 +80,6 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -sf http://localhost:8000/health || exit 1
 
-# Comando padrão: iniciar servidor FastAPI
+# Comando padrão: migrar banco e iniciar servidor FastAPI
 # Railway injeta $PORT dinamicamente; fallback 8000 para ambientes locais
-CMD ["sh", "-c", "uvicorn feature_1_ia_personalizada.api.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --log-level info"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn feature_1_ia_personalizada.api.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --log-level info"]
