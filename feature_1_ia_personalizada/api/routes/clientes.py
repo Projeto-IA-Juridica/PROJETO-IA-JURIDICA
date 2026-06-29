@@ -28,6 +28,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,12 +40,11 @@ from feature_1_ia_personalizada.api.routes.processos import (
     _disparar_monitoramento,
     _enriquecer_processo_async,
 )
-from pydantic import BaseModel
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
 from shared.models.documento_cliente import (
-    TIPOS_DOCUMENTO_CLIENTE,
     MAX_TAMANHO_BYTES,
+    TIPOS_DOCUMENTO_CLIENTE,
     DocumentoCliente,
 )
 from shared.models.processo import Processo
