@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20260628_2000"
-down_revision = "20260628_1000_make_cpf_nullable_in_clientes"
+down_revision = "20260628_cpf_nullable"
 branch_labels = None
 depends_on = None
 
