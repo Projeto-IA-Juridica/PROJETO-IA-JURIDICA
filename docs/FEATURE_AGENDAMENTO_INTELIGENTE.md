@@ -356,10 +356,116 @@ Se o advogado aprovar pelo Hub, a variável `canal_aprovacao = 'hub'` é salva e
 
 Toggle adicional ao lado de **Lista | Relacionamento**: **Agenda**
 
-Exibe calendário semanal simples com:
-- Reuniões confirmadas (cor azul)
-- Prazos processuais de clientes (cor vermelha, read-only — vem dos andamentos)
-- Slots de disponibilidade cadastrados (cor cinza claro)
+#### Layout
+
+Visão semanal com navegação por semana (◀ semana atual ▶). Cada dia é uma coluna. Itens empilhados dentro do dia, ordenados por horário.
+
+```
+◀  30 jun — 06 jul 2025  ▶
+
+   SEG 30    TER 01    QUA 02    QUI 03    SEX 04
+   ─────────────────────────────────────────────
+   ┌────────┐
+   │ 10h    │
+   │ João   │           ┌────────┐
+   │ Silva  │           │ 14h    │          ┌────────┐
+   │ ✅      │           │ Maria  │          │ 16h    │
+   └────────┘           │ Costa  │          │ Pedro  │
+                        │ ⏳ pend.│          │ Lima   │
+              🔴 Prazo  └────────┘          │ ✅      │
+              Contestação                   └────────┘
+              (Ana Souza)
+```
+
+Três tipos de item na grade:
+
+| Tipo | Cor | Origem |
+|---|---|---|
+| Reunião confirmada | Azul (`am-blue`) | `Agendamento.status = 'confirmado'` |
+| Aprovação pendente | Âmbar | `Agendamento.status = 'aguardando_advogado'` |
+| Prazo processual | Vermelho, sem borda (read-only) | `andamentos` dos processos ativos |
+
+**Card de reunião confirmada:**
+```
+┌─────────────────┐
+│ 10h             │
+│ João da Silva   │
+│ ✅ Confirmado   │
+└─────────────────┘
+```
+Clique → abre detalhe do cliente na aba **Assistente** (para ver a conversa que originou a reunião).
+
+**Card de aprovação pendente:**
+```
+┌─────────────────┐
+│ 14h             │
+│ Maria Costa     │
+│ ⏳ Aguardando   │
+│ [Confirmar]     │
+└─────────────────┘
+```
+Clique no card → expande com contexto da conversa e botões completos (mesmo comportamento do card na vista Lista).  
+Clique em **[Confirmar]** direto → aprova sem abrir detalhes.
+
+**Item de prazo processual:**
+```
+🔴 Prazo contestação — Ana Souza
+```
+Linha simples, sem clique direto. Hover mostra tooltip com número CNJ. Clique → abre detalhe do processo da Ana Souza na aba **Processo**.
+
+#### Banner de pendentes
+
+Se há aprovações pendentes na semana exibida, aparece um banner fixo no topo da agenda:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ ⏳  2 reuniões aguardando sua aprovação esta semana       │
+│     [Ver pendentes]                                       │
+└──────────────────────────────────────────────────────────┘
+```
+
+Clicar em **[Ver pendentes]** navega para a vista **Lista** com filtro de pendentes ativo — reaproveitando o comportamento do badge já planejado.
+
+#### Empty states
+
+| Situação | Mensagem |
+|---|---|
+| Semana sem reuniões e sem prazos | "Semana livre. Que tal configurar seus horários de atendimento?" + link para Configurações |
+| Sem disponibilidade cadastrada | "Configure seus horários para que a IA possa sugerir reuniões automaticamente." + botão direto para Configurações → Horários |
+| Sem processos ativos | Agenda exibe só os agendamentos (sem linha de prazos) |
+
+#### Conexão com outras páginas
+
+| Ação na Agenda | Destino |
+|---|---|
+| Clique em reunião confirmada | Clientes → detalhe → aba **Assistente** (conversa que originou) |
+| Clique em prazo processual | Clientes → detalhe → aba **Processo** |
+| Clique em card pendente / [Confirmar] | Aprova inline, card some em tempo real |
+| Link "configurar horários" (empty state) | Configurações → seção Horários de atendimento |
+| Badge no Painel | Navega para Clientes → vista **Agenda** filtrada na semana atual |
+
+O toggle **Lista | Relacionamento | Agenda** mantém o estado de qual cliente está selecionado — trocar de aba e voltar para Agenda não perde a semana navegada.
+
+### Widget no Painel (`PainelPage`)
+
+Bloco "Próximas reuniões" exibido na `PainelPage` com as **3 próximas reuniões confirmadas** e o total de aprovações pendentes.
+
+```
+┌────────────────────────────────────────┐
+│ 📅 Próximas reuniões                   │
+│                                        │
+│  Hoje, 10h   · João da Silva           │
+│  Amanhã, 14h · Maria Costa             │
+│  Sex, 09h    · Pedro Lima              │
+│                                        │
+│  ⏳ 1 aguardando aprovação  [Ver]      │
+└────────────────────────────────────────┘
+```
+
+Clicar em qualquer reunião → Clientes → Agenda (semana correspondente).  
+Clicar em **[Ver]** → Clientes → Lista (filtro de pendentes ativo).
+
+Se não há reuniões próximas: bloco oculto no Painel (não ocupa espaço com estado vazio).
 
 ### Configuração de disponibilidade
 
