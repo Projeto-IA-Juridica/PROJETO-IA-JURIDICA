@@ -74,7 +74,7 @@ class Agendamento(Base, TenantMixin, TimestampMixin):
     )
     data_hora_fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    opcoes_propostas: Mapped[dict | None] = mapped_column(
+    opcoes_propostas: Mapped[list[dict] | None] = mapped_column(
         JSONB,
         nullable=True,
         comment='[{inicio: ISO, fim: ISO, label: "Segunda, 07/07 às 10h"}, ...]',
