@@ -33,6 +33,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from shared.models.base import Base, TenantMixin, TimestampMixin
 
 if TYPE_CHECKING:
+    from shared.models.agendamento import Agendamento
     from shared.models.escritorio import Escritorio
     from shared.models.interacao import Interacao
     from shared.models.processo import Processo
@@ -147,6 +148,9 @@ class Cliente(Base, TimestampMixin, TenantMixin):
     )
     interacoes: Mapped[list["Interacao"]] = relationship(  # noqa: F821
         "Interacao", back_populates="cliente", cascade="all, delete-orphan"
+    )
+    agendamentos: Mapped[list["Agendamento"]] = relationship(  # noqa: F821
+        "Agendamento", back_populates="cliente", cascade="all, delete-orphan"
     )
 
     # --- Constraints e Índices ---

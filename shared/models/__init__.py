@@ -10,8 +10,10 @@ Uso:
     from shared.models import Base, Escritorio, Cliente, Processo, Usuario, Interacao
 """
 
+from shared.models.agendamento import Agendamento
 from shared.models.base import Base, TenantMixin, TimestampMixin
 from shared.models.cliente import Cliente
+from shared.models.disponibilidade_advogado import DisponibilidadeAdvogado
 from shared.models.documento_cliente import DocumentoCliente
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
@@ -36,4 +38,6 @@ __all__ = [
     "MensagemAgendada",
     "SessaoAdvogado",
     "DocumentoCliente",
+    "Agendamento",
+    "DisponibilidadeAdvogado",
 ]
