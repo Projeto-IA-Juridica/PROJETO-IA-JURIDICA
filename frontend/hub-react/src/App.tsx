@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  LayoutDashboard, Users, Heart, Brain, MessageSquare,
+  LayoutDashboard, Users, Brain, MessageSquare,
   Target, FolderOpen, CreditCard, Settings,
 } from 'lucide-react'
 import DevBanner from './components/DevBanner'
@@ -19,7 +19,6 @@ import { getAccessToken, refreshAccessToken, fetchMe, clearAuth } from './api/au
 /* ── Pages ── */
 import PainelPage     from './pages/PainelPage'
 import HubPage        from './pages/HubPage'
-import CRMPage        from './pages/CRMPage'
 import HubIAPage      from './pages/HubIAPage'
 import CaptacaoPage   from './pages/CaptacaoPage'
 import DocumentosPage from './pages/DocumentosPage'
@@ -177,15 +176,14 @@ export default function App() {
 interface ShellProps { onReady?: () => void }
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
-  { id: 'painel',     label: 'Painel',          icon: <LayoutDashboard size={18} /> },
-  { id: 'hub-ia',     label: 'Hub IA',           icon: <Brain      size={18} /> },
-  { id: 'whatsapp',   label: 'WhatsApp',        icon: <MessageSquare size={18} /> },
-  { id: 'clientes',   label: 'Clientes',         icon: <Users      size={18} /> },
-  { id: 'crm',        label: 'Relacionamento',   icon: <Heart      size={18} /> },
-  { id: 'captacao',   label: 'Captação',         icon: <Target     size={18} /> },
-  { id: 'documentos', label: 'Documentos',       icon: <FolderOpen size={18} /> },
-  { id: 'planos',     label: 'Planos',           icon: <CreditCard size={18} /> },
-  { id: 'config',     label: 'Configurações',    icon: <Settings   size={18} /> },
+  { id: 'painel',     label: 'Painel',        icon: <LayoutDashboard size={18} /> },
+  { id: 'hub-ia',     label: 'Hub IA',         icon: <Brain         size={18} /> },
+  { id: 'whatsapp',   label: 'WhatsApp',       icon: <MessageSquare size={18} /> },
+  { id: 'clientes',   label: 'Clientes',       icon: <Users         size={18} /> },
+  { id: 'captacao',   label: 'Captação',       icon: <Target        size={18} /> },
+  { id: 'documentos', label: 'Documentos',     icon: <FolderOpen    size={18} /> },
+  { id: 'planos',     label: 'Planos',         icon: <CreditCard    size={18} /> },
+  { id: 'config',     label: 'Configurações',  icon: <Settings      size={18} /> },
 ]
 
 function Shell({ onReady }: ShellProps) {
@@ -238,10 +236,9 @@ function Shell({ onReady }: ShellProps) {
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
       <main id="main-content" className="flex-1 overflow-hidden">
         <PageTransition id={section} className="h-full overflow-hidden pb-20">
-          {section === 'painel'     && <PainelPage onSelectCliente={selectCliente} />}
-          {section === 'clientes'   && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
-          {section === 'crm'        && <CRMPage onSelectCliente={selectCliente} />}
-          {section === 'hub-ia'     && <HubIAPage />}
+          {section === 'painel'   && <PainelPage onSelectCliente={selectCliente} />}
+          {section === 'clientes' && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
+          {section === 'hub-ia'   && <HubIAPage />}
           {section === 'whatsapp'   && <WhatsappPage />}
           {section === 'captacao'   && <CaptacaoPage />}
           {section === 'documentos' && <DocumentosPage />}

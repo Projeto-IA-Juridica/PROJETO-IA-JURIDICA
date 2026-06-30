@@ -1,7 +1,6 @@
 export type Section =
   | 'painel'
   | 'clientes'
-  | 'crm'
   | 'hub-ia'
   | 'whatsapp'
   | 'captacao'
