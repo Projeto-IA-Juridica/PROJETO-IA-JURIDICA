@@ -187,8 +187,25 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
 ]
 
 function Shell({ onReady }: ShellProps) {
-  const [section, setSection]     = useState<Section>('painel')
-  const [clienteId, setClienteId] = useState<number | null>(null)
+  const [section, setSection] = useState<Section>(() => {
+    return (localStorage.getItem('amicus:section') as Section) || 'painel'
+  })
+  const [clienteId, setClienteId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('amicus:clienteId')
+    return saved ? parseInt(saved, 10) : null
+  })
+
+  useEffect(() => {
+    localStorage.setItem('amicus:section', section)
+  }, [section])
+
+  useEffect(() => {
+    if (clienteId) {
+      localStorage.setItem('amicus:clienteId', clienteId.toString())
+    } else {
+      localStorage.removeItem('amicus:clienteId')
+    }
+  }, [clienteId])
 
   useEffect(() => {
     onReady?.()
