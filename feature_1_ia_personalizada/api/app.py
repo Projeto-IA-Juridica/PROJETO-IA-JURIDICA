@@ -132,6 +132,8 @@ from feature_1_ia_personalizada.api.middleware.request_logging import (  # noqa:
 # Importando os roteadores das nossas subpastas
 from feature_1_ia_personalizada.api.routes import (  # noqa: E402
     admin_import,
+    agenda,
+    agendamentos,
     auth,
     billing,
     chat,
@@ -294,6 +296,8 @@ app.include_router(hub_advogado.router, dependencies=_guard)
 app.include_router(crm.router, dependencies=_guard)
 app.include_router(chat, dependencies=_guard)
 app.include_router(rag, dependencies=_guard)
+app.include_router(agenda.router, dependencies=_guard)
+app.include_router(agendamentos.router, dependencies=_guard)
 
 # Webhook WhatsApp — sem guard (recebe de terceiros, não de usuários logados)
 app.include_router(webhook_whatsapp)
