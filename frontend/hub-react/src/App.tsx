@@ -238,16 +238,22 @@ function Shell({ onReady }: ShellProps) {
 
       {/* Top bar */}
       <header className="flex-shrink-0 flex items-center px-6 pt-5 pb-2">
-        <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 28, height: 28, objectFit: 'contain', opacity: 0.85 }} />
-        <span className="ml-2.5 text-xl font-black tracking-tight select-none"
-          style={{
-            background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}>
-          amicus
-        </span>
+        <button 
+          onClick={() => { setSection('painel'); setClienteId(null); }}
+          className="flex items-center hover:opacity-80 transition-opacity cursor-pointer focus:outline-none"
+          aria-label="Ir para o painel principal"
+        >
+          <img src="/logo.png" alt="" aria-hidden="true" style={{ width: 28, height: 28, objectFit: 'contain', opacity: 0.85 }} />
+          <span className="ml-2.5 text-xl font-black tracking-tight select-none"
+            style={{
+              background: 'linear-gradient(135deg, #0C1E30 0%, #1248BE 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
+            amicus
+          </span>
+        </button>
       </header>
 
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
