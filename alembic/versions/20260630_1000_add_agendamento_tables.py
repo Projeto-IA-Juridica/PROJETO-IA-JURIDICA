@@ -76,6 +76,7 @@ def upgrade() -> None:
         sa.Column("expira_em", sa.DateTime(timezone=True), nullable=True),
         sa.Column("resposta_cliente_em", sa.DateTime(timezone=True), nullable=True),
         sa.Column("resposta_advogado_em", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("nota_advogado", sa.Text(), nullable=True),
         sa.Column("motivo_cancelamento", sa.Text(), nullable=True),
         sa.Column(
             "created_at",

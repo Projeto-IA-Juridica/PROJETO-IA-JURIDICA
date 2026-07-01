@@ -54,6 +54,7 @@ class AgendamentoResponse(BaseModel):
     opcao_selecionada_pos: int | None = None
     canal_aprovacao: str | None = None
     motivo_cliente: str | None = None
+    nota_advogado: str | None = None
     expira_em: datetime | None = None
     proposta_enviada_em: datetime | None = None
     resposta_cliente_em: datetime | None = None
@@ -66,9 +67,10 @@ class AgendamentoResponse(BaseModel):
 
 
 class SugerirRequest(BaseModel):
-    motivo: str | None = Field(
+    nota_advogado: str | None = Field(
         default=None,
-        description="Motivo opcional para comunicar ao cliente",
+        max_length=500,
+        description="Nota interna do advogado (não exibida ao cliente)",
     )
 
 

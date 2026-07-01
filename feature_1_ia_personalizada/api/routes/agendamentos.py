@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -24,6 +24,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/agendamentos", tags=["Agendamento — Hub"])
 
 _LOCK_TTL_S = 30
+_PROPOSTA_TTL_H = 48
 _STATUS_VALIDOS = {
     "aguardando_cliente",
     "aguardando_advogado",
@@ -161,8 +162,8 @@ async def confirmar_agendamento(
     eid = _escritorio_id(request)
     ag = await _get_agendamento(agendamento_id, eid, db)
 
-    # Idempotência: já confirmado pelo hub → retorna sem erro
-    if ag.status == "confirmado" and ag.canal_aprovacao == "hub":
+    # Idempotência: qualquer canal que confirmou primeiro → hub retorna 200 sem re-processar
+    if ag.status == "confirmado":
         return await _to_response(ag, db)
 
     if ag.status != "aguardando_advogado":
@@ -186,7 +187,13 @@ async def confirmar_agendamento(
             raise HTTPException(status_code=409, detail="Confirmação em andamento, aguarde")
 
     try:
-        opcao = ag.opcoes_propostas[ag.opcao_selecionada_pos]
+        pos = ag.opcao_selecionada_pos
+        if pos >= len(ag.opcoes_propostas):
+            raise HTTPException(
+                status_code=409,
+                detail=f"opcao_selecionada_pos={pos} fora do range (total={len(ag.opcoes_propostas)})",
+            )
+        opcao = ag.opcoes_propostas[pos]
         ag.status = "confirmado"
         ag.canal_aprovacao = "hub"
         ag.resposta_advogado_em = datetime.now(UTC)
@@ -226,27 +233,43 @@ async def sugerir_novos_horarios(
             detail=f"Agendamento não está aguardando aprovação (status='{ag.status}')",
         )
 
-    tz_str = (
-        await db.execute(select(Escritorio.timezone).where(Escritorio.id == eid))
-    ).scalar_one_or_none() or "America/Sao_Paulo"
+    r = _redis(request)
+    lock_key = f"agendamento_sugerir:{agendamento_id}"
+    if r:
+        acquired = await r.set(lock_key, "1", ex=_LOCK_TTL_S, nx=True)
+        if not acquired:
+            raise HTTPException(status_code=409, detail="Sugestão em andamento, aguarde")
 
-    detector = AgendamentoDetector(db=db, escritorio_id=eid, timezone_str=tz_str)
-    slots = await detector.buscar_slots(num_slots=3)
+    try:
+        tz_str = (
+            await db.execute(select(Escritorio.timezone).where(Escritorio.id == eid))
+        ).scalar_one_or_none() or "America/Sao_Paulo"
 
-    if not slots:
-        raise HTTPException(
-            status_code=409,
-            detail="Não há slots disponíveis nos próximos 30 dias",
-        )
+        detector = AgendamentoDetector(db=db, escritorio_id=eid, timezone_str=tz_str)
+        slots = await detector.buscar_slots(num_slots=3)
 
-    ag.opcoes_propostas = [
-        {"inicio": s.inicio.isoformat(), "fim": s.fim.isoformat(), "label": s.label} for s in slots
-    ]
-    ag.opcao_selecionada_pos = None
-    ag.status = "aguardando_cliente"
-    if body.motivo:
-        ag.motivo_cliente = body.motivo
-    await db.flush()
+        if not slots:
+            raise HTTPException(
+                status_code=409,
+                detail="Não há slots disponíveis nos próximos 30 dias",
+            )
+
+        ag.opcoes_propostas = [
+            {"inicio": s.inicio.isoformat(), "fim": s.fim.isoformat(), "label": s.label}
+            for s in slots
+        ]
+        ag.opcao_selecionada_pos = None
+        ag.status = "aguardando_cliente"
+        ag.proposta_enviada_em = None
+        ag.expira_em = datetime.now(UTC) + timedelta(hours=_PROPOSTA_TTL_H)
+        ag.whatsapp_proposta_cliente_enviado = False
+        ag.whatsapp_notificacao_advogado_enviado = False
+        if body.nota_advogado:
+            ag.nota_advogado = body.nota_advogado
+        await db.flush()
+    finally:
+        if r:
+            await r.delete(lock_key)
 
     logger.info("agendamento_sugeriu_novos_horarios", id=agendamento_id, escritorio_id=eid)
     return await _to_response(ag, db)

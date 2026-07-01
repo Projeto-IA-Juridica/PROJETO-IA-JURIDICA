@@ -96,7 +96,12 @@ class Agendamento(Base, TenantMixin, TimestampMixin):
 
     # Trecho da conversa que originou o pedido de reunião.
     # Exibido no card de aprovação do Hub e na notificação WhatsApp ao advogado.
+    # Imutável após criação — nunca sobrescrever com notas internas do advogado.
     motivo_cliente: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Nota interna do advogado ao sugerir novos horários ("sem vagas essa semana").
+    # Semântica distinta de motivo_cliente — não exibir ao cliente nem enviar via WhatsApp.
+    nota_advogado: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Flags de idempotência — impedem que retries e workers horários reenviem a
     # mesma mensagem. O mais crítico: whatsapp_confirmacao_pre_reuniao_enviado evita

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models.agendamento import Agendamento
@@ -128,16 +128,25 @@ class AgendamentoDetector:
         """Retorna True se há agendamento confirmado/pendente que sobrepõe o slot."""
         stmt = select(Agendamento.id).where(
             Agendamento.escritorio_id == self._escritorio_id,
-            Agendamento.status.in_(["confirmado", "aguardando_advogado"]),
-            and_(
-                Agendamento.data_hora_inicio.isnot(None),
-                Agendamento.data_hora_fim.isnot(None),
-                # Sobreposição: início do existente < fim do candidato E fim do existente > início
-                or_(
-                    and_(
-                        Agendamento.data_hora_inicio < fim_utc,
-                        Agendamento.data_hora_fim > inicio_utc,
-                    )
+            or_(
+                # Caso 1: data_hora já preenchida (confirmado; ou aguardando_advogado pós-Fase 3)
+                and_(
+                    Agendamento.status.in_(["confirmado", "aguardando_advogado"]),
+                    Agendamento.data_hora_inicio.isnot(None),
+                    Agendamento.data_hora_fim.isnot(None),
+                    Agendamento.data_hora_inicio < fim_utc,
+                    Agendamento.data_hora_fim > inicio_utc,
+                ),
+                # Caso 2: aguardando_advogado sem data_hora — consulta via JSONB o slot selecionado
+                # (interim até o nó LangGraph da Fase 3 popular data_hora na seleção do cliente)
+                and_(
+                    Agendamento.status == "aguardando_advogado",
+                    Agendamento.opcao_selecionada_pos.isnot(None),
+                    Agendamento.data_hora_inicio.is_(None),
+                    text(
+                        "(opcoes_propostas->opcao_selecionada_pos->>'inicio')::timestamptz < :fim_p"
+                        " AND (opcoes_propostas->opcao_selecionada_pos->>'fim')::timestamptz > :inicio_p"
+                    ).bindparams(inicio_p=inicio_utc, fim_p=fim_utc),
                 ),
             ),
         )
