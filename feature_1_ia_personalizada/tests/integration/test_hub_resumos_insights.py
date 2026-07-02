@@ -145,10 +145,10 @@ async def test_consultar_com_processo_real_passa_cnj_para_escalacao(
     body = resp.json()
     assert "instrução" in body["resposta"].lower()
 
-    # CNJ injetado no contexto enviado à IA
-    mensagem_ia = mock_client.gerar_resposta.call_args.kwargs["mensagem_usuario"]
-    assert "0001234-55.2023.8.26.0001" in mensagem_ia
-    assert "Ação de Indenização por Danos Morais" in mensagem_ia
+    # CNJ injetado no contexto enviado à IA (agora no system_prompt, não na mensagem)
+    system_prompt = mock_client.gerar_resposta.call_args.kwargs["system_prompt"]
+    assert "0001234-55.2023.8.26.0001" in system_prompt
+    assert "Ação de Indenização por Danos Morais" in system_prompt
 
     # SessaoAdvogado salva com referência ao processo
     result = await db_session.execute(
@@ -203,9 +203,9 @@ async def test_consultar_com_cliente_chama_aggregator_e_injeta_nome(
     body = resp.json()
     assert body["modelo_ia"] == "claude_opus"
 
-    # Nome da cliente injetado na mensagem
-    mensagem_ia = mock_client.gerar_resposta.call_args.kwargs["mensagem_usuario"]
-    assert "Maria Souza" in mensagem_ia
+    # Nome da cliente injetado no system_prompt
+    system_prompt = mock_client.gerar_resposta.call_args.kwargs["system_prompt"]
+    assert "Maria Souza" in system_prompt
 
     # Sessão salva com referência à cliente
     result = await db_session.execute(
