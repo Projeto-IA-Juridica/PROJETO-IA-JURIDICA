@@ -28,12 +28,25 @@ connect_args: dict[str, Any] = {}
 if "supabase.com" in db_url:
     connect_args["ssl"] = "require"
 
+if "supabase.com" in db_url:
+    # Supabase Free tier limita a 15 conexões simultâneas no pooler de sessão
+    # (compartilhado entre esta API, os workers Celery e qualquer outra sessão
+    # conectada ao projeto) — por isso o pool aqui precisa ser bem enxuto.
+    _pool_size, _max_overflow = 3, 2
+else:
+    # Postgres dedicado (CI com container próprio, docker-compose local,
+    # self-hosted) não tem esse teto artificial. Um pool de 5 conexões totais
+    # virava gargalo sob carga concorrente — visto no smoke load test do CI,
+    # onde /health/ready enfileirava atrás de outras requisições e estourava
+    # o SLA de latência mesmo sem nenhum erro real.
+    _pool_size, _max_overflow = 10, 10
+
 engine = create_async_engine(
     db_url,
     connect_args=connect_args,
     echo=(settings.ENVIRONMENT == "development"),  # Loga queries SQL no console apenas em dev
-    pool_size=3,  # Reduzido de 20 para 3 devido ao limite de 15 conexões no Supabase Free
-    max_overflow=2,  # Reduzido de 10 para 2
+    pool_size=_pool_size,
+    max_overflow=_max_overflow,
     pool_timeout=30,  # Espera até 30s por uma conexão livre antes de dar erro
 )
 
