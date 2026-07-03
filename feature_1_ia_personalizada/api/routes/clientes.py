@@ -172,45 +172,57 @@ async def criar_cliente_manual(
         )
 
     # 2. Criar cliente
-    novo_cliente = Cliente(
-        escritorio_id=escritorio_id,
-        nome=payload.nome,
-        telefone_whatsapp=payload.telefone_whatsapp,
-        ativo=True,
-        aceite_lgpd=False,
-    )
-    db.add(novo_cliente)
-    await db.flush()
-
-    logger.info("cliente_manual_criado", cliente_id=novo_cliente.id, escritorio_id=escritorio_id)
-
-    # 3. Processo opcional
-    processo_id: int | None = None
-    if payload.numero_cnj:
-        novo_processo = Processo(
+    try:
+        novo_cliente = Cliente(
             escritorio_id=escritorio_id,
-            numero_cnj=payload.numero_cnj,
-            cliente_id=novo_cliente.id,
-            polo_cliente=payload.polo_cliente,
-            tipo_acao=payload.tipo_acao,
-            status="ativo",
-            monitoramento_ativo=True,
+            nome=payload.nome,
+            telefone_whatsapp=payload.telefone_whatsapp,
+            ativo=True,
+            aceite_lgpd=False,
         )
-        db.add(novo_processo)
+        db.add(novo_cliente)
         await db.flush()
-        processo_id = novo_processo.id
 
-        background_tasks.add_task(
-            _enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj
+        logger.info("cliente_manual_criado", cliente_id=novo_cliente.id, escritorio_id=escritorio_id)
+
+        # 3. Processo opcional
+        processo_id: int | None = None
+        if payload.numero_cnj:
+            novo_processo = Processo(
+                escritorio_id=escritorio_id,
+                numero_cnj=payload.numero_cnj,
+                cliente_id=novo_cliente.id,
+                polo_cliente=payload.polo_cliente,
+                tipo_acao=payload.tipo_acao,
+                status="ativo",
+                monitoramento_ativo=True,
+            )
+            db.add(novo_processo)
+            await db.flush()
+            processo_id = novo_processo.id
+
+            background_tasks.add_task(
+                _enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj
+            )
+            background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
+            
+        await db.commit()
+
+        return ClienteCreateManualResponse(
+            id=novo_cliente.id,
+            nome=novo_cliente.nome,
+            telefone_whatsapp=novo_cliente.telefone_whatsapp,
+            processo_id=processo_id,
         )
-        background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
-
-    return ClienteCreateManualResponse(
-        id=novo_cliente.id,
-        nome=novo_cliente.nome,
-        telefone_whatsapp=novo_cliente.telefone_whatsapp,
-        processo_id=processo_id,
-    )
+    except Exception as e:
+        await db.rollback()
+        import traceback
+        tb = traceback.format_exc()
+        logger.error("erro_criar_cliente_manual", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno: {str(e)}\nTraceback: {tb}"
+        )
 
 
 # ---------------------------------------------------------------------------
