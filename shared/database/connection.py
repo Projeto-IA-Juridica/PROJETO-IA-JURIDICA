@@ -28,9 +28,9 @@ connect_args: dict[str, Any] = {}
 if "supabase.com" in db_url:
     connect_args["ssl"] = "require"
 
-# Limita o pool a 3 conexões por worker para evitar estourar limites
-# de PgBouncer em provedores (como Supabase/Neon/Railway).
-_pool_size, _max_overflow = 3, 2
+# Limita o pool a 1 conexão por worker para evitar estourar limites
+# de PgBouncer em provedores durante deploys Blue/Green.
+_pool_size, _max_overflow = 1, 1
 
 engine = create_async_engine(
     db_url,
