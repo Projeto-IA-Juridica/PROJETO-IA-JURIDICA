@@ -29,21 +29,28 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. Adiciona nome como nullable (para poder popular antes de tornar NOT NULL)
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column("nome", sa.String(500), nullable=True),
-    )
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    cols = [c["name"] for c in inspector.get_columns("leads_prospeccao")]
+
+    # 1. Adiciona nome como nullable
+    if "nome" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column("nome", sa.String(500), nullable=True),
+        )
 
     # 2. Copia empresa_nome → nome
-    op.execute("UPDATE leads_prospeccao SET nome = empresa_nome WHERE nome IS NULL")
+    if "empresa_nome" in cols:
+        op.execute("UPDATE leads_prospeccao SET nome = empresa_nome WHERE nome IS NULL")
+        # 3. Remove empresa_nome
+        op.drop_column("leads_prospeccao", "empresa_nome")
 
-    # 3. Torna nome NOT NULL e remove empresa_nome (coluna renomeada)
+    # 3. Torna nome NOT NULL
     op.alter_column("leads_prospeccao", "nome", nullable=False)
-    op.drop_column("leads_prospeccao", "empresa_nome")
 
     # 4. Altera cnpj: NOT NULL → nullable e String(18) → String(50)
-    #    NULL é permitido para leads B2C (deduplicação via numero_cnj_exemplo)
     op.alter_column(
         "leads_prospeccao",
         "cnpj",
@@ -52,44 +59,50 @@ def upgrade() -> None:
         nullable=True,
     )
 
-    # 5. Remove coluna órfã processos_publicos (JSONB substituído por processos_publicos_count)
-    op.drop_column("leads_prospeccao", "processos_publicos")
+    # 5. Remove coluna órfã processos_publicos
+    if "processos_publicos" in cols:
+        op.drop_column("leads_prospeccao", "processos_publicos")
 
     # 6. Adiciona campos B2C
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column("polo_processo", sa.String(50), nullable=True),
-    )
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column("tipo_acao_origem", sa.String(300), nullable=True),
-    )
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column("numero_cnj_exemplo", sa.String(50), nullable=True),
-    )
+    if "polo_processo" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column("polo_processo", sa.String(50), nullable=True),
+        )
+    if "tipo_acao_origem" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column("tipo_acao_origem", sa.String(300), nullable=True),
+        )
+    if "numero_cnj_exemplo" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column("numero_cnj_exemplo", sa.String(50), nullable=True),
+        )
 
     # 7. Adiciona contador de processos públicos
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column(
-            "processos_publicos_count",
-            sa.SmallInteger(),
-            server_default="0",
-            nullable=False,
-        ),
-    )
+    if "processos_publicos_count" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column(
+                "processos_publicos_count",
+                sa.SmallInteger(),
+                server_default="0",
+                nullable=False,
+            ),
+        )
 
     # 8. Adiciona flag de LinkedIn disponível
-    op.add_column(
-        "leads_prospeccao",
-        sa.Column(
-            "linkedin_disponivel",
-            sa.Boolean(),
-            server_default="false",
-            nullable=False,
-        ),
-    )
+    if "linkedin_disponivel" not in cols:
+        op.add_column(
+            "leads_prospeccao",
+            sa.Column(
+                "linkedin_disponivel",
+                sa.Boolean(),
+                server_default="false",
+                nullable=False,
+            ),
+        )
 
 
 def downgrade() -> None:
