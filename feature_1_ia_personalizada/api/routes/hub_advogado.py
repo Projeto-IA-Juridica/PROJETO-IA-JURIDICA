@@ -633,108 +633,117 @@ async def consultar(
     `cliente_id` e `processo_id` são validados contra o escritório do advogado
     (isolamento multi-tenant — IDs de outros escritórios são silenciosamente ignorados).
     """
-    usuario, escritorio = await _carregar_usuario_escritorio(advogado_id, escritorio_id, db)
+    try:
+        usuario, escritorio = await _carregar_usuario_escritorio(advogado_id, escritorio_id, db)
 
-    # Montar contexto adicional com dados reais do banco (cliente, processo,
-    # score de outro modelo, satisfação, histórico de WhatsApp e documentos)
-    ref_cliente_id: int | None = None
-    ref_processo_id: int | None = None
+        # Montar contexto adicional com dados reais do banco (cliente, processo,
+        # score de outro modelo, satisfação, histórico de WhatsApp e documentos)
+        ref_cliente_id: int | None = None
+        ref_processo_id: int | None = None
     contexto_cliente = ""
 
-    cliente: Cliente | None = None
-    if body.cliente_id:
-        cliente = await db.get(Cliente, body.cliente_id)
-        if not (cliente and cliente.escritorio_id == escritorio_id):
-            cliente = None
-        else:
-            ref_cliente_id = cliente.id
+        cliente: Cliente | None = None
+        if body.cliente_id:
+            cliente = await db.get(Cliente, body.cliente_id)
+            if not (cliente and cliente.escritorio_id == escritorio_id):
+                cliente = None
+            else:
+                ref_cliente_id = cliente.id
 
-    # Resolve processo(s) sempre pelo backend — nunca depende do frontend ter
-    # terminado de buscar o processo do cliente, e cobre clientes com mais
-    # de um processo ativo (não só o primeiro item de uma listagem).
-    processos, ref_processo_id = await _resolver_processos(
-        db, cliente, body.processo_id, escritorio_id
-    )
-
-    if cliente or processos:
-        contexto_cliente = await _montar_contexto_consulta(db, cliente, processos, escritorio_id)
-
-    system_prompt = SYSTEM_PROMPT_HUB_ADVOGADO_BASE.format(
-        nome_usuario=usuario.nome,
-        nome_escritorio=escritorio.nome,
-        data_hoje=date.today().strftime("%d/%m/%Y"),
-    )
-    if contexto_cliente:
-        system_prompt = f"{system_prompt}\n\n{_AVISO_DADOS_NAO_CONFIAVEIS}\n\n{contexto_cliente}"
-
-    mensagem = body.pergunta
-
-    # Resolve o conversa_id: usa o do frontend ou gera um novo
-    conversa_uuid: uuid.UUID
-    if body.conversa_id:
-        try:
-            conversa_uuid = uuid.UUID(body.conversa_id)
-        except ValueError:
-            conversa_uuid = uuid.uuid4()
-    else:
-        conversa_uuid = uuid.uuid4()
-
-    # Turnos anteriores desta mesma conversa — dá memória ao Opus entre perguntas
-    historico_memoria = await _montar_historico_memoria(
-        db, conversa_uuid, escritorio_id, advogado_id
-    )
-
-    try:
-        resultado = await escalacao_client.gerar_resposta(
-            system_prompt=system_prompt,
-            mensagem_usuario=mensagem,
-            escritorio_id=escritorio_id,
-            historico=historico_memoria,
+        # Resolve processo(s) sempre pelo backend — nunca depende do frontend ter
+        # terminado de buscar o processo do cliente, e cobre clientes com mais
+        # de um processo ativo (não só o primeiro item de uma listagem).
+        processos, ref_processo_id = await _resolver_processos(
+            db, cliente, body.processo_id, escritorio_id
         )
-    except EscalacaoIndisponivelError as exc:
-        logger.error("hub_rest_consulta_falhou", erro=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Serviço de consulta indisponível. Tente novamente.",
-        ) from exc
 
-    # Verifica se é a primeira mensagem desta conversa (para gerar título)
-    count_result = await db.execute(
-        select(func.count()).where(SessaoAdvogado.conversa_id == conversa_uuid)
-    )
-    is_primeira_mensagem = (count_result.scalar() or 0) == 0
+        if cliente or processos:
+            contexto_cliente = await _montar_contexto_consulta(db, cliente, processos, escritorio_id)
 
-    await _salvar_sessao(
-        db,
-        SessaoAdvogado(
-            escritorio_id=escritorio_id,
-            usuario_id=advogado_id,
-            mensagem_advogado=body.pergunta,
-            resposta_hub=resultado.conteudo,
-            intencao="duvida_juridica",
+        system_prompt = SYSTEM_PROMPT_HUB_ADVOGADO_BASE.format(
+            nome_usuario=usuario.nome,
+            nome_escritorio=escritorio.nome,
+            data_hoje=date.today().strftime("%d/%m/%Y"),
+        )
+        if contexto_cliente:
+            system_prompt = f"{system_prompt}\n\n{_AVISO_DADOS_NAO_CONFIAVEIS}\n\n{contexto_cliente}"
+
+        mensagem = body.pergunta
+
+        # Resolve o conversa_id: usa o do frontend ou gera um novo
+        conversa_uuid: uuid.UUID
+        if body.conversa_id:
+            try:
+                conversa_uuid = uuid.UUID(body.conversa_id)
+            except ValueError:
+                conversa_uuid = uuid.uuid4()
+        else:
+            conversa_uuid = uuid.uuid4()
+
+        # Turnos anteriores desta mesma conversa — dá memória ao Opus entre perguntas
+        historico_memoria = await _montar_historico_memoria(
+            db, conversa_uuid, escritorio_id, advogado_id
+        )
+
+        try:
+            resultado = await escalacao_client.gerar_resposta(
+                system_prompt=system_prompt,
+                mensagem_usuario=mensagem,
+                escritorio_id=escritorio_id,
+                historico=historico_memoria,
+            )
+        except EscalacaoIndisponivelError as exc:
+            logger.error("hub_rest_consulta_falhou", erro=str(exc))
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serviço de consulta indisponível. Tente novamente.",
+            ) from exc
+
+        # Verifica se é a primeira mensagem desta conversa (para gerar título)
+        count_result = await db.execute(
+            select(func.count()).where(SessaoAdvogado.conversa_id == conversa_uuid)
+        )
+        is_primeira_mensagem = (count_result.scalar() or 0) == 0
+
+        await _salvar_sessao(
+            db,
+            SessaoAdvogado(
+                escritorio_id=escritorio_id,
+                usuario_id=advogado_id,
+                mensagem_advogado=body.pergunta,
+                resposta_hub=resultado.conteudo,
+                intencao="duvida_juridica",
+                modelo_ia="claude_opus",
+                tokens_input=resultado.tokens_input,
+                tokens_output=resultado.tokens_output,
+                custo_estimado=resultado.custo_estimado,
+                cliente_referenciado_id=ref_cliente_id,
+                processo_referenciado_id=ref_processo_id,
+                conversa_id=conversa_uuid,
+                metadata_json={},
+            ),
+        )
+
+        # Dispara geração de título em background apenas na 1ª mensagem
+        if is_primeira_mensagem:
+            asyncio.create_task(_gerar_e_salvar_titulo(conversa_uuid, body.pergunta))
+
+        return ConsultaHubResponse(
+            resposta=resultado.conteudo,
             modelo_ia="claude_opus",
             tokens_input=resultado.tokens_input,
             tokens_output=resultado.tokens_output,
             custo_estimado=resultado.custo_estimado,
-            cliente_referenciado_id=ref_cliente_id,
-            processo_referenciado_id=ref_processo_id,
-            conversa_id=conversa_uuid,
-            metadata_json={},
-        ),
-    )
-
-    # Dispara geração de título em background apenas na 1ª mensagem
-    if is_primeira_mensagem:
-        asyncio.create_task(_gerar_e_salvar_titulo(conversa_uuid, body.pergunta))
-
-    return ConsultaHubResponse(
-        resposta=resultado.conteudo,
-        modelo_ia="claude_opus",
-        tokens_input=resultado.tokens_input,
-        tokens_output=resultado.tokens_output,
-        custo_estimado=resultado.custo_estimado,
-        conversa_id=str(conversa_uuid),
-    )
+            conversa_id=str(conversa_uuid),
+        )
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error("erro_inesperado_consultar", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno: {str(e)}\nTraceback: {tb}"
+        )
 
 
 # ---------------------------------------------------------------------------
