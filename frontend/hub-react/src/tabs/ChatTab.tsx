@@ -235,6 +235,11 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
         tokens: data.tokens_output,
       }])
     },
+    onError: (err: any) => {
+      const msg = err.response?.data?.detail || err.message || "Erro desconhecido"
+      console.error("ERRO DETALHADO DO BACKEND:", msg)
+      alert("ERRO: \n" + msg)
+    }
   })
 
   useEffect(() => {
