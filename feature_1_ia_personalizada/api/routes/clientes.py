@@ -174,7 +174,7 @@ async def criar_cliente_manual(
 
     # 2. Criar cliente
     try:
-        cpf_criptografado = criptografar("00000000000")
+        cpf_criptografado = criptografar(payload.cpf)
         
         novo_cliente = Cliente(
             escritorio_id=escritorio_id,

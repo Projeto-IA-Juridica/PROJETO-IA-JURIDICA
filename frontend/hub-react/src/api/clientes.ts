@@ -2,6 +2,7 @@ import { api } from './client'
 
 export interface ClienteCreateManual {
   nome: string
+  cpf: string
   telefone_whatsapp: string
   numero_cnj?: string | null
   polo_cliente?: 'autor' | 'reu' | 'terceiro'
