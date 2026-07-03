@@ -640,7 +640,7 @@ async def consultar(
         # score de outro modelo, satisfação, histórico de WhatsApp e documentos)
         ref_cliente_id: int | None = None
         ref_processo_id: int | None = None
-    contexto_cliente = ""
+        contexto_cliente = ""
 
         cliente: Cliente | None = None
         if body.cliente_id:
