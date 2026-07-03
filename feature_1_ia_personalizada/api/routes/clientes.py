@@ -41,6 +41,7 @@ from feature_1_ia_personalizada.api.routes.processos import (
     _enriquecer_processo_async,
 )
 from shared.database.session import get_db
+from shared.security.encryption import criptografar
 from shared.models.cliente import Cliente
 from shared.models.documento_cliente import (
     MAX_TAMANHO_BYTES,
@@ -173,9 +174,12 @@ async def criar_cliente_manual(
 
     # 2. Criar cliente
     try:
+        cpf_criptografado = criptografar("00000000000")
+        
         novo_cliente = Cliente(
             escritorio_id=escritorio_id,
             nome=payload.nome,
+            cpf=cpf_criptografado,
             telefone_whatsapp=payload.telefone_whatsapp,
             ativo=True,
             aceite_lgpd=False,
