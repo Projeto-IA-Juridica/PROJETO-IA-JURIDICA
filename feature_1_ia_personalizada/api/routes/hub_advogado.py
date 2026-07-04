@@ -68,6 +68,7 @@ logger = structlog.get_logger(__name__)
 _MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB
 _MAX_CHARS_ANALISE = 15_000  # ~5 000 tokens — limite seguro para Opus
 _PDF_MAGIC = b"%PDF-"  # primeiros bytes de qualquer PDF válido
+_JOB_TTL_SEGUNDOS = 3600  # mesmo TTL usado por hub_worker.py ao gravar o resultado final
 
 # Contexto do chat "Assistente" por cliente (POST /hub/consultar)
 # Nota: não é "todo" o histórico — é uma janela das interações mais recentes.
@@ -504,6 +505,7 @@ async def _montar_historico_memoria(
 
 @router.post("/analisar-peticao", status_code=status.HTTP_202_ACCEPTED)
 async def analisar_peticao(
+    request: Request,
     arquivo: UploadFile = File(..., description="Arquivo PDF da petição (máx. 10 MB)"),
     advogado_id: int = Depends(get_advogado_id),
     escritorio_id: int = Depends(get_escritorio_id_advogado),
@@ -556,6 +558,19 @@ async def analisar_peticao(
     )
 
     job_id = str(uuid.uuid4())
+
+    # Grava o estado "processando" ANTES de enfileirar a task — a análise no Opus
+    # leva 15-60s e, sem isso, GET /hub/jobs/{job_id} responde 404 (chave ainda
+    # não existe) enquanto a task roda. O polling do frontend só continua
+    # automaticamente quando recebe de volta status "processando"; um 404 nessa
+    # janela mata o polling e a análise concluída nunca chega a aparecer na tela.
+    redis_client = getattr(request.app.state, "redis_client", None)
+    if redis_client is not None:
+        await redis_client.setex(
+            f"hub:job:{job_id}",
+            _JOB_TTL_SEGUNDOS,
+            json.dumps({"status": "processando", "resultado": None, "erro": None}),
+        )
 
     from kombu.exceptions import OperationalError
 

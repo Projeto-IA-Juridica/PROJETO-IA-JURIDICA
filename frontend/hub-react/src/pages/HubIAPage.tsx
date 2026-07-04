@@ -471,7 +471,14 @@ export default function HubIAPage() {
     queryKey: ['hub-job', peticaoJobId],
     queryFn: () => pollHubJob(peticaoJobId!),
     enabled: peticaoJobId !== null,
-    refetchInterval: (query) => query.state.data?.status === 'processando' ? 2000 : false,
+    // Continua tentando enquanto não houver um status terminal — inclusive
+    // quando a última tentativa falhou (ex: 404 transitório), em vez de exigir
+    // status === 'processando', que fica indefinido se algum fetch falhar antes
+    // de qualquer resposta bem-sucedida chegar a existir.
+    refetchInterval: (query) => {
+      const st = query.state.data?.status
+      return st === 'concluido' || st === 'erro' ? false : 2000
+    },
   })
 
   useEffect(() => {
