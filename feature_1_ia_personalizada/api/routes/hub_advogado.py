@@ -202,7 +202,7 @@ async def _gerar_e_salvar_titulo(conversa_id: uuid.UUID, mensagem: str) -> None:
             logger.warning("titulo_salvar_falhou", erro=str(exc))
 
 
-async def _montar_bloco_processo(processo: Processo) -> str:
+async def _montar_bloco_processo(processo: Processo, nome_cliente: str | None = None) -> str:
     """Formata todos os dados relevantes do processo para o contexto do Opus."""
     linhas = [f"=== PROCESSO {processo.numero_cnj} ==="]
     linhas.append(f"Tribunal: {processo.tribunal or 'não informado'}")
@@ -211,7 +211,11 @@ async def _montar_bloco_processo(processo: Processo) -> str:
     if processo.comarca:
         linhas.append(f"Comarca: {processo.comarca}")
     linhas.append(f"Tipo de ação: {processo.tipo_acao or 'não informado'}")
-    linhas.append(f"Polo do cliente: {processo.polo_cliente}")
+    # Nome do cliente explícito aqui (não só no bloco === CLIENTE ===) para o
+    # Opus nunca confundir a posição processual do cliente com a do próprio
+    # advogado que está fazendo a pergunta — ver SYSTEM_PROMPT_HUB_ADVOGADO_BASE.
+    sujeito_polo = f"o cliente {nome_cliente}" if nome_cliente else "o cliente"
+    linhas.append(f"Polo processual de {sujeito_polo} (não do advogado): {processo.polo_cliente}")
     linhas.append(f"Status: {processo.status}")
     if processo.fase_processual:
         linhas.append(f"Fase processual: {processo.fase_processual}")
@@ -437,7 +441,7 @@ async def _montar_contexto_consulta(
         blocos.append(_montar_bloco_cliente(cliente))
 
     for processo in processos:
-        blocos.append(await _montar_bloco_processo(processo))
+        blocos.append(await _montar_bloco_processo(processo, cliente.nome if cliente else None))
 
     if cliente:
         # Nonce único por requisição — ver _envolver_nao_confiavel.
