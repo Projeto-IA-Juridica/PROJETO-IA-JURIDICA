@@ -41,7 +41,6 @@ from feature_1_ia_personalizada.api.routes.processos import (
     _enriquecer_processo_async,
 )
 from shared.database.session import get_db
-from shared.security.encryption import criptografar
 from shared.models.cliente import Cliente
 from shared.models.documento_cliente import (
     MAX_TAMANHO_BYTES,
@@ -50,6 +49,7 @@ from shared.models.documento_cliente import (
 )
 from shared.models.processo import Processo
 from shared.schemas.cliente import ClienteCreateManual, ClienteCreateManualResponse
+from shared.security.encryption import criptografar
 from shared.utils.lgpd import (
     anonimizar_dados_cliente,
     exportar_dados_cliente,
@@ -175,7 +175,7 @@ async def criar_cliente_manual(
     # 2. Criar cliente
     try:
         cpf_criptografado = criptografar(payload.cpf)
-        
+
         novo_cliente = Cliente(
             escritorio_id=escritorio_id,
             nome=payload.nome,
@@ -187,7 +187,9 @@ async def criar_cliente_manual(
         db.add(novo_cliente)
         await db.flush()
 
-        logger.info("cliente_manual_criado", cliente_id=novo_cliente.id, escritorio_id=escritorio_id)
+        logger.info(
+            "cliente_manual_criado", cliente_id=novo_cliente.id, escritorio_id=escritorio_id
+        )
 
         # 3. Processo opcional
         processo_id: int | None = None
@@ -209,7 +211,7 @@ async def criar_cliente_manual(
                 _enriquecer_processo_async, novo_processo.id, novo_processo.numero_cnj
             )
             background_tasks.add_task(_disparar_monitoramento, novo_processo.id)
-            
+
         await db.commit()
 
         return ClienteCreateManualResponse(
@@ -218,15 +220,13 @@ async def criar_cliente_manual(
             telefone_whatsapp=novo_cliente.telefone_whatsapp,
             processo_id=processo_id,
         )
-    except Exception as e:
+    except Exception as exc:
         await db.rollback()
-        import traceback
-        tb = traceback.format_exc()
         logger.error("erro_criar_cliente_manual", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno: {str(e)}\nTraceback: {tb}"
-        )
+            detail="Erro interno ao criar cliente.",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

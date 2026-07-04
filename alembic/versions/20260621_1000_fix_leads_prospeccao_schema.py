@@ -30,6 +30,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     from sqlalchemy import inspect
+
     conn = op.get_bind()
     inspector = inspect(conn)
     cols = [c["name"] for c in inspector.get_columns("leads_prospeccao")]

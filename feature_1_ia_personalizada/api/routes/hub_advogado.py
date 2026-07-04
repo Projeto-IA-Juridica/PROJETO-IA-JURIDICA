@@ -658,7 +658,9 @@ async def consultar(
         )
 
         if cliente or processos:
-            contexto_cliente = await _montar_contexto_consulta(db, cliente, processos, escritorio_id)
+            contexto_cliente = await _montar_contexto_consulta(
+                db, cliente, processos, escritorio_id
+            )
 
         system_prompt = SYSTEM_PROMPT_HUB_ADVOGADO_BASE.format(
             nome_usuario=usuario.nome,
@@ -666,7 +668,9 @@ async def consultar(
             data_hoje=date.today().strftime("%d/%m/%Y"),
         )
         if contexto_cliente:
-            system_prompt = f"{system_prompt}\n\n{_AVISO_DADOS_NAO_CONFIAVEIS}\n\n{contexto_cliente}"
+            system_prompt = (
+                f"{system_prompt}\n\n{_AVISO_DADOS_NAO_CONFIAVEIS}\n\n{contexto_cliente}"
+            )
 
         mensagem = body.pergunta
 
@@ -736,14 +740,14 @@ async def consultar(
             custo_estimado=resultado.custo_estimado,
             conversa_id=str(conversa_uuid),
         )
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
+    except HTTPException:
+        raise
+    except Exception as exc:
         logger.error("erro_inesperado_consultar", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno: {str(e)}\nTraceback: {tb}"
-        )
+            detail="Erro interno ao processar consulta.",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
