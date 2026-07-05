@@ -166,4 +166,21 @@ export interface Configuracoes {
   template_boas_vindas: string
   template_atualizacao: string
   template_sem_novidade: string
+  /* Agendamento Inteligente */
+  telefone_advogado?: string | null
+  timezone?: string
+}
+
+/* ── Agendamento Inteligente — navegação entre páginas ── */
+
+export type ClientesView = 'lista' | 'crm' | 'agenda'
+
+export interface ClientesNavRequest {
+  view: ClientesView
+  /** filtra a lista mostrando aprovações pendentes no topo */
+  pendentes?: boolean
+  /** ISO date — semana a exibir na Agenda */
+  semana?: string
+  /** timestamp para disparar o efeito mesmo com valores iguais */
+  ts: number
 }

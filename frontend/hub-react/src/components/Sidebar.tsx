@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  LayoutDashboard, Users, Heart, Sparkles, Target, MessageSquare,
+  LayoutDashboard, Users, Sparkles, Target, MessageSquare,
   FolderOpen, Settings, Search, Shield, X, ChevronDown,
 } from 'lucide-react'
 import { fetchClientes } from '../api/crm'
@@ -10,7 +10,6 @@ import type { CRMClienteCard, Section } from '../types'
 const NAV: { id: Section; icon: React.ReactNode; label: string }[] = [
   { id: 'painel',     icon: <LayoutDashboard size={15} />, label: 'Painel'          },
   { id: 'clientes',   icon: <Users size={15} />,           label: 'Clientes'        },
-  { id: 'crm',        icon: <Heart size={15} />,           label: 'Relacionamento'  },
   { id: 'hub-ia',     icon: <Sparkles size={15} />,        label: 'Hub IA'          },
   { id: 'whatsapp',   icon: <MessageSquare size={15} />,   label: 'WhatsApp'        },
   { id: 'captacao',   icon: <Target size={15} />,          label: 'Captação'        },

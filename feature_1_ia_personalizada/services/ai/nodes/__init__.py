@@ -1,5 +1,6 @@
 """Nós do orquestrador LangGraph — cada módulo agrupa nós por responsabilidade."""
 
+from feature_1_ia_personalizada.services.ai.nodes.agendamento import node_agendamento
 from feature_1_ia_personalizada.services.ai.nodes.data import node_buscar_dados
 from feature_1_ia_personalizada.services.ai.nodes.delivery import (
     node_enviar_resposta,
@@ -23,6 +24,7 @@ __all__ = [
     "node_classificar_intencao",
     "node_avaliar_escalacao",
     "node_preparar_escalacao",
+    "node_agendamento",
     "node_buscar_dados",
     "node_gerar_resposta",
     "node_gerar_resposta_escalacao",

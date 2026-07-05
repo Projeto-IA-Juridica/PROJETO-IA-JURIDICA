@@ -27,6 +27,9 @@ class SlotDisponivel:
     inicio: datetime  # UTC, timezone-aware
     fim: datetime  # UTC, timezone-aware
     label: str  # ex: "Segunda-feira, 07/07 às 10h"
+    # Preenchido quando o slot cai no dia (ou véspera) de um prazo processual e
+    # não havia alternativa livre — conflito avisa, nunca bloqueia.
+    conflito_prazo: bool = False
 
 
 class AgendamentoDetector:
@@ -58,7 +61,16 @@ class AgendamentoDetector:
         self,
         num_slots: int = 3,
         duracao_min: int = 60,
+        datas_evitar: set[date] | None = None,
     ) -> list[SlotDisponivel]:
+        """
+        Retorna os primeiros num_slots livres.
+
+        datas_evitar: dias locais com prazo processual (ou véspera). Slots nesses
+        dias são pulados; se não houver alternativa suficiente sem conflito, os
+        slots conflitantes entram no fim marcados com conflito_prazo=True
+        (o conflito avisa o advogado, nunca bloqueia a proposta).
+        """
         disponibilidades = await self._carregar_disponibilidades()
         if not disponibilidades:
             return []
@@ -67,7 +79,9 @@ class AgendamentoDetector:
             d.dia_semana: d for d in disponibilidades
         }
 
+        evitar = datas_evitar or set()
         slots: list[SlotDisponivel] = []
+        reservas_conflito: list[SlotDisponivel] = []
         hoje = datetime.now(self._tz).date()
 
         for delta in range(1, self._MAX_DIAS_FRENTE + 1):
@@ -80,15 +94,35 @@ class AgendamentoDetector:
             if weekday not in disp_por_dia:
                 continue
 
+            em_conflito = dia in evitar
+            if em_conflito and len(reservas_conflito) >= num_slots:
+                continue
+
             disp = disp_por_dia[weekday]
             candidatos = self._gerar_candidatos(dia, disp, duracao_min)
 
             for inicio_utc, fim_utc in candidatos:
                 if len(slots) >= num_slots:
                     break
+                if em_conflito and len(reservas_conflito) >= num_slots:
+                    break
                 if not await self._tem_conflito(inicio_utc, fim_utc):
-                    label = self._formatar_label(inicio_utc)
-                    slots.append(SlotDisponivel(inicio=inicio_utc, fim=fim_utc, label=label))
+                    slot = SlotDisponivel(
+                        inicio=inicio_utc,
+                        fim=fim_utc,
+                        label=self._formatar_label(inicio_utc),
+                        conflito_prazo=em_conflito,
+                    )
+                    if em_conflito:
+                        reservas_conflito.append(slot)
+                    else:
+                        slots.append(slot)
+
+        # Completa com slots em dia de prazo apenas se faltou alternativa livre
+        if len(slots) < num_slots and reservas_conflito:
+            faltam = num_slots - len(slots)
+            slots.extend(reservas_conflito[:faltam])
+            slots.sort(key=lambda s: s.inicio)
 
         return slots
 
@@ -126,19 +160,23 @@ class AgendamentoDetector:
 
     async def _tem_conflito(self, inicio_utc: datetime, fim_utc: datetime) -> bool:
         """Retorna True se há agendamento confirmado/pendente que sobrepõe o slot."""
-        stmt = select(Agendamento.id).where(
-            Agendamento.escritorio_id == self._escritorio_id,
-            or_(
-                # Caso 1: data_hora já preenchida (confirmado; ou aguardando_advogado pós-Fase 3)
-                and_(
-                    Agendamento.status.in_(["confirmado", "aguardando_advogado"]),
-                    Agendamento.data_hora_inicio.isnot(None),
-                    Agendamento.data_hora_fim.isnot(None),
-                    Agendamento.data_hora_inicio < fim_utc,
-                    Agendamento.data_hora_fim > inicio_utc,
-                ),
-                # Caso 2: aguardando_advogado sem data_hora — consulta via JSONB o slot selecionado
-                # (interim até o nó LangGraph da Fase 3 popular data_hora na seleção do cliente)
+        # Caso 1: data_hora já preenchida (confirmado; ou aguardando_advogado — a
+        # seleção do cliente na Fase 3 popula data_hora_inicio/fim)
+        caso_data_hora = and_(
+            Agendamento.status.in_(["confirmado", "aguardando_advogado"]),
+            Agendamento.data_hora_inicio.isnot(None),
+            Agendamento.data_hora_fim.isnot(None),
+            Agendamento.data_hora_inicio < fim_utc,
+            Agendamento.data_hora_fim > inicio_utc,
+        )
+
+        condicoes = [caso_data_hora]
+
+        # Caso 2 (fallback legado, sintaxe JSONB PostgreSQL): aguardando_advogado
+        # sem data_hora — registros criados antes da Fase 3. Não roda em SQLite (testes).
+        bind = self._db.get_bind()
+        if bind is not None and bind.dialect.name == "postgresql":
+            condicoes.append(
                 and_(
                     Agendamento.status == "aguardando_advogado",
                     Agendamento.opcao_selecionada_pos.isnot(None),
@@ -147,8 +185,12 @@ class AgendamentoDetector:
                         "(opcoes_propostas->opcao_selecionada_pos->>'inicio')::timestamptz < :fim_p"
                         " AND (opcoes_propostas->opcao_selecionada_pos->>'fim')::timestamptz > :inicio_p"
                     ).bindparams(inicio_p=inicio_utc, fim_p=fim_utc),
-                ),
-            ),
+                )
+            )
+
+        stmt = select(Agendamento.id).where(
+            Agendamento.escritorio_id == self._escritorio_id,
+            or_(*condicoes),
         )
         result = await self._db.execute(stmt)
         return result.first() is not None

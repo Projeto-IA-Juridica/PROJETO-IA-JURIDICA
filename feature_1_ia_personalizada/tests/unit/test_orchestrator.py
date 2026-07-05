@@ -278,8 +278,9 @@ class TestClassificarPorKeywords:
     def test_duvida_termo(self):
         assert _classificar_por_keywords("o que significa agravo?") == "duvida_termo"
 
-    def test_agendamento_retorna_outro(self):
-        assert _classificar_por_keywords("quero agendar uma consulta") == "outro"
+    def test_agendamento_detectado_por_keywords(self):
+        # Feature Agendamento Inteligente: pedido de reunião tem intenção própria
+        assert _classificar_por_keywords("quero agendar uma consulta") == "agendar_reuniao"
 
     def test_saudacao(self):
         assert _classificar_por_keywords("olá, bom dia!") == "saudacao"

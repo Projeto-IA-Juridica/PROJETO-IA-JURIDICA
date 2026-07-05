@@ -171,6 +171,31 @@ celery_app.conf.task_routes = {
         "queue": "dead_letter",
         "routing_key": "dead_letter",
     },
+    # agendamento_worker.py — Agendamento Inteligente (fila ia)
+    "workers.agendamento.processar_resposta_advogado_wpp": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
+    "workers.agendamento.enviar_mensagens_pos_acao": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
+    "workers.agendamento.expirar_propostas": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
+    "workers.agendamento.enviar_lembretes": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
+    "workers.agendamento.enviar_confirmacao_pre_reuniao": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
+    "workers.agendamento.verificar_conflitos_prazos": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
 }
 
 #  BEAT: usar o NOME REAL da task (mesmo padrão)
@@ -206,6 +231,23 @@ celery_app.conf.beat_schedule = {
     "despachar-mensagens-agendadas": {
         "task": "feature_1_ia_personalizada.workers.dispatcher_agendadas.despachar_mensagens_agendadas",
         "schedule": crontab(minute="*/5"),
+    },
+    # Agendamento Inteligente
+    "agendamento-expirar-propostas": {
+        "task": "workers.agendamento.expirar_propostas",
+        "schedule": crontab(minute=5),  # a cada hora
+    },
+    "agendamento-lembretes-8h": {
+        "task": "workers.agendamento.enviar_lembretes",
+        "schedule": crontab(hour=8, minute=15),
+    },
+    "agendamento-pre-reuniao": {
+        "task": "workers.agendamento.enviar_confirmacao_pre_reuniao",
+        "schedule": crontab(minute=10),  # a cada hora — janela [now+3h, now+4h)
+    },
+    "agendamento-conflitos-prazos": {
+        "task": "workers.agendamento.verificar_conflitos_prazos",
+        "schedule": crontab(hour=7, minute=30),  # varredura diária além do hook
     },
 }
 
@@ -288,6 +330,7 @@ def _init_worker_process(**kwargs: Any) -> None:
 
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
+import feature_1_ia_personalizada.workers.agendamento_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
 import feature_1_ia_personalizada.workers.dispatcher_agendadas  # noqa: F401

@@ -165,6 +165,21 @@ def delay_digitacao_whatsapp(texto: str) -> float:
 # ---------------------------------------------------------------------------
 
 _KEYWORDS: list[tuple[str, re.Pattern[str]]] = [
+    # agendar_reuniao vem PRIMEIRO: "preciso falar com você" também casaria com
+    # o pattern de duvida_geral ("preciso"), e a intenção específica deve vencer.
+    (
+        "agendar_reuniao",
+        re.compile(
+            r"(\b(marcar|agendar|remarcar|reagendar)\b[\s\S]{0,40}"
+            r"\b(reuni[aã]o|hor[aá]rio|consulta|conversa|atendimento|encontro|visita)\b)"
+            r"|(\b(reuni[aã]o|hor[aá]rio|consulta)\b[\s\S]{0,40}\b(marcar|agendar)\b)"
+            r"|(\bpreciso falar com\b)"
+            r"|(\bquero (conversar|falar)\b[\s\S]{0,40}\b(voc[eê]|advogad\w*|doutor\w*|dr)\b)"
+            r"|(\bquando\b[\s\S]{0,40}\b(tem|teria|t[eê]m)\b[\s\S]{0,25}"
+            r"\b(hor[aá]rio|disponibilidade|tempo)\b)",
+            re.IGNORECASE,
+        ),
+    ),
     (
         "status",
         re.compile(

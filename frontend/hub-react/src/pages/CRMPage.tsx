@@ -241,9 +241,9 @@ export default function CRMPage({ onSelectCliente }: Props) {
 
           {filtered.map((c: CRMClienteCard) => {
             const cfg = c.crm_nivel ? (NIVEL_CFG[c.crm_nivel] ?? NIVEL_CFG.sem_analise) : NIVEL_CFG.sem_analise
-            const accentColor = c.crm_nivel === 'alto' || c.crm_nivel === 'critico'
+            const accentColor = c.crm_nivel === 'em_risco' || c.crm_nivel === 'critico'
               ? 'rgba(200,48,48,0.55)'
-              : c.crm_nivel === 'moderado' ? 'rgba(208,128,16,0.55)' : 'transparent'
+              : c.crm_nivel === 'neutro' ? 'rgba(208,128,16,0.55)' : 'transparent'
             const isAnalysing = analisandoId === c.id
             const hasErro     = erroId?.id === c.id
 

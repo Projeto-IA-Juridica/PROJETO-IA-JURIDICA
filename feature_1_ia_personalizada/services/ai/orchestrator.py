@@ -53,6 +53,7 @@ from feature_1_ia_personalizada.services.ai.escalation_client import EscalacaoCl
 from feature_1_ia_personalizada.services.ai.fact_checker import FactChecker
 from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
 from feature_1_ia_personalizada.services.ai.nodes import (
+    node_agendamento,
     node_avaliar_confianca,
     node_avaliar_escalacao,
     node_buscar_dados,
@@ -192,6 +193,15 @@ class ConversationOrchestrator:
         """
         t_inicio = time.perf_counter()
 
+        # Agendamento: se o cliente tem proposta de horários pendente e esta
+        # mensagem escolhe uma opção (1/2/3 ou texto livre), o fluxo é resolvido
+        # aqui — sem RAG e, na maioria dos casos, sem gastar tokens Claude.
+        resposta_selecao = await self._tentar_selecao_agendamento(
+            escritorio_id, cliente_id, mensagem, tipo
+        )
+        if resposta_selecao is not None:
+            return resposta_selecao
+
         try:
             await self._verificar_quota_tokens(escritorio_id)
         except QuotaExcedidaError:
@@ -330,6 +340,91 @@ class ConversationOrchestrator:
         }
 
     # -----------------------------------------------------------------------
+    # Agendamento — seleção de horário pelo cliente (early-exit)
+    # -----------------------------------------------------------------------
+
+    async def _tentar_selecao_agendamento(
+        self,
+        escritorio_id: int,
+        cliente_id: int,
+        mensagem: str,
+        tipo: str,
+    ) -> dict[str, Any] | None:
+        """
+        Se houver Agendamento `aguardando_cliente` e a mensagem escolher uma das
+        opções, efetiva a escolha (notifier notifica o advogado nos 2 canais) e
+        entrega a resposta ao cliente via node_enviar_resposta (WhatsApp +
+        Interacao + memória). Retorna None para seguir o fluxo normal.
+        """
+        try:
+            from feature_1_ia_personalizada.services.agendamento.notifier import (
+                AgendamentoNotifier,
+            )
+
+            async with self._session_factory() as session:
+                notifier = AgendamentoNotifier(
+                    session=session,
+                    evolution=self._deps.evolution,
+                    redis=self._deps.redis,
+                    claude=self._deps.claude,
+                )
+                resposta = await notifier.processar_resposta_cliente(
+                    escritorio_id, cliente_id, mensagem
+                )
+        except Exception as exc:
+            logger.warning(
+                "agendamento_selecao_falhou",
+                escritorio_id=escritorio_id,
+                cliente_id=cliente_id,
+                erro=str(exc),
+            )
+            return None
+
+        if resposta is None:
+            return None
+
+        state_entrega: ConversationState = {
+            "escritorio_id": escritorio_id,
+            "cliente_id": cliente_id,
+            "processo_id": None,
+            "mensagem_original": mensagem,
+            "tipo_mensagem": tipo,
+            "historico": [],
+            "intencao": "agendar_reuniao",
+            "dados_processo": None,
+            "contexto_rag": None,
+            "resposta_ia": resposta,
+            "resposta_verificada": resposta,
+            "tokens_usados": {"input": 0, "output": 0},
+            "erro": None,
+            "tentativas_correcao": 0,
+            "usando_fallback": False,
+            "precisa_regenerar": False,
+            "requer_escalacao": False,
+            "motivo_escalacao": None,
+            "confidence_score": None,
+            "modelo_ia_usado": "claude",
+            "_escalar_para_opus": False,
+            "rag_docs_com_score": [],
+            "fact_check_result": {},
+        }
+        try:
+            await node_enviar_resposta(state_entrega, self._deps)
+        except Exception as exc:
+            logger.warning("agendamento_entrega_selecao_falhou", erro=str(exc))
+
+        _fluxo_total.labels(intencao="agendar_reuniao", status="ok").inc()
+        _ia_requests_total.labels(intencao="agendar_reuniao", sucesso="true").inc()
+
+        return {
+            "resposta": resposta,
+            "intencao": "agendar_reuniao",
+            "usando_fallback": False,
+            "tokens_usados": {},
+            "processo_id": None,
+        }
+
+    # -----------------------------------------------------------------------
     # Construção do grafo LangGraph
     # -----------------------------------------------------------------------
 
@@ -346,6 +441,7 @@ class ConversationOrchestrator:
         graph.add_node("classificar_intencao", _wrap(node_classificar_intencao))
         graph.add_node("avaliar_escalacao", _wrap(node_avaliar_escalacao))
         graph.add_node("preparar_escalacao", _wrap(node_preparar_escalacao))
+        graph.add_node("agendamento", _wrap(node_agendamento))
         graph.add_node("buscar_dados", _wrap(node_buscar_dados))
         graph.add_node("gerar_resposta", _wrap(node_gerar_resposta))
         graph.add_node("avaliar_confianca", _wrap(node_avaliar_confianca))
@@ -361,12 +457,19 @@ class ConversationOrchestrator:
             self._rota_apos_avaliar_escalacao,
             {
                 "preparar_escalacao": "preparar_escalacao",
+                "agendamento": "agendamento",
                 "buscar_dados": "buscar_dados",
                 "gerar_resposta": "gerar_resposta",
                 "tratar_erro": "tratar_erro",
             },
         )
         graph.add_edge("preparar_escalacao", "enviar_resposta")
+        # Agendamento vai direto à entrega — propor horários não passa pelo RAG
+        graph.add_conditional_edges(
+            "agendamento",
+            lambda state: "tratar_erro" if state.get("erro") else "enviar_resposta",
+            {"enviar_resposta": "enviar_resposta", "tratar_erro": "tratar_erro"},
+        )
         graph.add_conditional_edges(
             "buscar_dados",
             self._rota_apos_busca_dados,
@@ -435,6 +538,8 @@ class ConversationOrchestrator:
             return "tratar_erro"
         if state.get("requer_escalacao"):
             return "preparar_escalacao"
+        if state.get("intencao") == "agendar_reuniao":
+            return "agendamento"
         if state.get("intencao") in (
             "status",
             "duvida_termo",
@@ -569,6 +674,16 @@ class ConversationOrchestrator:
 
         if s.get("requer_escalacao"):
             s.update(await _run(node_preparar_escalacao, s))
+            if s.get("erro"):
+                await _run(node_tratar_erro, s)
+                return s  # type: ignore[return-value]
+            s.update(await _run(node_enviar_resposta, s))
+            if s.get("erro"):
+                await _run(node_tratar_erro, s)
+            return s  # type: ignore[return-value]
+
+        if s["intencao"] == "agendar_reuniao":
+            s.update(await _run(node_agendamento, s))
             if s.get("erro"):
                 await _run(node_tratar_erro, s)
                 return s  # type: ignore[return-value]

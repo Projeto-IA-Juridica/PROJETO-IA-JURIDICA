@@ -1,13 +1,14 @@
 import hmac
 import re
 import time
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from prometheus_client import Counter, Histogram
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.api.schemas.webhook import (
@@ -22,6 +23,7 @@ from feature_1_ia_personalizada.workers.send_notifications import (
 )
 from shared.config.settings import settings
 from shared.database.session import get_db
+from shared.models.agendamento import Agendamento
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 
@@ -184,6 +186,51 @@ async def receive_message(
         logger.warning("webhook_instancia_nao_vinculada", instance_name=instance_name)
         return {"status": "ignored", "reason": "Instance not found in DB"}
 
+    # 1.5 Agendamento Inteligente — o remetente é o ADVOGADO respondendo a uma
+    # solicitação de reunião? Só desvia o fluxo se houver agendamento aguardando
+    # aprovação (ou recém-confirmado pelo Hub, para responder "já confirmada").
+    # Caso contrário, a mensagem segue o fluxo normal (cliente/escalação).
+    if escritorio.telefone_advogado:
+        from feature_1_ia_personalizada.services.agendamento.notifier import mesmo_numero
+
+        if mesmo_numero(telefone_digitos, escritorio.telefone_advogado):
+            _cutoff_confirmado = datetime.now(UTC) - timedelta(hours=24)
+            tem_agendamento_relevante = (
+                await db.execute(
+                    select(Agendamento.id)
+                    .where(
+                        Agendamento.escritorio_id == escritorio.id,
+                        or_(
+                            Agendamento.status == "aguardando_advogado",
+                            and_(
+                                Agendamento.status == "confirmado",
+                                Agendamento.canal_aprovacao == "hub",
+                                Agendamento.resposta_advogado_em >= _cutoff_confirmado,
+                            ),
+                        ),
+                    )
+                    .limit(1)
+                )
+            ).first()
+
+            if tem_agendamento_relevante:
+                from feature_1_ia_personalizada.workers.agendamento_worker import (
+                    processar_resposta_advogado_wpp,
+                )
+
+                processar_resposta_advogado_wpp.delay(
+                    escritorio_id=escritorio.id,
+                    texto=texto,
+                )
+                _mensagens_recebidas.labels(
+                    escritorio_id=str(escritorio.id), tipo="agendamento_advogado"
+                ).inc()
+                logger.info(
+                    "agendamento_resposta_advogado_enfileirada",
+                    escritorio_id=escritorio.id,
+                )
+                return {"status": "queued_agendamento_advogado"}
+
     # 2. Puxar o Cliente correspondente a esse telefone dentro do escritório
     stmt_cli = select(Cliente).where(
         Cliente.telefone_whatsapp == telefone_digitos,
@@ -319,6 +366,24 @@ async def _processar_resposta_nps(
     # Só processa se for dígito 1-5 isolado
     texto_limpo = texto.strip()
     if texto_limpo not in {"1", "2", "3", "4", "5"}:
+        return False
+
+    # Agendamento Inteligente: se o cliente tem proposta de horários pendente,
+    # "1"/"2"/"3" é a escolha do slot — a seleção (fluxo da IA) tem prioridade
+    # sobre o NPS. O NPS pode ser respondido depois; a proposta expira em 48h.
+    proposta_pendente = (
+        await db.execute(
+            select(Agendamento.id)
+            .where(
+                Agendamento.escritorio_id == escritorio.id,
+                Agendamento.cliente_id == cliente.id,
+                Agendamento.status == "aguardando_cliente",
+                Agendamento.whatsapp_proposta_cliente_enviado.is_(True),
+            )
+            .limit(1)
+        )
+    ).first()
+    if proposta_pendente is not None:
         return False
 
     nota = int(texto_limpo)

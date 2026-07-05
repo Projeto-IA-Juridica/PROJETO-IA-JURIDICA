@@ -210,7 +210,6 @@ function PlanoCard({ plano, ativo, carregando, onEscolher }: CardProps) {
           fontWeight: 700,
           cursor: carregando || ativo ? 'not-allowed' : 'pointer',
           opacity: ativo ? 0.6 : 1,
-          border: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

@@ -33,8 +33,13 @@ _CATEGORIAS_VALIDAS = {
     "estrategia_processual",
     "negociacao",
     "decisao_judicial_impacto_alto",
+    "agendar_reuniao",
     "outro",
 }
+
+# Threshold de confiança para agendar_reuniao — abaixo disso a mensagem segue o
+# fluxo normal de dúvida (evita falsos positivos que disparariam proposta de horários).
+_THRESHOLD_AGENDAMENTO = 0.80
 
 _ESCALACAO_OBRIGATORIA = {
     "parecer_juridico",
@@ -61,6 +66,14 @@ async def node_classificar_intencao(state: ConversationState, deps: NodeDeps) ->
         intencao = parsed.get("intencao", "outro")
         if intencao not in _CATEGORIAS_VALIDAS:
             intencao = "outro"
+        if intencao == "agendar_reuniao":
+            try:
+                confianca = float(parsed.get("confianca", 1.0))
+            except (TypeError, ValueError):
+                confianca = 1.0
+            if confianca < _THRESHOLD_AGENDAMENTO:
+                log.info("agendamento_abaixo_threshold", confianca=confianca)
+                intencao = "duvida_geral"
         log.info("intencao_classificada_claude", intencao=intencao)
     except Exception as exc:
         intencao = classificar_por_keywords(state["mensagem_original"])
