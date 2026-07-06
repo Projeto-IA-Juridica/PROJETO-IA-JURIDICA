@@ -346,7 +346,7 @@ async def test_consultar_com_cliente_injeta_contexto_e_salva_referencia(
         _clear(app)
 
     assert resp.status_code == 200
-    assert "Maria Oliveira" in mock_client.gerar_resposta.call_args.kwargs["mensagem_usuario"]
+    assert "Maria Oliveira" in mock_client.gerar_resposta.call_args.kwargs["system_prompt"]
 
     result = await db_session.execute(
         select(SessaoAdvogado).where(SessaoAdvogado.usuario_id == advogado.id)
@@ -392,9 +392,9 @@ async def test_consultar_com_processo_injeta_contexto_e_salva_referencia(
         _clear(app)
 
     assert resp.status_code == 200
-    mensagem = mock_client.gerar_resposta.call_args.kwargs["mensagem_usuario"]
-    assert "0001234-56.2024.8.26.0001" in mensagem
-    assert "Ação de Indenização" in mensagem
+    system_prompt = mock_client.gerar_resposta.call_args.kwargs["system_prompt"]
+    assert "0001234-56.2024.8.26.0001" in system_prompt
+    assert "Ação de Indenização" in system_prompt
 
     result = await db_session.execute(
         select(SessaoAdvogado).where(SessaoAdvogado.usuario_id == advogado.id)
@@ -430,8 +430,8 @@ async def test_consultar_cliente_outro_escritorio_ignorado(
         _clear(app)
 
     assert resp.status_code == 200
-    mensagem = mock_client.gerar_resposta.call_args.kwargs["mensagem_usuario"]
-    assert "Carlos Alheio" not in mensagem
+    system_prompt = mock_client.gerar_resposta.call_args.kwargs["system_prompt"]
+    assert "Carlos Alheio" not in system_prompt
 
     result = await db_session.execute(
         select(SessaoAdvogado).where(SessaoAdvogado.usuario_id == advogado.id)

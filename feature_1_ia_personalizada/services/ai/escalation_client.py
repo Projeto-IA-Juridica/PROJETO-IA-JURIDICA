@@ -16,6 +16,7 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 
 import anthropic
 import structlog
@@ -125,9 +126,14 @@ class EscalacaoClient:
         mensagem_usuario: str,
         contexto_rag: str = "",
         escritorio_id: int | None = None,
+        historico: list[dict[str, str]] | None = None,
     ) -> EscalacaoResponse:
         """
         Gera uma resposta jurídica usando o modelo de escalação.
+
+        `historico` permite passar turnos anteriores da mesma conversa
+        (lista de {"role": "user"|"assistant", "content": str}) para que o
+        modelo tenha memória entre perguntas.
 
         Raises:
             EscalacaoIndisponivelError: Se todas as tentativas falharem.
@@ -140,6 +146,7 @@ class EscalacaoClient:
         resposta = await self._chamar_com_retry(
             system_prompt=system_prompt,
             mensagem=conteudo_usuario,
+            historico=historico,
         )
         latencia_ms = int((time.perf_counter() - inicio) * 1000)
 
@@ -281,11 +288,17 @@ class EscalacaoClient:
     # Internos
     # ------------------------------------------------------------------
 
-    async def _chamar_com_retry(self, system_prompt: str, mensagem: str) -> anthropic.types.Message:
+    async def _chamar_com_retry(
+        self,
+        system_prompt: str,
+        mensagem: str,
+        historico: list[dict[str, str]] | None = None,
+    ) -> anthropic.types.Message:
         """Chama o modelo de escalação com retry e backoff exponencial."""
         import asyncio
         import random
 
+        mensagens: list[Any] = [*(historico or []), {"role": "user", "content": mensagem}]
         ultimo_erro: Exception | None = None
 
         for tentativa in range(1, self.MAX_RETRIES + 1):
@@ -294,7 +307,7 @@ class EscalacaoClient:
                     model=self._modelo,
                     max_tokens=self.MAX_TOKENS,
                     system=system_prompt,
-                    messages=[{"role": "user", "content": mensagem}],
+                    messages=mensagens,
                 )
             except anthropic.AuthenticationError as exc:
                 raise EscalacaoIndisponivelError("Chave Anthropic inválida.") from exc

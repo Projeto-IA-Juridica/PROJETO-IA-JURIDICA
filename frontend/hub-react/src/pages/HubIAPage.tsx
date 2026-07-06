@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, Scale, FileSearch, AlertTriangle, RotateCcw,
-  Upload, X, MessageSquare, Plus, Clock,
+  Upload, X, MessageSquare, Plus, Clock, CheckCircle2, Circle,
 } from 'lucide-react'
 import {
   consultar, analisarPeticaoAsync, pollHubJob,
@@ -181,6 +181,81 @@ function AnalisePeticaoResult({ analise, onReset }: { analise: PeticaoAnalise; o
   )
 }
 
+/* ── Loading da análise de petição ───────────────────────────────────────
+ * A análise no Opus leva de 15 a 60s — sem feedback de progresso, o usuário
+ * não tem como distinguir "processando" de "travado". As etapas abaixo não
+ * refletem progresso real do backend (ele não expõe granularidade), são só
+ * uma progressão por tempo decorrido para comunicar atividade contínua.
+ */
+const PETICAO_ETAPAS = [
+  { label: 'Lendo o documento e extraindo o conteúdo', apos: 0 },
+  { label: 'Identificando pontos fortes e vulnerabilidades', apos: 5 },
+  { label: 'Cruzando com jurisprudência relevante', apos: 15 },
+  { label: 'Calculando score e finalizando sugestões', apos: 30 },
+]
+
+function AnalisePeticaoLoading() {
+  const [segundos, setSegundos] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setSegundos(s => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const etapaAtual = PETICAO_ETAPAS.reduce(
+    (acc, etapa, i) => (segundos >= etapa.apos ? i : acc), 0,
+  )
+  // Progresso "fake" que desacelera exponencialmente e nunca fecha em 100% —
+  // só o resultado real (ou erro) chegando encerra o loading de verdade.
+  const progresso = Math.min(92, Math.round((1 - Math.exp(-segundos / 18)) * 92))
+
+  return (
+    <div className="w-full flex flex-col items-center gap-5 py-8">
+      <motion.div
+        animate={{ rotate: [0, 10, -10, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+        className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg,#1248BE,#4A8ED4)', boxShadow: '0 6px 20px rgba(18,72,190,0.3)' }}>
+        <Scale size={24} className="text-white" />
+      </motion.div>
+
+      <div className="w-full max-w-[15rem] h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(18,72,190,0.1)' }}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: 'linear-gradient(90deg,#1248BE,#4A8ED4)' }}
+          animate={{ width: `${progresso}%` }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2.5 w-full max-w-[15rem]">
+        {PETICAO_ETAPAS.map((etapa, i) => {
+          const concluida = i < etapaAtual
+          const ativa = i === etapaAtual
+          return (
+            <div key={etapa.label} className="flex items-center gap-2.5">
+              {concluida ? (
+                <CheckCircle2 size={14} style={{ color: '#1A9E78' }} className="flex-shrink-0" />
+              ) : ativa ? (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-am-blue border-t-transparent animate-spin flex-shrink-0" />
+              ) : (
+                <Circle size={14} className="text-am-border flex-shrink-0" />
+              )}
+              <span className={`text-xs text-left ${ativa ? 'text-am-ink font-semibold' : 'text-am-muted'}`}>
+                {etapa.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-[11px] text-am-muted">
+        Analisando com Claude Opus · {segundos}s
+      </p>
+    </div>
+  )
+}
+
 function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
   onAnalise: (f: File) => void
   loading: boolean
@@ -212,10 +287,9 @@ function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
           border: `2px dashed ${dragging ? 'var(--color-am-blue)' : 'rgba(18,72,190,0.25)'}`,
           background: dragging ? 'rgba(18,72,190,0.04)' : 'white',
           cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.6 : 1,
         }}>
         {loading
-          ? <><div className="w-8 h-8 rounded-full border-2 border-am-blue border-t-transparent animate-spin" /><p className="text-xs text-am-muted">Analisando com Claude Opus…</p></>
+          ? <AnalisePeticaoLoading />
           : <><Upload size={20} style={{ color: 'var(--color-am-blue)' }} /><div className="text-center"><p className="text-sm font-semibold text-am-ink">Arraste o PDF aqui</p><p className="text-xs text-am-muted mt-1">ou clique para selecionar · máx. 10 MB</p></div></>
         }
       </button>
@@ -471,7 +545,14 @@ export default function HubIAPage() {
     queryKey: ['hub-job', peticaoJobId],
     queryFn: () => pollHubJob(peticaoJobId!),
     enabled: peticaoJobId !== null,
-    refetchInterval: (query) => query.state.data?.status === 'processando' ? 2000 : false,
+    // Continua tentando enquanto não houver um status terminal — inclusive
+    // quando a última tentativa falhou (ex: 404 transitório), em vez de exigir
+    // status === 'processando', que fica indefinido se algum fetch falhar antes
+    // de qualquer resposta bem-sucedida chegar a existir.
+    refetchInterval: (query) => {
+      const st = query.state.data?.status
+      return st === 'concluido' || st === 'erro' ? false : 2000
+    },
   })
 
   useEffect(() => {

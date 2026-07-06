@@ -625,9 +625,7 @@ def verificar_escalacoes_pendentes(self: Any) -> dict[str, Any]:
 
                 try:
                     # ts_criacao tem o formato ISO. Pode ter Z no final.
-                    from dateutil.parser import isoparse  # type: ignore[import-untyped]
-
-                    ts_criacao = isoparse(criacao_str)
+                    ts_criacao = datetime.fromisoformat(criacao_str.replace("Z", "+00:00"))
                     if ts_criacao.tzinfo is None:
                         ts_criacao = ts_criacao.replace(tzinfo=UTC)
                 except Exception:

@@ -26,7 +26,7 @@ from feature_1_ia_personalizada.services.ai.escalation_client import (
     TipoAnalise,
 )
 from shared.config.settings import settings
-from shared.database.session import get_session_factory
+from shared.database.connection import create_worker_session_factory
 from shared.models.sessao_advogado import SessaoAdvogado
 
 from .celery_app import DLQTask, celery_app
@@ -71,27 +71,33 @@ def hub_analisar_peticao_task(
             contexto_processo="Análise solicitada via API REST.",
         )
 
-        # Salvar sessão no DB
-        factory = get_session_factory()
-        async with factory() as db:
-            sessao = SessaoAdvogado(
-                escritorio_id=escritorio_id,
-                usuario_id=advogado_id,
-                mensagem_advogado=f"[PDF] {filename}",
-                resposta_hub=str(dataclasses.asdict(analise)),
-                intencao="analise_peticao",
-                modelo_ia="claude_opus",
-                tokens_input=analise.tokens_input,
-                tokens_output=analise.tokens_output,
-                custo_estimado=analise.custo_estimado,
-                metadata_json={
-                    "filename": filename,
-                    "texto_truncado": texto_truncado,
-                    "job_id": job_id,
-                },
-            )
-            db.add(sessao)
-            await db.commit()
+        # Salvar sessão no DB — factory/engine dedicados a este asyncio.run(), nunca
+        # a factory compartilhada do FastAPI (get_session_factory()): reaproveitar
+        # conexões pooled através de event loops diferentes (um novo a cada task)
+        # trava silenciosamente em vez de lançar exceção — ver create_worker_session_factory.
+        factory, db_engine = create_worker_session_factory()
+        try:
+            async with factory() as db:
+                sessao = SessaoAdvogado(
+                    escritorio_id=escritorio_id,
+                    usuario_id=advogado_id,
+                    mensagem_advogado=f"[PDF] {filename}",
+                    resposta_hub=str(dataclasses.asdict(analise)),
+                    intencao="analise_peticao",
+                    modelo_ia="claude_opus",
+                    tokens_input=analise.tokens_input,
+                    tokens_output=analise.tokens_output,
+                    custo_estimado=analise.custo_estimado,
+                    metadata_json={
+                        "filename": filename,
+                        "texto_truncado": texto_truncado,
+                        "job_id": job_id,
+                    },
+                )
+                db.add(sessao)
+                await db.commit()
+        finally:
+            await db_engine.dispose()
 
         return analise
 

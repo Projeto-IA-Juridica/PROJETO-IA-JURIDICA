@@ -228,6 +228,7 @@ class ClienteCreateManual(BaseModel):
     """Cadastro simplificado pelo advogado na interface — CPF opcional."""
 
     nome: str = Field(min_length=2, max_length=200)
+    cpf: str = Field(description="CPF com ou sem formatação (XXX.XXX.XXX-XX)")
     telefone_whatsapp: str = Field(
         description="Telefone com DDD. Aceita qualquer formato: 11999999999, (11) 99999-9999, +5511999999999"
     )
@@ -240,6 +241,13 @@ class ClienteCreateManual(BaseModel):
         description="Polo do cliente no processo (ignorado se numero_cnj não for informado)",
     )
     tipo_acao: str | None = Field(default=None, max_length=200)
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_cpf_manual(cls, v: str) -> str:
+        if not validar_cpf(v):
+            raise ValueError("CPF inválido — verifique os dígitos verificadores")
+        return normalizar_cpf(v)
 
     @field_validator("telefone_whatsapp")
     @classmethod

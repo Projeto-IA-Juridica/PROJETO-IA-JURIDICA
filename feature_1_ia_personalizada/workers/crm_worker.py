@@ -23,7 +23,7 @@ from sqlalchemy import select
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.crm.analyzer import CRMAnalyzer
 from shared.config.settings import settings
-from shared.database.session import get_session_factory
+from shared.database.connection import create_worker_session_factory
 from shared.models.cliente import Cliente
 
 from .celery_app import DLQTask, celery_app
@@ -57,19 +57,25 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
     log.info("crm_worker.analisar_cliente.iniciando")
 
     async def _run() -> dict[str, Any]:
-        factory = get_session_factory()
-        async with factory() as db:
-            claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
-            analyzer = CRMAnalyzer(claude_client=claude, db=db)
-            result = await analyzer.analisar_cliente(cliente_id, escritorio_id)
-            return {
-                "cliente_id": cliente_id,
-                "nivel": result.nivel,
-                "score": result.score,
-                "cache_hit": result.cache_hit,
-                "tokens_input": result.tokens_input,
-                "tokens_output": result.tokens_output,
-            }
+        # Factory/engine dedicados a este asyncio.run() — get_session_factory()
+        # reaproveitaria conexões pooled de um event loop diferente a cada task
+        # e trava silenciosamente em vez de lançar exceção (create_worker_session_factory).
+        factory, db_engine = create_worker_session_factory()
+        try:
+            async with factory() as db:
+                claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
+                analyzer = CRMAnalyzer(claude_client=claude, db=db)
+                result = await analyzer.analisar_cliente(cliente_id, escritorio_id)
+                return {
+                    "cliente_id": cliente_id,
+                    "nivel": result.nivel,
+                    "score": result.score,
+                    "cache_hit": result.cache_hit,
+                    "tokens_input": result.tokens_input,
+                    "tokens_output": result.tokens_output,
+                }
+        finally:
+            await db_engine.dispose()
 
     try:
         resultado = asyncio.run(_run())
@@ -108,14 +114,17 @@ def crm_analisar_escritorio(escritorio_id: int) -> dict[str, Any]:
     log.info("crm_worker.analisar_escritorio.iniciando")
 
     async def _buscar_clientes() -> list[int]:
-        factory = get_session_factory()
-        async with factory() as db:
-            stmt = select(Cliente.id).where(
-                Cliente.escritorio_id == escritorio_id,
-                Cliente.ativo.is_(True),
-            )
-            rows = (await db.execute(stmt)).all()
-            return [r.id for r in rows]
+        factory, db_engine = create_worker_session_factory()
+        try:
+            async with factory() as db:
+                stmt = select(Cliente.id).where(
+                    Cliente.escritorio_id == escritorio_id,
+                    Cliente.ativo.is_(True),
+                )
+                rows = (await db.execute(stmt)).all()
+                return [r.id for r in rows]
+        finally:
+            await db_engine.dispose()
 
     cliente_ids = asyncio.run(_buscar_clientes())
     total = len(cliente_ids)

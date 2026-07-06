@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Send, BookOpen, AlertTriangle, History, ChevronDown, ChevronUp } from 'lucide-react'
-import { consultar } from '../api/hub'
-import { fetchProcessos } from '../api/processos'
+import { consultar, fetchConversa } from '../api/hub'
 import { fetchChatHistory, type InteracaoItem } from '../api/chat'
 import type { CRMClienteCard, ChatMessage } from '../types'
 
@@ -150,26 +149,82 @@ function HistoricoPanel({ clienteId }: { clienteId: number }) {
   )
 }
 
-export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([{
+function saudacaoInicial(nomeCliente: string): ChatMessage {
+  return {
     role: 'assistant',
-    content: `Olá! Estou aqui para auxiliar no caso de ${cliente.nome}. Pode perguntar sobre o processo, prazos, termos jurídicos ou qualquer dúvida.`,
+    content: `Olá! Estou aqui para auxiliar no caso de ${nomeCliente}. Pode perguntar sobre o processo, prazos, termos jurídicos ou qualquer dúvida.`,
     intencao: 'saudacao',
-  }])
+  }
+}
+
+function conversaStorageKey(clienteId: number) {
+  return `hub_chat_conversa_id_${clienteId}`
+}
+
+export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([saudacaoInicial(cliente.nome)])
   const [input, setInput] = useState('')
+  // Enquanto uma conversa anterior está sendo retomada do backend, o envio
+  // fica bloqueado — sem isso, uma pergunta enviada antes do fetchConversa
+  // resolver seria apagada quando o histórico chegasse e sobrescrevesse
+  // `messages` por inteiro.
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // conversa_id é persistido por cliente (localStorage), não gerado do zero
+  // a cada montagem — sem isso, trocar de aba (Processo/Score/Documentos) e
+  // voltar para "Assistente" recriava o componente e perdia a memória da
+  // conversa com o Opus, mesmo dentro da mesma visita ao Hub.
+  const conversaIdRef = useRef<string>('')
 
-  const { data: processoData } = useQuery({
-    queryKey: ['processos', cliente.id],
-    queryFn: () => fetchProcessos(cliente.id),
-    enabled: cliente.total_processos > 0,
-  })
-  const processo = processoData?.items[0] ?? null
+  useEffect(() => {
+    const key = conversaStorageKey(cliente.id)
+    const existente = localStorage.getItem(key)
+    const conversaId = existente || crypto.randomUUID()
+    conversaIdRef.current = conversaId
+    localStorage.setItem(key, conversaId)
+
+    if (!existente) {
+      setMessages([saudacaoInicial(cliente.nome)])
+      setCarregandoHistorico(false)
+      return
+    }
+
+    // Retoma a conversa anterior buscando as trocas já salvas no backend.
+    let cancelado = false
+    setCarregandoHistorico(true)
+    fetchConversa(existente)
+      .then((turnos) => {
+        if (cancelado) return
+        if (!turnos.length) {
+          setMessages([saudacaoInicial(cliente.nome)])
+          return
+        }
+        const historico: ChatMessage[] = turnos.flatMap((t) => [
+          { role: 'user', content: t.mensagem_advogado } as ChatMessage,
+          { role: 'assistant', content: t.resposta_hub, intencao: 'duvida_juridica' } as ChatMessage,
+        ])
+        setMessages([saudacaoInicial(cliente.nome), ...historico])
+      })
+      .catch(() => {
+        if (!cancelado) setMessages([saudacaoInicial(cliente.nome)])
+      })
+      .finally(() => {
+        if (!cancelado) setCarregandoHistorico(false)
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [cliente.id, cliente.nome])
 
   const mutation = useMutation({
     mutationFn: (pergunta: string) =>
-      consultar({ pergunta, cliente_id: cliente.id, processo_id: processo?.id }),
+      consultar({
+        pergunta,
+        cliente_id: cliente.id,
+        conversa_id: conversaIdRef.current,
+      }),
     onSuccess: (data, pergunta) => {
       setMessages((prev) => [...prev, {
         role: 'assistant',
@@ -180,6 +235,11 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
         tokens: data.tokens_output,
       }])
     },
+    onError: (err: any) => {
+      const msg = err.response?.data?.detail || err.message || "Erro desconhecido"
+      console.error("ERRO DETALHADO DO BACKEND:", msg)
+      alert("ERRO: \n" + msg)
+    }
   })
 
   useEffect(() => {
@@ -189,7 +249,7 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
 
   function handleSend() {
     const text = input.trim()
-    if (!text || mutation.isPending) return
+    if (!text || mutation.isPending || carregandoHistorico) return
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setMessages((prev) => [...prev, { role: 'user', content: text }])
@@ -216,7 +276,7 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
       {/* ── Mensagens ── */}
       <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4 bg-am-bg">
         {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
-        {mutation.isPending && <TypingIndicator />}
+        {(mutation.isPending || carregandoHistorico) && <TypingIndicator />}
         {mutation.isError && (
           <div className="flex items-center gap-2 p-3 rounded-xl text-xs"
             style={{ background: 'rgba(200,48,48,0.07)', border: '1px solid rgba(200,48,48,0.2)', color: '#C83030' }}>
@@ -235,16 +295,16 @@ export default function ChatTab({ cliente }: { cliente: CRMClienteCard }) {
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           rows={1}
-          placeholder="Pergunte sobre o processo, termos jurídicos ou prazos…"
-          disabled={mutation.isPending}
+          placeholder={carregandoHistorico ? 'Carregando conversa anterior…' : 'Pergunte sobre o processo, termos jurídicos ou prazos…'}
+          disabled={mutation.isPending || carregandoHistorico}
           className="am-textarea flex-1 max-h-[120px] disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || mutation.isPending}
+          disabled={!input.trim() || mutation.isPending || carregandoHistorico}
           className="w-9 h-9 flex items-center justify-center rounded-xl text-white flex-shrink-0 transition-fast disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: 'var(--color-am-blue)' }}
-          onMouseEnter={(e) => { if (!mutation.isPending && input.trim()) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
+          onMouseEnter={(e) => { if (!mutation.isPending && !carregandoHistorico && input.trim()) e.currentTarget.style.background = 'var(--color-am-blue-hover)' }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-am-blue)' }}
         >
           <Send size={13} />

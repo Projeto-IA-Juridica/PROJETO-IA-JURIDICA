@@ -86,6 +86,7 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
   // Modal novo cliente
   const [showModal, setShowModal]       = useState(false)
   const [novoNome, setNovoNome]         = useState('')
+  const [novoCpf, setNovoCpf]           = useState('')
   const [novoTel, setNovoTel]           = useState('')
   const [novoCnj, setNovoCnj]           = useState('')
   const [novoPolo, setNovoPolo]         = useState<'autor' | 'reu' | 'terceiro'>('autor')
@@ -117,6 +118,7 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
   const novoClienteMut = useMutation({
     mutationFn: () => criarClienteManual({
       nome: novoNome.trim(),
+      cpf: novoCpf.trim(),
       telefone_whatsapp: novoTel.trim(),
       numero_cnj: novoCnj.trim() || null,
       polo_cliente: novoPolo,
@@ -127,7 +129,7 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
       setNovoOk(`Cliente "${res.nome}" cadastrado com sucesso!${res.processo_id ? ' Processo vinculado e enriquecimento iniciado.' : ''}`)
       setTimeout(() => {
         setShowModal(false); setNovoOk(null)
-        setNovoNome(''); setNovoTel(''); setNovoCnj(''); setNovoPolo('autor')
+        setNovoNome(''); setNovoCpf(''); setNovoTel(''); setNovoCnj(''); setNovoPolo('autor')
       }, 2200)
     },
     onError: (e: unknown) => {
@@ -621,6 +623,14 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
 
                 <div>
                   <label className="block text-[11px] font-semibold text-am-secondary mb-1">
+                    CPF <span style={{ color: '#C83030' }}>*</span>
+                  </label>
+                  <input type="text" value={novoCpf} onChange={e => setNovoCpf(e.target.value)}
+                    placeholder="000.000.000-00" className="am-input w-full" disabled={novoClienteMut.isPending} />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-am-secondary mb-1">
                     Telefone WhatsApp <span style={{ color: '#C83030' }}>*</span>
                   </label>
                   <input type="tel" value={novoTel} onChange={e => setNovoTel(e.target.value)}
@@ -662,12 +672,12 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
                   Cancelar
                 </button>
                 <button type="button" onClick={() => novoClienteMut.mutate()}
-                  disabled={novoClienteMut.isPending || !novoNome.trim() || !novoTel.trim()}
+                  disabled={novoClienteMut.isPending || !novoNome.trim() || !novoCpf.trim() || !novoTel.trim()}
                   className="flex-1 py-2 rounded-xl text-xs font-semibold text-white press"
                   style={{
                     background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
-                    opacity: (novoClienteMut.isPending || !novoNome.trim() || !novoTel.trim()) ? 0.5 : 1,
-                    cursor:  (novoClienteMut.isPending || !novoNome.trim() || !novoTel.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (novoClienteMut.isPending || !novoNome.trim() || !novoCpf.trim() || !novoTel.trim()) ? 0.5 : 1,
+                    cursor:  (novoClienteMut.isPending || !novoNome.trim() || !novoCpf.trim() || !novoTel.trim()) ? 'not-allowed' : 'pointer',
                   }}>
                   {novoClienteMut.isPending
                     ? <span className="flex items-center justify-center gap-1.5">

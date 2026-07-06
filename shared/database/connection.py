@@ -28,12 +28,16 @@ connect_args: dict[str, Any] = {}
 if "supabase.com" in db_url:
     connect_args["ssl"] = "require"
 
+# Limita o pool a 1 conexão por worker para evitar estourar limites
+# de PgBouncer em provedores durante deploys Blue/Green.
+_pool_size, _max_overflow = 1, 1
+
 engine = create_async_engine(
     db_url,
     connect_args=connect_args,
     echo=(settings.ENVIRONMENT == "development"),  # Loga queries SQL no console apenas em dev
-    pool_size=3,  # Reduzido de 20 para 3 devido ao limite de 15 conexões no Supabase Free
-    max_overflow=2,  # Reduzido de 10 para 2
+    pool_size=_pool_size,
+    max_overflow=_max_overflow,
     pool_timeout=30,  # Espera até 30s por uma conexão livre antes de dar erro
 )
 

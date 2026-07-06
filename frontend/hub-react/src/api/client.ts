@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { KEYS, getAccessToken, getCsrfToken, refreshAccessToken, clearAuth } from './auth'
+import { KEYS, getAccessToken, getCsrfToken, refreshAccessToken, fetchCsrfToken, clearAuth } from './auth'
 
 /* Mantido para compatibilidade com DevBanner */
 export const TOKEN_KEY = KEYS.access
@@ -38,10 +38,29 @@ function drainQueue(token: string | null, err: unknown = null) {
   pendingQueue = []
 }
 
+function isCsrfError(status: number | undefined, detail: unknown): boolean {
+  return status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('csrf')
+}
+
 api.interceptors.response.use(
   (r) => r,
   async (err) => {
     const original = err.config
+
+    // O token CSRF (cookie de 24h) pode expirar no meio de uma sessão longa,
+    // ou nunca ter sido obtido (ex: falha silenciosa no fetchCsrfToken() pós-login).
+    // Sem este retry, qualquer POST/PUT/PATCH/DELETE falha para sempre com 403
+    // até o usuário deslogar e logar de novo manualmente.
+    if (isCsrfError(err.response?.status, err.response?.data?.detail) && !original?._csrfRetry) {
+      original._csrfRetry = true
+      try {
+        const csrf = await fetchCsrfToken()
+        original.headers['X-CSRF-Token'] = csrf
+        return api(original)
+      } catch (csrfErr) {
+        return Promise.reject(csrfErr)
+      }
+    }
 
     if (err.response?.status !== 401 || original?._retry) {
       if (err.response?.status === 401) {
