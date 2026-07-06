@@ -16,8 +16,9 @@ Altera escritorios:
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 revision = "20260630_1000"
 down_revision = "20260628_2000"
@@ -91,15 +92,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.ForeignKeyConstraint(["cliente_id"], ["clientes.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["interacao_id"], ["interacoes.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["processo_id"], ["processos.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["interacao_id"], ["interacoes.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["processo_id"], ["processos.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
     # ix_agendamentos_escritorio_id é tecnicamente coberto pelo leftmost prefix do
@@ -175,9 +170,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(
-            ["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["escritorio_id"], ["escritorios.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         # UniqueConstraint já cria índice B-tree implícito no PostgreSQL.
         sa.UniqueConstraint(
@@ -230,7 +223,9 @@ def downgrade() -> None:
     op.drop_column("escritorios", "timezone")
     op.drop_column("escritorios", "telefone_advogado")
 
-    op.drop_index("ix_disponibilidade_advogado_escritorio_id", table_name="disponibilidade_advogado")
+    op.drop_index(
+        "ix_disponibilidade_advogado_escritorio_id", table_name="disponibilidade_advogado"
+    )
     op.drop_table("disponibilidade_advogado")
 
     op.drop_index("ix_agendamentos_expira_em", table_name="agendamentos")
