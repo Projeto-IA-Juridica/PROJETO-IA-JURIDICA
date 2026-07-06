@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut, CreditCard, ExternalLink } from 'lucide-react'
+import { Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut, CreditCard, ExternalLink } from 'lucide-react'
 import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
 import { fetchMe, logout } from '../api/auth'
+import HorariosAtendimento from '../components/agendamento/HorariosAtendimento'
 import { fetchMetricasHub } from '../api/hub'
 import {
   getBillingStatus,
@@ -512,6 +513,9 @@ export default function ConfigPage() {
               Fora desse horário, a IA responde informando que o escritório está fechado e que entrará em contato em breve.
             </p>
           </div>
+
+          {/* Agendamento Inteligente — grade semanal + telefone do advogado */}
+          <HorariosAtendimento />
 
           {/* Templates */}
           <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">

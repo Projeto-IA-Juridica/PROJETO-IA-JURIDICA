@@ -241,6 +241,22 @@ def processar_processo_individual(dados_processo: dict[str, Any]) -> dict[str, A
     if "andamento" in futures:
         futures["andamento"].result()
 
+    # Agendamento Inteligente — novos andamentos podem trazer novos prazos:
+    # re-verifica reuniões confirmadas do cliente deste processo (alerta, não bloqueia)
+    if quantidade_novos > 0:
+        try:
+            celery_app.send_task(
+                "workers.agendamento.verificar_conflitos_prazos",
+                kwargs={"processo_id": id_processo},
+                queue="ia",
+            )
+        except Exception as exc:
+            logger.warning(
+                "agendamento_hook_conflitos_falhou",
+                processo_id=id_processo,
+                erro=str(exc),
+            )
+
     return {
         "id_processo": id_processo,
         "sucesso": True,

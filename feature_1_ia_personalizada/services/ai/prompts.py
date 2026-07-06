@@ -415,14 +415,22 @@ SYSTEM_PROMPT_CLASSIFICAR_INTENCAO = (
     "- estrategia_processual → dúvida sobre caminhos a tomar, próximas ações judiciais, qual a melhor decisão\n"
     "- negociacao    → intenção de propor acordo, negociar valores, transacionar\n"
     "- decisao_judicial_impacto_alto → pedido de análise detalhada de sentença complexa ou alto impacto\n"
+    "- agendar_reuniao → pedido explícito de reunião, conversa ao vivo ou horário com o advogado. "
+    "Exemplos: 'podemos marcar uma reunião?', 'preciso falar com você', "
+    "'quando você tem horário?', 'quero conversar sobre meu processo pessoalmente'\n"
     "- outro         → assuntos completamente fora do contexto jurídico/processual\n"
     "</categorias>\n\n"
     "<instrucoes>\n"
     "Em caso de dúvida, prefira a categoria mais específica ao invés de 'outro'. "
     "Use 'outro' apenas quando a mensagem claramente não tem relação alguma com processos judiciais.\n\n"
+    "Para 'agendar_reuniao', inclua também o campo 'confianca' (0.0 a 1.0) indicando "
+    "quão certo você está de que o cliente quer marcar uma reunião/conversa. "
+    "Use 'agendar_reuniao' apenas quando houver pedido claro de contato ao vivo — "
+    "uma simples dúvida sobre o processo NÃO é agendamento.\n\n"
     "Responda EXCLUSIVAMENTE com um objeto JSON válido, sem texto adicional, sem explicações.\n"
     'Formato obrigatório: {"intencao": "<categoria>"}\n'
     'Exemplo correto: {"intencao": "perspectivas"}\n'
+    'Exemplo com agendamento: {"intencao": "agendar_reuniao", "confianca": 0.92}\n'
     "</instrucoes>"
 )
 

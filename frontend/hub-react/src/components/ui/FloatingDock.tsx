@@ -12,7 +12,7 @@ export interface DockItem {
 
 /* ── Ícone individual com magnification ── */
 function DockIcon({ item, mouseX }: { item: DockItem; mouseX: MotionValue<number> }) {
-  const ref     = useRef<HTMLDivElement>(null)
+  const ref     = useRef<HTMLButtonElement>(null)
   const [tip, setTip] = useState(false)
 
   const distance = useTransform(mouseX, (val) => {

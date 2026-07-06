@@ -248,13 +248,21 @@ class TestProcessarProcessoIndividual:
             return_value=[ANDAMENTO_A, ANDAMENTO_B],
         ):
             processar_processo_individual(PROCESSO)
-        assert fase3["celery"].send_task.call_count == 2
+        # 1 notificação por andamento + 1 verificação de conflitos de agendamento
+        chamadas = fase3["celery"].send_task.call_args_list
+        notificacoes = [c for c in chamadas if "enviar_notificacao_andamento" in c.args[0]]
+        conflitos = [c for c in chamadas if "verificar_conflitos_prazos" in c.args[0]]
+        assert len(notificacoes) == 2
+        assert len(conflitos) == 1
 
     def test_task_celery_enviada_para_fila_correta(self, fase3):
         with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]):
             processar_processo_individual(PROCESSO)
-        call_kwargs = fase3["celery"].send_task.call_args
-        assert call_kwargs.kwargs["queue"] == "notificacoes"
+        chamadas = fase3["celery"].send_task.call_args_list
+        notificacao = next(c for c in chamadas if "enviar_notificacao_andamento" in c.args[0])
+        conflito = next(c for c in chamadas if "verificar_conflitos_prazos" in c.args[0])
+        assert notificacao.kwargs["queue"] == "notificacoes"
+        assert conflito.kwargs["queue"] == "ia"
 
     def test_atualiza_banco_com_ultimo_andamento(self, fase3):
         with patch(f"{MODULE}.buscar_andamentos_datajud", return_value=[ANDAMENTO_A]):
@@ -542,7 +550,12 @@ class TestCacheAside:
         mock_api.assert_not_called()
         # Apenas 1 andamento novo deve gerar notificação
         assert r["novos_andamentos"] == 1
-        assert mock_celery.send_task.call_count == 1
+        notificacoes = [
+            c
+            for c in mock_celery.send_task.call_args_list
+            if "enviar_notificacao_andamento" in c.args[0]
+        ]
+        assert len(notificacoes) == 1
 
     def test_ultima_data_salva_e_a_mais_recente(self, fase3):
         """data_ultimo_andamento no banco deve ser a data MAIS RECENTE dos andamentos

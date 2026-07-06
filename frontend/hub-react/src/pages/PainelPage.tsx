@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, FileText, AlertTriangle, MessageCircle, Star,
+  Users, FileText, MessageCircle, Star,
   ArrowRight, Zap,
   TrendingUp, TrendingDown, Minus, Download,
   Bell, Check, X, ChevronDown, ChevronUp,
@@ -10,6 +10,7 @@ import {
 import { fetchClientes, fetchResumoCRM } from '../api/crm'
 import { exportarRelatorio } from '../api/chat'
 import { listarEscalacoes, aprovarEscalacao, rejeitarEscalacao, type EscalacaoItem } from '../api/escalacoes'
+import ProximasReunioes from '../components/agendamento/ProximasReunioes'
 import type { CRMClienteCard } from '../types'
 /* ── Barra animada ── */
 function Bar({ pct, color }: { pct: number; color: string }) {
@@ -235,9 +236,14 @@ const NIVEL_CFG: Record<string, { label: string; color: string; bg: string }> = 
   critico:  { label: 'Crítico', color: '#8B0000', bg: 'rgba(139,0,0,0.08)'   },
 }
 
-interface Props { onSelectCliente: (id: number) => void }
+interface Props {
+  onSelectCliente: (id: number) => void
+  /** Agendamento Inteligente — navegação para Clientes → Agenda / pendentes */
+  onVerAgenda?: (semanaISO: string) => void
+  onVerPendentes?: () => void
+}
 
-export default function PainelPage({ onSelectCliente }: Props) {
+export default function PainelPage({ onSelectCliente, onVerAgenda, onVerPendentes }: Props) {
   const [periodo, setPeriodo] = useState<7 | 30 | 90>(30)
   const [mes, setMes] = useState(() => new Date().toISOString().slice(0, 7))
 
@@ -363,6 +369,12 @@ export default function PainelPage({ onSelectCliente }: Props) {
 
         {/* ── Escalações pendentes ── */}
         <EscalacoesSection />
+
+        {/* ── Próximas reuniões (Agendamento Inteligente) ── */}
+        <ProximasReunioes
+          onVerAgenda={(semanaISO) => onVerAgenda?.(semanaISO)}
+          onVerPendentes={() => onVerPendentes?.()}
+        />
 
         {/* ── Clientes em risco + Eficiência (lado a lado quando há dados de risco) ── */}
         <div className={`flex-1 min-h-0 grid gap-5 items-stretch ${!isLoading && clientesRisco.length > 0 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>

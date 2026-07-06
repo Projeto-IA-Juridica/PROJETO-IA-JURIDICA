@@ -61,6 +61,9 @@ class ConfigResponse(BaseModel):
     template_boas_vindas: str | None
     template_atualizacao: str | None
     template_sem_novidade: str | None
+    # Agendamento Inteligente
+    telefone_advogado: str | None
+    timezone: str
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -74,6 +77,9 @@ class ConfigUpdateRequest(BaseModel):
     template_boas_vindas: str | None = Field(default=None, max_length=2000)
     template_atualizacao: str | None = Field(default=None, max_length=2000)
     template_sem_novidade: str | None = Field(default=None, max_length=2000)
+    # Agendamento Inteligente — telefone_advogado="" limpa o campo
+    telefone_advogado: str | None = None
+    timezone: str | None = Field(default=None, max_length=50)
 
     @field_validator("persona_tom")
     @classmethod
@@ -94,6 +100,32 @@ class ConfigUpdateRequest(BaseModel):
             raise ValueError("Telefone inválido — use formato brasileiro (ex: (11) 99999-9999)")
         return v
 
+    @field_validator("telefone_advogado")
+    @classmethod
+    def _validar_telefone_advogado(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return v  # "" limpa o campo; None mantém
+        if not validar_telefone_br(v):
+            raise ValueError(
+                "Telefone do advogado inválido — use formato brasileiro (ex: (11) 99999-9999)"
+            )
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def _validar_timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except Exception:
+            raise ValueError(
+                "Timezone inválida — use um identificador IANA (ex: America/Sao_Paulo)"
+            ) from None
+        return v
+
 
 def _escritorio_to_response(e: Escritorio) -> ConfigResponse:
     return ConfigResponse(
@@ -108,6 +140,8 @@ def _escritorio_to_response(e: Escritorio) -> ConfigResponse:
         template_boas_vindas=e.template_boas_vindas,
         template_atualizacao=e.template_atualizacao,
         template_sem_novidade=e.template_sem_novidade,
+        telefone_advogado=e.telefone_advogado,
+        timezone=e.timezone or "America/Sao_Paulo",
     )
 
 
@@ -175,6 +209,12 @@ async def put_config(
             status_code=400,
             detail="horario_inicio deve ser anterior a horario_fim.",
         )
+
+    # Agendamento Inteligente — string vazia limpa o telefone do advogado
+    if body.telefone_advogado is not None:
+        escritorio.telefone_advogado = body.telefone_advogado or None
+    if body.timezone is not None:
+        escritorio.timezone = body.timezone
 
     # Strings vazias limpam o campo; None mantém valor atual
     if body.template_boas_vindas is not None:

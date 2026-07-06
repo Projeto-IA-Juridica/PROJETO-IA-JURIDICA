@@ -27,7 +27,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from shared.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from shared.models.agendamento import Agendamento
     from shared.models.cliente import Cliente
+    from shared.models.disponibilidade_advogado import DisponibilidadeAdvogado
     from shared.models.interacao import Interacao
     from shared.models.processo import Processo
     from shared.models.usuario import Usuario
@@ -207,6 +209,24 @@ class Escritorio(Base, TimestampMixin):
     #             perfil_cliente_ideal, diferenciais, gerado_em}
     dna_prospeccao: Mapped[dict | None] = mapped_column(JSONB(), nullable=True)
 
+    # --- Agendamento Inteligente ---
+    # telefone_advogado: número WhatsApp do advogado usado para notificações de
+    #   agendamento e para identificar respostas dele no webhook (Etapa 7).
+    #   Distinto de escalacao_canal_advogado_numero, que serve ao Hub de Escalação.
+    # timezone: fuso IANA do escritório; usado pelo AgendamentoDetector para
+    #   converter slots UTC em horário local antes de exibir ao cliente.
+    telefone_advogado: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="WhatsApp do advogado para notificações de agendamento",
+    )
+    timezone: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        server_default="America/Sao_Paulo",
+        comment="Fuso IANA (ex: America/Sao_Paulo, America/Manaus, America/Rio_Branco)",
+    )
+
     # --- Feature Hub do Advogado — Modelo de Escalação (Claude Opus) ---
     # escalacao_habilitada: liga/desliga o Hub por escritório (feature flag por tenant).
     # escalacao_canal_advogado_numero: número WhatsApp dedicado ao Hub; se None usa o mesmo
@@ -236,6 +256,12 @@ class Escritorio(Base, TimestampMixin):
     )
     interacoes: Mapped[list["Interacao"]] = relationship(  # noqa: F821
         "Interacao", back_populates="escritorio", cascade="all, delete-orphan"
+    )
+    agendamentos: Mapped[list["Agendamento"]] = relationship(  # noqa: F821
+        "Agendamento", back_populates="escritorio", cascade="all, delete-orphan"
+    )
+    disponibilidades: Mapped[list["DisponibilidadeAdvogado"]] = relationship(  # noqa: F821
+        "DisponibilidadeAdvogado", back_populates="escritorio", cascade="all, delete-orphan"
     )
 
     # --- Constraints ---

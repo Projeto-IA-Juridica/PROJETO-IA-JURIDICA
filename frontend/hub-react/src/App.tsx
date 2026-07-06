@@ -13,7 +13,7 @@ import LoadingPage      from './pages/LoadingPage'
 import LoginPage        from './pages/LoginPage'
 import AjudaPage        from './pages/AjudaPage'
 import OnboardingPage   from './pages/OnboardingPage'
-import type { Section } from './types'
+import type { ClientesNavRequest, Section } from './types'
 import { getAccessToken, refreshAccessToken, fetchMe, clearAuth } from './api/auth'
 
 /* ── Pages ── */
@@ -194,6 +194,9 @@ function Shell({ onReady }: ShellProps) {
     const saved = localStorage.getItem('amicus:clienteId')
     return saved ? parseInt(saved, 10) : null
   })
+  // Agendamento Inteligente — navegação Painel → Clientes (Agenda/pendentes).
+  // Efêmero por design: não persiste em localStorage (é um comando, não estado).
+  const [clientesNav, setClientesNav] = useState<ClientesNavRequest | null>(null)
 
   useEffect(() => {
     localStorage.setItem('amicus:section', section)
@@ -214,6 +217,13 @@ function Shell({ onReady }: ShellProps) {
 
   function selectCliente(id: number) {
     setClienteId(id)
+    setSection('clientes')
+  }
+
+  /* Agendamento Inteligente — Painel → Clientes (Agenda / pendentes) */
+  function navigateClientes(req: Omit<ClientesNavRequest, 'ts'>) {
+    setClienteId(null)
+    setClientesNav({ ...req, ts: Date.now() })
     setSection('clientes')
   }
 
@@ -259,8 +269,22 @@ function Shell({ onReady }: ShellProps) {
       {/* Conteúdo — padding-bottom para não ficar atrás da dock */}
       <main id="main-content" className="flex-1 overflow-hidden">
         <PageTransition id={section} className="h-full overflow-hidden pb-20">
-          {section === 'painel'   && <PainelPage onSelectCliente={selectCliente} />}
-          {section === 'clientes' && <HubPage activeId={clienteId} onSelect={setClienteId} onBack={() => setClienteId(null)} />}
+          {section === 'painel'   && (
+            <PainelPage
+              onSelectCliente={selectCliente}
+              onVerAgenda={(semanaISO) => navigateClientes({ view: 'agenda', semana: semanaISO })}
+              onVerPendentes={() => navigateClientes({ view: 'lista', pendentes: true })}
+            />
+          )}
+          {section === 'clientes' && (
+            <HubPage
+              activeId={clienteId}
+              onSelect={setClienteId}
+              onBack={() => setClienteId(null)}
+              navRequest={clientesNav}
+              onGoConfig={() => setSection('config')}
+            />
+          )}
           {section === 'hub-ia'   && <HubIAPage />}
           {section === 'whatsapp'   && <WhatsappPage />}
           {section === 'captacao'   && <CaptacaoPage />}

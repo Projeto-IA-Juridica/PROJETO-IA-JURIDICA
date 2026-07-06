@@ -51,6 +51,9 @@ def _mock_db_com_nps(interacao=None) -> AsyncMock:
     db = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = interacao
+    # Guard do Agendamento Inteligente: .first() é a checagem de proposta de
+    # horários pendente — None = sem proposta, NPS segue o fluxo normal
+    mock_result.first.return_value = None
     db.execute.return_value = mock_result
     db.commit = AsyncMock()
     return db
@@ -189,10 +192,13 @@ async def test_alerta_enviado_para_nps_baixo(nota: int):
     mock_adv_result = MagicMock()
     mock_adv_result.scalars.return_value.all.return_value = [adv1, adv2]
 
-    # execute: primeiro call → interação NPS; segundo call → advogados
+    # execute: 1º call → guard de proposta de agendamento (None = sem proposta);
+    # 2º call → interação NPS; 3º call → advogados
+    mock_guard_result = MagicMock()
+    mock_guard_result.first.return_value = None
     mock_nps_result = MagicMock()
     mock_nps_result.scalar_one_or_none.return_value = interacao
-    db.execute.side_effect = [mock_nps_result, mock_adv_result]
+    db.execute.side_effect = [mock_guard_result, mock_nps_result, mock_adv_result]
 
     patch_ctx, evo_mock = _patch_evo()
 
@@ -222,7 +228,8 @@ async def test_sem_alerta_para_nps_alto(nota: int):
     assert result is True
     # Apenas o agradecimento — sem query de advogados, sem alerta
     evo_mock.enviar_texto.assert_awaited_once()
-    db.execute.assert_awaited_once()  # só a query de NPS, não a de advogados
+    # guard de proposta de agendamento + query de NPS; não a de advogados
+    assert db.execute.await_count == 2
 
 
 # ---------------------------------------------------------------------------

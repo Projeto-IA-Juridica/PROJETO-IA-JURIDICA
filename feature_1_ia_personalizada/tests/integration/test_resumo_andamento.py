@@ -270,6 +270,21 @@ class TestFluxoFeature3DadosPassados:
 # ---------------------------------------------------------------------------
 
 
+def _chamadas_notificacao(celery_mock):
+    """
+    Filtra send_task pela task de notificação de andamento.
+
+    O hook do Agendamento Inteligente dispara verificar_conflitos_prazos
+    após novos andamentos — os asserts destes testes olham apenas as
+    notificações ao cliente.
+    """
+    return [
+        c
+        for c in celery_mock.send_task.call_args_list
+        if "enviar_notificacao_andamento" in c.args[0]
+    ]
+
+
 class TestFluxoFeature3Celery:
     def test_resumo_enviado_via_celery(self, infra):
         """O texto retornado por traduzir_com_contexto() vai nos args da task Celery."""
@@ -284,9 +299,9 @@ class TestFluxoFeature3Celery:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        infra["celery"].send_task.assert_called_once()
-        call_kwargs = infra["celery"].send_task.call_args.kwargs
-        assert call_kwargs["args"] == [42, resumo_final]
+        notificacoes = _chamadas_notificacao(infra["celery"])
+        assert len(notificacoes) == 1
+        assert notificacoes[0].kwargs["args"] == [42, resumo_final]
 
     def test_task_enviada_para_fila_notificacoes(self, infra):
         mock_state = _make_state_mock()
@@ -299,8 +314,8 @@ class TestFluxoFeature3Celery:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        call_kwargs = infra["celery"].send_task.call_args.kwargs
-        assert call_kwargs["queue"] == "notificacoes"
+        notificacoes = _chamadas_notificacao(infra["celery"])
+        assert notificacoes[0].kwargs["queue"] == "notificacoes"
 
     def test_nome_da_task_celery_correto(self, infra):
         mock_state = _make_state_mock()
@@ -313,8 +328,10 @@ class TestFluxoFeature3Celery:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        task_name = infra["celery"].send_task.call_args.args[0]
-        assert "enviar_notificacao_andamento" in task_name
+        # Além da notificação, o hook de agendamento re-verifica conflitos de prazo
+        nomes = [c.args[0] for c in infra["celery"].send_task.call_args_list]
+        assert any("enviar_notificacao_andamento" in n for n in nomes)
+        assert any("verificar_conflitos_prazos" in n for n in nomes)
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +403,9 @@ class TestFluxoFeature3MultiplosAndamentos:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        assert infra["celery"].send_task.call_count == 2
+        # 1 notificação por andamento + 1 verificação de conflitos por processo
+        assert len(_chamadas_notificacao(infra["celery"])) == 2
+        assert infra["celery"].send_task.call_count == 3
 
     def test_cada_andamento_envia_resumo_proprio(self, infra):
         """Cada andamento tem seu resumo independente (diferentes retornos do tradutor)."""
@@ -405,7 +424,7 @@ class TestFluxoFeature3MultiplosAndamentos:
         ):
             processar_processo_individual(PROCESSO_COBRANCA)
 
-        calls = infra["celery"].send_task.call_args_list
+        calls = _chamadas_notificacao(infra["celery"])
         assert calls[0].kwargs["args"][1] == "Resumo da intimação."
         assert calls[1].kwargs["args"][1] == "Resumo da sentença."
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -12,14 +12,23 @@ import ScoreTab       from '../tabs/ScoreTab'
 import ChatTab        from '../tabs/ChatTab'
 import DocumentosTab  from '../tabs/DocumentosTab'
 import RiskChip       from '../components/RiskChip'
+import AprovacaoCard  from '../components/agendamento/AprovacaoCard'
+import AgendaSemanal  from '../components/agendamento/AgendaSemanal'
 import { fetchClientes, analisarCliente } from '../api/crm'
 import { fetchProcessos }  from '../api/processos'
 import { exportarCliente, deletarClienteLGPD, criarClienteManual } from '../api/clientes'
+import { listarAgendamentos } from '../api/agendamentos'
 import CadastroCSVPage from './CadastroCSVPage'
-import type { CRMClienteCard } from '../types'
+import type { CRMClienteCard, ClientesNavRequest } from '../types'
 
 type Tab  = 'processo' | 'score' | 'chat' | 'documentos'
-type View = 'lista' | 'crm'
+type View = 'lista' | 'crm' | 'agenda'
+
+const VIEW_LABELS: Record<View, string> = {
+  lista: 'Lista',
+  crm: 'Relacionamento',
+  agenda: 'Agenda',
+}
 
 const TABS: { id: Tab; icon: React.ReactNode; label: string }[] = [
   { id: 'processo',   icon: <FileText size={13} />,      label: 'Processo'   },
@@ -53,14 +62,21 @@ interface Props {
   activeId: number | null
   onSelect: (id: number) => void
   onBack?: () => void
+  /** navegação vinda do Painel (agenda/pendentes) */
+  navRequest?: ClientesNavRequest | null
+  onGoConfig?: () => void
 }
 
-export default function HubPage({ activeId, onSelect, onBack }: Props) {
+export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoConfig }: Props) {
   const [activeTab, setActiveTab]       = useState<Tab>('processo')
   const [search, setSearch]             = useState('')
   const [view, setView]                 = useState<View>('lista')
   const [showCSV, setShowCSV]           = useState(false)
   const [confirmarDelete, setConfirmarDelete] = useState(false)
+
+  // Agendamento Inteligente
+  const [showPendentes, setShowPendentes] = useState(false)
+  const [agendaSemana, setAgendaSemana]   = useState<string | null>(null)
 
   // CRM states
   const [nivel, setNivel]               = useState<Nivel>('todos')
@@ -134,6 +150,30 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
     enabled: activeId != null,
   })
 
+  // Aprovações pendentes — polling 10s sincroniza com aprovações via WhatsApp:
+  // quando o advogado responde "1" no WhatsApp, o card some no próximo ciclo.
+  const { data: pendentes } = useQuery({
+    queryKey: ['agendamentos-pendentes'],
+    queryFn: () => listarAgendamentos({ status: 'aguardando_advogado' }),
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+  })
+  const totalPendentes = pendentes?.length ?? 0
+
+  // Navegação vinda do Painel (widget Próximas reuniões)
+  useEffect(() => {
+    if (!navRequest) return
+    setView(navRequest.view)
+    setShowPendentes(!!navRequest.pendentes)
+    if (navRequest.semana) setAgendaSemana(navRequest.semana)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navRequest?.ts])
+
+  function selectClienteComTab(clienteId: number, tab: Tab) {
+    setActiveTab(tab)
+    onSelect(clienteId)
+  }
+
   const cliente  = clientes?.find((c) => c.id === activeId) ?? null
   const processo = processoData?.items[0] ?? null
 
@@ -166,13 +206,26 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
           <div className="flex-shrink-0 px-6 pt-3 pb-4 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h1 className="text-sm font-bold text-am-ink tracking-tight">
-                  {view === 'lista' ? 'Clientes' : 'Relacionamento'}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm font-bold text-am-ink tracking-tight">
+                    {view === 'lista' ? 'Clientes' : view === 'crm' ? 'Relacionamento' : 'Agenda'}
+                  </h1>
+                  {totalPendentes > 0 && (
+                    <button
+                      onClick={() => { setView('lista'); setShowPendentes(true) }}
+                      title={`${totalPendentes} agendamento(s) aguardando aprovação`}
+                      className="press flex items-center justify-center text-[10px] font-bold text-white rounded-full"
+                      style={{ background: '#C83030', minWidth: 18, height: 18, padding: '0 5px' }}>
+                      {totalPendentes}
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-am-muted mt-0.5">
                   {view === 'lista'
                     ? `${clientes?.length ?? 0} cadastrados`
-                    : 'Satisfação baseada no histórico de conversas com a IA'}
+                    : view === 'crm'
+                      ? 'Satisfação baseada no histórico de conversas com a IA'
+                      : 'Reuniões confirmadas, aprovações pendentes e prazos da semana'}
                 </p>
               </div>
 
@@ -200,10 +253,10 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
 
                 {/* View toggle */}
                 <div className="flex p-1 rounded-xl gap-0.5" style={{ background: 'rgba(12,30,48,0.05)' }}>
-                  {(['lista', 'crm'] as const).map(v => (
+                  {(['lista', 'crm', 'agenda'] as const).map(v => (
                     <motion.button
                       key={v}
-                      onClick={() => setView(v)}
+                      onClick={() => { setView(v); if (v !== 'lista') setShowPendentes(false) }}
                       className="relative px-3 py-1.5 rounded-lg text-[11px] font-semibold"
                       style={{ color: view === v ? 'var(--color-am-blue)' : 'var(--color-am-muted)' }}
                     >
@@ -220,7 +273,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
                           />
                         )}
                       </AnimatePresence>
-                      <span className="relative">{v === 'lista' ? 'Lista' : 'Relacionamento'}</span>
+                      <span className="relative">{VIEW_LABELS[v]}</span>
                     </motion.button>
                   ))}
                 </div>
@@ -251,25 +304,73 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
               </div>
             )}
 
-            {/* Search */}
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" aria-hidden="true" />
-              <label htmlFor="hub-search" className="sr-only">Buscar cliente</label>
-              <input
-                id="hub-search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar cliente..."
-                className="am-input am-input-with-icon"
-              />
-            </div>
+            {/* Search — não se aplica à Agenda */}
+            {view !== 'agenda' && (
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-am-muted pointer-events-none" aria-hidden="true" />
+                <label htmlFor="hub-search" className="sr-only">Buscar cliente</label>
+                <input
+                  id="hub-search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar cliente..."
+                  className="am-input am-input-with-icon"
+                />
+              </div>
+            )}
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-6 pb-4">
 
+            {/* ── Vista: Agenda semanal ── */}
+            {view === 'agenda' && (
+              <AgendaSemanal
+                semanaISO={agendaSemana}
+                navTs={navRequest?.ts}
+                onSelectCliente={(id, tab) => selectClienteComTab(id, tab)}
+                onVerPendentes={() => { setView('lista'); setShowPendentes(true) }}
+                onGoConfig={() => onGoConfig?.()}
+              />
+            )}
+
+            {/* ── Cards de aprovação pendente (vista Lista) ── */}
+            {view === 'lista' && (pendentes ?? []).length > 0 && (
+              <div className="space-y-3 mt-2 mb-4">
+                <div className="flex items-center justify-between">
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: '#B06D0A' }}>
+                    <Clock size={11} /> Aguardando sua aprovação
+                  </p>
+                  {showPendentes && (
+                    <button
+                      onClick={() => setShowPendentes(false)}
+                      className="press text-[11px] font-semibold"
+                      style={{ color: 'var(--color-am-blue)' }}>
+                      Mostrar todos os clientes
+                    </button>
+                  )}
+                </div>
+                {(pendentes ?? []).map(ag => (
+                  <AprovacaoCard key={ag.id} agendamento={ag} />
+                ))}
+              </div>
+            )}
+
+            {view === 'lista' && showPendentes && (pendentes ?? []).length === 0 && (
+              <div className="flex flex-col items-center gap-2 py-8">
+                <CheckCircle2 size={20} style={{ color: '#1A9E78' }} />
+                <p className="text-xs text-am-muted">Nenhuma aprovação pendente. Tudo em dia! 🎉</p>
+                <button
+                  onClick={() => setShowPendentes(false)}
+                  className="press text-[11px] font-semibold"
+                  style={{ color: 'var(--color-am-blue)' }}>
+                  Mostrar todos os clientes
+                </button>
+              </div>
+            )}
+
             {/* Empty state — sem clientes */}
-            {!isLoading && (clientes ?? []).length === 0 && (
+            {view !== 'agenda' && !showPendentes && !isLoading && (clientes ?? []).length === 0 && (
               <div className="flex flex-col items-center justify-center gap-4 py-12">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
                   style={{ background: 'rgba(18,72,190,0.07)', border: '1px solid rgba(18,72,190,0.15)' }}>
@@ -289,7 +390,7 @@ export default function HubPage({ activeId, onSelect, onBack }: Props) {
             )}
 
             {/* ── Vista: Lista ── */}
-            {view === 'lista' && (
+            {view === 'lista' && !showPendentes && (
               <>
                 {isLoading && (
                   <div className="flex items-center justify-center h-32">

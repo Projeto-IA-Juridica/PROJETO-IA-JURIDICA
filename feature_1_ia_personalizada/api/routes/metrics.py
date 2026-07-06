@@ -153,6 +153,41 @@ escalacao_latencia_ms = Histogram(
     buckets=(1000, 2000, 5000, 10000, 20000, 30000, 45000, 60000),
 )
 
+# ---------------------------------------------------------------------------
+# Métricas de negócio — Agendamento Inteligente
+# ---------------------------------------------------------------------------
+
+agendamentos_criados_total = Counter(
+    "agendamentos_criados_total",
+    "Total de propostas de agendamento criadas pela IA",
+    labelnames=["escritorio_id"],
+)
+
+agendamentos_confirmados_total = Counter(
+    "agendamentos_confirmados_total",
+    "Total de agendamentos confirmados pelo advogado (qualquer canal)",
+    labelnames=["escritorio_id"],
+)
+
+agendamentos_expirados_total = Counter(
+    "agendamentos_expirados_total",
+    "Total de propostas expiradas sem resposta do cliente (48h)",
+    labelnames=["escritorio_id"],
+)
+
+agendamentos_conflito_prazo_total = Counter(
+    "agendamentos_conflito_prazo_total",
+    "Total de agendamentos com conflito de prazo processual detectado",
+    labelnames=["escritorio_id"],
+)
+
+tempo_aprovacao_advogado_segundos = Histogram(
+    "tempo_aprovacao_advogado_segundos",
+    "Tempo entre a escolha do cliente e a aprovação do advogado",
+    labelnames=["escritorio_id"],
+    buckets=(30, 60, 300, 900, 1800, 3600, 7200, 14400, 43200, 86400, 172800),
+)
+
 
 def _verificar_token(request: Request) -> None:
     """
