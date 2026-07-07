@@ -40,19 +40,17 @@ _METODOS_MUTANTES = {"POST", "PUT", "PATCH", "DELETE"}
 
 # Prefixos de rota isentos de CSRF (não envolvem sessão de browser)
 _ROTAS_ISENTAS = (
-    "/api/v1/webhook/",  # WhatsApp — autenticado via HMAC
-    "/api/v1/billing/webhook",  # Stripe — autenticado via stripe-signature HMAC
-    "/api/v1/health",  # leitura
-    "/api/v1/metrics",  # leitura
-    "/api/v1/auth/csrf-token",  # emissão do token
-    "/api/v1/auth/login",  # login inicial (sem sessão prévia para proteger)
-    "/api/v1/auth/refresh",  # refresh usa JWT, não sessão
-    "/api/v1/onboarding/register",  # registro inicial (sem sessão prévia)
+    "/webhook/",  # WhatsApp — autenticado via HMAC
+    "/billing/webhook",  # Stripe — autenticado via stripe-signature HMAC
+    "/health",  # leitura
+    "/metrics",  # leitura
+    "/auth/csrf-token",  # emissão do token
+    "/auth/login",  # login inicial (sem sessão prévia para proteger)
+    "/auth/refresh",  # refresh usa JWT, não sessão
+    "/onboarding/register",  # registro inicial (sem sessão prévia)
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/health",  # em caso de montagem na raiz
-    "/metrics",
 )
 
 _COOKIE_NAME = "csrf_token"
