@@ -23,11 +23,11 @@ try:
 except Exception:
     pass
 
-BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1").replace("CERT_NONE", "none")
-RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2").replace(
+BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1").strip().replace("CERT_NONE", "none")
+RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/2").strip().replace(
     "CERT_NONE", "none"
 )
-TIMEZONE = os.getenv("CELERY_TIMEZONE", "America/Sao_Paulo")
+TIMEZONE = os.getenv("CELERY_TIMEZONE", "America/Sao_Paulo").strip()
 
 celery_app = Celery(
     "concierge_worker",
