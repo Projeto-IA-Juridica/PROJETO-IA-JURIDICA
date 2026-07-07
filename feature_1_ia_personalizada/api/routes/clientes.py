@@ -48,7 +48,11 @@ from shared.models.documento_cliente import (
     DocumentoCliente,
 )
 from shared.models.processo import Processo
-from shared.schemas.cliente import ClienteCreateManual, ClienteCreateManualResponse
+from shared.schemas.cliente import (
+    ClienteCreateManual,
+    ClienteCreateManualResponse,
+    ClienteUpdate,
+)
 from shared.security.encryption import criptografar
 from shared.utils.lgpd import (
     anonimizar_dados_cliente,
@@ -227,6 +231,43 @@ async def criar_cliente_manual(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno ao criar cliente.",
         ) from exc
+
+
+# ---------------------------------------------------------------------------
+# PUT /clientes/{cliente_id}
+# ---------------------------------------------------------------------------
+
+@router.put(
+    "/{cliente_id}",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+)
+async def atualizar_cliente(
+    cliente_id: int,
+    payload: ClienteUpdate,
+    db: AsyncSession = Depends(get_db),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+) -> dict:
+    """Atualiza dados do cliente (nome, telefone)."""
+    stmt = select(Cliente).where(
+        Cliente.id == cliente_id,
+        Cliente.escritorio_id == escritorio_id,
+        Cliente.ativo.is_(True),
+    )
+    cliente = (await db.execute(stmt)).scalar_one_or_none()
+    if not cliente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente não encontrado.",
+        )
+
+    if payload.nome is not None:
+        cliente.nome = payload.nome
+    if payload.telefone_whatsapp is not None:
+        cliente.telefone_whatsapp = payload.telefone_whatsapp
+
+    await db.commit()
+    return {"message": "Cliente atualizado com sucesso"}
 
 
 # ---------------------------------------------------------------------------

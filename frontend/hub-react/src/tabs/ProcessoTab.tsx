@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Plus, Trash2, Edit2, X, Check, Search, RefreshCw, WifiOff,
 } from 'lucide-react'
 import { fetchProcessos, criarProcesso, deletarProcesso, atualizarProcesso, enriquecerProcesso, type ProcessoCreate, type ProcessoUpdate, type ProcessoFilters } from '../api/processos'
+import { atualizarCliente } from '../api/clientes'
 import type { CRMClienteCard, Processo } from '../types'
 import Skeleton from '../components/Skeleton'
 import RiskChip from '../components/RiskChip'
@@ -218,11 +219,82 @@ const SCORE_LABELS: Record<string, { label: string; color: string; bg: string; b
   critico:  { label: 'Crítico',  color: '#C83030', bg: 'rgba(200,48,48,0.08)',   border: 'rgba(200,48,48,0.22)'   },
 }
 
+/* ── Modal de edição do cliente ── */
+function EditarClienteModal({ cliente, onClose }: { cliente: CRMClienteCard; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [nome, setNome] = useState(cliente.nome)
+  const [telefone, setTelefone] = useState(cliente.telefone_whatsapp ?? '')
+  const [erro, setErro] = useState('')
+
+  const mut = useMutation({
+    mutationFn: () => atualizarCliente(cliente.id, { nome: nome.trim(), telefone_whatsapp: telefone.trim() || undefined }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] })
+      onClose()
+    },
+    onError: (e: unknown) => {
+      let msg: any = (e as any)?.response?.data?.detail ?? 'Erro ao atualizar cliente.'
+      if (Array.isArray(msg)) msg = msg.map((m: any) => m.msg).join(', ')
+      setErro(String(msg))
+    },
+  })
+
+  function handleSubmit() {
+    if (!nome.trim()) { setErro('Informe o nome.'); return }
+    setErro('')
+    mut.mutate()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(12,30,48,0.45)', backdropFilter: 'blur(4px)' }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+        className="w-full max-w-md bg-white rounded-3xl p-6"
+        style={{ boxShadow: '0 24px 64px rgba(12,30,48,0.18)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-bold text-am-ink">Editar cliente</h2>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-am-muted hover:text-am-ink transition-colors"
+            style={{ border: '1px solid var(--color-am-border)' }}>
+            <X size={13} />
+          </button>
+        </div>
+
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">Nome completo *</label>
+            <input value={nome} onChange={e => setNome(e.target.value)} className="am-input" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-am-secondary mb-1.5">Telefone WhatsApp</label>
+            <input value={telefone} onChange={e => setTelefone(e.target.value)} className="am-input" placeholder="(11) 99999-9999" />
+          </div>
+        </div>
+
+        {erro && (
+          <p className="text-xs mb-3 flex items-center gap-1.5" style={{ color: '#C83030' }}>
+            <AlertCircle size={12} /> {erro}
+          </p>
+        )}
+
+        <button onClick={handleSubmit} disabled={mut.isPending}
+          className="press w-full py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-2"
+          style={{ background: 'linear-gradient(135deg,#1248BE,#3A7AB8)', border: 'none', cursor: mut.isPending ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-sans)', opacity: mut.isPending ? 0.6 : 1 }}>
+          {mut.isPending
+            ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Salvando...</>
+            : <><Check size={13} /> Salvar alterações</>
+          }
+        </button>
+      </motion.div>
+    </div>
+  )
+}
+
 /* ── ProcessoTab principal ── */
 export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
   const qc = useQueryClient()
   const [andamentosAbertos, setAndamentosAbertos] = useState<Set<number>>(new Set())
   const [showNovoModal,  setShowNovoModal]  = useState(false)
+  const [showEditCliente, setShowEditCliente] = useState(false)
   const [editandoProc,   setEditandoProc]   = useState<Processo | null>(null)
   const [enrichErros, setEnrichErros]       = useState<Record<number, string>>({})
 
@@ -294,7 +366,14 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
       {/* Card do cliente */}
       <Card>
         <CardHeader icon={<User size={13} />} title="Cliente"
-          badge={<span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg" style={{ color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }}>Ativo</span>}
+          badge={
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-lg" style={{ color: '#1A9E78', background: 'rgba(26,158,120,0.08)', border: '1px solid rgba(26,158,120,0.18)' }}>Ativo</span>
+              <button onClick={() => setShowEditCliente(true)} className="w-6 h-6 rounded-lg flex items-center justify-center text-am-muted hover:text-am-blue transition-colors" title="Editar Cliente">
+                <Edit2 size={11} />
+              </button>
+            </div>
+          }
         />
         <div className="px-4 py-4 space-y-4">
           <div>
@@ -590,6 +669,7 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
       <AnimatePresence>
         {showNovoModal && <NovoProcessoModal clienteId={cliente.id} onClose={() => setShowNovoModal(false)} />}
         {editandoProc  && <EditarProcessoModal processo={editandoProc} clienteId={cliente.id} onClose={() => setEditandoProc(null)} />}
+        {showEditCliente && <EditarClienteModal cliente={cliente} onClose={() => setShowEditCliente(false)} />}
       </AnimatePresence>
     </div>
   )
