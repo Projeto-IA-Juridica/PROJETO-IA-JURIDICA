@@ -28,6 +28,7 @@ from feature_1_ia_personalizada.services.agendamento.google_calendar import (
     salvar_conexao,
     trocar_code_por_refresh_token,
 )
+from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.escritorio import Escritorio
 
@@ -98,8 +99,11 @@ async def callback_oauth(
     Redirect do Google (sem JWT — rota pública na whitelist do middleware).
     Segurança: state de uso único gerado por usuário autenticado em /auth-url.
     """
-    destino_ok = "/?gcal=conectado"
-    destino_erro = "/?gcal=erro"
+    # Com frontend em domínio próprio (Railway 2 serviços), FRONTEND_URL leva
+    # o usuário de volta ao app; sem ela, redirect relativo (mesmo domínio)
+    base = (settings.FRONTEND_URL or "").rstrip("/")
+    destino_ok = f"{base}/?gcal=conectado"
+    destino_erro = f"{base}/?gcal=erro"
 
     if error or not code or not state:
         logger.warning("gcal_callback_negado", error=error)

@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_CLIENT_ID: str | None = None
     GOOGLE_CALENDAR_CLIENT_SECRET: str | None = None
     GOOGLE_CALENDAR_REDIRECT_URI: str | None = None
+    # URL pública do frontend (ex: https://app.seudominio.com). Usada no
+    # redirect pós-OAuth quando frontend e backend vivem em domínios
+    # distintos (Railway com 2 serviços). Vazio = redireciona relativo ("/").
+    FRONTEND_URL: str | None = None
 
     # LinkedIn API — Feature 3 (Prospecção Inteligente)
     # Requer aprovação no LinkedIn Partner Program antes de usar.
