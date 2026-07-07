@@ -237,6 +237,7 @@ async def criar_cliente_manual(
 # PUT /clientes/{cliente_id}
 # ---------------------------------------------------------------------------
 
+
 @router.put(
     "/{cliente_id}",
     response_model=dict,

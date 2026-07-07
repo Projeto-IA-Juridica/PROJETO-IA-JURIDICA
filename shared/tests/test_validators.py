@@ -218,9 +218,10 @@ class TestValidarTelefoneWhatsapp:
     def test_valido_com_formatacao_internacional(self):
         assert validar_telefone_whatsapp("+55 (11) 98765-4321") is True
 
-    def test_fixo_sem_nono_digito(self):
-        """Linha fixa (8 dígitos após DDD) não é aceita no WhatsApp."""
-        assert validar_telefone_whatsapp("551132345678") is False
+    def test_numero_sem_nono_digito_aceito(self):
+        """8 dígitos após DDD (sem o nono) são aceitos — WhatsApp de números
+        antigos/fixos com WhatsApp Business existe na prática."""
+        assert validar_telefone_whatsapp("551132345678") is True
 
     def test_ddd_comecando_com_zero_invalido(self):
         """DDD não pode começar com 0 (regex: [1-9])."""
@@ -254,18 +255,17 @@ class TestNormalizarTelefone:
     def test_com_formatacao_nacional_normaliza(self):
         assert normalizar_telefone("(11) 98765-4321") == "5511987654321"
 
-    def test_fixo_levanta_erro(self):
-        with pytest.raises(ValueError, match="Telefone inválido"):
-            normalizar_telefone("551132345678")
+    def test_sem_nono_digito_normaliza(self):
+        # Regex aceita 12 dígitos (9 opcional) desde o suporte a números antigos
+        assert normalizar_telefone("551132345678") == "551132345678"
 
     def test_muito_curto_levanta_erro(self):
         with pytest.raises(ValueError, match="Telefone inválido"):
             normalizar_telefone("123")
 
-    def test_10_digitos_fixo_adiciona_prefixo_mas_ainda_invalido(self):
-        """10 dígitos → 'elif len == 10' adiciona '55' → 12 dígitos → falha validação WhatsApp."""
-        with pytest.raises(ValueError, match="Telefone inválido"):
-            normalizar_telefone("1132345678")  # DDD + 8 dígitos fixo
+    def test_10_digitos_adiciona_prefixo_e_valida(self):
+        """10 dígitos → adiciona '55' → 12 dígitos, válido (9 é opcional)."""
+        assert normalizar_telefone("1132345678") == "551132345678"
 
     def test_11_digitos_comecando_com_5_nao_adiciona_prefixo(self):
         """11 dígitos começando com '5' não entram no branch de adição de prefixo

@@ -70,7 +70,7 @@ CNPJ_SEQUENCIAL = "00.000.000/0000-00"
 # Telefone WhatsApp válido: 55 + DDD + 9 + 8 dígitos
 TEL_VALIDO = "5511987654321"
 TEL_VALIDO_FORMATADO = "+55 (11) 98765-4321"
-TEL_FIXO = "551132345678"  # sem o dígito 9 obrigatório
+TEL_SEM_NONO = "551132345678"  # sem o nono dígito — aceito desde o suporte a números antigos
 
 
 def _make_cnj(nnnnnnn="0001234", aaaa="2024", j="8", tt="26", oooo="0100") -> str:
@@ -189,8 +189,8 @@ class TestValidarTelefoneWhatsapp:
     def test_valido_com_formatacao(self):
         assert validar_telefone_whatsapp(TEL_VALIDO_FORMATADO) is True
 
-    def test_fixo_sem_nono_digito(self):
-        assert validar_telefone_whatsapp(TEL_FIXO) is False
+    def test_sem_nono_digito_aceito(self):
+        assert validar_telefone_whatsapp(TEL_SEM_NONO) is True
 
     def test_muito_curto(self):
         assert validar_telefone_whatsapp("55119") is False
@@ -211,9 +211,8 @@ class TestNormalizarTelefone:
         with pytest.raises(ValueError, match="Telefone inválido"):
             normalizar_telefone("123")
 
-    def test_fixo_levanta_erro(self):
-        with pytest.raises(ValueError, match="Telefone inválido"):
-            normalizar_telefone(TEL_FIXO)
+    def test_sem_nono_digito_normaliza(self):
+        assert normalizar_telefone(TEL_SEM_NONO) == TEL_SEM_NONO
 
 
 # ===========================================================================
