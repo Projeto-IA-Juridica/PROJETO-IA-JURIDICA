@@ -163,6 +163,12 @@ async def node_agendamento(state: ConversationState, deps: NodeDeps) -> dict[str
             session.add(agendamento)
             await session.commit()
 
+            from feature_1_ia_personalizada.services.agendamento.eventos import (
+                publicar_evento_agendamento,
+            )
+
+            await publicar_evento_agendamento(deps.redis, escritorio_id)
+
             try:
                 from feature_1_ia_personalizada.api.routes.metrics import (
                     agendamentos_criados_total,

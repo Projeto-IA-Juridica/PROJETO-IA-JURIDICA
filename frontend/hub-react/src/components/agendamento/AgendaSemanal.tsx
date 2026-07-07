@@ -12,6 +12,7 @@ import {
   type PrazoAgenda,
 } from '../../api/agendamentos'
 import AprovacaoCard, { labelHorario } from './AprovacaoCard'
+import { useStreamConectado } from '../../hooks/useAgendamentoStream'
 
 const DIAS_LABEL = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 
@@ -81,10 +82,12 @@ export default function AgendaSemanal({ semanaISO, navTs, onSelectCliente, onVer
     return d.toISOString()
   }, [weekStart])
 
+  const streamConectado = useStreamConectado()
   const { data, isLoading } = useQuery({
     queryKey: ['agendamentos-eventos', inicioISO],
     queryFn: () => fetchEventosAgenda(inicioISO, fimISO),
-    refetchInterval: 15_000, // sincroniza com aprovações via WhatsApp
+    // tempo real via SSE; polling é fallback (60s com stream, 15s sem)
+    refetchInterval: streamConectado ? 60_000 : 15_000,
     staleTime: 5_000,
   })
 
@@ -271,11 +274,11 @@ export default function AgendaSemanal({ semanaISO, navTs, onSelectCliente, onVer
                     <button
                       key={`p-${j}`}
                       onClick={() => p.cliente_id && onSelectCliente(p.cliente_id, 'processo')}
-                      title={p.numero_cnj ? `Processo ${p.numero_cnj}` : p.descricao}
+                      title={`${p.estimado ? '≈ data estimada (prazo em dias úteis) · ' : ''}${p.numero_cnj ? `Processo ${p.numero_cnj}` : p.descricao}`}
                       className="w-full text-left rounded-xl px-2 py-1.5 press"
                       style={{ background: 'rgba(200,48,48,0.06)', border: 'none' }}>
                       <p className="flex items-center gap-1 text-[9px] font-bold" style={{ color: '#C83030' }}>
-                        <AlertTriangle size={9} /> Prazo
+                        <AlertTriangle size={9} /> Prazo{p.estimado ? ' ≈' : ''}
                       </p>
                       <p className="text-[10px] font-semibold text-am-ink truncate">
                         {p.cliente_nome ?? p.descricao}

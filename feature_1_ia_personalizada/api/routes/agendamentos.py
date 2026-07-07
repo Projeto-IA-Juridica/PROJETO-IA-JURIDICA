@@ -5,10 +5,15 @@ from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.agendamento import AgendamentoDetector
+from feature_1_ia_personalizada.services.agendamento.eventos import (
+    canal_agendamento,
+    publicar_evento_agendamento,
+)
 from feature_1_ia_personalizada.services.agendamento.prazos import (
     buscar_prazos_escritorio,
     datas_a_evitar,
@@ -238,6 +243,63 @@ async def listar_agendamentos(
 
 
 # ---------------------------------------------------------------------------
+# GET /agendamentos/stream — Server-Sent Events (tempo real)
+# ---------------------------------------------------------------------------
+
+_SSE_POLL_TIMEOUT_S = 25.0  # sem evento nesse intervalo → heartbeat
+
+
+@router.get("/stream", include_in_schema=False)
+async def stream_agendamentos(request: Request) -> StreamingResponse:
+    """
+    Stream SSE de mudanças nos agendamentos do escritório (Redis pub/sub).
+
+    Cada transição de estado publica "changed"; o frontend invalida as
+    queries e re-busca pelos endpoints normais. Declarada ANTES de /{id}
+    para "stream" não colidir com o path param inteiro.
+    """
+    eid = _escritorio_id(request)
+    r = _redis(request)
+    if r is None:
+        raise HTTPException(status_code=503, detail="Tempo real indisponível (Redis offline)")
+
+    async def gerar() -> Any:
+        pubsub = r.pubsub()
+        await pubsub.subscribe(canal_agendamento(eid))
+        logger.info("agendamento_sse_conectado", escritorio_id=eid)
+        try:
+            # retry orienta o EventSource/cliente a reconectar em 5s
+            yield "retry: 5000\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                msg = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=_SSE_POLL_TIMEOUT_S
+                )
+                if msg is not None and msg.get("type") == "message":
+                    yield "event: agendamentos\ndata: changed\n\n"
+                else:
+                    yield ": ping\n\n"  # heartbeat mantém proxies/conexão vivos
+        finally:
+            try:
+                await pubsub.unsubscribe(canal_agendamento(eid))
+                await pubsub.aclose()
+            except Exception:
+                pass
+            logger.info("agendamento_sse_desconectado", escritorio_id=eid)
+
+    return StreamingResponse(
+        gerar(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # desativa buffering em nginx
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # GET /agendamentos/{id}
 # ---------------------------------------------------------------------------
 
@@ -330,6 +392,7 @@ async def confirmar_agendamento(
         pass
 
     _enfileirar_mensagem_pos_acao(agendamento_id, "confirmado")
+    await publicar_evento_agendamento(r, eid)
 
     logger.info("agendamento_confirmado", id=agendamento_id, canal="hub", escritorio_id=eid)
     return await _to_response(ag, db)
@@ -412,6 +475,7 @@ async def sugerir_novos_horarios(
             await r.delete(lock_key)
 
     _enfileirar_mensagem_pos_acao(agendamento_id, "proposta")
+    await publicar_evento_agendamento(r, eid)
 
     logger.info("agendamento_sugeriu_novos_horarios", id=agendamento_id, escritorio_id=eid)
     return await _to_response(ag, db)
@@ -451,6 +515,7 @@ async def cancelar_agendamento(
 
     if notificar_cliente and ag.whatsapp_proposta_cliente_enviado:
         _enfileirar_mensagem_pos_acao(agendamento_id, "cancelado")
+    await publicar_evento_agendamento(_redis(request), eid)
 
     logger.info("agendamento_cancelado", id=agendamento_id, escritorio_id=eid)
     return await _to_response(ag, db)

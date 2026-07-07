@@ -25,12 +25,12 @@ MODULE = "feature_1_ia_personalizada.services.ai.processo_state"
 
 
 # ---------------------------------------------------------------------------
-# Helper: mock de async_session_factory()
+# Helper: mock de worker_session_factory()
 # ---------------------------------------------------------------------------
 
 
 def _make_factory(session_mock):
-    """Cria um mock de async_session_factory compatível com 'async with ... as session'."""
+    """Cria um mock de worker_session_factory compatível com 'async with ... as session'."""
 
     # session.begin() precisa ser async context manager que chama commit() ao sair.
     # MagicMock passa 'self' como 1º argumento ao chamar dunders, por isso _aexit aceita *args.
@@ -152,7 +152,7 @@ class TestGetState:
         result.one_or_none.return_value = None
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.get_state(99)
 
         assert estado == _estado_inicial()
@@ -163,7 +163,7 @@ class TestGetState:
         result.one_or_none.return_value = (None, "conhecimento")
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.get_state(1)
 
         assert estado == _estado_inicial()
@@ -179,7 +179,7 @@ class TestGetState:
         result.one_or_none.return_value = (estado_salvo, "recurso")
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.get_state(1)
 
         assert estado == estado_salvo
@@ -196,7 +196,7 @@ class TestGetState:
         result.one_or_none.return_value = (estado_salvo, "execucao")
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.get_state(1)
 
         assert "fase" in estado
@@ -222,31 +222,31 @@ class TestUpdateState:
 
     def test_classifica_fase_julgamento(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "sentença proferida pelo juiz")
         assert estado["fase"] == "julgamento"
 
     def test_classifica_fase_recurso(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "apelação interposta pelo réu")
         assert estado["fase"] == "recurso"
 
     def test_classifica_fase_execucao(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "penhora online realizada")
         assert estado["fase"] == "execucao"
 
     def test_classifica_fase_encerrado(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "processo arquivado definitivamente")
         assert estado["fase"] == "encerrado"
 
     def test_estado_nulo_no_banco_usa_estado_inicial(self):
         session = self._build_session(estado_atual=None)
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "despacho ordinatório")
         assert "despacho ordinatório" in estado["ultimos_andamentos"]
 
@@ -257,7 +257,7 @@ class TestUpdateState:
             "proximo_passo_esperado": "",
         }
         session = self._build_session(estado_atual=estado_existente)
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "novo andamento")
         assert "andamento antigo 1" in estado["ultimos_andamentos"]
         assert "andamento antigo 2" in estado["ultimos_andamentos"]
@@ -270,7 +270,7 @@ class TestUpdateState:
             "proximo_passo_esperado": "",
         }
         session = self._build_session(estado_atual=estado_com_5)
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "a6")
         assert len(estado["ultimos_andamentos"]) == 5
         assert "a1" not in estado["ultimos_andamentos"]
@@ -278,19 +278,19 @@ class TestUpdateState:
 
     def test_persiste_via_commit(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ProcessoStateManager.update_state(1, "qualquer andamento")
         session.commit.assert_called_once()
 
     def test_proximo_passo_correspondente_a_fase(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "penhora online realizada")
         assert estado["proximo_passo_esperado"] == _PROXIMO_PASSO["execucao"]
 
     def test_retorna_dict_com_campos_obrigatorios(self):
         session = self._build_session()
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "despacho")
         assert isinstance(estado, dict)
         assert "fase" in estado
@@ -304,7 +304,7 @@ class TestUpdateState:
             "proximo_passo_esperado": "",
         }
         session = self._build_session(estado_atual=estado_existente)
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             estado = ProcessoStateManager.update_state(1, "segundo")
         assert estado["ultimos_andamentos"][-1] == "segundo"
 
@@ -321,7 +321,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = []
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ctx = ProcessoStateManager.gerar_contexto_historico(1)
 
         assert ctx == "Nenhum andamento anterior registrado."
@@ -334,7 +334,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = [(m,) for m in mensagens_desc]
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ctx = ProcessoStateManager.gerar_contexto_historico(1)
 
         linhas = ctx.split("\n")
@@ -347,7 +347,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = [("resumo A",), ("resumo B",)]
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ctx = ProcessoStateManager.gerar_contexto_historico(1)
 
         assert "1. " in ctx
@@ -359,7 +359,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = [("Sentença de procedência proferida.",)]
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ctx = ProcessoStateManager.gerar_contexto_historico(1)
 
         assert "Sentença de procedência proferida." in ctx
@@ -371,7 +371,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = []
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ProcessoStateManager.gerar_contexto_historico(1)
 
         session.execute.assert_called_once()
@@ -383,7 +383,7 @@ class TestGerarContextoHistorico:
         result.all.return_value = []
         session.execute = AsyncMock(return_value=result)
 
-        with patch(f"{MODULE}.async_session_factory", _make_factory(session)):
+        with patch(f"{MODULE}.worker_session_factory", _make_factory(session)):
             ctx = ProcessoStateManager.gerar_contexto_historico(1, n_ultimos=3)
 
         session.execute.assert_called_once()

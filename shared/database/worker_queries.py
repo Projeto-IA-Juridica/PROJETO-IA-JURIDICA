@@ -43,7 +43,7 @@ import structlog
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import selectinload
 
-from shared.database.connection import async_session_factory
+from shared.database.connection import worker_session_factory
 from shared.models.cliente import Cliente as ClienteModel
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
@@ -90,7 +90,7 @@ def _run(coro: Any) -> Any:
 
 
 async def _query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
             .where(ProcessoModel.monitoramento_ativo == True)  # noqa: E712
@@ -118,7 +118,7 @@ def query_processos_monitorados(limite: int) -> list[dict[str, Any]]:
 
 
 async def _query_processo_por_id(id_processo: int) -> dict[str, Any] | None:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(select(ProcessoModel).where(ProcessoModel.id == id_processo))
         p = result.scalar_one_or_none()
         if p is None:
@@ -147,7 +147,7 @@ async def _update_ultimo_andamento(id_processo: int, texto: str, data_iso: str) 
     except (ValueError, TypeError):
         data_dt = None
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         await session.execute(
             update(ProcessoModel)
             .where(ProcessoModel.id == id_processo)
@@ -192,7 +192,7 @@ async def _update_metadados_processo(
     if not campos:
         return
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         await session.execute(
             update(ProcessoModel).where(ProcessoModel.id == id_processo).values(**campos)
         )
@@ -215,7 +215,7 @@ async def _update_score_risco(
     interpretacao: str,
     atualizado_em: datetime,
 ) -> None:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         await session.execute(
             update(ProcessoModel)
             .where(ProcessoModel.id == id_processo)
@@ -263,7 +263,7 @@ def update_score_risco(
 
 
 async def _query_clientes_relacionamento() -> list[dict[str, Any]]:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ClienteModel).where(ClienteModel.ativo == True)  # noqa: E712
         )
@@ -296,7 +296,7 @@ def query_clientes_relacionamento() -> list[dict[str, Any]]:
 async def _query_processo_ativo_do_cliente(
     id_cliente: int,
 ) -> dict[str, Any] | None:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
             .where(
@@ -327,7 +327,7 @@ async def _insert_interacao(
     tipo: str,
     direcao: str,
 ) -> None:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         # Obtém escritorio_id do cliente para respeitar multi-tenancy
         result = await session.execute(
             select(ClienteModel.escritorio_id).where(ClienteModel.id == id_cliente)
@@ -377,7 +377,7 @@ async def _query_ultima_interacao_batch(
 ) -> dict[int, datetime]:
     if not ids_clientes:
         return {}
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(Interacao.cliente_id, func.max(Interacao.created_at))
             .where(Interacao.cliente_id.in_(ids_clientes))
@@ -407,7 +407,7 @@ def query_ultima_interacao_batch(
 async def _query_processo_e_cliente(
     id_processo: int,
 ) -> tuple[ProcessoWorker, ClienteWorker] | None:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
             .where(ProcessoModel.id == id_processo)
@@ -442,7 +442,7 @@ def query_processo_e_cliente(
 
 async def _query_processos_sem_movimentacao() -> list[ProcessoWorker]:
     limite_data = datetime.now(UTC) - timedelta(days=30)
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel)
             .where(
@@ -485,7 +485,7 @@ def query_processos_sem_movimentacao() -> list[ProcessoWorker]:
 
 
 async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ClienteModel).where(
                 ClienteModel.ativo == True,  # noqa: E712
@@ -511,7 +511,7 @@ def query_clientes_para_pesquisa() -> list[ClienteWorker]:
 async def _query_clientes_ativos_por_escritorio(
     escritorio_id: int,
 ) -> list[ClienteWorker]:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ClienteModel).where(
                 ClienteModel.escritorio_id == escritorio_id,
@@ -548,7 +548,7 @@ async def _enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) 
     from shared.config.settings import settings
 
     # Resolve o webhook_whatsapp_instance do escritório do cliente em uma query
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(Escritorio.webhook_whatsapp_instance)
             .join(ClienteModel, ClienteModel.escritorio_id == Escritorio.id)
@@ -608,7 +608,7 @@ async def _query_clientes_nps_pendente() -> list[ClienteNPS]:
     inicio_janela = agora - timedelta(days=8)
     fim_janela = agora - timedelta(days=7)
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(
                 ClienteModel.id,

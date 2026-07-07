@@ -22,7 +22,7 @@ from typing import Any, cast
 import structlog
 from sqlalchemy import desc, select, update
 
-from shared.database.connection import async_session_factory
+from shared.database.connection import worker_session_factory
 from shared.models.interacao import Interacao
 from shared.models.processo import Processo as ProcessoModel
 
@@ -99,7 +99,7 @@ def _run(coro: Any) -> Any:
 
 
 async def _get_state(processo_id: int) -> dict[str, Any]:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(ProcessoModel.estado_atual, ProcessoModel.fase_processual).where(
                 ProcessoModel.id == processo_id
@@ -121,7 +121,7 @@ async def _get_state(processo_id: int) -> dict[str, Any]:
 async def _update_state(processo_id: int, novo_andamento: str) -> dict[str, Any]:
     fase = _classificar_fase(novo_andamento)
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         async with session.begin():
             # SELECT FOR UPDATE garante que dois workers Celery não atualizem
             # o mesmo processo simultaneamente. O segundo worker bloqueia até
@@ -162,7 +162,7 @@ async def _update_state(processo_id: int, novo_andamento: str) -> dict[str, Any]
 
 
 async def _gerar_contexto_historico(processo_id: int, n_ultimos: int) -> str:
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         result = await session.execute(
             select(Interacao.mensagem_ia)
             .where(

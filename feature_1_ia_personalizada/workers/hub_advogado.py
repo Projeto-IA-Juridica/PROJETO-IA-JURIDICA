@@ -99,11 +99,11 @@ def processar_mensagem_advogado(
 
 
 async def _processar(payload: dict[str, Any], usuario_id: int) -> None:
-    from shared.database.connection import async_session_factory
+    from shared.database.connection import worker_session_factory
 
     log = logger.bind(usuario_id=usuario_id)
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         # 1. Buscar e validar usuário
         usuario = await session.get(Usuario, usuario_id)
         if not usuario or not usuario.ativo or usuario.role not in ("advogado", "admin"):

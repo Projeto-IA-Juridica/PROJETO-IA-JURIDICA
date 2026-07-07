@@ -15,6 +15,7 @@ import AjudaPage        from './pages/AjudaPage'
 import OnboardingPage   from './pages/OnboardingPage'
 import type { ClientesNavRequest, Section } from './types'
 import { getAccessToken, refreshAccessToken, fetchMe, clearAuth } from './api/auth'
+import { AgendamentoStreamContext, useAgendamentoStream } from './hooks/useAgendamentoStream'
 
 /* ── Pages ── */
 import PainelPage     from './pages/PainelPage'
@@ -198,6 +199,10 @@ function Shell({ onReady }: ShellProps) {
   // Efêmero por design: não persiste em localStorage (é um comando, não estado).
   const [clientesNav, setClientesNav] = useState<ClientesNavRequest | null>(null)
 
+  // Tempo real (SSE): uma conexão por app; eventos invalidam as queries de
+  // agendamento e as páginas relaxam o polling quando conectado
+  const streamConectado = useAgendamentoStream()
+
   useEffect(() => {
     localStorage.setItem('amicus:section', section)
   }, [section])
@@ -236,6 +241,7 @@ function Shell({ onReady }: ShellProps) {
   }))
 
   return (
+    <AgendamentoStreamContext.Provider value={streamConectado}>
     <div className="flex flex-col h-screen overflow-hidden bg-am-bg">
 
       {/* Skip to content */}
@@ -299,5 +305,6 @@ function Shell({ onReady }: ShellProps) {
         <FloatingDock items={dockItems} />
       </nav>
     </div>
+    </AgendamentoStreamContext.Provider>
   )
 }

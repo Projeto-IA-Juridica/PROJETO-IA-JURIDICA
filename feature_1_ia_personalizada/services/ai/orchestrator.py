@@ -799,7 +799,7 @@ def executar_fluxo_orquestrador(
     import redis.asyncio as aioredis
 
     from shared.config.settings import settings
-    from shared.database.connection import async_session_factory
+    from shared.database.connection import worker_session_factory
 
     async def _run() -> dict[str, Any]:
         redis_client = aioredis.from_url(settings.REDIS_URL)
@@ -815,7 +815,7 @@ def executar_fluxo_orquestrador(
                     base_url=settings.EVOLUTION_API_URL,
                     api_key=settings.EVOLUTION_API_KEY,
                 ),
-                session_factory=async_session_factory,
+                session_factory=worker_session_factory,
             )
             return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo)
         finally:

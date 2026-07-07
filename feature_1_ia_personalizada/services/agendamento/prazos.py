@@ -29,8 +29,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.models.processo import Processo
 
 # Frase contendo "prazo" (ou construções "até DD/MM" comuns em intimações)
-_RE_PRAZO = re.compile(r"\bprazo\b|\bcontesta[çc][aã]o\b|\bintima[çc][aã]o\b", re.IGNORECASE)
+_RE_PRAZO = re.compile(
+    r"\bprazos?\b|\bcontesta[çc][aã]o\b|\bintima[çc][aã]o\b"
+    r"|\bmanifesta[çc][aã]o\b|\bembargos\b|\bvenc(?:e|imento)\b",
+    re.IGNORECASE,
+)
 _RE_DATA = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
+
+# Prazo relativo: "prazo de 15 dias", "no prazo de 15 (quinze) dias úteis",
+# "prazo: 5 dias corridos". CPC art. 219: prazos processuais contam em dias
+# ÚTEIS por padrão; "corridos" só quando explícito.
+_RE_PRAZO_RELATIVO = re.compile(
+    r"\bprazos?\s*(?:de|:|em)?\s*(\d{1,3})\s*(?:\([^)]{1,30}\))?\s*dias?"
+    r"(\s*[úu]teis|\s*corridos)?\b",
+    re.IGNORECASE,
+)
+_MAX_DIAS_RELATIVO = 120
 
 # Janela de sanidade: datas fora de [hoje-30, hoje+365] são descartadas
 _JANELA_PASSADO_DIAS = 30
@@ -46,6 +60,9 @@ class PrazoDetectado:
     processo_id: int
     cliente_id: int
     numero_cnj: str | None
+    # True quando a data foi CALCULADA a partir de um prazo relativo
+    # ("15 dias a contar da intimação") — exibida como aproximação (≈)
+    estimado: bool = False
 
 
 def _resolver_ano(dia: int, mes: int, ano_raw: str | None, hoje: date) -> date | None:
@@ -88,15 +105,84 @@ def extrair_prazos_do_texto(texto: str, hoje: date) -> list[tuple[date, str]]:
     return resultados
 
 
-def _textos_do_processo(processo: Processo) -> list[str]:
-    textos: list[str] = []
+def _somar_dias_uteis(base: date, n: int) -> date:
+    """Avança n dias úteis (seg–sex) a partir de base — CPC art. 219.
+
+    Aproximação: feriados não são considerados (não há calendário forense
+    no sistema); o resultado é marcado como estimado."""
+    atual = base
+    restantes = n
+    while restantes > 0:
+        atual += timedelta(days=1)
+        if atual.weekday() < 5:
+            restantes -= 1
+    return atual
+
+
+def extrair_prazos_relativos(texto: str, base: date | None, hoje: date) -> list[tuple[date, str]]:
+    """
+    Detecta prazos SEM data explícita ("prazo de 15 dias") e calcula a data
+    a partir da âncora fornecida (data do andamento). Sem âncora confiável,
+    não arrisca — retorna vazio (precisão > recall aqui: uma data errada no
+    detector de conflitos é pior que nenhuma).
+    """
+    if not texto:
+        return []
+
+    # Se o próprio texto traz uma data explícita, ela serve de âncora
+    # ("Intimação em 01/07 — prazo de 15 dias"); senão usa a data do andamento.
+    m_data = _RE_DATA.search(texto)
+    if m_data:
+        ancora = _resolver_ano(int(m_data.group(1)), int(m_data.group(2)), m_data.group(3), hoje)
+        # datas futuras não são âncora de contagem — já são o prazo em si
+        if ancora is not None and ancora > hoje:
+            ancora = base
+    else:
+        ancora = base
+    if ancora is None:
+        return []
+
+    resultados: list[tuple[date, str]] = []
+    for m in _RE_PRAZO_RELATIVO.finditer(texto):
+        n_dias = int(m.group(1))
+        if not (0 < n_dias <= _MAX_DIAS_RELATIVO):
+            continue
+        qualificador = (m.group(2) or "").strip().lower()
+        if qualificador == "corridos":
+            data_prazo = ancora + timedelta(days=n_dias)
+        else:
+            # padrão CPC: dias úteis
+            data_prazo = _somar_dias_uteis(ancora, n_dias)
+        if not (
+            hoje - timedelta(days=_JANELA_PASSADO_DIAS)
+            <= data_prazo
+            <= hoje + timedelta(days=_JANELA_FUTURO_DIAS)
+        ):
+            continue
+        descricao = texto.strip()
+        if len(descricao) > _MAX_DESCRICAO:
+            descricao = descricao[: _MAX_DESCRICAO - 1] + "…"
+        resultados.append((data_prazo, descricao))
+    return resultados
+
+
+def _textos_do_processo(processo: Processo) -> list[tuple[str, date | None]]:
+    """
+    Retorna [(texto, data_base)] — data_base é a âncora para prazos relativos.
+    Só o último andamento tem data confiável (data_ultimo_andamento); os
+    demais itens do histórico ficam sem âncora (prazo relativo é ignorado).
+    """
+    ultimo = processo.ultimo_andamento
+    data_base = processo.data_ultimo_andamento.date() if processo.data_ultimo_andamento else None
+
+    textos: list[tuple[str, date | None]] = []
     estado: dict[str, Any] | None = processo.estado_atual
     if isinstance(estado, dict):
         for item in estado.get("ultimos_andamentos", []) or []:
             if isinstance(item, str):
-                textos.append(item)
-    if processo.ultimo_andamento and processo.ultimo_andamento not in textos:
-        textos.append(processo.ultimo_andamento)
+                textos.append((item, data_base if item == ultimo else None))
+    if ultimo and all(t != ultimo for t, _ in textos):
+        textos.append((ultimo, data_base))
     return textos
 
 
@@ -123,22 +209,35 @@ async def buscar_prazos_escritorio(
 
     vistos: set[tuple[int, date]] = set()
     prazos: list[PrazoDetectado] = []
+
+    def _adicionar(proc: Processo, data_prazo: date, descricao: str, estimado: bool) -> None:
+        chave = (proc.id, data_prazo)
+        if chave in vistos:
+            return
+        vistos.add(chave)
+        prazos.append(
+            PrazoDetectado(
+                data=data_prazo,
+                descricao=descricao,
+                processo_id=proc.id,
+                cliente_id=proc.cliente_id,
+                numero_cnj=proc.numero_cnj,
+                estimado=estimado,
+            )
+        )
+
     for proc in processos:
-        for texto in _textos_do_processo(proc):
-            for data_prazo, descricao in extrair_prazos_do_texto(texto, hoje):
-                chave = (proc.id, data_prazo)
-                if chave in vistos:
-                    continue
-                vistos.add(chave)
-                prazos.append(
-                    PrazoDetectado(
-                        data=data_prazo,
-                        descricao=descricao,
-                        processo_id=proc.id,
-                        cliente_id=proc.cliente_id,
-                        numero_cnj=proc.numero_cnj,
-                    )
-                )
+        for texto, data_base in _textos_do_processo(proc):
+            # Data explícita no texto ("prazo até 10/07") — precisão máxima
+            explicitos = extrair_prazos_do_texto(texto, hoje)
+            for data_prazo, descricao in explicitos:
+                _adicionar(proc, data_prazo, descricao, estimado=False)
+            # Prazo relativo ("prazo de 15 dias") — calculado da âncora;
+            # só quando o texto não tinha data futura explícita
+            if not explicitos:
+                for data_prazo, descricao in extrair_prazos_relativos(texto, data_base, hoje):
+                    _adicionar(proc, data_prazo, descricao, estimado=True)
+
     prazos.sort(key=lambda p: p.data)
     return prazos
 
@@ -157,5 +256,6 @@ def descrever_conflito(data_local: date, prazos: list[PrazoDetectado]) -> str | 
     for p in prazos:
         if data_local in (p.data, p.data - timedelta(days=1)):
             cnj = f" (proc. {p.numero_cnj})" if p.numero_cnj else ""
-            return f"Prazo processual em {p.data.strftime('%d/%m')}{cnj}: {p.descricao}"
+            aprox = "≈ " if p.estimado else ""
+            return f"Prazo processual {aprox}em {p.data.strftime('%d/%m')}{cnj}: {p.descricao}"
     return None

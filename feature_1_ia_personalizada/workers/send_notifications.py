@@ -470,11 +470,11 @@ def processar_resposta_advogado(
     """
     from sqlalchemy import select
 
-    from shared.database.connection import async_session_factory
+    from shared.database.connection import worker_session_factory
     from shared.models.interacao import Interacao
 
     async def _processar() -> None:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             interacao_id = None
             import re
 

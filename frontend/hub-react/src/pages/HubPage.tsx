@@ -18,6 +18,7 @@ import { fetchClientes, analisarCliente } from '../api/crm'
 import { fetchProcessos }  from '../api/processos'
 import { exportarCliente, deletarClienteLGPD, criarClienteManual } from '../api/clientes'
 import { listarAgendamentos } from '../api/agendamentos'
+import { useStreamConectado } from '../hooks/useAgendamentoStream'
 import CadastroCSVPage from './CadastroCSVPage'
 import type { CRMClienteCard, ClientesNavRequest } from '../types'
 
@@ -150,12 +151,14 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
     enabled: activeId != null,
   })
 
-  // Aprovações pendentes — polling 10s sincroniza com aprovações via WhatsApp:
-  // quando o advogado responde "1" no WhatsApp, o card some no próximo ciclo.
+  // Aprovações pendentes — tempo real via SSE (card some em ms quando o
+  // advogado responde no WhatsApp); polling fica como fallback: 10s sem
+  // stream, 60s com stream conectado.
+  const streamConectado = useStreamConectado()
   const { data: pendentes } = useQuery({
     queryKey: ['agendamentos-pendentes'],
     queryFn: () => listarAgendamentos({ status: 'aguardando_advogado' }),
-    refetchInterval: 10_000,
+    refetchInterval: streamConectado ? 60_000 : 10_000,
     staleTime: 5_000,
   })
   const totalPendentes = pendentes?.length ?? 0
