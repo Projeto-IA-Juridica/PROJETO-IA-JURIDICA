@@ -615,6 +615,27 @@ async def connect_whatsapp(
                 },
             )
 
+            # 2. Configura o webhook para essa instância
+            if resp.status_code in (200, 201, 409):
+                webhook_url = f"{current_api_base}/webhook/whatsapp"
+                try:
+                    await client.post(
+                        f"{settings.EVOLUTION_API_URL}/webhook/set/{instance_name}",
+                        headers={"apikey": settings.EVOLUTION_API_KEY or ""},
+                        json={
+                            "webhook": {
+                                "enabled": True,
+                                "url": webhook_url,
+                                "webhookByEvents": False,
+                                "events": ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
+                                "headers": {"apikey": settings.EVOLUTION_API_KEY or ""}
+                            }
+                        },
+                    )
+                    logger.info("webhook_configurado", instance=instance_name, url=webhook_url)
+                except Exception as e:
+                    logger.warning("erro_ao_configurar_webhook", erro=str(e), instance=instance_name)
+
             if resp.status_code in (200, 201):
                 data = resp.json()
                 # Em algumas versões da Evolution o QR não vem no /instance/create.
