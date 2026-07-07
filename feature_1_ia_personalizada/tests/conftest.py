@@ -43,6 +43,8 @@ class _FakeStore:
         self.lists: dict[str, list] = {}
         self.strings: dict[str, str] = {}
         self.ttls: dict[str, int] = {}
+        # (canal, mensagem) publicados via pub/sub — inspecionável nos testes
+        self.published: list[tuple[str, str]] = []
 
     def _ltrim_impl(self, key: str, start: int, end: int) -> None:
         items = self.lists.get(key, [])
@@ -165,10 +167,18 @@ class FakeRedis:
                 count += 1
         return count
 
+    async def publish(self, channel: str, message: str) -> int:
+        """Pub/sub fake — registra a publicação para asserts (0 subscribers)."""
+        self._store.published.append((str(channel), str(message)))
+        return 0
+
     async def aclose(self) -> None:
         pass
 
     # Helpers de inspeção para testes
+    def _published(self) -> list[tuple[str, str]]:
+        return self._store.published
+
     def _list(self, key: str) -> list:
         return self._store.lists.get(key, [])
 

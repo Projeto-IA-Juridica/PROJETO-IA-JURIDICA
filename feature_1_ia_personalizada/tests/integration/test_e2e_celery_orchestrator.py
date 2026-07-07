@@ -15,6 +15,7 @@ _orig_wq = sys.modules.get("shared.database.worker_queries")
 
 fake_db = MagicMock()
 fake_db.async_session_factory = MagicMock()
+fake_db.worker_session_factory = MagicMock()
 sys.modules["shared.database"] = fake_db
 sys.modules["shared.database.connection"] = fake_db
 # worker_queries também precisa ser mockado: celery_app importa mensagens_relacionamento

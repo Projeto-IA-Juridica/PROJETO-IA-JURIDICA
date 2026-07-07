@@ -29,7 +29,7 @@ from feature_1_ia_personalizada.services.messaging.evolution_client import Evolu
 from feature_1_ia_personalizada.services.messaging.whatsapp import SQLWhatsAppRepository
 from feature_1_ia_personalizada.workers.celery_app import DLQTask
 from shared.config.settings import settings
-from shared.database.connection import async_session_factory
+from shared.database.connection import worker_session_factory
 from shared.models.mensagem_agendada import MensagemAgendada
 
 logger = structlog.get_logger(__name__)
@@ -62,7 +62,7 @@ async def _processar_lote() -> tuple[int, int]:
     enviadas = 0
     falhas = 0
 
-    async with async_session_factory() as session:
+    async with worker_session_factory() as session:
         # SELECT ... FOR UPDATE SKIP LOCKED — garante que workers paralelos
         # não peguem a mesma linha
         stmt = (
@@ -94,7 +94,7 @@ async def _processar_lote() -> tuple[int, int]:
                 numero = await repo.obter_numero_cliente(msg.cliente_id)
                 await evolution.enviar_texto(instancia, numero, msg.texto)
 
-                async with async_session_factory() as session:
+                async with worker_session_factory() as session:
                     await session.execute(
                         update(MensagemAgendada)
                         .where(MensagemAgendada.id == msg.id)
@@ -118,7 +118,7 @@ async def _processar_lote() -> tuple[int, int]:
                 novas_tentativas = msg.tentativas + 1
                 novo_status = "falha" if novas_tentativas >= MAX_TENTATIVAS else "pendente"
 
-                async with async_session_factory() as session:
+                async with worker_session_factory() as session:
                     await session.execute(
                         update(MensagemAgendada)
                         .where(MensagemAgendada.id == msg.id)

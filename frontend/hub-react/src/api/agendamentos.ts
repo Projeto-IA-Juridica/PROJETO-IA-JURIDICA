@@ -54,6 +54,8 @@ export interface PrazoAgenda {
   cliente_id: number | null
   cliente_nome: string | null
   numero_cnj: string | null
+  /** data calculada de prazo relativo ("15 dias úteis") — aproximação */
+  estimado?: boolean
 }
 
 export interface EventosAgenda {

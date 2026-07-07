@@ -190,6 +190,7 @@ async def _prazos_com_cache(
             cliente_id=p.cliente_id,
             cliente_nome=nomes.get(p.cliente_id),
             numero_cnj=p.numero_cnj,
+            estimado=p.estimado,
         )
         for p in prazos
     ]

@@ -3,12 +3,12 @@ PIJ-193 — Testes unitários das funções de banco em send_notifications.py.
 
 As três funções (buscar_processo_e_cliente, buscar_processos_sem_movimentacao,
 buscar_clientes_para_pesquisa) já existem em worker_queries.py com lógica real.
-Os testes cobrem o comportamento de cada uma usando mocks do async_session_factory.
+Os testes cobrem o comportamento de cada uma usando mocks do worker_session_factory.
 
 Arquitetura testada:
     send_notifications.py
         → worker_queries.py (async via asyncio.run)
-            → async_session_factory (mockado aqui)
+            → worker_session_factory (mockado aqui)
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def test_query_processo_e_cliente_retorna_tupla(monkeypatch):
     processo_orm = _make_processo(cliente=cliente_orm)
     session = _mock_session(scalar_result=processo_orm)
 
-    # Precisamos mockar o async_session_factory como gerenciador de contexto
+    # Precisamos mockar o worker_session_factory como gerenciador de contexto
     async def _fake_session_factory():
         return session
 
@@ -107,7 +107,7 @@ def test_query_processo_e_cliente_retorna_tupla(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processo_e_cliente(1)
@@ -131,7 +131,7 @@ def test_query_processo_e_cliente_retorna_none_quando_nao_existe(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processo_e_cliente(999)
@@ -149,7 +149,7 @@ def test_query_processo_e_cliente_retorna_none_sem_cliente(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processo_e_cliente(1)
@@ -175,7 +175,7 @@ def test_query_processos_sem_movimentacao_retorna_lista(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processos_sem_movimentacao()
@@ -199,7 +199,7 @@ def test_query_processos_sem_movimentacao_ignora_sem_cliente(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processos_sem_movimentacao()
@@ -216,7 +216,7 @@ def test_query_processos_sem_movimentacao_lista_vazia(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_processos_sem_movimentacao()
@@ -239,7 +239,7 @@ def test_query_clientes_para_pesquisa_retorna_clientes(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_clientes_para_pesquisa()
@@ -260,7 +260,7 @@ def test_query_clientes_para_pesquisa_lista_vazia(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_clientes_para_pesquisa()
@@ -282,7 +282,7 @@ def test_query_clientes_para_pesquisa_multiplos(monkeypatch):
     ctx.__aexit__ = AsyncMock(return_value=False)
 
     with patch(
-        "shared.database.worker_queries.async_session_factory",
+        "shared.database.worker_queries.worker_session_factory",
         return_value=ctx,
     ):
         resultado = query_clientes_para_pesquisa()

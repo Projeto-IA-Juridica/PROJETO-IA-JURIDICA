@@ -850,3 +850,205 @@ class TestGuardNPSComPropostaPendente:
 
         tratado_como_nps = await _processar_resposta_nps("1", cliente, escritorio, db_session)
         assert tratado_como_nps is False  # segue para a IA → seleção de horário
+
+
+# ---------------------------------------------------------------------------
+# Hardening — prazos relativos, eventos em tempo real e factory de worker
+# ---------------------------------------------------------------------------
+
+
+class TestPrazosRelativos:
+    def test_prazo_relativo_dias_uteis_por_padrao(self):
+        # CPC art. 219: prazos processuais contam em dias úteis.
+        # base = sexta 03/07/2026 → 15 dias úteis = 24/07/2026
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        base = date(2026, 7, 3)  # sexta-feira
+        resultado = extrair_prazos_relativos(
+            "Intimação eletrônica. Prazo de 15 dias para contestação.", base, _HOJE
+        )
+        assert len(resultado) == 1
+        assert resultado[0][0] == date(2026, 7, 24)
+        assert resultado[0][0].weekday() < 5  # nunca cai em fim de semana
+
+    def test_prazo_relativo_corridos_quando_explicito(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        base = date(2026, 7, 3)
+        resultado = extrair_prazos_relativos("prazo de 10 dias corridos", base, _HOJE)
+        assert resultado[0][0] == date(2026, 7, 13)
+
+    def test_prazo_relativo_com_extenso_entre_parenteses(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        resultado = extrair_prazos_relativos(
+            "no prazo de 5 (cinco) dias úteis", date(2026, 7, 6), _HOJE
+        )
+        assert len(resultado) == 1
+        assert resultado[0][0] == date(2026, 7, 13)  # seg 06/07 + 5 úteis
+
+    def test_data_passada_no_texto_serve_de_ancora(self):
+        # "Intimação em 01/07 — prazo de 15 dias": conta a partir de 01/07,
+        # não da data do andamento
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        resultado = extrair_prazos_relativos(
+            "Intimação em 01/07. Prazo de 15 dias.", date(2026, 6, 20), _HOJE
+        )
+        assert len(resultado) == 1
+        assert resultado[0][0] == date(2026, 7, 22)  # qua 01/07 + 15 úteis
+
+    def test_sem_ancora_nao_arrisca(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        assert extrair_prazos_relativos("prazo de 15 dias", None, _HOJE) == []
+
+    def test_dias_absurdos_ignorados(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            extrair_prazos_relativos,
+        )
+
+        assert extrair_prazos_relativos("prazo de 500 dias", date(2026, 7, 6), _HOJE) == []
+
+    @pytest.mark.asyncio
+    async def test_busca_integra_relativos_com_flag_estimado(
+        self, db_session, escritorio_factory, cliente_factory
+    ):
+        from datetime import datetime as dt
+
+        from feature_1_ia_personalizada.services.agendamento.prazos import (
+            buscar_prazos_escritorio,
+        )
+        from shared.models.processo import Processo
+
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        db_session.add(
+            Processo(
+                escritorio_id=escritorio.id,
+                cliente_id=cliente.id,
+                numero_cnj="0001234-56.2026.8.26.0100",
+                status="ativo",
+                ultimo_andamento="Publicada sentença. Prazo de 15 dias para recurso.",
+                data_ultimo_andamento=dt(2026, 7, 3, 12, 0),
+                estado_atual={
+                    "ultimos_andamentos": [
+                        "Distribuído por sorteio",  # sem prazo
+                        "Publicada sentença. Prazo de 15 dias para recurso.",
+                    ]
+                },
+            )
+        )
+        await db_session.commit()
+
+        prazos = await buscar_prazos_escritorio(
+            db_session, escritorio.id, cliente_id=cliente.id, hoje=_HOJE
+        )
+        assert len(prazos) == 1
+        assert prazos[0].estimado is True
+        assert prazos[0].data == date(2026, 7, 24)  # sex 03/07 + 15 úteis
+
+    def test_explicito_continua_sem_flag(self):
+        # comportamento antigo preservado: data explícita não é "estimado"
+        resultado = extrair_prazos_do_texto("Prazo para contestação até 10/07", _HOJE)
+        assert resultado[0][0] == date(2026, 7, 10)
+
+
+@pytest.mark.asyncio
+class TestEventosTempoReal:
+    async def test_selecao_do_cliente_publica_evento(
+        self, db_session, escritorio_factory, cliente_factory, fake_redis
+    ):
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        db_session.add(_nova_proposta(escritorio.id, cliente.id))
+        await db_session.commit()
+
+        notifier = AgendamentoNotifier(db_session, _evolution_mock(), redis=fake_redis)  # type: ignore[arg-type]
+        resposta = await notifier.processar_resposta_cliente(escritorio.id, cliente.id, "1")
+
+        assert resposta is not None
+        publicados = fake_redis._published()
+        assert (f"agendamento_ev:{escritorio.id}", "changed") in publicados
+
+    async def test_confirmacao_do_advogado_publica_evento(
+        self, db_session, escritorio_factory, cliente_factory, fake_redis
+    ):
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        db_session.add(_pendente_aprovacao(escritorio.id, cliente.id))
+        await db_session.commit()
+
+        notifier = AgendamentoNotifier(db_session, _evolution_mock(), redis=fake_redis)  # type: ignore[arg-type]
+        resultado = await notifier.processar_resposta_advogado("1", escritorio.id)
+
+        assert resultado["status"] == "confirmado"
+        assert (f"agendamento_ev:{escritorio.id}", "changed") in fake_redis._published()
+
+    async def test_publicacao_sem_redis_nao_quebra(self):
+        from feature_1_ia_personalizada.services.agendamento.eventos import (
+            publicar_evento_agendamento,
+        )
+
+        await publicar_evento_agendamento(None, 1)  # não levanta
+
+    async def test_publicacao_com_redis_quebrado_nao_propaga(self):
+        from feature_1_ia_personalizada.services.agendamento.eventos import (
+            publicar_evento_agendamento,
+        )
+
+        class RedisQuebrado:
+            async def publish(self, *a):
+                raise ConnectionError("down")
+
+        await publicar_evento_agendamento(RedisQuebrado(), 1)  # não levanta
+
+
+class TestWorkerSessionFactory:
+    def test_engine_de_worker_usa_nullpool(self):
+        """NullPool = nenhuma conexão sobrevive entre event loops (asyncio.run)."""
+        from sqlalchemy.pool import NullPool
+
+        from shared.database.connection import worker_engine
+
+        assert isinstance(worker_engine.pool, NullPool)
+
+    def test_engine_da_api_mantem_pool(self):
+        from sqlalchemy.pool import NullPool
+
+        from shared.database.connection import engine
+
+        assert not isinstance(engine.pool, NullPool)
+
+    def test_workers_nao_usam_mais_factory_da_api(self):
+        """Nenhum worker/serviço de worker deve importar a factory pooled da API."""
+        import pathlib
+
+        alvos = [
+            "feature_1_ia_personalizada/workers",
+            "feature_1_ia_personalizada/services/messaging/whatsapp.py",
+            "feature_1_ia_personalizada/services/ai/processo_state.py",
+            "shared/database/worker_queries.py",
+        ]
+        raiz = pathlib.Path(__file__).resolve().parents[3]
+        for alvo in alvos:
+            caminho = raiz / alvo
+            arquivos = caminho.rglob("*.py") if caminho.is_dir() else [caminho]
+            for arq in arquivos:
+                conteudo = arq.read_text(encoding="utf-8", errors="replace")
+                assert (
+                    "import async_session_factory" not in conteudo
+                ), f"{arq} ainda usa a factory pooled da API em contexto de worker"

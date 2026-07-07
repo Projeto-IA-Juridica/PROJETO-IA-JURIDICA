@@ -107,6 +107,9 @@ class PrazoAgendaItem(BaseModel):
     cliente_id: int | None = None
     cliente_nome: str | None = None
     numero_cnj: str | None = None
+    # Data calculada a partir de prazo relativo ("prazo de 15 dias úteis") —
+    # aproximação exibida com ≈ no frontend
+    estimado: bool = False
 
 
 class EventosAgendaResponse(BaseModel):

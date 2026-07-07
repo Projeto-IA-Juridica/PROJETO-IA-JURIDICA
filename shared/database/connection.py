@@ -52,6 +52,39 @@ async_session_factory = async_sessionmaker(
 )
 
 
+# =====================================================================
+# WORKER SESSION FACTORY (global): sessões seguras para Celery.
+#
+# Tasks Celery rodam corrotinas com asyncio.run(), que cria um event loop
+# NOVO por execução. Conexões asyncpg ficam amarradas ao loop em que
+# nasceram — reaproveitar o pool da API entre loops gera
+# "Future attached to a different loop".
+#
+# NullPool resolve na raiz: nenhuma conexão sobrevive entre usos, então
+# nenhuma cruza event loops. A engine em si é apenas configuração
+# (thread/loop-safe) — não precisa de dispose por task.
+# Em Supabase, usa transaction mode (porta 6543), que suporta centenas de
+# conexões curtas; prepared statements desabilitados (exigência PgBouncer).
+# =====================================================================
+_worker_url = db_url
+_worker_connect_args: dict[str, Any] = dict(connect_args)
+if "supabase.com" in _worker_url:
+    _worker_url = _worker_url.replace(":5432/", ":6543/")
+    _worker_connect_args["prepared_statement_cache_size"] = 0
+
+worker_engine = create_async_engine(
+    _worker_url,
+    connect_args=_worker_connect_args,
+    poolclass=NullPool,
+)
+
+worker_session_factory = async_sessionmaker(
+    bind=worker_engine,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
+
 def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     """
     Cria engine + session factory frescos para uso em Celery workers.

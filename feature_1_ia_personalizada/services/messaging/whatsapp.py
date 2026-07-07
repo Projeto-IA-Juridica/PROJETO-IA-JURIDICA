@@ -9,7 +9,7 @@ import structlog
 from prometheus_client import Counter
 from sqlalchemy import func, select
 
-from shared.database.connection import async_session_factory
+from shared.database.connection import worker_session_factory
 from shared.models.cliente import Cliente
 from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
@@ -259,7 +259,7 @@ class WhatsAppService:
 
     async def _obter_contexto_processo(self, processo_id: int) -> tuple[int, int] | None:
         """Retorna (escritorio_id, cliente_id) do processo, ou None se não encontrado."""
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             result = await session.execute(
                 select(ProcessoModel.escritorio_id, ProcessoModel.cliente_id).where(
                     ProcessoModel.id == processo_id
@@ -286,7 +286,7 @@ class WhatsAppService:
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
 
     async def enviar_boas_vindas(self, escritorio_id: int, cliente_id: int) -> dict[str, Any]:
-        async with async_session_factory() as db:
+        async with worker_session_factory() as db:
             tmpl = await carregar_templates(escritorio_id, db=db)
         texto = tmpl["boas_vindas"]
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=None)
@@ -338,7 +338,7 @@ class WhatsAppService:
         if contexto is None:
             return {"ok": False, "erro": "processo_nao_encontrado"}
         escritorio_id, cliente_id = contexto
-        async with async_session_factory() as db:
+        async with worker_session_factory() as db:
             tmpl = await carregar_templates(escritorio_id, db=db)
         texto = tmpl["sem_novidade"]
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=processo_id)
@@ -358,7 +358,7 @@ class SQLWhatsAppRepository:
     """Implementa as rotinas de banco de dados para os envios de mensagens."""
 
     async def obter_instancia_por_escritorio(self, escritorio_id: int) -> str:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             result = await session.execute(
                 select(Escritorio.webhook_whatsapp_instance).where(Escritorio.id == escritorio_id)
             )
@@ -370,7 +370,7 @@ class SQLWhatsAppRepository:
         return str(val)
 
     async def obter_numero_cliente(self, cliente_id: int) -> str:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             result = await session.execute(
                 select(Cliente.telefone_whatsapp).where(Cliente.id == cliente_id)
             )
@@ -380,7 +380,7 @@ class SQLWhatsAppRepository:
         return str(val)
 
     async def obter_preferencia_horario_notificacao(self, cliente_id: int) -> str:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             result = await session.execute(
                 select(Cliente.preferencia_horario_notificacao).where(Cliente.id == cliente_id)
             )
@@ -389,7 +389,7 @@ class SQLWhatsAppRepository:
 
     async def contar_mensagens_enviadas_hoje(self, cliente_id: int) -> int:
         hj = datetime.now().date()
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             result = await session.execute(
                 select(func.count(Interacao.id)).where(
                     Interacao.cliente_id == cliente_id,
@@ -416,7 +416,7 @@ class SQLWhatsAppRepository:
         if metadata_extra:
             metadata.update(metadata_extra)
 
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             interacao = Interacao(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,
@@ -438,7 +438,7 @@ class SQLWhatsAppRepository:
         enviar_em: datetime,
         motivo: str,
     ) -> None:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             agendada = MensagemAgendada(
                 escritorio_id=escritorio_id,
                 cliente_id=cliente_id,

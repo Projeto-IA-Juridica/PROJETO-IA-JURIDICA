@@ -59,7 +59,7 @@ async def test_obter_contexto_processo_retorna_tupla(service: WhatsAppService):
     ctx = _mock_session_ctx(row=row)
 
     with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+        "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
         return_value=ctx,
     ):
         resultado = await service._obter_contexto_processo(processo_id=1)
@@ -77,7 +77,7 @@ async def test_obter_contexto_processo_ids_corretos(service: WhatsAppService):
     ctx = _mock_session_ctx(row=row)
 
     with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+        "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
         return_value=ctx,
     ):
         resultado = await service._obter_contexto_processo(10)
@@ -101,7 +101,7 @@ async def test_obter_contexto_processo_retorna_none_quando_nao_existe(
     ctx = _mock_session_ctx(row=None)
 
     with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+        "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
         return_value=ctx,
     ):
         resultado = await service._obter_contexto_processo(processo_id=999)
@@ -122,7 +122,7 @@ async def test_enviar_notificacao_andamento_retorna_erro_processo_nao_encontrado
     ctx = _mock_session_ctx(row=None)
 
     with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+        "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
         return_value=ctx,
     ):
         resultado = await service.enviar_notificacao_andamento(
@@ -146,7 +146,7 @@ async def test_enviar_notificacao_andamento_delega_para_enviar_mensagem(
 
     with (
         patch(
-            "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+            "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
             return_value=ctx,
         ),
         patch.object(
@@ -182,7 +182,7 @@ async def test_enviar_sem_movimentacao_retorna_erro_processo_nao_encontrado(
     ctx = _mock_session_ctx(row=None)
 
     with patch(
-        "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+        "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
         return_value=ctx,
     ):
         resultado = await service.enviar_sem_movimentacao(processo_id=404)
@@ -206,7 +206,7 @@ async def test_enviar_sem_movimentacao_texto_correto(service: WhatsAppService):
 
     with (
         patch(
-            "feature_1_ia_personalizada.services.messaging.whatsapp.async_session_factory",
+            "feature_1_ia_personalizada.services.messaging.whatsapp.worker_session_factory",
             return_value=ctx,
         ),
         patch.object(

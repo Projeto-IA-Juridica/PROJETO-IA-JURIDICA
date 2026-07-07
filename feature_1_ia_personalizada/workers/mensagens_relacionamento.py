@@ -589,14 +589,14 @@ def verificar_escalacoes_pendentes(self: Any) -> dict[str, Any]:
 
     from sqlalchemy import select
 
-    from shared.database.connection import async_session_factory
+    from shared.database.connection import worker_session_factory
     from shared.models.interacao import Interacao
     from shared.models.usuario import Usuario
 
     agora = agora_local()
 
     async def _processar() -> dict[str, Any]:
-        async with async_session_factory() as session:
+        async with worker_session_factory() as session:
             stmt = (
                 select(Interacao)
                 .where(

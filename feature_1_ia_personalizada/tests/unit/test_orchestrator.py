@@ -1161,6 +1161,7 @@ class TestExecutarFluxoOrquestrador:
         """
         fake_db = MagicMock()
         fake_db.async_session_factory = MagicMock()
+        fake_db.worker_session_factory = MagicMock()
         with patch.dict(
             sys.modules,
             {

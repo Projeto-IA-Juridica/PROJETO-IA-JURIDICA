@@ -480,8 +480,10 @@ Banner fixo no topo quando há pendentes na semana. Empty states com link para C
 | Cliente tem **NPS pendente E proposta de horários** e responde "1" | Seleção de horário tem prioridade; NPS não captura a mensagem |
 | Advogado com **várias solicitações** responde "1" no WhatsApp | Ack informa qual foi confirmada + mostra a próxima da fila (dá para despachar tudo por WhatsApp) |
 | Reunião **remarcada** (sugerir → reconfirmar) | Flags de confirmação/pré-reunião são resetadas — cliente recebe confirmação e lembretes da NOVA data; dedup do lembrete 24h inclui a data |
-| Workers Celery + asyncio.run | `create_worker_session_factory()` (NullPool + dispose) — evita "Future attached to a different loop" |
+| Workers Celery + asyncio.run | `worker_session_factory` global (NullPool) em **todos** os workers e serviços de worker (agendamento, dispatcher, relacionamento, hub_advogado, orchestrator, whatsapp service, worker_queries, processo_state) — elimina "Future attached to a different loop" na raiz |
 | Polling da Agenda (15s) | Varredura de prazos cacheada no Redis por 2 min (`agenda_prazos:{eid}`) |
+| **Prazos relativos** ("prazo de 15 dias úteis") | Calculados em dias úteis (CPC art. 219; "corridos" quando explícito) a partir da âncora — data no próprio texto ou `data_ultimo_andamento`. Sem âncora confiável, não arrisca. Datas calculadas levam `estimado=true` e aparecem com **≈** na Agenda |
+| **Tempo real (SSE)** | `GET /agendamentos/stream` (Redis pub/sub, canal `agendamento_ev:{eid}`): toda transição de estado publica evento; o frontend invalida as queries — card some em milissegundos. Polling vira fallback (10→60s pendentes, 15→60s agenda com stream conectado). Publicação é best-effort: Redis fora nunca quebra uma confirmação |
 
 ### 🧪 Testes
 

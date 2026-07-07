@@ -54,18 +54,14 @@ def _criar_redis() -> Any:
 async def _sessao_worker() -> AsyncGenerator[AsyncSession, None]:
     """
     Sessão async segura para Celery: asyncio.run() cria um event loop novo a
-    cada task, então NÃO se pode reaproveitar o pool global (conexões ficam
-    presas ao loop anterior → "Future attached to a different loop").
-    create_worker_session_factory usa NullPool + engine descartada no fim.
+    cada task, e conexões asyncpg não podem cruzar loops. A factory global de
+    worker usa NullPool — nenhuma conexão sobrevive entre usos, sem precisar
+    de engine/dispose por task.
     """
-    from shared.database.connection import create_worker_session_factory
+    from shared.database.connection import worker_session_factory
 
-    factory, engine = create_worker_session_factory()
-    try:
-        async with factory() as session:
-            yield session
-    finally:
-        await engine.dispose()
+    async with worker_session_factory() as session:
+        yield session
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +209,23 @@ def expirar_propostas(self: Any) -> dict[str, Any]:
             return expirados
 
     expirados = asyncio.run(_run())
+
+    # Tempo real: avisa os escritórios afetados (cards/agenda atualizam na hora)
+    if expirados:
+
+        async def _publicar() -> None:
+            from feature_1_ia_personalizada.services.agendamento.eventos import (
+                publicar_evento_agendamento,
+            )
+
+            redis_client = _criar_redis()
+            try:
+                for eid in {e for _, e in expirados}:
+                    await publicar_evento_agendamento(redis_client, eid)
+            finally:
+                await redis_client.aclose()
+
+        asyncio.run(_publicar())
 
     try:
         from feature_1_ia_personalizada.api.routes.metrics import agendamentos_expirados_total

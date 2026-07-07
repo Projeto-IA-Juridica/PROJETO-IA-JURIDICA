@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Calendar, Clock } from 'lucide-react'
 import { listarAgendamentos, type Agendamento } from '../../api/agendamentos'
+import { useStreamConectado } from '../../hooks/useAgendamentoStream'
 
 function labelDia(iso: string): string {
   const d = new Date(iso)
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function ProximasReunioes({ onVerAgenda, onVerPendentes }: Props) {
+  const streamConectado = useStreamConectado()
   const { data: confirmadas } = useQuery({
     queryKey: ['agendamentos-proximas'],
     queryFn: () => listarAgendamentos({
@@ -29,14 +31,14 @@ export default function ProximasReunioes({ onVerAgenda, onVerPendentes }: Props)
       page_size: 50,
     }),
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: streamConectado ? 120_000 : 60_000,
   })
 
   const { data: pendentes } = useQuery({
     queryKey: ['agendamentos-pendentes'],
     queryFn: () => listarAgendamentos({ status: 'aguardando_advogado' }),
     staleTime: 10_000,
-    refetchInterval: 30_000,
+    refetchInterval: streamConectado ? 60_000 : 30_000,
   })
 
   const proximas: Agendamento[] = (confirmadas ?? [])

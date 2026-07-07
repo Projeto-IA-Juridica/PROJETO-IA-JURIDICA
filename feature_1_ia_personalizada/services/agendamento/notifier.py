@@ -32,6 +32,9 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from feature_1_ia_personalizada.services.agendamento.eventos import (
+    publicar_evento_agendamento,
+)
 from feature_1_ia_personalizada.services.messaging.evolution_client import EvolutionClient
 from shared.models.agendamento import Agendamento
 from shared.models.cliente import Cliente
@@ -515,6 +518,7 @@ class AgendamentoNotifier:
                 ag.data_hora_inicio = datetime.fromisoformat(opcao["inicio"])
                 ag.data_hora_fim = datetime.fromisoformat(opcao["fim"])
                 await self._db.commit()
+                await publicar_evento_agendamento(self._redis, ag.escritorio_id)
 
                 _registrar_confirmacao_metricas(ag, agora)
 
@@ -540,6 +544,7 @@ class AgendamentoNotifier:
             ag.resposta_advogado_em = datetime.now(UTC)
             ag.motivo_cancelamento = "Recusado pelo advogado via WhatsApp"
             await self._db.commit()
+            await publicar_evento_agendamento(self._redis, ag.escritorio_id)
 
             await self.enviar_cancelamento(ag)
             await self._enviar(
@@ -682,6 +687,7 @@ class AgendamentoNotifier:
         ag.data_hora_inicio = inicio
         ag.data_hora_fim = fim
         await self._db.commit()
+        await publicar_evento_agendamento(self._redis, ag.escritorio_id)
 
         conflito = None
         if opcao.get("conflito_prazo"):
@@ -791,6 +797,7 @@ class AgendamentoNotifier:
         ag.whatsapp_confirmacao_cliente_enviado = False
         ag.whatsapp_confirmacao_pre_reuniao_enviado = False
         await self._db.commit()
+        await publicar_evento_agendamento(self._redis, ag.escritorio_id)
 
         linhas = "\n".join(
             f"{_EMOJIS_OPCAO[i]}  {op['label']}" for i, op in enumerate(ag.opcoes_propostas[:3])
