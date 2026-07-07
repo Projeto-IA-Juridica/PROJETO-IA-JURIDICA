@@ -134,6 +134,19 @@ async def receive_message(
     if not telefone_digitos:
         return {"status": "ignored", "reason": "Invalid phone format"}
 
+    def _variacoes_telefone(digitos: str) -> list[str]:
+        d = digitos
+        if d.startswith("55") and len(d) >= 12:
+            d = d[2:]
+        res = [digitos]
+        if len(d) == 10:
+            res.extend([f"55{d[:2]}{d[2:]}", f"55{d[:2]}9{d[2:]}"])
+        elif len(d) == 11 and d[2] == "9":
+            res.extend([f"55{d[:2]}{d[3:]}", f"55{d[:2]}9{d[3:]}"])
+        return list(set(res))
+
+    variacoes_tel = _variacoes_telefone(telefone_digitos)
+
     # Idempotência: impede reprocessamento de duplicatas enviadas pela Evolution em alta carga.
     # A Evolution pode reenviar o mesmo webhook se não receber 200 dentro do timeout.
     # Usamos o message_id (único por mensagem WhatsApp) como chave com TTL de 5 min.
@@ -233,7 +246,7 @@ async def receive_message(
 
     # 2. Puxar o Cliente correspondente a esse telefone dentro do escritório
     stmt_cli = select(Cliente).where(
-        Cliente.telefone_whatsapp == telefone_digitos,
+        Cliente.telefone_whatsapp.in_(variacoes_tel),
         Cliente.escritorio_id == escritorio.id,
     )
     cliente = (await db.execute(stmt_cli)).scalars().first()
@@ -243,7 +256,7 @@ async def receive_message(
         from shared.models.usuario import Usuario
 
         stmt_adv = select(Usuario).where(
-            Usuario.whatsapp_numero == telefone_digitos,
+            Usuario.whatsapp_numero.in_(variacoes_tel),
             Usuario.escritorio_id == escritorio.id,
             Usuario.ativo.is_(True),
             Usuario.escalacao_ativa.is_(True),
