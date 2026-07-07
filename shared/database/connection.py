@@ -71,9 +71,9 @@ _worker_connect_args: dict[str, Any] = dict(connect_args)
 if "supabase.com" in _worker_url:
     _worker_url = _worker_url.replace(":5432/", ":6543/")
     if "?" in _worker_url:
-        _worker_url += "&prepared_statement_cache_size=0"
+        _worker_url += "&prepared_statement_cache_size=0&statement_cache_size=0"
     else:
-        _worker_url += "?prepared_statement_cache_size=0"
+        _worker_url += "?prepared_statement_cache_size=0&statement_cache_size=0"
 
 worker_engine = create_async_engine(
     _worker_url,
@@ -105,9 +105,9 @@ def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     if "supabase.com" in worker_url:
         worker_url = worker_url.replace(":5432/", ":6543/")
         if "?" in worker_url:
-            worker_url += "&prepared_statement_cache_size=0"
+            worker_url += "&prepared_statement_cache_size=0&statement_cache_size=0"
         else:
-            worker_url += "?prepared_statement_cache_size=0"
+            worker_url += "?prepared_statement_cache_size=0&statement_cache_size=0"
 
     worker_engine = create_async_engine(
         worker_url,
