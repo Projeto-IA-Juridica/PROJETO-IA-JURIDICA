@@ -135,6 +135,10 @@ def enviar_mensagens_pos_acao(self: Any, agendamento_id: int, acao: str) -> dict
     """
 
     async def _run() -> str:
+        from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+            remover_evento_agendamento,
+            sincronizar_confirmacao,
+        )
         from feature_1_ia_personalizada.services.agendamento.notifier import AgendamentoNotifier
 
         evolution = _criar_evolution()
@@ -151,17 +155,22 @@ def enviar_mensagens_pos_acao(self: Any, agendamento_id: int, acao: str) -> dict
                     if ag.status != "confirmado":
                         return f"status_divergente:{ag.status}"
                     enviado = await notifier.enviar_confirmacao_cliente(ag)
+                    # Google Calendar: evento na agenda do escritório (best-effort)
+                    await sincronizar_confirmacao(session, ag)
                     return "enviado" if enviado else "ja_enviado_ou_falha"
 
                 if acao == "proposta":
                     if ag.status != "aguardando_cliente":
                         return f"status_divergente:{ag.status}"
+                    # Remarcação: o evento antigo sai da agenda externa
+                    await remover_evento_agendamento(session, ag)
                     enviado = await notifier.enviar_proposta_cliente(ag, reproposta=True)
                     return "enviado" if enviado else "ja_enviado_ou_falha"
 
                 if acao == "cancelado":
                     if ag.status != "cancelado":
                         return f"status_divergente:{ag.status}"
+                    await remover_evento_agendamento(session, ag)
                     dedup = f"agendamento_cancelamento_enviado:{ag.id}"
                     if not await redis_client.set(dedup, "1", ex=_LEMBRETE_DEDUP_TTL_S, nx=True):
                         return "ja_enviado"

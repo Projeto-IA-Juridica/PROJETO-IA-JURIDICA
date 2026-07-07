@@ -5,6 +5,7 @@ import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
 import { fetchMe, logout } from '../api/auth'
 import HorariosAtendimento from '../components/agendamento/HorariosAtendimento'
+import GoogleCalendarSection from '../components/agendamento/GoogleCalendarSection'
 import { fetchMetricasHub } from '../api/hub'
 import {
   getBillingStatus,
@@ -516,6 +517,9 @@ export default function ConfigPage() {
 
           {/* Agendamento Inteligente — grade semanal + telefone do advogado */}
           <HorariosAtendimento />
+
+          {/* Agendamento Inteligente — sincronização com Google Calendar */}
+          <GoogleCalendarSection />
 
           {/* Templates */}
           <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">

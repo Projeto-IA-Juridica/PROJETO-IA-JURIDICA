@@ -799,10 +799,15 @@ def executar_fluxo_orquestrador(
     import redis.asyncio as aioredis
 
     from shared.config.settings import settings
-    from shared.database.connection import worker_session_factory
+    from shared.database.connection import create_worker_session_factory
 
     async def _run() -> dict[str, Any]:
         redis_client = aioredis.from_url(settings.REDIS_URL)
+        # Hot path: uma mensagem dispara várias queries no MESMO event loop.
+        # Engine pooled por task reusa a conexão dentro da task (evita o custo
+        # de reconectar por query do NullPool); o dispose no finally garante
+        # que nada sobrevive para o loop da próxima task.
+        session_factory, task_engine = create_worker_session_factory(pooled=True)
         assert settings.EVOLUTION_API_URL and settings.EVOLUTION_API_KEY
         try:
             orchestrador = ConversationOrchestrator(
@@ -815,10 +820,11 @@ def executar_fluxo_orquestrador(
                     base_url=settings.EVOLUTION_API_URL,
                     api_key=settings.EVOLUTION_API_KEY,
                 ),
-                session_factory=worker_session_factory,
+                session_factory=session_factory,
             )
             return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo)
         finally:
+            await task_engine.dispose()
             await redis_client.close()
 
     return asyncio.run(_run())

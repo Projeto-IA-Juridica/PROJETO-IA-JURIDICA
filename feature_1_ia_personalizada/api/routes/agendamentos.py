@@ -437,8 +437,24 @@ async def sugerir_novos_horarios(
 
         # Prazos do cliente entram como dias a evitar nas novas opções
         prazos = await buscar_prazos_escritorio(db, eid, cliente_id=ag.cliente_id)
+
+        # Agenda externa (Google Calendar) — best-effort
+        from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+            obter_ocupados_google,
+        )
+
+        escritorio_obj = await db.get(Escritorio, eid)
+        agora_utc = datetime.now(UTC)
+        ocupados = (
+            await obter_ocupados_google(escritorio_obj, agora_utc, agora_utc + timedelta(days=31))
+            if escritorio_obj
+            else []
+        )
+
         detector = AgendamentoDetector(db=db, escritorio_id=eid, timezone_str=tz_str)
-        slots = await detector.buscar_slots(num_slots=3, datas_evitar=datas_a_evitar(prazos))
+        slots = await detector.buscar_slots(
+            num_slots=3, datas_evitar=datas_a_evitar(prazos), ocupados_externos=ocupados
+        )
 
         if not slots:
             raise HTTPException(
