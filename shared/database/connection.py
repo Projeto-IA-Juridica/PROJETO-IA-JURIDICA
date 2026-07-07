@@ -14,19 +14,32 @@ from sqlalchemy.pool import NullPool
 
 from shared.config.settings import settings
 
-# ⚠️ O SQLAlchemy + asyncpg exige que a URL comece com "postgresql+asyncpg://"
-# Caso a variável de ambiente não inclua "+asyncpg", fazemos o replace garantindo
-# que o driver correto seja usado.
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
 db_url = settings.DATABASE_URL
 if not db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+# Remover parâmetros não suportados nativamente pelo asyncpg
+# (ex: schema, pgbouncer) que podem causar TypeError: unexpected keyword argument.
+_parsed = urlparse(db_url)
+_query = dict(parse_qsl(_parsed.query))
+for k in ["schema", "pgbouncer"]:
+    _query.pop(k, None)
+
+# Desativar cache de statements globalmente para compatibilidade com PgBouncer (Supabase)
+if "supabase." in db_url:
+    _query["prepared_statement_cache_size"] = "0"
+
+db_url = urlunparse(_parsed._replace(query=urlencode(_query)))
 
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
 connect_args: dict[str, Any] = {}
-if "supabase.com" in db_url:
+if "supabase.com" in db_url or "supabase.co" in db_url:
     connect_args["ssl"] = "require"
+    connect_args["statement_cache_size"] = 0
 
 # Limita o pool a 1 conexão por worker para evitar estourar limites
 # de PgBouncer em provedores durante deploys Blue/Green.
@@ -68,12 +81,8 @@ async_session_factory = async_sessionmaker(
 # =====================================================================
 _worker_url = db_url
 _worker_connect_args: dict[str, Any] = dict(connect_args)
-if "supabase.com" in _worker_url:
+if "supabase." in _worker_url:
     _worker_url = _worker_url.replace(":5432/", ":6543/")
-    if "?" in _worker_url:
-        _worker_url += "&prepared_statement_cache_size=0&statement_cache_size=0"
-    else:
-        _worker_url += "?prepared_statement_cache_size=0&statement_cache_size=0"
 
 worker_engine = create_async_engine(
     _worker_url,
@@ -102,12 +111,8 @@ def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     worker_url = db_url
     worker_connect_args = dict(connect_args)
 
-    if "supabase.com" in worker_url:
+    if "supabase." in worker_url:
         worker_url = worker_url.replace(":5432/", ":6543/")
-        if "?" in worker_url:
-            worker_url += "&prepared_statement_cache_size=0&statement_cache_size=0"
-        else:
-            worker_url += "?prepared_statement_cache_size=0&statement_cache_size=0"
 
     worker_engine = create_async_engine(
         worker_url,
