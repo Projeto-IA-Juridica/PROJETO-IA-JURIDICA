@@ -36,3 +36,7 @@ export async function exportarCliente(clienteId: number): Promise<void> {
 export async function deletarClienteLGPD(clienteId: number): Promise<void> {
   await api.delete(`/clientes/${clienteId}`)
 }
+
+export async function atualizarCliente(clienteId: number, payload: { nome?: string, telefone_whatsapp?: string }): Promise<void> {
+  await api.put(`/clientes/${clienteId}`, payload)
+}

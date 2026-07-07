@@ -110,8 +110,9 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
     onSuccess: () => { setAnalisandoId(null); qc.invalidateQueries({ queryKey: ['clientes'] }) },
     onError: (e: unknown, clienteId) => {
       setAnalisandoId(null)
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Erro ao analisar'
-      setErroId({ id: clienteId, msg })
+      let msg: any = (e as any)?.response?.data?.detail ?? 'Erro ao analisar'
+      if (Array.isArray(msg)) msg = msg.map((m: any) => m.msg).join(', ')
+      setErroId({ id: clienteId, msg: String(msg) })
       setTimeout(() => setErroId(null), 5000)
     },
   })
@@ -134,8 +135,9 @@ export default function HubPage({ activeId, onSelect, onBack, navRequest, onGoCo
       }, 2200)
     },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Erro ao cadastrar cliente'
-      setNovoErro(msg)
+      let msg: any = (e as any)?.response?.data?.detail ?? 'Erro ao cadastrar cliente'
+      if (Array.isArray(msg)) msg = msg.map((m: any) => m.msg).join(', ')
+      setNovoErro(String(msg))
     },
   })
 

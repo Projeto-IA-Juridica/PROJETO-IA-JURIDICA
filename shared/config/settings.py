@@ -189,8 +189,10 @@ class Settings(BaseSettings):
     @classmethod
     def fix_redis_ssl_cert_reqs(cls, v: str) -> str:
         """Corrige a flag de SSL do Redis vinda de provedores como Railway."""
-        if isinstance(v, str) and "CERT_NONE" in v:
-            return v.replace("CERT_NONE", "none")
+        if isinstance(v, str):
+            v = v.strip()
+            if "CERT_NONE" in v:
+                return v.replace("CERT_NONE", "none")
         return v
 
     @field_validator("JWT_SECRET_KEY")

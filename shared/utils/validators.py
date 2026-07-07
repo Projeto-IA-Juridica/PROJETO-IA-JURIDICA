@@ -142,9 +142,8 @@ def normalizar_numero_processo(numero: str) -> str:
 # Telefone WhatsApp
 # ---------------------------------------------------------------------------
 
-# Formato: 55 + DDD (2 dígitos, começa com 1-9) + 9 obrigatório + 8 dígitos = 13 total
-# Fixo (8 dígitos sem o 9) é rejeitado — WhatsApp só funciona em celular
-_TEL_WPP_REGEX = re.compile(r"^55[1-9]\d9\d{8}$")
+# Formato: 55 + DDD (2 dígitos) + 9 (opcional) + 8 dígitos = 12 ou 13 dígitos
+_TEL_WPP_REGEX = re.compile(r"^55[1-9]\d9?\d{8}$")
 
 
 def validar_telefone_whatsapp(telefone: str) -> bool:
