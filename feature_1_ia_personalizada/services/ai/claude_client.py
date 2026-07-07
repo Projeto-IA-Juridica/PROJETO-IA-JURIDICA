@@ -253,7 +253,6 @@ class ClaudeClient:
             return await self._client.messages.create(
                 model=MODELO_CLAUDE,
                 max_tokens=MAX_TOKENS_RESPOSTA,
-                temperature=TEMPERATURA_CLAUDE,
                 system=system_blocks,  # type: ignore[arg-type]
                 messages=messages,
             )
@@ -295,7 +294,6 @@ class ClaudeClient:
             return await self._client.messages.create(
                 model=modelo,
                 max_tokens=max_tokens,
-                temperature=temperature,
                 system=system_blocks,  # type: ignore[arg-type]
                 messages=[{"role": "user", "content": mensagem}],
             )
@@ -329,7 +327,6 @@ class ClaudeClient:
             return await self._client.messages.create(
                 model=MODELO_CLAUDE,
                 max_tokens=32,
-                temperature=0.0,
                 system=system_blocks,  # type: ignore[arg-type]
                 messages=[{"role": "user", "content": mensagem}],
             )
