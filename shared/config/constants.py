@@ -36,7 +36,7 @@ NAO_PODE_FAZER: Final[list[str]] = [
 
 MAX_TOKENS_RESPOSTA: Final[int] = 1024
 TEMPERATURA_CLAUDE: Final[float] = 0.3
-MODELO_CLAUDE: Final[str] = "claude-sonnet-4-20250514"
+MODELO_CLAUDE: Final[str] = "claude-sonnet-5"
 
 
 # 4) Cache e retenção
