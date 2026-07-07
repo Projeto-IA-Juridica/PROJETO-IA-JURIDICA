@@ -28,22 +28,24 @@ from shared.security.jwt import token_esta_revogado, validar_token
 
 # Rotas que não exigem token JWT para serem acessadas
 ROTAS_PUBLICAS = [
-    "/health",  # O health check básico é open
-    "/health/ready",  # O detailed também, para pods k8s conseguirem ler
-    "/auth/login",  # Obviamente, pra gerar o token
-    "/auth/refresh",  # Pra renovar
-    "/auth/csrf-token",  # Pra buscar o token CSRF antes do login
-    "/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
-    "/billing/webhook",  # Stripe manda pra cá (autenticado via stripe-signature HMAC)
-    "/metrics",  # Prometheus scraper não usa JWT
+    "/api/v1/health",  # O health check básico é open
+    "/api/v1/health/ready",  # O detailed também, para pods k8s conseguirem ler
+    "/api/v1/auth/login",  # Obviamente, pra gerar o token
+    "/api/v1/auth/refresh",  # Pra renovar
+    "/api/v1/auth/csrf-token",  # Pra buscar o token CSRF antes do login
+    "/api/v1/webhook/whatsapp",  # Evolution API manda pra cá (autenticado via Header X-API-Key depois)
+    "/api/v1/billing/webhook",  # Stripe manda pra cá (autenticado via stripe-signature HMAC)
+    "/api/v1/metrics",  # Prometheus scraper não usa JWT
+    "/health", # Em caso de montagem na raiz
+    "/metrics",
 ]
 
 # Rotas com match EXATO (não prefixo) — evita vazar proteção de sub-rotas.
 # Ex: /admin/import (HTML) é público, mas /admin/import/clientes (POST) exige JWT.
 # /onboarding/register é público; demais rotas /onboarding/* exigem JWT.
 ROTAS_PUBLICAS_EXATAS = [
-    "/admin/import",
-    "/onboarding/register",
+    "/api/v1/admin/import",
+    "/api/v1/onboarding/register",
 ]
 
 
