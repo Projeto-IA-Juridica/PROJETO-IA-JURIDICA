@@ -124,12 +124,14 @@ async def receive_message(
         return {"status": "ignored", "reason": "Message from self"}
 
     remote_jid = key.get("remoteJid", "")
+    remote_jid_alt = key.get("remoteJidAlt", "")
     if "@g.us" in remote_jid:
         # Ignorar mensagens de grupos
         return {"status": "ignored", "reason": "Group message"}
 
-    # Extrair telefone puro
-    telefone_str = remote_jid.split("@")[0]
+    # Extrair telefone puro (considerando LIDs da API do WhatsApp)
+    jid_to_use = remote_jid_alt if "@lid" in remote_jid and remote_jid_alt else remote_jid
+    telefone_str = jid_to_use.split("@")[0]
     telefone_digitos = re.sub(r"\D", "", telefone_str)
     if not telefone_digitos:
         return {"status": "ignored", "reason": "Invalid phone format"}
