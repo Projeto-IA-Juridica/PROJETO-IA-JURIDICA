@@ -179,6 +179,22 @@ class EvolutionClient:
         }
         return await self._request_com_retry("POST", f"/message/sendText/{instance}", json=payload)
 
+    async def marcar_como_lida(self, instance: str, numero: str, message_id: str) -> dict[str, Any]:
+        """
+        POST /chat/markMessageAsRead/{instance}
+        Marca uma mensagem específica como lida (tick azul).
+        """
+        payload = {
+            "readMessages": [
+                {
+                    "remoteJid": numero if "@" in numero else f"{numero}@s.whatsapp.net",
+                    "fromMe": False,
+                    "id": message_id
+                }
+            ]
+        }
+        return await self._request_com_retry("POST", f"/chat/markMessageAsRead/{instance}", json=payload)
+
     async def enviar_botoes(
         self,
         instance: str,

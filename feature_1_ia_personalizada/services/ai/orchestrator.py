@@ -178,6 +178,7 @@ class ConversationOrchestrator:
         cliente_id: int,
         mensagem: str,
         tipo: str = "texto",
+        message_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Executa o fluxo completo: classifica → busca → gera → verifica → envia.
@@ -192,6 +193,26 @@ class ConversationOrchestrator:
             }
         """
         t_inicio = time.perf_counter()
+
+        # Marca como lida assim que a IA começar a processar, se soubermos a mensagem original
+        if message_id:
+            try:
+                async with self._session_factory() as session:
+                    escritorio = await session.get(Escritorio, escritorio_id)
+                    cliente = await session.get(Cliente, cliente_id)
+                    if (
+                        escritorio
+                        and cliente
+                        and escritorio.webhook_whatsapp_instance
+                        and cliente.telefone_whatsapp
+                    ):
+                        await self._deps.evolution.marcar_como_lida(
+                            escritorio.webhook_whatsapp_instance,
+                            cliente.telefone_whatsapp,
+                            message_id,
+                        )
+            except Exception as e:
+                logger.warning("erro_marcar_lida", erro=str(e), msg_id=message_id)
 
         # Agendamento: se o cliente tem proposta de horários pendente e esta
         # mensagem escolhe uma opção (1/2/3 ou texto livre), o fluxo é resolvido
@@ -795,6 +816,7 @@ def executar_fluxo_orquestrador(
     id_cliente: int,
     mensagem: str,
     tipo: str = "texto",
+    message_id: str | None = None,
 ) -> dict[str, Any]:
     import redis.asyncio as aioredis
 
@@ -822,7 +844,7 @@ def executar_fluxo_orquestrador(
                 ),
                 session_factory=session_factory,
             )
-            return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo)
+            return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo, message_id)
         finally:
             await task_engine.dispose()
             await redis_client.close()

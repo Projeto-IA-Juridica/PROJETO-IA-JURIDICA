@@ -633,9 +633,21 @@ async def connect_whatsapp(
                         },
                     )
                     logger.info("webhook_configurado", instance=instance_name, url=webhook_url)
+
+                    # 3. Otimizar as configurações da instância para performance
+                    await client.post(
+                        f"{settings.EVOLUTION_API_URL}/settings/set/{instance_name}",
+                        headers={"apikey": settings.EVOLUTION_API_KEY or ""},
+                        json={
+                            "groupsIgnore": True,
+                            "readMessages": False,
+                            "readStatus": False
+                        },
+                    )
+                    logger.info("instancia_otimizada", instance=instance_name)
                 except Exception as e:
                     logger.warning(
-                        "erro_ao_configurar_webhook", erro=str(e), instance=instance_name
+                        "erro_ao_configurar_instancia", erro=str(e), instance=instance_name
                     )
 
             if resp.status_code in (200, 201):

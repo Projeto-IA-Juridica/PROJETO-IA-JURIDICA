@@ -287,6 +287,7 @@ def processar_mensagem_recebida(
     tipo: str,
     instance_nome: str | None = None,
     audio_message_id: str | None = None,
+    message_id: str | None = None,
 ) -> dict[str, Any]:
     # Import lazy: evita importar asyncpg e SQLAlchemy no boot do módulo.
     # O orchestrator já envia a resposta via EvolutionClient em _node_enviar_resposta,

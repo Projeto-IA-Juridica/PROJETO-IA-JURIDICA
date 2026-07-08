@@ -333,6 +333,7 @@ async def receive_message(
             tipo=tipo_mensagem,
             instance_nome=instance_name,
             audio_message_id=audio_message_id,
+            message_id=msg_id,
         )
     except Exception as exc:
         logger.error(
