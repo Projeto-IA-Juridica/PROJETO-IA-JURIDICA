@@ -139,3 +139,40 @@ def formatar_numero_processo(numero: str) -> str:
     if len(limpo) != 20:
         raise ValueError(f"Número de processo deve ter 20 dígitos, recebeu {len(limpo)}")
     return f"{limpo[:7]}-{limpo[7:9]}.{limpo[9:13]}.{limpo[13]}.{limpo[14:16]}.{limpo[16:20]}"
+
+
+# ---------------------------------------------------------------------------
+# Emojis
+# ---------------------------------------------------------------------------
+
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001f000-\U0001faff"  # emojis, pictogramas, símbolos suplementares
+    "☀-➿"  # símbolos diversos e dingbats (⚖, ✅, ❌ etc.)
+    "⬀-⯿"  # setas e estrelas (⭐, ⬆ etc.)
+    "←-⇿"  # setas básicas usadas como emoji (↔️ etc.)
+    "⌀-⏿"  # técnico misc. (⏰, ⌛ etc.)
+    "■-◿"  # formas geométricas (▶️ etc.)
+    " -‏"  # espaços tipográficos e ZWJ/ZWNJ de sequências emoji
+    "⃣"  # keycap combinante (1️⃣ → remove o quadrado, mantém o dígito)
+    "︎️"  # variation selectors (forma texto/emoji)
+    "〰〽™©®"  # marcas usadas como emoji (™ © ®)
+    "]+"
+)
+
+
+def remover_emojis(texto: str) -> str:
+    """
+    Remove emojis e caracteres de composição de emoji do texto.
+
+    Rede de segurança das mensagens WhatsApp ao cliente: os templates não
+    têm mais emojis, mas texto gerado pelo Claude pode trazê-los mesmo com
+    a instrução em contrário no prompt. Dígitos de keycaps são preservados
+    ("1️⃣" vira "1"). Espaços duplicados que sobram são colapsados.
+    """
+    sem_emoji = _EMOJI_RE.sub("", texto)
+    # colapsa espaços que sobraram no lugar do emoji, sem tocar em quebras de linha
+    sem_emoji = re.sub(r"[ \t]{2,}", " ", sem_emoji)
+    # remove espaço órfão antes de pontuação final ("Até lá !" → "Até lá!")
+    sem_emoji = re.sub(r" +([!?.,;:])", r"\1", sem_emoji)
+    return "\n".join(linha.strip() for linha in sem_emoji.split("\n"))

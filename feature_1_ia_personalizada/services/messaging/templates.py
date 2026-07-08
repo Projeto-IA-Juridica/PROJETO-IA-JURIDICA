@@ -18,12 +18,12 @@ from typing import cast
 # -----------------------------------------------------------
 
 TEMPLATE_BOAS_VINDAS = (
-    "Olá! 👋 Eu sou o assistente virtual do escritório {escritorio}.\n\n"
-    "📌 Posso ajudar com:\n"
+    "Olá! Eu sou o assistente virtual do escritório {escritorio}.\n\n"
+    "Posso ajudar com:\n"
     "• Status e andamento do seu processo\n"
     "• Explicação de termos jurídicos em linguagem simples\n"
     "• Informações sobre agendamentos\n\n"
-    "⚖️ Aviso importante (OAB): não forneço parecer jurídico "
+    "Aviso importante (OAB): não forneço parecer jurídico "
     "e não substituo seu advogado(a). Minhas respostas são informativas "
     "com base nos dados disponíveis.\n\n"
     "Como posso ajudar você hoje?"
@@ -33,7 +33,7 @@ TEMPLATE_BOAS_VINDAS = (
 # PROCESSO
 # -----------------------------------------------------------
 
-TEMPLATE_NOVO_ANDAMENTO = "📄 Atualização no seu processo {numero}!\n\n{resumo_traduzido}"
+TEMPLATE_NOVO_ANDAMENTO = "Atualização no seu processo {numero}!\n\n{resumo_traduzido}"
 
 TEMPLATE_SEM_MOVIMENTACAO = (
     "Olá! Sobre o processo {numero}, até o momento não identifiquei "
@@ -56,10 +56,10 @@ TEMPLATE_CLIENTE_NAO_ENCONTRADO = (
 # -----------------------------------------------------------
 
 TEMPLATE_AGENDAMENTO_CONFIRMADO = (
-    "✅ Consulta confirmada!\n\n"
-    "👩‍⚖️ Dr(a). {nome}\n"
-    "📅 Data: {data}\n"
-    "⏰ Horário: {horario}\n\n"
+    "Consulta confirmada!\n\n"
+    "Dr(a). {nome}\n"
+    "Data: {data}\n"
+    "Horário: {horario}\n\n"
     "Se precisar reagendar, é só avisar."
 )
 
@@ -68,14 +68,14 @@ TEMPLATE_AGENDAMENTO_CONFIRMADO = (
 # -----------------------------------------------------------
 
 TEMPLATE_PESQUISA_NPS = (
-    "Olá, {nome_cliente}! 😊\n\n"
+    "Olá, {nome_cliente}!\n\n"
     "Como avalia o atendimento do {nome_escritorio} até agora?\n"
     "Responda com um número de *1 a 5*:\n"
     "1 = Muito insatisfeito  |  5 = Muito satisfeito"
 )
 
 TEMPLATE_MENSAGEM_TRIMESTRAL = (
-    "Olá, {nome}! 👋\n\n"
+    "Olá, {nome}!\n\n"
     "Faz {dias} dias desde nosso último contato. "
     "Se quiser uma atualização do seu processo, é só me chamar."
 )
@@ -85,16 +85,16 @@ TEMPLATE_MENSAGEM_TRIMESTRAL = (
 # -----------------------------------------------------------
 
 TEMPLATE_ANIVERSARIO = (
-    "🎉 Feliz Aniversário, {nome}! A equipe do escritório {escritorio} deseja um excelente dia!"
+    "Feliz Aniversário, {nome}! A equipe do escritório {escritorio} deseja um excelente dia!"
 )
 
 TEMPLATE_DIA_BANCARIO = (
-    "💼 Feliz Dia do Bancário! "
+    "Feliz Dia do Bancário! "
     "Atualizando: seu processo {numero} está com status: {status_processo}."
 )
 
 TEMPLATE_DIA_PROFESSOR = (
-    "📚 Feliz Dia do Professor! A equipe do escritório {escritorio} deseja um ótimo dia!"
+    "Feliz Dia do Professor! A equipe do escritório {escritorio} deseja um ótimo dia!"
 )
 
 # -----------------------------------------------------------

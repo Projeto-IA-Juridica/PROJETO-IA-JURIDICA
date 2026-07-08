@@ -52,7 +52,7 @@ _FALLBACKS: dict[str, str] = {
     "perspectivas": (
         "Entendo sua dúvida sobre as perspectivas do processo. "
         "Estou com uma instabilidade técnica agora — "
-        "o escritório entrará em contato em breve para esclarecer. ⚖️"
+        "o escritório entrará em contato em breve para esclarecer."
     ),
     "duvida_termo": (
         "Obrigado pela pergunta! Estou com uma dificuldade técnica temporária. "
@@ -69,7 +69,7 @@ _FALLBACKS: dict[str, str] = {
     "desabafo": (
         "Entendo que esse momento pode ser muito difícil. "
         "Estou com uma instabilidade técnica agora, mas o escritório "
-        "está ciente e entrará em contato com você em breve. 🤝"
+        "está ciente e entrará em contato com você em breve."
     ),
 }
 

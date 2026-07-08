@@ -31,7 +31,7 @@ _FORMATO_WHATSAPP = (
     "_itálico_ para ênfase suave. "
     "Sem markdown estilo HTML, sem listas com hífens ou números, sem cabeçalhos com #. "
     "Parágrafos separados por linha em branco. "
-    "Emojis com moderação: 📋 andamentos, ⚖️ informações processuais, 📅 datas."
+    "NUNCA use emojis, em nenhuma circunstância — nem para ilustrar, nem para saudação."
     "</formato_saida>"
 )
 
@@ -46,7 +46,7 @@ _TOM_FORMAL = (
 
 _TOM_AMIGAVEL = (
     "Trate o cliente de forma próxima e descontraída: use 'você', linguagem leve mas ainda profissional. "
-    "Pode usar um emoji ocasional (com moderação). Seja caloroso(a) e acessível."
+    "Seja caloroso(a) e acessível, mas nunca use emojis."
 )
 
 _TOM_NEUTRO = (

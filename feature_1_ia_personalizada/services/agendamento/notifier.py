@@ -145,7 +145,7 @@ def mesmo_numero(a: str | None, b: str | None) -> bool:
 # Templates
 # ---------------------------------------------------------------------------
 
-_EMOJIS_OPCAO = ["1️⃣", "2️⃣", "3️⃣"]
+_MARCADORES_OPCAO = ["1)", "2)", "3)"]
 
 
 def montar_mensagem_proposta(
@@ -156,8 +156,8 @@ def montar_mensagem_proposta(
     primeiro_nome = nome_cliente.split(" ")[0] if nome_cliente else ""
     linhas = []
     for i, op in enumerate(opcoes[:3]):
-        emoji = _EMOJIS_OPCAO[i] if i < len(_EMOJIS_OPCAO) else f"{i + 1})"
-        linhas.append(f"{emoji}  {op.get('label', '')}")
+        marcador = _MARCADORES_OPCAO[i] if i < len(_MARCADORES_OPCAO) else f"{i + 1})"
+        linhas.append(f"{marcador} {op.get('label', '')}")
     corpo = "\n".join(linhas)
 
     if reproposta:
@@ -171,7 +171,7 @@ def montar_mensagem_proposta(
             "tenho os seguintes horários disponíveis:"
         )
 
-    return f"{intro}\n\n{corpo}\n\n" "É só responder com o número da opção (1, 2 ou 3). 😊"
+    return f"{intro}\n\n{corpo}\n\n" "É só responder com o número da opção (1, 2 ou 3)."
 
 
 def _label_opcao_selecionada(ag: Agendamento) -> str:
@@ -280,11 +280,11 @@ class AgendamentoNotifier:
         data_str, hora_str = _formatar_local(ag.data_hora_inicio, escritorio.timezone)
         responsavel = escritorio.nome_responsavel or escritorio.nome
         texto = (
-            "✅ *Reunião confirmada!*\n\n"
-            f"📅 {_label_opcao_selecionada(ag)}\n"
-            f"👤 Dr(a). {responsavel}\n"
-            f"📋 Assunto: conversar sobre seu processo\n\n"
-            f"Até {data_str} às {hora_str}! Qualquer imprevisto, é só avisar por aqui. 😊"
+            "*Reunião confirmada!*\n\n"
+            f"{_label_opcao_selecionada(ag)}\n"
+            f"Dr(a). {responsavel}\n"
+            f"Assunto: conversar sobre seu processo\n\n"
+            f"Até {data_str} às {hora_str}! Qualquer imprevisto, é só avisar por aqui."
         )
         ok = await self._enviar(
             escritorio.webhook_whatsapp_instance, cliente.telefone_whatsapp, texto
@@ -307,7 +307,7 @@ class AgendamentoNotifier:
         primeiro_nome = cliente.nome.split(" ")[0]
         texto = (
             f"Olá, {primeiro_nome}! Só passando para lembrar da sua reunião "
-            f"com Dr(a). {responsavel} hoje às {hora_str}. 😊\n\n"
+            f"com Dr(a). {responsavel} hoje às {hora_str}.\n\n"
             "Qualquer imprevisto, é só avisar aqui!"
         )
         ok = await self._enviar(
@@ -326,7 +326,7 @@ class AgendamentoNotifier:
         primeiro_nome = cliente.nome.split(" ")[0]
         texto = (
             f"Olá, {primeiro_nome}. Infelizmente o horário solicitado não pôde "
-            "ser confirmado desta vez. 🙏\n\n"
+            "ser confirmado desta vez.\n\n"
             "Em breve entraremos em contato para combinar uma nova data. "
             "Se preferir, me diga aqui qual período costuma ser melhor para você."
         )
@@ -350,7 +350,7 @@ class AgendamentoNotifier:
             instance,
             cliente.telefone_whatsapp,
             f"Olá, {primeiro_nome}! Lembrete: sua reunião com o escritório é amanhã, "
-            f"{data_str} às {hora_str}. Até lá! 😊",
+            f"{data_str} às {hora_str}. Até lá!",
         )
         ok_advogado = True
         if escritorio.telefone_advogado:
@@ -716,9 +716,9 @@ class AgendamentoNotifier:
             escritorio_id=escritorio_id,
         )
         return (
-            f"Perfeito, {primeiro_nome}! Anotei *{opcao.get('label', '')}*. 📅\n\n"
+            f"Perfeito, {primeiro_nome}! Anotei *{opcao.get('label', '')}*.\n\n"
             "Vou confirmar a disponibilidade com o advogado e te aviso "
-            "por aqui assim que estiver tudo certo. 😊"
+            "por aqui assim que estiver tudo certo."
         )
 
     async def _slot_ocupado(self, ag: Agendamento, inicio: datetime, fim: datetime) -> bool:
@@ -756,9 +756,9 @@ class AgendamentoNotifier:
         primeiro_nome = cliente.nome.split(" ")[0] if cliente else ""
 
         intro = (
-            f"Poxa, {primeiro_nome} — esse horário acabou de ficar indisponível. 😕"
+            f"Poxa, {primeiro_nome} — esse horário acabou de ficar indisponível."
             if motivo == "ocupado"
-            else f"Poxa, {primeiro_nome} — esse horário já passou. 😕"
+            else f"Poxa, {primeiro_nome} — esse horário já passou."
         )
 
         slots: list[Any] = []
@@ -785,7 +785,7 @@ class AgendamentoNotifier:
             return (
                 f"{intro}\n\n"
                 "No momento não encontrei outros horários livres, mas o escritório "
-                "vai entrar em contato para combinar a melhor data. 🙏"
+                "vai entrar em contato para combinar a melhor data."
             )
 
         agora = datetime.now(UTC)
@@ -813,13 +813,13 @@ class AgendamentoNotifier:
         await publicar_evento_agendamento(self._redis, ag.escritorio_id)
 
         linhas = "\n".join(
-            f"{_EMOJIS_OPCAO[i]}  {op['label']}" for i, op in enumerate(ag.opcoes_propostas[:3])
+            f"{_MARCADORES_OPCAO[i]} {op['label']}" for i, op in enumerate(ag.opcoes_propostas[:3])
         )
         logger.info("agendamento_reproposto", agendamento_id=ag.id, motivo=motivo)
         return (
             f"{intro}\n\n"
             f"Mas tenho estas novas opções:\n\n{linhas}\n\n"
-            "É só responder com o número da opção (1, 2 ou 3). 😊"
+            "É só responder com o número da opção (1, 2 ou 3)."
         )
 
     @staticmethod

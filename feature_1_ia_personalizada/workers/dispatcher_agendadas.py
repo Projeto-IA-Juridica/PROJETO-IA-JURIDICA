@@ -31,6 +31,7 @@ from feature_1_ia_personalizada.workers.celery_app import DLQTask
 from shared.config.settings import settings
 from shared.database.connection import worker_session_factory
 from shared.models.mensagem_agendada import MensagemAgendada
+from shared.utils.formatters import remover_emojis
 
 logger = structlog.get_logger(__name__)
 
@@ -92,7 +93,7 @@ async def _processar_lote() -> tuple[int, int]:
             try:
                 instancia = await repo.obter_instancia_por_escritorio(msg.escritorio_id)
                 numero = await repo.obter_numero_cliente(msg.cliente_id)
-                await evolution.enviar_texto(instancia, numero, msg.texto)
+                await evolution.enviar_texto(instancia, numero, remover_emojis(msg.texto))
 
                 async with worker_session_factory() as session:
                     await session.execute(

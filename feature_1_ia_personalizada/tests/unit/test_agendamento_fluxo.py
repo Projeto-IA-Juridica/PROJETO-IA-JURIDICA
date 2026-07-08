@@ -207,7 +207,7 @@ class TestMontarMensagemProposta:
     def test_contem_tres_opcoes_e_nome(self):
         msg = montar_mensagem_proposta("João da Silva", _OPCOES)
         assert "João" in msg
-        assert "1️⃣" in msg and "2️⃣" in msg and "3️⃣" in msg
+        assert "1)" in msg and "2)" in msg and "3)" in msg
         assert "Terça-feira, 07/07 às 10h" in msg
 
     def test_reproposta_menciona_ajuste(self):
@@ -574,7 +574,7 @@ class TestNodeAgendamento:
         )
 
         assert "erro" not in resultado or resultado.get("erro") is None
-        assert "1️⃣" in resultado["resposta_verificada"]
+        assert "1)" in resultado["resposta_verificada"]
 
         ag = (
             (
@@ -613,7 +613,7 @@ class TestNodeAgendamento:
             )
         ).scalar_one()
         assert total == 1  # não duplica proposta
-        assert "1️⃣" in resultado2["resposta_verificada"]
+        assert "1)" in resultado2["resposta_verificada"]
 
     async def test_sem_disponibilidade_retorna_fallback(
         self, db_session, escritorio_factory, cliente_factory, fake_redis, engine
@@ -685,7 +685,7 @@ class TestSelecaoSlotIndisponivel:
 
         assert resposta is not None
         assert "já passou" in resposta
-        assert "1️⃣" in resposta  # novas opções na mesma mensagem
+        assert "1)" in resposta  # novas opções na mesma mensagem
         await db_session.refresh(ag)
         assert ag.status == "aguardando_cliente"
         assert ag.opcao_selecionada_pos is None
@@ -802,7 +802,7 @@ class TestPropostaObsoletaNoNode:
         }
         resultado = await node_agendamento(state, deps)  # type: ignore[arg-type]
 
-        assert "1️⃣" in resultado["resposta_verificada"]
+        assert "1)" in resultado["resposta_verificada"]
         await db_session.refresh(antiga)
         assert antiga.status == "expirado"
         total = (

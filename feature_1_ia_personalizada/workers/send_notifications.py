@@ -80,10 +80,10 @@ MENSAGEM_ERRO_PADRAO = (
 )
 
 MENSAGEM_BOAS_VINDAS = (
-    "Olá, {nome}! 👋 Seja bem-vindo(a).\n\n"
+    "Olá, {nome}! Seja bem-vindo(a).\n\n"
     "Estou aqui para facilitar o acompanhamento do seu processo e esclarecer dúvidas rápidas.\n\n"
-    "⚠️ _As informações enviadas por aqui não substituem a orientação jurídica formal do seu advogado._\n\n"
-    "Quando precisar, é só chamar! ⚖️"
+    "_As informações enviadas por aqui não substituem a orientação jurídica formal do seu advogado._\n\n"
+    "Quando precisar, é só chamar!"
 )
 
 

@@ -48,22 +48,22 @@ TEMPO_5_MINUTOS = 5 * 60
 
 
 TEMPLATE_ANIVERSARIO = (
-    "🎉 {nome}, feliz aniversário!\n\n"
-    "Passando pra te desejar um dia incrível. Se precisar de algo sobre seu processo, estou por aqui. 😊"
+    "{nome}, feliz aniversário!\n\n"
+    "Passando pra te desejar um dia incrível. Se precisar de algo sobre seu processo, estou por aqui."
 )
 
 TEMPLATE_MENSAGEM_TRIMESTRAL = (
-    "👋 Oi, {nome}! Passando pra saber se está tudo certo.\n\n"
+    "Oi, {nome}! Passando pra saber se está tudo certo.\n\n"
     "Se quiser, posso te atualizar sobre seu processo e próximos passos."
 )
 
 TEMPLATE_DIA_BANCARIO = (
-    "🏦 Hoje é {nome_data}.\n\n"
+    "Hoje é {nome_data}.\n\n"
     "Se precisar de ajuda com documentos, prazos ou dúvidas do processo, me chama por aqui."
 )
 
 TEMPLATE_DATA_COMEMORATIVA_GENERICA = (
-    "📅 Hoje é {nome_data}.\n\nSe precisar de qualquer apoio com seu processo, estou à disposição."
+    "Hoje é {nome_data}.\n\nSe precisar de qualquer apoio com seu processo, estou à disposição."
 )
 
 

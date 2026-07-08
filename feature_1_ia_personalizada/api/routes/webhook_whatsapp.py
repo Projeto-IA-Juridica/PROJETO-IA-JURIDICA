@@ -449,7 +449,7 @@ async def _processar_resposta_nps(
     try:
         agradecimento = (
             f"Obrigado pela avaliação, {cliente.nome}! "
-            "Seu feedback é muito importante para continuarmos melhorando o atendimento. 🙏"
+            "Seu feedback é muito importante para continuarmos melhorando o atendimento."
         )
         await evo.enviar_texto(
             escritorio.webhook_whatsapp_instance,  # type: ignore[arg-type]

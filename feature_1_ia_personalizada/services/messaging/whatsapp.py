@@ -15,6 +15,7 @@ from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.models.mensagem_agendada import MensagemAgendada
 from shared.models.processo import Processo as ProcessoModel
+from shared.utils.formatters import remover_emojis
 
 from .evolution_client import EvolutionClient, EvolutionError, EvolutionOfflineError
 from .templates import carregar_templates
@@ -160,6 +161,7 @@ class WhatsAppService:
         Resolve instância do escritório e envia ao cliente.
         Se fora do horário comercial ou rate limit excedido, agenda (se permitir_agendamento).
         """
+        texto = remover_emojis(texto)  # cliente nunca recebe emoji
         agora = datetime.now(tz=timezone(timedelta(hours=_FUSO_HORARIO_PADRAO)))
         pode, motivo_bloqueio = await self._pode_enviar_agora(cliente_id, agora)
 

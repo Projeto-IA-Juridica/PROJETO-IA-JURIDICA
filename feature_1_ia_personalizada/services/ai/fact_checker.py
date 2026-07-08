@@ -54,7 +54,7 @@
 #         ]
 
 #         # Disclaimer — aparece apenas quando um padrão proibido é corrigido
-#         self._disclaimer = "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a). 😊"
+#         self._disclaimer = "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a)."
 
 #     # 1) Status do processo
 
@@ -296,7 +296,7 @@ class FactChecker:
         ]
 
         # Disclaimer — aparece apenas quando um padrão proibido é corrigido
-        self._disclaimer = "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a). 😊"
+        self._disclaimer = "Qualquer dúvida sobre os próximos passos, fale com seu advogado(a)."
 
     # 1) Status do processo
 

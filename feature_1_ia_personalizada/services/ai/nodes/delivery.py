@@ -23,6 +23,7 @@ from feature_1_ia_personalizada.services.ai.state import (
 )
 from feature_1_ia_personalizada.services.messaging.templates import TEMPLATE_ERRO_GENERICO
 from shared.models.interacao import Interacao
+from shared.utils.formatters import remover_emojis
 
 logger = structlog.get_logger(__name__)
 
@@ -30,7 +31,9 @@ logger = structlog.get_logger(__name__)
 async def node_enviar_resposta(state: ConversationState, deps: NodeDeps) -> dict[str, Any]:
     log = logger.bind(escritorio_id=state["escritorio_id"], cliente_id=state["cliente_id"])
 
-    resposta_final = (
+    # Rede de segurança: cliente nunca recebe emoji, mesmo se o Claude
+    # ignorar a instrução do prompt.
+    resposta_final = remover_emojis(
         state.get("resposta_verificada") or state.get("resposta_ia") or TEMPLATE_ERRO_GENERICO
     )
     tokens = state.get("tokens_usados") or {"input": 0, "output": 0}

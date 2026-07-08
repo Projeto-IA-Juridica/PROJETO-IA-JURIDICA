@@ -39,16 +39,16 @@ _DEBOUNCE_TTL_S = 60
 _MAX_MOTIVO_CHARS = 500
 
 _MSG_JA_COM_ADVOGADO = (
-    "Sua solicitação de reunião já está com o advogado para confirmação. 😊\n\n"
+    "Sua solicitação de reunião já está com o advogado para confirmação.\n\n"
     "Assim que ele confirmar o horário, te aviso por aqui!"
 )
 _MSG_SEM_DISPONIBILIDADE = (
-    "Que bom que você quer conversar! 😊\n\n"
+    "Que bom que você quer conversar!\n\n"
     "No momento não consigo verificar a agenda automaticamente, "
     "mas já registrei seu interesse e o escritório entrará em contato "
     "para combinar o melhor horário."
 )
-_MSG_PROCESSANDO = "Um instante — já estou verificando os horários disponíveis! 😊"
+_MSG_PROCESSANDO = "Um instante — já estou verificando os horários disponíveis!"
 
 
 def _proposta_ainda_valida(ag: Agendamento) -> bool:
