@@ -35,7 +35,12 @@ db_url = urlunparse(_parsed._replace(query=urlencode(_query)))
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
 connect_args: dict[str, Any] = {"statement_cache_size": 0}
-if "supabase.com" in db_url or "supabase.co" in db_url or "railway.internal" in db_url or "railway.app" in db_url:
+if (
+    "supabase.com" in db_url
+    or "supabase.co" in db_url
+    or "railway.internal" in db_url
+    or "railway.app" in db_url
+):
     connect_args["ssl"] = "require"
 
 # Limita o pool a 1 conexão por worker para evitar estourar limites
