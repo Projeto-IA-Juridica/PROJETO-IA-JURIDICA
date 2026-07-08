@@ -189,11 +189,13 @@ class EvolutionClient:
                 {
                     "remoteJid": numero if "@" in numero else f"{numero}@s.whatsapp.net",
                     "fromMe": False,
-                    "id": message_id
+                    "id": message_id,
                 }
             ]
         }
-        return await self._request_com_retry("POST", f"/chat/markMessageAsRead/{instance}", json=payload)
+        return await self._request_com_retry(
+            "POST", f"/chat/markMessageAsRead/{instance}", json=payload
+        )
 
     async def enviar_botoes(
         self,

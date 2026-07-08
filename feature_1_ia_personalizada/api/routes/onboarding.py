@@ -647,7 +647,7 @@ async def connect_whatsapp(
                             "alwaysOnline": True,
                             "readMessages": False,
                             "readStatus": False,
-                            "syncFullHistory": False
+                            "syncFullHistory": False,
                         },
                     )
                     logger.info("instancia_otimizada", instance=instance_name)

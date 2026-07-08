@@ -844,7 +844,9 @@ def executar_fluxo_orquestrador(
                 ),
                 session_factory=session_factory,
             )
-            return await orchestrador.processar(id_escritorio, id_cliente, mensagem, tipo, message_id)
+            return await orchestrador.processar(
+                id_escritorio, id_cliente, mensagem, tipo, message_id
+            )
         finally:
             await task_engine.dispose()
             await redis_client.close()

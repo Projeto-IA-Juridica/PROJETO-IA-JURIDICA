@@ -316,6 +316,7 @@ class TestWebhookHappyPath:
             tipo="texto",
             instance_nome=INSTANCIA,
             audio_message_id=None,
+            message_id="AABBCCDD",
         )
 
     @pytest.mark.asyncio
@@ -487,4 +488,5 @@ class TestWebhookMultiTenant:
             tipo="texto",
             instance_nome="instancia-escritorio-b",
             audio_message_id=None,
+            message_id="AABBCCDD",
         )
