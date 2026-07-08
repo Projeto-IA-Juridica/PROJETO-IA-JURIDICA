@@ -8,13 +8,12 @@ na aplicação FastAPI, permitindo concorrência sem bloquear a thread principal
 """
 
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from shared.config.settings import settings
-
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 db_url = settings.DATABASE_URL
 if not db_url.startswith("postgresql+asyncpg://"):

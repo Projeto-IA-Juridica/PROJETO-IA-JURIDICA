@@ -279,11 +279,12 @@ class TestClassificarIntencao:
         kwargs = client._client.messages.create.call_args.kwargs
         assert kwargs["max_tokens"] == 32
 
-    async def test_usa_temperature_zero(self, client: ClaudeClient):
+    async def test_nao_envia_temperature(self, client: ClaudeClient):
+        """claude-sonnet-5 não aceita temperature — o parâmetro não deve ser enviado."""
         client._client.messages.create = AsyncMock(return_value=_mock_resposta("{}"))  # type: ignore[method-assign]
         await client.classificar_intencao("system", "oi")
         kwargs = client._client.messages.create.call_args.kwargs
-        assert kwargs["temperature"] == 0.0
+        assert "temperature" not in kwargs
 
     async def test_mensagem_como_user_message(self, client: ClaudeClient):
         """A mensagem deve ir como user message, não embutida no system."""

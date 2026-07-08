@@ -14,7 +14,6 @@ from prometheus_client import Counter, Histogram
 from shared.config.constants import (
     MAX_TOKENS_RESPOSTA,
     MODELO_CLAUDE,
-    TEMPERATURA_CLAUDE,
 )
 
 logger = structlog.get_logger(__name__)
@@ -313,7 +312,7 @@ class ClaudeClient:
         """
         Chamada leve usada apenas para classificar a intenção.
         max_tokens=32 — suficiente para {"intencao": "duvida_termo"} com folga.
-        temperature=0.0 — determinístico para classificação.
+        Sem temperature: claude-sonnet-5 não aceita o parâmetro.
 
         O system prompt de classificação é cacheado: como é chamado a cada mensagem,
         o cache hit paga a diferença já na segunda requisição do dia.
