@@ -27,19 +27,17 @@ _query = dict(parse_qsl(_parsed.query))
 for k in ["schema", "pgbouncer"]:
     _query.pop(k, None)
 
-# Desativar cache de statements globalmente para compatibilidade com PgBouncer (Supabase)
-if "supabase." in db_url:
-    _query["prepared_statement_cache_size"] = "0"
+# Desativar cache de statements globalmente na query string (asyncpg)
+_query["prepared_statement_cache_size"] = "0"
 
 db_url = urlunparse(_parsed._replace(query=urlencode(_query)))
 
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
-connect_args: dict[str, Any] = {}
-if "supabase.com" in db_url or "supabase.co" in db_url:
+connect_args: dict[str, Any] = {"statement_cache_size": 0}
+if "supabase.com" in db_url or "supabase.co" in db_url or "railway.internal" in db_url or "railway.app" in db_url:
     connect_args["ssl"] = "require"
-    connect_args["statement_cache_size"] = 0
 
 # Limita o pool a 1 conexão por worker para evitar estourar limites
 # de PgBouncer em provedores durante deploys Blue/Green.
