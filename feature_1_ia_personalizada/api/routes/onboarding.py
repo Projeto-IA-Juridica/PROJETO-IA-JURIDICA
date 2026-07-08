@@ -520,6 +520,8 @@ async def connect_whatsapp(
     instance_name = f"escritorio_{escritorio.id}"
     configured_base = (settings.EVOLUTION_API_URL or "").rstrip("/")
     current_api_base = str(request.base_url).rstrip("/")
+    if "railway.app" in current_api_base and current_api_base.startswith("http://"):
+        current_api_base = current_api_base.replace("http://", "https://", 1)
 
     # Falha comum em produção: EVOLUTION_API_URL apontando para a própria API.
     if configured_base == current_api_base:
