@@ -641,9 +641,13 @@ async def connect_whatsapp(
                         f"{settings.EVOLUTION_API_URL}/settings/set/{instance_name}",
                         headers={"apikey": settings.EVOLUTION_API_KEY or ""},
                         json={
+                            "rejectCall": False,
+                            "msgCall": "",
                             "groupsIgnore": True,
+                            "alwaysOnline": True,
                             "readMessages": False,
-                            "readStatus": False
+                            "readStatus": False,
+                            "syncFullHistory": False
                         },
                     )
                     logger.info("instancia_otimizada", instance=instance_name)
