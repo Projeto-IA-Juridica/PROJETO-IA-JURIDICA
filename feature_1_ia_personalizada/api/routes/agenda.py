@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -136,12 +136,27 @@ async def listar_slots_disponiveis(
     if escritorio is None:
         raise HTTPException(status_code=404, detail="Escritório não encontrado")
 
+    # Agenda externa (Google Calendar) — a prévia reflete o que a IA fará
+    from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+        obter_ocupados_google,
+    )
+
+    escritorio_obj = await db.get(Escritorio, eid)
+    agora_utc = datetime.now(UTC)
+    ocupados = (
+        await obter_ocupados_google(escritorio_obj, agora_utc, agora_utc + timedelta(days=31))
+        if escritorio_obj
+        else []
+    )
+
     detector = AgendamentoDetector(
         db=db,
         escritorio_id=eid,
         timezone_str=escritorio,
     )
-    slots = await detector.buscar_slots(num_slots=num_slots, duracao_min=duracao_min)
+    slots = await detector.buscar_slots(
+        num_slots=num_slots, duracao_min=duracao_min, ocupados_externos=ocupados
+    )
 
     return [
         SlotResponse(inicio=s.inicio, fim=s.fim, label=s.label, conflito_prazo=s.conflito_prazo)

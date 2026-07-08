@@ -248,10 +248,10 @@ class TestClienteCreate:
         c = ClienteCreate(**_payload_cliente(telefone_whatsapp="+55 (11) 98765-4321"))
         assert c.telefone_whatsapp == "5511987654321"
 
-    def test_whatsapp_fixo_rejeitado(self):
-        # Fixo: 8 dígitos sem o 9 inicial — inválido para WhatsApp
-        with pytest.raises(ValidationError, match="WhatsApp inválido"):
-            ClienteCreate(**_payload_cliente(telefone_whatsapp="551133334444"))
+    def test_whatsapp_sem_nono_digito_aceito(self):
+        # 8 dígitos sem o 9 — aceito desde o suporte a números antigos (12 dígitos)
+        c = ClienteCreate(**_payload_cliente(telefone_whatsapp="551133334444"))
+        assert c.telefone_whatsapp == "551133334444"
 
     def test_whatsapp_sem_codigo_pais_rejeitado(self):
         with pytest.raises(ValidationError, match="WhatsApp inválido"):

@@ -522,6 +522,13 @@ class AgendamentoNotifier:
 
                 _registrar_confirmacao_metricas(ag, agora)
 
+                # Google Calendar (best-effort — roda no worker Celery)
+                from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+                    sincronizar_confirmacao,
+                )
+
+                await sincronizar_confirmacao(self._db, ag)
+
                 await self.enviar_confirmacao_cliente(ag)
                 await self._enviar(
                     instance,
@@ -545,6 +552,12 @@ class AgendamentoNotifier:
             ag.motivo_cancelamento = "Recusado pelo advogado via WhatsApp"
             await self._db.commit()
             await publicar_evento_agendamento(self._redis, ag.escritorio_id)
+
+            from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+                remover_evento_agendamento,
+            )
+
+            await remover_evento_agendamento(self._db, ag)
 
             await self.enviar_cancelamento(ag)
             await self._enviar(

@@ -300,6 +300,14 @@ app.include_router(rag, dependencies=_guard)
 app.include_router(agenda, dependencies=_guard)
 app.include_router(agendamentos, dependencies=_guard)
 
+# Google Calendar — auth-url/status/disconnect exigem JWT (middleware);
+# /callback é público (redirect do Google), validado por state de uso único
+from feature_1_ia_personalizada.api.routes import (  # noqa: E402
+    google_calendar as google_calendar_routes,
+)
+
+app.include_router(google_calendar_routes.router)
+
 # Webhook WhatsApp — sem guard (recebe de terceiros, não de usuários logados)
 app.include_router(webhook_whatsapp)
 app.include_router(admin_import)

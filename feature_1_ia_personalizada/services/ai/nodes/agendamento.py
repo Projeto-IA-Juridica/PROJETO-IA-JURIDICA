@@ -120,12 +120,25 @@ async def node_agendamento(state: ConversationState, deps: NodeDeps) -> dict[str
             prazos = await buscar_prazos_escritorio(session, escritorio_id, cliente_id=cliente_id)
             evitar = datas_a_evitar(prazos)
 
+            # Agenda externa (Google Calendar): horários que a secretária já
+            # ocupou não são oferecidos — best-effort, [] se desconectado
+            from feature_1_ia_personalizada.services.agendamento.google_calendar import (
+                obter_ocupados_google,
+            )
+
+            agora_utc = datetime.now(UTC)
+            ocupados = await obter_ocupados_google(
+                escritorio, agora_utc, agora_utc + timedelta(days=31)
+            )
+
             detector = AgendamentoDetector(
                 db=session,
                 escritorio_id=escritorio_id,
                 timezone_str=escritorio.timezone or "America/Sao_Paulo",
             )
-            slots = await detector.buscar_slots(num_slots=3, datas_evitar=evitar)
+            slots = await detector.buscar_slots(
+                num_slots=3, datas_evitar=evitar, ocupados_externos=ocupados
+            )
 
             if not slots:
                 log.warning("agendamento_sem_slots")

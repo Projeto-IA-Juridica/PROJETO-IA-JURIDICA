@@ -299,13 +299,33 @@ async def _preparar_cenario(db_session, escritorio_factory, cliente_factory):
     return escritorio, cliente
 
 
+def _opcoes_futuras() -> list[dict]:
+    """
+    Opções sempre no futuro relativo a agora — datas fixas apodreceriam com o
+    relógio real (a validação de slot-no-passado dispararia reproposta indevida).
+    Labels dos _OPCOES fixos continuam usados nos testes de parsing puro.
+    """
+    base = (datetime.now(UTC) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+    opcoes = []
+    for i, rotulo in enumerate(["Opção A", "Opção B", "Opção C"]):
+        inicio = base + timedelta(days=i)
+        opcoes.append(
+            {
+                "inicio": inicio.isoformat(),
+                "fim": (inicio + timedelta(hours=1)).isoformat(),
+                "label": f"{rotulo} — {inicio.strftime('%d/%m às %Hh')}",
+            }
+        )
+    return opcoes
+
+
 def _nova_proposta(escritorio_id: int, cliente_id: int) -> Agendamento:
     agora = datetime.now(UTC)
     return Agendamento(
         escritorio_id=escritorio_id,
         cliente_id=cliente_id,
         status="aguardando_cliente",
-        opcoes_propostas=_OPCOES,
+        opcoes_propostas=_opcoes_futuras(),
         motivo_cliente="preciso falar sobre meu processo",
         proposta_enviada_em=agora,
         expira_em=agora + timedelta(hours=48),
@@ -334,7 +354,7 @@ class TestProcessarRespostaCliente:
         resposta = await notifier.processar_resposta_cliente(escritorio.id, cliente.id, "2")
 
         assert resposta is not None
-        assert "Quarta-feira, 08/07 às 14h" in resposta
+        assert ag.opcoes_propostas[1]["label"] in resposta
         await db_session.refresh(ag)
         assert ag.status == "aguardando_advogado"
         assert ag.opcao_selecionada_pos == 1
@@ -388,10 +408,11 @@ class TestProcessarRespostaCliente:
 
 def _pendente_aprovacao(escritorio_id: int, cliente_id: int) -> Agendamento:
     ag = _nova_proposta(escritorio_id, cliente_id)
+    opcoes = ag.opcoes_propostas or []
     ag.status = "aguardando_advogado"
     ag.opcao_selecionada_pos = 0
-    ag.data_hora_inicio = datetime.fromisoformat(_OPCOES[0]["inicio"])
-    ag.data_hora_fim = datetime.fromisoformat(_OPCOES[0]["fim"])
+    ag.data_hora_inicio = datetime.fromisoformat(opcoes[0]["inicio"])
+    ag.data_hora_fim = datetime.fromisoformat(opcoes[0]["fim"])
     ag.resposta_cliente_em = datetime.now(UTC)
     ag.whatsapp_notificacao_advogado_enviado = True
     return ag
@@ -1052,3 +1073,269 @@ class TestWorkerSessionFactory:
                 assert (
                     "import async_session_factory" not in conteudo
                 ), f"{arq} ainda usa a factory pooled da API em contexto de worker"
+
+
+# ---------------------------------------------------------------------------
+# Calendário forense — feriados nacionais e recesso (CPC art. 220)
+# ---------------------------------------------------------------------------
+
+
+class TestCalendarioForense:
+    def test_pascoa_2026(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import _pascoa
+
+        assert _pascoa(2026) == date(2026, 4, 5)
+
+    def test_feriados_moveis_2026(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import _feriados_nacionais
+
+        feriados = _feriados_nacionais(2026)
+        assert date(2026, 2, 17) in feriados  # terça de Carnaval
+        assert date(2026, 4, 3) in feriados  # Sexta-feira Santa
+        assert date(2026, 6, 4) in feriados  # Corpus Christi
+        assert date(2026, 9, 7) in feriados  # Independência
+        assert date(2026, 11, 20) in feriados  # Consciência Negra (Lei 14.759)
+
+    def test_contagem_pula_feriado_nacional(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import _somar_dias_uteis
+
+        # sex 04/09/2026 + 2 úteis: seg 07/09 é feriado → ter 08 (1), qua 09 (2)
+        assert _somar_dias_uteis(date(2026, 9, 4), 2) == date(2026, 9, 9)
+
+    def test_contagem_pula_recesso_forense(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import _somar_dias_uteis
+
+        # ter 15/12/2026 + 5 úteis: 16,17,18/12 (3) → recesso 20/12–20/01 →
+        # qui 21/01 (4), sex 22/01/2027 (5)
+        assert _somar_dias_uteis(date(2026, 12, 15), 5) == date(2027, 1, 22)
+
+    def test_recesso_bordas(self):
+        from feature_1_ia_personalizada.services.agendamento.prazos import _em_recesso_forense
+
+        assert _em_recesso_forense(date(2026, 12, 20)) is True
+        assert _em_recesso_forense(date(2027, 1, 20)) is True
+        assert _em_recesso_forense(date(2026, 12, 19)) is False
+        assert _em_recesso_forense(date(2027, 1, 21)) is False
+
+
+# ---------------------------------------------------------------------------
+# Google Calendar
+# ---------------------------------------------------------------------------
+
+
+class _FakeHttpResponse:
+    def __init__(self, status_code: int = 200, payload: dict | None = None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"http {self.status_code}")
+
+
+class _FakeHttp:
+    """httpx.AsyncClient fake — grava chamadas e devolve payloads programados."""
+
+    def __init__(self):
+        self.chamadas: list[tuple[str, str]] = []
+        self.token_calls = 0
+
+    async def post(self, url, json=None, data=None, headers=None):
+        self.chamadas.append(("POST", url))
+        if "oauth2.googleapis.com/token" in url:
+            self.token_calls += 1
+            return _FakeHttpResponse(200, {"access_token": "tok-abc", "expires_in": 3600})
+        if url.endswith("/events"):
+            return _FakeHttpResponse(200, {"id": "evt-123"})
+        if url.endswith("/freeBusy"):
+            return _FakeHttpResponse(
+                200,
+                {
+                    "calendars": {
+                        "primary": {
+                            "busy": [
+                                {
+                                    "start": "2026-07-08T13:00:00Z",
+                                    "end": "2026-07-08T14:00:00Z",
+                                }
+                            ]
+                        }
+                    }
+                },
+            )
+        return _FakeHttpResponse(404)
+
+    async def delete(self, url, headers=None):
+        self.chamadas.append(("DELETE", url))
+        return _FakeHttpResponse(204)
+
+    async def aclose(self):
+        pass
+
+
+@pytest.mark.asyncio
+class TestGoogleCalendarClient:
+    async def test_criar_evento_retorna_id_e_cacheia_token(self, monkeypatch):
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_ID", "cid")
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_SECRET", "sec")
+
+        http = _FakeHttp()
+        client = gc.GoogleCalendarClient(refresh_token="rt", http=http)  # type: ignore[arg-type]
+
+        inicio = datetime(2026, 7, 8, 13, 0, tzinfo=UTC)
+        eid1 = await client.criar_evento(
+            "primary",
+            "Reunião — João",
+            "d",
+            inicio,
+            inicio + timedelta(hours=1),
+            "America/Sao_Paulo",
+        )
+        eid2 = await client.criar_evento(
+            "primary",
+            "Reunião — Maria",
+            "d",
+            inicio,
+            inicio + timedelta(hours=1),
+            "America/Sao_Paulo",
+        )
+
+        assert eid1 == eid2 == "evt-123"
+        assert http.token_calls == 1  # access token cacheado entre chamadas
+
+    async def test_listar_ocupados_parseia_freebusy(self, monkeypatch):
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_ID", "cid")
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_SECRET", "sec")
+
+        client = gc.GoogleCalendarClient(refresh_token="rt", http=_FakeHttp())  # type: ignore[arg-type]
+        ocupados = await client.listar_ocupados(
+            "primary",
+            datetime(2026, 7, 8, tzinfo=UTC),
+            datetime(2026, 7, 9, tzinfo=UTC),
+        )
+        assert ocupados == [
+            (
+                datetime(2026, 7, 8, 13, 0, tzinfo=UTC),
+                datetime(2026, 7, 8, 14, 0, tzinfo=UTC),
+            )
+        ]
+
+
+@pytest.mark.asyncio
+class TestGoogleCalendarSync:
+    async def test_confirmacao_cria_evento_e_persiste_id(
+        self, db_session, escritorio_factory, cliente_factory, monkeypatch
+    ):
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        ag = _pendente_aprovacao(escritorio.id, cliente.id)
+        ag.status = "confirmado"
+        db_session.add(ag)
+        await db_session.commit()
+
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_ID", "cid")
+        monkeypatch.setattr(gc.settings, "GOOGLE_CALENDAR_CLIENT_SECRET", "sec")
+        monkeypatch.setattr(
+            gc,
+            "_client_do_escritorio",
+            lambda e: gc.GoogleCalendarClient(refresh_token="rt", http=_FakeHttp()),  # type: ignore[arg-type]
+        )
+
+        ok = await gc.sincronizar_confirmacao(db_session, ag)
+        assert ok is True
+        await db_session.refresh(ag)
+        assert ag.google_event_id == "evt-123"
+
+        # Idempotência: segunda chamada não recria
+        assert await gc.sincronizar_confirmacao(db_session, ag) is False
+
+    async def test_remocao_limpa_event_id(
+        self, db_session, escritorio_factory, cliente_factory, monkeypatch
+    ):
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        ag = _pendente_aprovacao(escritorio.id, cliente.id)
+        ag.google_event_id = "evt-123"
+        db_session.add(ag)
+        await db_session.commit()
+
+        monkeypatch.setattr(
+            gc,
+            "_client_do_escritorio",
+            lambda e: gc.GoogleCalendarClient(refresh_token="rt", http=_FakeHttp()),  # type: ignore[arg-type]
+        )
+
+        assert await gc.remover_evento_agendamento(db_session, ag) is True
+        await db_session.refresh(ag)
+        assert ag.google_event_id is None
+
+    async def test_desconectado_e_noop_silencioso(
+        self, db_session, escritorio_factory, cliente_factory
+    ):
+        """Sem credenciais/conexão, sync é no-op — nunca quebra a confirmação."""
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+
+        escritorio, cliente = await _preparar_cenario(
+            db_session, escritorio_factory, cliente_factory
+        )
+        ag = _pendente_aprovacao(escritorio.id, cliente.id)
+        ag.status = "confirmado"
+        db_session.add(ag)
+        await db_session.commit()
+
+        assert await gc.sincronizar_confirmacao(db_session, ag) is False
+        assert ag.google_event_id is None
+
+    def test_roundtrip_criptografia_refresh_token(self):
+        from feature_1_ia_personalizada.services.agendamento import google_calendar as gc
+        from shared.security.encryption import descriptografar
+
+        class _E:
+            google_calendar_refresh_token = None
+            google_calendar_conectado_em = None
+
+        e = _E()
+        gc.salvar_conexao(e, "refresh-secreto")  # type: ignore[arg-type]
+        assert e.google_calendar_refresh_token != "refresh-secreto"  # criptografado
+        assert descriptografar(e.google_calendar_refresh_token) == "refresh-secreto"
+        gc.limpar_conexao(e)  # type: ignore[arg-type]
+        assert e.google_calendar_refresh_token is None
+
+
+@pytest.mark.asyncio
+class TestDetectorOcupadosExternos:
+    async def test_slot_ocupado_no_google_nao_e_oferecido(
+        self, db_session, escritorio_factory, cliente_factory
+    ):
+        from feature_1_ia_personalizada.services.agendamento.detector import AgendamentoDetector
+
+        escritorio, _ = await _preparar_cenario(db_session, escritorio_factory, cliente_factory)
+        await _criar_disponibilidade(db_session, escritorio.id)
+
+        detector = AgendamentoDetector(
+            db=db_session, escritorio_id=escritorio.id, timezone_str="America/Sao_Paulo"
+        )
+        livres = await detector.buscar_slots(num_slots=3)
+        assert len(livres) == 3
+
+        # Ocupa exatamente o primeiro slot na agenda externa
+        ocupado = [(livres[0].inicio, livres[0].fim)]
+        filtrados = await detector.buscar_slots(num_slots=3, ocupados_externos=ocupado)
+
+        assert len(filtrados) == 3
+        assert filtrados[0].inicio != livres[0].inicio
+        for s in filtrados:
+            assert not (livres[0].inicio < s.fim and livres[0].fim > s.inicio)

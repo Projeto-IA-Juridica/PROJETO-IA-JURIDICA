@@ -44,6 +44,9 @@ ROTAS_PUBLICAS = [
 ROTAS_PUBLICAS_EXATAS = [
     "/admin/import",
     "/onboarding/register",
+    # Redirect OAuth do Google (sem header Authorization) — validado por state
+    # de uso único no Redis; demais rotas /google-calendar/* exigem JWT.
+    "/google-calendar/callback",
 ]
 
 

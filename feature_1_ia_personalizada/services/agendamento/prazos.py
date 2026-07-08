@@ -105,16 +105,63 @@ def extrair_prazos_do_texto(texto: str, hoje: date) -> list[tuple[date, str]]:
     return resultados
 
 
-def _somar_dias_uteis(base: date, n: int) -> date:
-    """Avança n dias úteis (seg–sex) a partir de base — CPC art. 219.
+def _pascoa(ano: int) -> date:
+    """Domingo de Páscoa — algoritmo de Meeus/Jones/Butcher (calendário gregoriano)."""
+    a = ano % 19
+    b, c = divmod(ano, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    length = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * length) // 451
+    mes, dia = divmod(h + length - 7 * m + 114, 31)
+    return date(ano, mes, dia + 1)
 
-    Aproximação: feriados não são considerados (não há calendário forense
-    no sistema); o resultado é marcado como estimado."""
+
+def _feriados_nacionais(ano: int) -> set[date]:
+    """Feriados nacionais BR (fixos + móveis derivados da Páscoa)."""
+    pascoa = _pascoa(ano)
+    return {
+        date(ano, 1, 1),  # Confraternização Universal
+        date(ano, 4, 21),  # Tiradentes
+        date(ano, 5, 1),  # Dia do Trabalho
+        date(ano, 9, 7),  # Independência
+        date(ano, 10, 12),  # Nossa Senhora Aparecida
+        date(ano, 11, 2),  # Finados
+        date(ano, 11, 15),  # Proclamação da República
+        date(ano, 11, 20),  # Consciência Negra (nacional desde 2024, Lei 14.759)
+        date(ano, 12, 25),  # Natal
+        pascoa - timedelta(days=48),  # Segunda de Carnaval
+        pascoa - timedelta(days=47),  # Terça de Carnaval
+        pascoa - timedelta(days=2),  # Sexta-feira Santa
+        pascoa + timedelta(days=60),  # Corpus Christi
+    }
+
+
+def _em_recesso_forense(d: date) -> bool:
+    """CPC art. 220: prazos processuais ficam suspensos de 20/12 a 20/01."""
+    return (d.month == 12 and d.day >= 20) or (d.month == 1 and d.day <= 20)
+
+
+def _eh_dia_util_forense(d: date) -> bool:
+    return d.weekday() < 5 and d not in _feriados_nacionais(d.year) and not _em_recesso_forense(d)
+
+
+def _somar_dias_uteis(base: date, n: int) -> date:
+    """
+    Avança n dias úteis a partir de base — CPC art. 219, pulando fins de
+    semana, feriados nacionais e o recesso forense (art. 220: 20/12–20/01).
+
+    Ainda é aproximação (feriados estaduais/municipais e suspensões locais
+    de expediente ficam de fora) — por isso o resultado leva estimado=True.
+    """
     atual = base
     restantes = n
     while restantes > 0:
         atual += timedelta(days=1)
-        if atual.weekday() < 5:
+        if _eh_dia_util_forense(atual):
             restantes -= 1
     return atual
 

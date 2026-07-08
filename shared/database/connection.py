@@ -97,7 +97,7 @@ worker_session_factory = async_sessionmaker(
 )
 
 
-def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
+def create_worker_session_factory(pooled: bool = False) -> tuple[async_sessionmaker, Any]:
     """
     Cria engine + session factory frescos para uso em Celery workers.
 
@@ -107,6 +107,11 @@ def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     2. Supabase session mode (5432) tem limite de 15 conexões; workers usam
        transaction mode (6543), que suporta centenas. PgBouncer em transaction
        mode não suporta prepared statements — desabilitados via connect_args.
+
+    pooled=True: para tasks com MUITAS queries no mesmo event loop (ex: o
+    orchestrator processa uma mensagem com ~5-10 queries), um pool pequeno
+    reusa a conexão DENTRO da task. Continua seguro entre loops porque a
+    engine é criada por task e descartada no finally (dispose obrigatório).
     """
     worker_url = db_url
     worker_connect_args = dict(connect_args)
@@ -114,14 +119,16 @@ def create_worker_session_factory() -> tuple[async_sessionmaker, Any]:
     if "supabase." in worker_url:
         worker_url = worker_url.replace(":5432/", ":6543/")
 
-    worker_engine = create_async_engine(
-        worker_url,
-        connect_args=worker_connect_args,
-        poolclass=NullPool,
-    )
+    kwargs: dict[str, Any] = {"connect_args": worker_connect_args}
+    if pooled:
+        kwargs.update(pool_size=2, max_overflow=3, pool_timeout=15)
+    else:
+        kwargs["poolclass"] = NullPool
+
+    task_engine = create_async_engine(worker_url, **kwargs)
     factory = async_sessionmaker(
-        bind=worker_engine,
+        bind=task_engine,
         expire_on_commit=False,
         autoflush=False,
     )
-    return factory, worker_engine
+    return factory, task_engine

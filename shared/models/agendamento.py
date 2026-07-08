@@ -149,6 +149,11 @@ class Agendamento(Base, TenantMixin, TimestampMixin):
 
     motivo_cancelamento: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Evento criado no Google Calendar do escritório na confirmação (sync
+    # best-effort); usado para remover/atualizar o evento em cancelamento
+    # ou remarcação. None = sem evento sincronizado.
+    google_event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     escritorio: Mapped[Escritorio] = relationship("Escritorio", back_populates="agendamentos")
     cliente: Mapped[Cliente] = relationship("Cliente", back_populates="agendamentos")
     interacao: Mapped[Interacao | None] = relationship("Interacao", back_populates="agendamentos")

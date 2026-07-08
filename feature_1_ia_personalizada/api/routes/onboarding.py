@@ -628,13 +628,15 @@ async def connect_whatsapp(
                                 "url": webhook_url,
                                 "webhookByEvents": False,
                                 "events": ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
-                                "headers": {"apikey": settings.EVOLUTION_API_KEY or ""}
+                                "headers": {"apikey": settings.EVOLUTION_API_KEY or ""},
                             }
                         },
                     )
                     logger.info("webhook_configurado", instance=instance_name, url=webhook_url)
                 except Exception as e:
-                    logger.warning("erro_ao_configurar_webhook", erro=str(e), instance=instance_name)
+                    logger.warning(
+                        "erro_ao_configurar_webhook", erro=str(e), instance=instance_name
+                    )
 
             if resp.status_code in (200, 201):
                 data = resp.json()

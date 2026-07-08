@@ -484,6 +484,9 @@ Banner fixo no topo quando há pendentes na semana. Empty states com link para C
 | Polling da Agenda (15s) | Varredura de prazos cacheada no Redis por 2 min (`agenda_prazos:{eid}`) |
 | **Prazos relativos** ("prazo de 15 dias úteis") | Calculados em dias úteis (CPC art. 219; "corridos" quando explícito) a partir da âncora — data no próprio texto ou `data_ultimo_andamento`. Sem âncora confiável, não arrisca. Datas calculadas levam `estimado=true` e aparecem com **≈** na Agenda |
 | **Tempo real (SSE)** | `GET /agendamentos/stream` (Redis pub/sub, canal `agendamento_ev:{eid}`): toda transição de estado publica evento; o frontend invalida as queries — card some em milissegundos. Polling vira fallback (10→60s pendentes, 15→60s agenda com stream conectado). Publicação é best-effort: Redis fora nunca quebra uma confirmação |
+| **Feriados + recesso forense** | Dias úteis pulam feriados nacionais (fixos + móveis via Páscoa/Meeus) e o recesso do CPC art. 220 (20/12–20/01). Feriados estaduais/municipais fora → resultado segue `estimado` |
+| **Performance dos workers (medida)** | Benchmark real (`scripts/benchmark_worker_db.py`): NullPool ≈395ms/query vs pooled ≈180ms. Hot path (`executar_fluxo_orquestrador`) usa `create_worker_session_factory(pooled=True)` + dispose por task — reusa conexão dentro da task (~1,5–3s economizados por mensagem), sem cruzar event loops |
+| **Google Calendar** | OAuth2 por escritório (`/google-calendar/auth-url|callback|status|disconnect`; refresh token Fernet em `Escritorio`; migration `20260707_1000`). Confirmação → evento na agenda (a secretária vê); cancelar/remarcar remove; freeBusy filtra horários ocupados externamente nas 3 origens de proposta (nó IA, /sugerir, /agenda/slots). Tudo best-effort; desabilitada sem `GOOGLE_CALENDAR_CLIENT_ID/SECRET/REDIRECT_URI` |
 
 ### 🧪 Testes
 

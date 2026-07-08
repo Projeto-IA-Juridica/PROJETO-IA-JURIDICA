@@ -67,6 +67,18 @@ class Settings(BaseSettings):
     GOOGLE_SHEETS_ID: str | None = None
     GOOGLE_CREDENTIALS_PATH: str | None = None
 
+    # Google Calendar — Agendamento Inteligente (opcional)
+    # OAuth2 por escritório: reuniões confirmadas viram eventos na agenda que a
+    # secretária já usa, e horários ocupados lá deixam de ser oferecidos.
+    # Sem essas variáveis a integração fica desabilitada (fluxo segue normal).
+    GOOGLE_CALENDAR_CLIENT_ID: str | None = None
+    GOOGLE_CALENDAR_CLIENT_SECRET: str | None = None
+    GOOGLE_CALENDAR_REDIRECT_URI: str | None = None
+    # URL pública do frontend (ex: https://app.seudominio.com). Usada no
+    # redirect pós-OAuth quando frontend e backend vivem em domínios
+    # distintos (Railway com 2 serviços). Vazio = redireciona relativo ("/").
+    FRONTEND_URL: str | None = None
+
     # LinkedIn API — Feature 3 (Prospecção Inteligente)
     # Requer aprovação no LinkedIn Partner Program antes de usar.
     # Sem essas variáveis o LinkedInClient opera em modo degradado (retorna []).

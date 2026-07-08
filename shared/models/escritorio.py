@@ -220,6 +220,22 @@ class Escritorio(Base, TimestampMixin):
         nullable=True,
         comment="WhatsApp do advogado para notificações de agendamento",
     )
+    # Google Calendar (OAuth por escritório) — refresh token criptografado com
+    # Fernet (shared/security/encryption). None = integração desconectada.
+    google_calendar_refresh_token: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Refresh token OAuth2 criptografado (Fernet)",
+    )
+    google_calendar_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="ID da agenda alvo; None/'primary' = agenda principal da conta",
+    )
+    google_calendar_conectado_em: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+    )
     timezone: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

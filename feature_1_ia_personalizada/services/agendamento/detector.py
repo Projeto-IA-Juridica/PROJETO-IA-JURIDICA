@@ -62,6 +62,7 @@ class AgendamentoDetector:
         num_slots: int = 3,
         duracao_min: int = 60,
         datas_evitar: set[date] | None = None,
+        ocupados_externos: list[tuple[datetime, datetime]] | None = None,
     ) -> list[SlotDisponivel]:
         """
         Retorna os primeiros num_slots livres.
@@ -70,6 +71,10 @@ class AgendamentoDetector:
         dias são pulados; se não houver alternativa suficiente sem conflito, os
         slots conflitantes entram no fim marcados com conflito_prazo=True
         (o conflito avisa o advogado, nunca bloqueia a proposta).
+
+        ocupados_externos: intervalos UTC ocupados fora do sistema (Google
+        Calendar via freeBusy) — candidatos sobrepostos são descartados, para
+        a IA nunca oferecer um horário em que a secretária já marcou algo.
         """
         disponibilidades = await self._carregar_disponibilidades()
         if not disponibilidades:
@@ -106,6 +111,10 @@ class AgendamentoDetector:
                     break
                 if em_conflito and len(reservas_conflito) >= num_slots:
                     break
+                if ocupados_externos and self._sobrepoe_externo(
+                    inicio_utc, fim_utc, ocupados_externos
+                ):
+                    continue
                 if not await self._tem_conflito(inicio_utc, fim_utc):
                     slot = SlotDisponivel(
                         inicio=inicio_utc,
@@ -194,6 +203,21 @@ class AgendamentoDetector:
         )
         result = await self._db.execute(stmt)
         return result.first() is not None
+
+    @staticmethod
+    def _sobrepoe_externo(
+        inicio_utc: datetime,
+        fim_utc: datetime,
+        ocupados: list[tuple[datetime, datetime]],
+    ) -> bool:
+        for ini, fim in ocupados:
+            if ini.tzinfo is None:
+                ini = ini.replace(tzinfo=_UTC)
+            if fim.tzinfo is None:
+                fim = fim.replace(tzinfo=_UTC)
+            if ini < fim_utc and fim > inicio_utc:
+                return True
+        return False
 
     def _formatar_label(self, inicio_utc: datetime) -> str:
         local = inicio_utc.astimezone(self._tz)
