@@ -34,7 +34,13 @@ db_url = urlunparse(_parsed._replace(query=urlencode(_query)))
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
-connect_args: dict[str, Any] = {"statement_cache_size": 0}
+def _unnamed_stmt():
+    return ""
+
+connect_args: dict[str, Any] = {
+    "statement_cache_size": 0,
+    "prepared_statement_name_func": _unnamed_stmt
+}
 if (
     "supabase.com" in db_url
     or "supabase.co" in db_url
