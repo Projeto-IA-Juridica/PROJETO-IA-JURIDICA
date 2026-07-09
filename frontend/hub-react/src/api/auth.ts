@@ -96,3 +96,19 @@ export async function fetchMe(): Promise<User> {
   })
   return data
 }
+
+export async function changePassword(senhaAtual: string, novaSenha: string): Promise<{ status: string, message: string }> {
+  const token = getAccessToken()
+  const csrf = getCsrfToken()
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
+  if (csrf) {
+    headers['X-CSRF-Token'] = csrf
+  }
+  
+  const { data } = await plain.post(
+    '/auth/change-password',
+    { senha_atual: senhaAtual, nova_senha: novaSenha },
+    { headers }
+  )
+  return data
+}

@@ -91,6 +91,27 @@ class UsuarioLogin(BaseModel):
     senha: str = Field(min_length=1, description="Senha plain-text para verificação")
 
 
+class UsuarioChangePassword(BaseModel):
+    """Payload para mudança de senha — POST /auth/change-password."""
+
+    senha_atual: str = Field(min_length=1, description="Senha atual do usuário")
+    nova_senha: str = Field(min_length=8, description="Nova senha forte")
+
+    @field_validator("nova_senha")
+    @classmethod
+    def validar_senha(cls, v: str) -> str:
+        erros = []
+        if not re.search(r"[A-Z]", v):
+            erros.append("pelo menos uma letra maiúscula")
+        if not re.search(r"[a-z]", v):
+            erros.append("pelo menos uma letra minúscula")
+        if not re.search(r"\d", v):
+            erros.append("pelo menos um número")
+        if erros:
+            raise ValueError(f"Senha fraca — exige: {', '.join(erros)}")
+        return v
+
+
 class UsuarioResponse(BaseModel):
     """
     Representação pública do usuário — retornada nos endpoints.

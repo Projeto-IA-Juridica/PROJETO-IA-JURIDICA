@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut, CreditCard, ExternalLink } from 'lucide-react'
+import { Save, Bot, Clock, MessageSquare, Building2, CheckCircle, Loader2, AlertTriangle, BarChart2, Brain, Users, LogOut, CreditCard, ExternalLink, Key } from 'lucide-react'
 import type { Configuracoes } from '../types'
 import { getConfig, saveConfig } from '../api/config'
-import { fetchMe, logout } from '../api/auth'
+import { fetchMe, logout, changePassword } from '../api/auth'
 import HorariosAtendimento from '../components/agendamento/HorariosAtendimento'
 import GoogleCalendarSection from '../components/agendamento/GoogleCalendarSection'
 import { fetchMetricasHub } from '../api/hub'
@@ -41,6 +41,78 @@ const TOM_OPTS: { value: Configuracoes['persona_tom']; label: string; desc: stri
   { value: 'amigavel', label: 'Amigável', desc: 'Tom próximo e acolhedor'         },
   { value: 'neutro',   label: 'Neutro',   desc: 'Equilibrado e imparcial'         },
 ]
+
+/* ── Alterar Senha ─────────────────────────────────────────────────────── */
+function ChangePasswordSection() {
+  const [senhaAtual, setSenhaAtual] = useState('')
+  const [novaSenha, setNovaSenha] = useState('')
+  const [confirmarSenha, setConfirmarSenha] = useState('')
+  const [msg, setMsg] = useState<{ tipo: 'sucesso' | 'erro', texto: string } | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  async function handleMudarSenha(e: React.FormEvent) {
+    e.preventDefault()
+    setMsg(null)
+    if (!senhaAtual || !novaSenha || !confirmarSenha) {
+      setMsg({ tipo: 'erro', texto: 'Preencha todos os campos' })
+      return
+    }
+    if (novaSenha !== confirmarSenha) {
+      setMsg({ tipo: 'erro', texto: 'A nova senha e a confirmação não conferem' })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await changePassword(senhaAtual, novaSenha)
+      setMsg({ tipo: 'sucesso', texto: 'Senha alterada com sucesso!' })
+      setSenhaAtual('')
+      setNovaSenha('')
+      setConfirmarSenha('')
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail
+      let errorStr = 'Erro ao alterar a senha.'
+      if (typeof detail === 'string') errorStr = detail
+      else if (Array.isArray(detail)) errorStr = detail[0]?.msg || errorStr
+      setMsg({ tipo: 'erro', texto: errorStr })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl card-shadow border border-am-border p-5 card-border-hover">
+      <SectionTitle icon={<Key size={14} />} label="Alterar Senha" desc="Atualize a senha de acesso à sua conta" />
+      <form onSubmit={handleMudarSenha} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Senha atual">
+            <input type="password" value={senhaAtual} onChange={(e) => setSenhaAtual(e.target.value)} className="am-input" required />
+          </Field>
+          <div className="hidden sm:block"></div>
+          <Field label="Nova senha" hint="Mínimo de 8 caracteres, com letra maiúscula, minúscula e número">
+            <input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} className="am-input" required minLength={8} />
+          </Field>
+          <Field label="Confirmar nova senha">
+            <input type="password" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} className="am-input" required minLength={8} />
+          </Field>
+        </div>
+        
+        {msg && (
+          <div className={`flex items-start gap-2 px-4 py-3 rounded-xl text-xs ${msg.tipo === 'sucesso' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+            {msg.tipo === 'sucesso' ? <CheckCircle size={13} className="flex-shrink-0 mt-0.5" /> : <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />}
+            {msg.texto}
+          </div>
+        )}
+
+        <div className="pt-2">
+          <button type="submit" disabled={isLoading} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-fast border" style={{ color: 'var(--color-am-blue)', borderColor: 'rgba(18,72,190,0.25)', background: 'rgba(18,72,190,0.04)', opacity: isLoading ? 0.7 : 1, cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+            {isLoading ? <><Loader2 size={12} className="animate-spin" /> Alterando...</> : <><Save size={12} /> Atualizar senha</>}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 
 /* ── Métricas Hub IA (admin only) ───────────────────────────────────────── */
 function MetricasHubSection() {
@@ -548,6 +620,9 @@ export default function ConfigPage() {
               </div>
             </div>
           </div>
+
+          {/* Alterar Senha */}
+          <ChangePasswordSection />
 
           {/* Assinatura / Billing — admin only */}
           <BillingSection />
