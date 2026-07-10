@@ -31,15 +31,17 @@ _query["prepared_statement_cache_size"] = "0"
 
 db_url = urlunparse(_parsed._replace(query=urlencode(_query)))
 
+
 # =====================================================================
 # ENGINE: O "motor" principal que gerencia o pool de conexões com o BD.
 # =====================================================================
-def _unnamed_stmt():
+def _unnamed_stmt() -> str:
     return ""
+
 
 connect_args: dict[str, Any] = {
     "statement_cache_size": 0,
-    "prepared_statement_name_func": _unnamed_stmt
+    "prepared_statement_name_func": _unnamed_stmt,
 }
 if (
     "supabase.com" in db_url

@@ -373,6 +373,9 @@ async def confirmar_agendamento(
         ag.data_hora_fim = datetime.fromisoformat(opcao["fim"])
         # Commit explícito ANTES de enfileirar o envio — o worker abre sessão própria
         await db.commit()
+        # updated_at (onupdate no servidor) expira no commit; sem refresh o
+        # model_validate tenta IO síncrono e estoura MissingGreenlet
+        await db.refresh(ag)
     finally:
         if r:
             await r.delete(lock_key)
@@ -486,6 +489,7 @@ async def sugerir_novos_horarios(
         if body.nota_advogado:
             ag.nota_advogado = body.nota_advogado
         await db.commit()
+        await db.refresh(ag)  # updated_at expira no commit (onupdate no servidor)
     finally:
         if r:
             await r.delete(lock_key)
@@ -528,6 +532,7 @@ async def cancelar_agendamento(
     ag.status = "cancelado"
     ag.motivo_cancelamento = body.motivo
     await db.commit()
+    await db.refresh(ag)  # updated_at expira no commit (onupdate no servidor)
 
     if notificar_cliente and ag.whatsapp_proposta_cliente_enviado:
         _enfileirar_mensagem_pos_acao(agendamento_id, "cancelado")
