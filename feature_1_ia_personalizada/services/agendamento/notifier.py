@@ -756,9 +756,9 @@ class AgendamentoNotifier:
         primeiro_nome = cliente.nome.split(" ")[0] if cliente else ""
 
         intro = (
-            f"Poxa, {primeiro_nome} — esse horário acabou de ficar indisponível."
+            f"Poxa, {primeiro_nome}, esse horário acabou de ficar indisponível."
             if motivo == "ocupado"
-            else f"Poxa, {primeiro_nome} — esse horário já passou."
+            else f"Poxa, {primeiro_nome}, esse horário já passou."
         )
 
         slots: list[Any] = []

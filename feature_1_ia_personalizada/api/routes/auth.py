@@ -14,7 +14,12 @@ from feature_1_ia_personalizada.api.middleware.csrf import (
 from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.usuario import Usuario
-from shared.schemas.usuario import TokenResponse, UsuarioLogin, UsuarioResponse, UsuarioChangePassword
+from shared.schemas.usuario import (
+    TokenResponse,
+    UsuarioChangePassword,
+    UsuarioLogin,
+    UsuarioResponse,
+)
 from shared.security.encryption import hash_senha, verificar_senha
 from shared.security.jwt import (
     criar_refresh_token,
@@ -228,29 +233,27 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db)) -> Usuari
 
 @router.post("/change-password")
 async def change_password(
-    request: Request,
-    payload: UsuarioChangePassword,
-    db: AsyncSession = Depends(get_db)
+    request: Request, payload: UsuarioChangePassword, db: AsyncSession = Depends(get_db)
 ) -> dict[str, str]:
     """
     Altera a senha do usuário autenticado.
     """
     if not hasattr(request.state, "user_payload"):
         raise HTTPException(status_code=401, detail="Não autenticado")
-        
+
     sub = request.state.user_payload.get("sub")
     if sub is None:
         raise HTTPException(status_code=401, detail="Token inválido: sub ausente")
-        
+
     user_id = int(sub)
     usuario = await db.get(Usuario, user_id)
-    
+
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-        
+
     if not verificar_senha(payload.senha_atual, usuario.senha_hash):
         raise HTTPException(status_code=400, detail="Senha atual incorreta")
-        
+
     usuario.senha_hash = hash_senha(payload.nova_senha)
     usuario.updated_at = datetime.utcnow()
     # O get_db lida com o db.commit() ao final da requisição no middleware/dependency

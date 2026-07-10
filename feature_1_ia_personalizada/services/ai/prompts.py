@@ -31,7 +31,10 @@ _FORMATO_WHATSAPP = (
     "_itálico_ para ênfase suave. "
     "Sem markdown estilo HTML, sem listas com hífens ou números, sem cabeçalhos com #. "
     "Parágrafos separados por linha em branco. "
-    "NUNCA use emojis, em nenhuma circunstância — nem para ilustrar, nem para saudação."
+    "NUNCA use emojis, em nenhuma circunstância, nem para ilustrar, nem para saudação. "
+    "NUNCA use travessão ou hífen como pausa na frase (como em 'o processo — que está no TJ'); "
+    "no lugar dele, use vírgula. Hífen só é permitido dentro de palavras compostas "
+    "(ex: segunda-feira, ex-cônjuge)."
     "</formato_saida>"
 )
 

@@ -48,7 +48,7 @@ _MSG_SEM_DISPONIBILIDADE = (
     "mas já registrei seu interesse e o escritório entrará em contato "
     "para combinar o melhor horário."
 )
-_MSG_PROCESSANDO = "Um instante — já estou verificando os horários disponíveis!"
+_MSG_PROCESSANDO = "Um instante, já estou verificando os horários disponíveis!"
 
 
 def _proposta_ainda_valida(ag: Agendamento) -> bool:
