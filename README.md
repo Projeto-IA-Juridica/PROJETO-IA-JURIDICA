@@ -77,37 +77,43 @@ O resultado: mais clientes atendidos, menos tempo operacional, relacionamento ma
 
 Cobrança mensal por escritório com 4 planos. Receita recorrente e baixo churn estrutural — dados, personas e base RAG ficam no sistema, tornando a troca de produto extremamente custosa para o cliente.
 
-#### Planos e funcionalidades
+#### Planos e funcionalidades (tabela comercial v2)
 
-Assinatura self-service via **Stripe** (checkout, portal de billing e webhooks) com **trial gratuito de 7 dias** em qualquer plano — durante o trial as quotas ficam em ~20% do plano contratado, o suficiente para avaliar sem risco de abuso.
+Assinatura self-service via **Stripe** (checkout, portal de billing e webhooks) com **trial gratuito de 7 dias** em qualquer plano — durante o trial as quotas ficam em ~20% do plano contratado, o suficiente para avaliar sem risco de abuso. Preços fixos publicados; o plano anual dá **20% de desconto**.
 
-| | **Starter** (`basico`) | **Profissional** | **Escritório** | **Enterprise** |
+| | **Essencial** (`basico`) | **Profissional** | **Escritório** | **Enterprise** |
 |---|---|---|---|---|
-| **Preço** | R$ 497/mês | R$ 1.997/mês | R$ 4.997/mês | sob consulta |
+| **Preço mensal** | R$ 997/mês | R$ 1.997/mês | R$ 4.997/mês | sob consulta |
+| **Plano anual (–20%)** | R$ 797/mês | R$ 1.597/mês | R$ 3.997/mês | contratual |
 | **Trial 7 dias** | ✅ | ✅ | ✅ | contrato manual |
 | **Advogados** | 1 | até 5 | até 15 | ilimitado |
-| **Processos monitorados** | 30 | 300 | 500 | ilimitado |
-| **Clientes** | 50 | 500 | 10.000 | ilimitado |
-| **Tokens Claude Sonnet/mês** | 500K | 2M | 5M | ilimitado |
-| **IA WhatsApp 24h** | ✅ | ✅ | ✅ | ✅ |
+| **Processos monitorados** | 50 | 300 | 500 | ilimitado |
+| **Clientes** | 100 | 500 | 10.000 | ilimitado |
+| **Tokens Claude Sonnet/mês** | 750K | 2M | 5M | ilimitado |
+| **IA WhatsApp 24h + atualizações proativas** | ✅ | ✅ | ✅ | ✅ |
 | **Agendamento Inteligente + Google Calendar** | ✅ | ✅ | ✅ | ✅ |
 | **Monitoramento de processos** | ✅ | ✅ | ✅ | ✅ |
-| **RAG — base de conhecimento** | ✅ | ✅ | ✅ | ✅ |
-| **CRM Inteligente** | ✅ | ✅ | ✅ | ✅ |
-| **Analytics & exportação** | básico | completo | completo | completo |
+| **RAG — base de conhecimento** | até 20 documentos | ilimitado | ilimitado | ilimitado |
+| **Analytics** | dashboard básico (horas economizadas, % autônomo) | completo + exportação | completo + exportação | completo |
+| **CRM Inteligente** | ❌ | ✅ | ✅ | ✅ |
 | **Hub do Advogado (Claude Opus)** | ❌ | ✅ 300K tokens/mês | ✅ 1M tokens/mês | ✅ ilimitado |
-| **Prospecção Inteligente** | ❌ | ✅ | ✅ | ✅ |
-| **Suporte** | email | prioritário | dedicado | SLA contratual |
+| **Implantação & suporte** | self-service, email | prioritário | implantação dedicada + SLA | SLA contratual |
 
-Quotas de trial (7 dias): Starter 100K tokens / 10 processos / 20 clientes · Profissional 400K / 60 / 100 · Escritório 1M / 100 / 500. Ao converter, os limites do plano cheio são aplicados automaticamente pelo webhook do Stripe.
+Racional da estrutura: o RAG limitado no Essencial garante que **todo** cliente acumula o moat (base de conhecimento própria) desde o dia 1, e o analytics básico fica no plano de entrada porque a métrica "horas economizadas" é o que sustenta a renovação. A escada de preço (2x → 2,5x) torna cada upgrade natural.
+
+Quotas de trial (7 dias): Essencial 150K tokens / 10 processos / 20 clientes · Profissional 400K / 60 / 100 · Escritório 1M / 100 / 500. Ao converter, os limites do plano cheio são aplicados automaticamente pelo webhook do Stripe.
+
+> **Prospecção Inteligente (F3)** está fora da tabela comercial enquanto a descoberta de leads estiver bloqueada (aguarda API Escavador). Quando ativada, entra como diferencial dos planos Profissional+.
+
+> **Implementação pendente da tabela v2:** criar os novos Price IDs no Stripe (mensais e anuais), atualizar `QUOTAS_POR_PLANO`/`LIMITES_POR_PLANO` em `stripe_service.py` (Essencial: 750K tokens, 50 processos, 100 clientes) e o array `PLANOS` do frontend (`billing.ts` — display "Essencial"). O id interno `basico` permanece; clientes existentes no preço antigo (R$ 497) são grandfathered.
 
 #### Valor entregue vs. preço cobrado
 
-O preço de cada plano representa aproximadamente **2–10% do valor econômico mensal entregue** ao escritório — calculado sobre economia de tempo dos advogados, churn evitado e nova receita gerada por prospecção inteligente.
+O preço de cada plano representa aproximadamente **2–4,5% do valor econômico mensal entregue** ao escritório — calculado sobre economia de tempo dos advogados, secretariado eliminado pelo agendamento, churn evitado e análise de petições.
 
 | Plano | Valor econômico entregue/mês¹ | Preço | % do valor |
 |---|---|---|---|
-| Starter | ~R$ 23.000 | R$ 497 | 2,2% |
+| Essencial | ~R$ 23.000 | R$ 997 | 4,3% |
 | Profissional | ~R$ 96.000 | R$ 1.997 | 2,1% |
 | Escritório | ~R$ 210.000 | R$ 4.997 | 2,4% |
 
@@ -117,30 +123,43 @@ O preço de cada plano representa aproximadamente **2–10% do valor econômico 
 
 Custos variáveis por cliente: Claude API (com prompt caching ativo) + infra Railway pro-rata + Stripe 2,5%. DataJud CNJ como fonte de dados primária (gratuito). Impostos ~15% (Simples Nacional).
 
-| | Starter | Profissional | Escritório |
+| | Essencial | Profissional | Escritório |
 |---|---|---|---|
-| Receita | R$ 497 | R$ 1.997 | R$ 4.997 |
-| Claude Sonnet (com caching) | R$ 15 | R$ 58 | R$ 145 |
+| Receita | R$ 997 | R$ 1.997 | R$ 4.997 |
+| Claude Sonnet (com caching, 750K tokens) | R$ 22 | R$ 58 | R$ 145 |
 | Claude Opus — Hub | — | R$ 77 | R$ 255 |
 | Infra Railway pro-rata | R$ 25 | R$ 50 | R$ 100 |
 | Enriquecimento CNPJ | — | R$ 25 | R$ 60 |
-| Whisper (áudio) | R$ 1 | R$ 5 | R$ 12 |
-| Stripe 2,5% | R$ 12 | R$ 50 | R$ 125 |
-| Impostos ~15% | R$ 75 | R$ 300 | R$ 750 |
-| **Lucro líquido/cliente** | **R$ 369** | **R$ 1.432** | **R$ 3.550** |
-| **Margem líquida** | **74%** | **72%** | **71%** |
+| Whisper (áudio) | R$ 2 | R$ 5 | R$ 12 |
+| Stripe 2,5% | R$ 25 | R$ 50 | R$ 125 |
+| Impostos ~15% | R$ 150 | R$ 300 | R$ 750 |
+| **Lucro líquido/cliente** | **R$ 773** | **R$ 1.432** | **R$ 3.550** |
+| **Margem líquida** | **78%** | **72%** | **71%** |
 
-#### Projeção por escala (3 sócios, mix realista de planos)
+> No plano anual (–20%) a margem líquida cai ~2 p.p. — compensada pelo caixa antecipado de 12 meses e pelo churn estruturalmente menor do contrato anual.
 
-| Clientes ativos | Mix | Líquido total/mês | Por sócio/mês |
-|---|---|---|---|
-| 10 | 6 Profissional + 4 Starter | R$ 10.063 | **R$ 3.354** |
-| 20 | 12 Profissional + 8 Starter | R$ 20.125 | **R$ 6.708** |
-| 30 | 20 Profissional + 8 Starter + 2 Escritório | R$ 36.604 | **R$ 12.201** |
-| 50 | 32 Profissional + 12 Starter + 6 Escritório | R$ 63.523 | **R$ 21.174** |
-| 100 | 65 Profissional + 20 Starter + 15 Escritório | R$ 154.721 | **R$ 51.573** |
+#### Plano de 12 meses (jul/2026 → jul/2027) — com lucro líquido por sócio
 
-> Break-even operacional: **cliente 1** (sem folha fixa — sócios são a equipe). A partir de ~40 clientes, cada sócio supera R$ 15k/mês sem capital externo nem diluição.
+**Premissas:** 3 sócios como equipe (sem folha fixa até o T3; lucro = distribuição integral); lucro líquido por cliente conforme tabela de margens acima; 10 primeiros clientes como design partners com **30% de desconto até dez/2026** (nunca de graça — grátis não valida nada); verba de aquisição de ~8% do MRR a partir do T2; 1 pessoa de CS/suporte (~R$ 5k/mês) a partir de ~50 clientes; churn já embutido nas metas (números líquidos). E = Essencial, P = Profissional, Esc = Escritório.
+
+| Trimestre | Foco do trimestre | Clientes (mix) | MRR | Lucro líquido/mês | **Por sócio/mês** |
+|---|---|---|---|---|---|
+| **T1** — set/2026 | **Provar valor real:** 10 design partners pagantes; iniciar migração p/ WhatsApp Cloud API oficial (risco existencial do Evolution); staging + migrations validadas; métrica "horas economizadas" no dashboard do cliente | 10 (7E + 3P) | ~R$ 9k | ~R$ 5,5k | **~R$ 1,8k** |
+| **T2** — dez/2026 | **Destravar a captação:** implementar `EscavadorClient` e reativar a F3; 2–3 cases escritos com números reais; onboarding 100% self-service (cadastro → 1ª conversa < 30 min) | 28 (16E + 10P + 2Esc) | ~R$ 43k | ~R$ 29k | **~R$ 9,7k** |
+| **T3** — mar/2027 | **Motor de distribuição:** referral incentivado (advogado indica advogado), parcerias OAB/ESA e contadores; contratar 1 CS; iniciar ML de prazos (F4) com a base acumulada | 55 (30E + 20P + 5Esc) | ~R$ 92k | ~R$ 55k | **~R$ 18k** |
+| **T4** — jun/2027 | **Decisão de trajetória:** bootstrapped lucrativo × seed para acelerar antes dos incumbentes (Aurum/Projuris) colarem IA nos produtos deles; avaliar integração Astrea/Projuris (F6) como camada de atendimento | 90 (48E + 32P + 10Esc) | ~R$ 155k | ~R$ 95k | **~R$ 32k** |
+
+**Run-rate ao fim do ano 1:** ARR ~**R$ 1,9M** · lucro anualizado ~**R$ 1,1M** (~R$ 380k/sócio/ano) · churn-alvo < 2,5%/mês · ≥ 40% dos novos clientes por indicação · CAC recuperado em < 4 meses.
+
+> Break-even operacional continua no **cliente 1** (sem folha fixa até o T3). A janela competitiva estimada é de 12–24 meses antes dos incumbentes de gestão lançarem atendimento com IA — o ano 1 se decide em **distribuição e no risco Evolution API**, não em código.
+
+**Sinais de alerta (agir imediatamente):**
+
+| Sinal | Reação |
+|---|---|
+| Churn > 5%/mês sustentado | Parar de vender e corrigir produto — o valor prometido não está sendo entregue |
+| Ban de número WhatsApp em cliente pagante | Acelerar migração para a Cloud API oficial a qualquer custo |
+| Escavador não destravar a F3 | Reposicionar o pitch inteiro em retenção/atendimento e revisar o preço do Profissional |
 
 ---
 
@@ -238,7 +257,7 @@ A intenção `agendar_reuniao` tem threshold de confiança próprio — quando d
 - Rate limit de 5 mensagens proativas por dia por cliente
 - Mensagens bloqueadas são salvas na tabela `mensagens_agendadas` e despachadas automaticamente pelo `dispatcher_agendadas` a cada 5 minutos via Celery Beat
 
-**Quota de tokens:** cada plano tem limite mensal de tokens Claude (basico=500K | profissional=2M | escritorio=5M | enterprise=ilimitado; em trial, ~20% desses valores). Ao atingir a quota, o fluxo retorna mensagem de limite e não chama a API.
+**Quota de tokens:** cada plano tem limite mensal de tokens Claude (ver tabela de planos; em trial, ~20% do plano). Ao atingir a quota, o fluxo retorna mensagem de limite e não chama a API.
 
 ---
 
@@ -917,7 +936,7 @@ EXPLORIUM_API_KEY=...           # Vibe Prospecting — fallback LinkedIn
 # Billing — Stripe (sem SECRET_KEY o módulo opera em modo degradado)
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_BASICO=price_...        # R$ 497/mês
+STRIPE_PRICE_ID_BASICO=price_...        # Essencial — R$ 997/mês (id interno `basico`)
 STRIPE_PRICE_ID_PROFISSIONAL=price_...  # R$ 1.997/mês
 STRIPE_PRICE_ID_ESCRITORIO=price_...    # R$ 4.997/mês
 STRIPE_TRIAL_DAYS=7             # 0 = sem trial
