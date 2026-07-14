@@ -313,6 +313,19 @@ app.include_router(webhook_whatsapp)
 app.include_router(admin_import)
 
 # ==========================================
+# MÁQUINA DE VENDAS (feature_vendas) — OPT-IN, ISOLADA
+# ==========================================
+# Ponto de contato ÚNICO e guardado: se a feature estiver desligada
+# (VENDAS_TENANT_ID ausente) ou a pasta feature_vendas removida, este bloco é
+# um no-op e o produto roda idêntico. Nenhuma rota de cliente é afetada.
+try:
+    from feature_vendas.integration import incluir_rotas as _incluir_vendas
+
+    _incluir_vendas(app)
+except Exception:  # pragma: no cover — isolamento total: vendas nunca quebra o app
+    logger.debug("feature_vendas indisponível — seguindo sem a máquina de vendas")
+
+# ==========================================
 # INSTRUMENTAÇÃO HTTP (Prometheus)
 # ==========================================
 # Adiciona métricas HTTP automáticas:
