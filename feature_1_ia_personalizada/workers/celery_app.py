@@ -255,6 +255,15 @@ celery_app.conf.beat_schedule = {
     },
 }
 
+# Máquina de vendas (feature_vendas) — schedules OPT-IN e ISOLADOS. Guardado:
+# desligada ou pasta ausente → dict vazio, o Beat do produto segue idêntico.
+try:
+    from feature_vendas.integration import beat_schedule_vendas as _beat_vendas
+
+    celery_app.conf.beat_schedule.update(_beat_vendas())
+except Exception:  # pragma: no cover — isolamento: vendas nunca quebra o Beat
+    pass
+
 
 class DLQTask(Task):
     """
@@ -344,3 +353,11 @@ import feature_1_ia_personalizada.workers.ingest_documentos  # noqa: F401
 import feature_1_ia_personalizada.workers.mensagens_relacionamento  # noqa: F401
 import feature_1_ia_personalizada.workers.monitor_processos  # noqa: F401
 import feature_1_ia_personalizada.workers.send_notifications  # noqa: F401
+
+# Tasks da máquina de vendas — guardadas: se a pasta feature_vendas não existir,
+# o worker do produto registra suas tasks normalmente e ignora as de vendas.
+try:
+    import feature_vendas.workers.conversa_worker  # noqa: F401
+    import feature_vendas.workers.maquina_vendas  # noqa: F401
+except Exception:  # pragma: no cover — isolamento total
+    pass
