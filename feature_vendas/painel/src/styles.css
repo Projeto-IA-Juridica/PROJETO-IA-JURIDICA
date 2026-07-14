@@ -1,0 +1,29 @@
+/* Tokens locais do painel interno — deliberadamente NÃO importa o design system
+   do hub dos clientes, para não haver acoplamento algum entre os dois. */
+:root {
+  --bg: #f4f8fc;
+  --card: #ffffff;
+  --ink: #0c1e30;
+  --secondary: #4a6a88;
+  --muted: #8aaac0;
+  --blue: #3a7ab8;
+  --green: #1a9e78;
+  --amber: #d08010;
+  --red: #c83030;
+  --border: rgba(168, 200, 232, 0.35);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; cursor: pointer; border: none; }
+textarea { font: inherit; }
+a { text-decoration: none; }
+.tabnum { font-variant-numeric: tabular-nums; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
