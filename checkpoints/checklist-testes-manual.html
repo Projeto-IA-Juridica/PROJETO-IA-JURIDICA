@@ -1,0 +1,782 @@
+<title>Checklist de testes — amicus</title>
+<style>
+  :root{
+    --bg: #F3F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #EAF0F7;
+    --ink: #10202F;
+    --muted: #5A7186;
+    --faint: #93A7B8;
+    --border: #D8E3EE;
+    --accent: #1248BE;
+    --accent-ink: #0C1E30;
+    --accent-soft: #E7EEFB;
+    --ok: #1A9E78;
+    --ok-soft: #E4F5EE;
+    --warn: #B8790F;
+    --warn-soft: #FBF0DC;
+    --danger: #C23636;
+    --danger-soft: #FBE7E7;
+    --font-ui: -apple-system, "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #0E1720; --surface: #16212C; --surface-2: #1C2A37; --ink: #E7EEF5;
+      --muted: #9AB0C2; --faint: #5E7488; --border: #2A3D4C;
+      --accent: #6C9BF0; --accent-ink: #EAF1FF; --accent-soft: #1C2E47;
+      --ok: #4CC79A; --ok-soft: #163427; --warn: #E0A83C; --warn-soft: #3A2E12;
+      --danger: #E8706A; --danger-soft: #3A1E1E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #0E1720; --surface: #16212C; --surface-2: #1C2A37; --ink: #E7EEF5;
+    --muted: #9AB0C2; --faint: #5E7488; --border: #2A3D4C;
+    --accent: #6C9BF0; --accent-ink: #EAF1FF; --accent-soft: #1C2E47;
+    --ok: #4CC79A; --ok-soft: #163427; --warn: #E0A83C; --warn-soft: #3A2E12;
+    --danger: #E8706A; --danger-soft: #3A1E1E;
+  }
+  :root[data-theme="light"]{
+    --bg: #F3F6FA; --surface: #FFFFFF; --surface-2: #EAF0F7; --ink: #10202F;
+    --muted: #5A7186; --faint: #93A7B8; --border: #D8E3EE;
+    --accent: #1248BE; --accent-ink: #0C1E30; --accent-soft: #E7EEFB;
+    --ok: #1A9E78; --ok-soft: #E4F5EE; --warn: #B8790F; --warn-soft: #FBF0DC;
+    --danger: #C23636; --danger-soft: #FBE7E7;
+  }
+
+  *,*::before,*::after{ box-sizing: border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font-ui); font-size:14.5px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{ max-width:860px; margin:0 auto; padding:28px 20px 100px; }
+
+  header{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    margin:0 -20px 22px; padding:16px 20px 14px;
+    border-bottom:1px solid var(--border);
+  }
+  .eyebrow{
+    font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:4px;
+  }
+  h1{ font-size:21px; font-weight:800; letter-spacing:-.01em; margin:0 0 12px; text-wrap:balance; }
+  .progress-row{ display:flex; align-items:center; gap:12px; }
+  .progress-track{
+    flex:1; height:8px; border-radius:99px; background:var(--surface-2);
+    overflow:hidden; border:1px solid var(--border);
+  }
+  .progress-fill{
+    height:100%; border-radius:99px;
+    background:linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--ok)));
+    width:0%; transition:width .35s ease;
+  }
+  .progress-label{
+    font-variant-numeric:tabular-nums; font-size:12.5px; font-weight:700; color:var(--muted);
+    white-space:nowrap; min-width:64px; text-align:right;
+  }
+  .toolbar{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  button.tool{
+    font-family:var(--font-ui); font-size:12.5px; font-weight:600;
+    color:var(--muted); background:var(--surface); border:1px solid var(--border);
+    border-radius:9px; padding:6px 12px; cursor:pointer; transition:all .12s;
+  }
+  button.tool:hover{ border-color:var(--accent); color:var(--accent); }
+  button.tool:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  button.tool.danger:hover{ border-color:var(--danger); color:var(--danger); }
+
+  section.area{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    margin-bottom:16px; overflow:hidden;
+  }
+  .area-head{ display:flex; align-items:center; gap:12px; padding:15px 18px; cursor:pointer; user-select:none; }
+  .area-head:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .area-chip{
+    font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    padding:3px 8px; border-radius:6px; white-space:nowrap;
+  }
+  .chip-real{ background:var(--ok-soft); color:var(--ok); }
+  .chip-mock{ background:var(--warn-soft); color:var(--warn); }
+  .area-title{ font-weight:800; font-size:15px; flex:1; letter-spacing:-.005em; }
+  .area-count{ font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; font-weight:600; }
+  .area-caret{ color:var(--faint); transition:transform .18s; font-size:12px; }
+  section.area.collapsed .area-caret{ transform:rotate(-90deg); }
+  .area-note{ padding:0 18px 14px; margin-top:-6px; font-size:12.5px; color:var(--muted); line-height:1.6; }
+  .area-body{ border-top:1px solid var(--border); }
+  section.area.collapsed .area-body{ display:none; }
+
+  .group-title{
+    font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--faint); padding:14px 18px 4px;
+  }
+
+  .item{ border-top:1px solid var(--border); }
+  .item:first-of-type{ border-top:none; }
+  .item.checked > .item-row{ background:color-mix(in srgb, var(--ok-soft) 55%, transparent); }
+
+  .item-row{ display:flex; align-items:flex-start; gap:11px; padding:9px 18px; }
+
+  input[type="checkbox"]{
+    appearance:none; -webkit-appearance:none;
+    width:19px; height:19px; margin:1px 0 0; flex-shrink:0;
+    border:1.6px solid var(--border); border-radius:6px; background:var(--surface);
+    cursor:pointer; position:relative; transition:all .12s;
+  }
+  input[type="checkbox"]:hover{ border-color:var(--accent); }
+  input[type="checkbox"]:checked{ background:var(--ok); border-color:var(--ok); }
+  input[type="checkbox"]:checked::after{
+    content:""; position:absolute; left:5px; top:1px; width:5px; height:9px;
+    border:solid white; border-width:0 2px 2px 0; transform:rotate(40deg);
+  }
+  input[type="checkbox"]:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .item-body{ flex:1; min-width:0; }
+  .item-text-row{ display:flex; align-items:flex-start; gap:8px; cursor:pointer; }
+  .item-text{ font-size:13.5px; color:var(--ink); flex:1; }
+  .item.checked .item-text{ color:var(--muted); text-decoration:line-through; text-decoration-color:var(--faint); text-decoration-thickness:1.4px; }
+
+  .steps-toggle{
+    flex-shrink:0; display:flex; align-items:center; gap:4px;
+    font-size:11.5px; font-weight:700; color:var(--accent);
+    background:none; border:none; cursor:pointer; padding:1px 0 1px 4px; font-family:var(--font-ui);
+    white-space:nowrap;
+  }
+  .steps-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  .steps-toggle .car{ display:inline-block; transition:transform .15s; font-size:9px; }
+  .item.expanded .steps-toggle .car{ transform:rotate(90deg); }
+
+  .steps-panel{ display:none; padding:2px 0 10px 2px; }
+  .item.expanded .steps-panel{ display:block; }
+  .steps-panel ol{
+    margin:6px 0 0; padding-left:20px; display:flex; flex-direction:column; gap:5px;
+  }
+  .steps-panel li{ font-size:12.5px; color:var(--muted); line-height:1.55; }
+  .steps-panel li::marker{ color:var(--accent); font-weight:700; }
+  .steps-panel .expect{
+    margin-top:7px; padding:7px 10px; border-radius:9px;
+    background:var(--accent-soft); font-size:12px; color:var(--accent-ink); line-height:1.5;
+  }
+  :root[data-theme="dark"] .steps-panel .expect{ color:var(--ink); }
+  @media (prefers-color-scheme: dark){ .steps-panel .expect{ color:var(--ink); } }
+  .steps-panel .expect b{ color:var(--accent); }
+  .steps-panel code, .item-hint code{
+    font-family:var(--font-mono); font-size:11px; background:var(--surface-2);
+    padding:1px 5px; border-radius:5px; color:var(--accent-ink);
+  }
+  :root[data-theme="dark"] .steps-panel code, :root[data-theme="dark"] .item-hint code{ color:var(--accent); }
+  @media (prefers-color-scheme: dark){ .steps-panel code, .item-hint code{ color:var(--accent); } }
+
+  .item-hint{ font-size:12px; color:var(--muted); margin-top:2px; line-height:1.55; }
+
+  .tag{
+    display:inline-block; font-size:10px; font-weight:700; letter-spacing:.03em;
+    padding:1.5px 7px; border-radius:6px; margin-left:7px; vertical-align:1px;
+  }
+  .tag-erro{ background:var(--danger-soft); color:var(--danger); }
+  .tag-valid{ background:var(--warn-soft); color:var(--warn); }
+
+  footer{ text-align:center; color:var(--faint); font-size:11.5px; margin-top:26px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .progress-fill, .area-caret, .steps-toggle .car{ transition:none; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">QA manual · amicus</div>
+    <h1>Checklist de testes — login ao cadastro</h1>
+    <div class="progress-row">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">0 / 0</div>
+    </div>
+    <div class="toolbar">
+      <button class="tool" id="expandAll">Expandir tudo</button>
+      <button class="tool" id="collapseAll">Recolher tudo</button>
+      <button class="tool danger" id="resetAll">Zerar progresso</button>
+    </div>
+  </header>
+
+  <div id="areas"></div>
+
+  <footer>Progresso salvo automaticamente neste navegador. Clique em "Como testar" para ver o passo a passo de cada item.</footer>
+</div>
+
+<script>
+const DATA = [
+  {
+    id: "hub-acesso",
+    title: "Hub do Advogado — Acesso",
+    chip: "real", chipLabel: "backend real",
+    note: "http://localhost:5174 — fluxo de login de advogado, integrado ao backend.",
+    groups: [
+      { title: "Tela inicial", items: [
+        { t: "Splash 'amicus' carrega e o botão <strong>Começar</strong> leva à tela de login.",
+          steps: [
+            "Abra <code>http://localhost:5174</code> no navegador.",
+            "Confirme que aparece a palavra “amicus” em destaque no centro e o botão <strong>Começar</strong>."
+          ], expect: "Ao clicar em <b>Começar</b>, a tela troca para o formulário de login (campos de e-mail e senha)." },
+        { t: "Link de ajuda abre a página de contato e volta para o login.",
+          steps: [
+            "Na tela de login, clique em <strong>“Precisa de ajuda? Fale conosco →”</strong> (canto superior direito).",
+            "Confirme que abre uma página com o título “Fale com a gente.” e um formulário.",
+            "Clique em <strong>“← Voltar ao login”</strong> ou no logo “amicus” no topo."
+          ], expect: "Deve voltar exatamente para a tela de login." },
+      ]},
+      { title: "Login", items: [
+        { t: "Campos vazios não avançam e mostram aviso.", tag:"valid",
+          steps: [
+            "Na tela de login, deixe e-mail e senha em branco.",
+            "Clique em <strong>“Entrar na plataforma”</strong>."
+          ], expect: "Aparece a mensagem <b>“Preencha e-mail e senha.”</b> e a tela não muda." },
+        { t: "E-mail/senha incorretos exibe erro.", tag:"erro",
+          steps: [
+            "E-mail: <code>ana@silvarodrigue.adv.br</code>",
+            "Senha: qualquer coisa errada, ex: <code>senhaerrada123</code>",
+            "Clique em <strong>“Entrar na plataforma”</strong>."
+          ], expect: "Aparece <b>“E-mail ou senha incorretos.”</b> em vermelho, sem sair da tela de login." },
+        { t: "Muitas tentativas erradas seguidas dispara bloqueio temporário (429).", tag:"erro",
+          steps: [
+            "Repita o teste anterior (login errado) 5–6 vezes seguidas, rápido."
+          ], expect: "Em algum momento a mensagem deve mudar para <b>“Conta bloqueada temporariamente. Tente em 15 minutos.”</b>" },
+        { t: "Login correto avança para o painel.",
+          steps: [
+            "E-mail: <code>ana@silvarodrigue.adv.br</code>",
+            "Senha: <code>Advogada@456</code>",
+            "Clique em <strong>“Entrar na plataforma”</strong>."
+          ], expect: "Mostra uma tela de carregamento e em seguida o painel principal, com a barra de navegação flutuante (dock) na parte de baixo." },
+        { t: "Sessão persiste ao recarregar a página.",
+          steps: [
+            "Estando logado no painel, aperte F5 (recarregar)."
+          ], expect: "Você continua logado no painel — não deve voltar para a tela de login." },
+        { t: "Botão do olho mostra/esconde a senha digitada.",
+          steps: [
+            "No campo de senha, digite qualquer texto.",
+            "Clique no ícone de olho dentro do campo."
+          ], expect: "A senha alterna entre visível (texto) e oculta (pontinhos) a cada clique." },
+      ]},
+    ],
+  },
+  {
+    id: "hub-cadastro",
+    title: "Hub do Advogado — Cadastro de escritório (7 etapas)",
+    chip: "real", chipLabel: "backend real",
+    note: "Acessível pelo botão “Novo escritório? Criar conta gratuita” na tela de login. Cria um escritório de verdade no banco — use CNPJs de teste diferentes a cada tentativa completa, exceto quando o item pedir repetir um CNPJ de propósito.",
+    groups: [
+      { title: "Etapa 1 de 7 — Acesso", items: [
+        { t: "E-mail inválido bloqueia o avanço.", tag:"valid",
+          steps: [
+            "Na tela de login, clique em <strong>“Novo escritório? Criar conta gratuita →”</strong>.",
+            "No campo “E-mail profissional”, digite algo sem @, ex: <code>testeescritorio</code>",
+            "Clique em <strong>“Próximo →”</strong>."
+          ], expect: "Mostra <b>“E-mail inválido.”</b> e continua na Etapa 1." },
+        { t: "Senha fraca é bloqueada.", tag:"valid",
+          steps: [
+            "No campo “Senha”, digite algo fraco, ex: <code>123</code>"
+          ], expect: "Ao clicar em “Próximo →”, mostra <b>“Senha fraca. Use maiúsculas, números e símbolos.”</b>" },
+        { t: "Confirmação de senha diferente da senha mostra erro.", tag:"valid",
+          steps: [
+            "Senha: <code>Teste@1234</code>",
+            "Confirmar senha: <code>Teste@0000</code>",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“As senhas não coincidem.”</b>" },
+        { t: "Indicador de força da senha muda com o que você digita.",
+          steps: [
+            "Digite progressivamente: <code>a</code>, depois <code>abc123</code>, depois <code>Abc123!@</code> no campo Senha."
+          ], expect: "As 4 barrinhas abaixo do campo vão preenchendo e mudando de cor (vermelho → laranja → azul → verde) conforme a senha fica mais forte." },
+      ]},
+      { title: "Etapa 2 de 7 — Escritório", items: [
+        { t: "Deixar campos obrigatórios em branco bloqueia o avanço.", tag:"valid",
+          steps: [
+            "Preencha a Etapa 1 corretamente e avance.",
+            "Na Etapa 2, deixe nome, CNPJ, OAB e responsável vazios.",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra os 4 avisos: “Nome do escritório obrigatório.”, “CNPJ obrigatório.”, “OAB obrigatória.” e “Nome do responsável obrigatório.”" },
+        { t: "CNPJ com dígito verificador errado é recusado.", tag:"erro",
+          steps: [
+            "Preencha nome, OAB (ex: <code>SP123456</code>) e responsável.",
+            "No campo CNPJ digite algo inválido, ex: <code>11.111.111/1111-11</code>",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“CNPJ inválido — verifique os dígitos verificadores.”</b>" },
+        { t: "CNPJ já usado em outro cadastro é recusado.", tag:"erro",
+          steps: [
+            "Complete um cadastro inteiro uma vez (até a ativação) com um CNPJ válido qualquer.",
+            "Comece um <strong>novo</strong> cadastro e use o <strong>mesmo CNPJ</strong> de novo.",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“CNPJ já cadastrado. Faça login ou use outro CNPJ.”</b>" },
+        { t: "OAB fora do formato esperado é recusada.", tag:"erro",
+          steps: [
+            "No campo OAB digite só números, ex: <code>123456</code>",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“OAB inválida — formato esperado: UFNNNNN (ex: SP123456).”</b>" },
+        { t: "Seleção de áreas de atuação (pills) marca e desmarca.",
+          steps: [
+            "Clique em algumas pills de área, ex: “Civil”, “Trabalhista”.",
+            "Clique de novo nelas."
+          ], expect: "Ficam destacadas em azul ao marcar e voltam ao normal ao desmarcar." },
+        { t: "Preenchimento correto avança para a etapa de WhatsApp.",
+          steps: [
+            "Nome do escritório: <code>Escritório Teste QA</code>",
+            "CNPJ: um CNPJ válido novo (com dígitos verificadores corretos)",
+            "OAB: <code>SP999999</code>",
+            "Responsável: <code>Dr. Teste da Silva</code>",
+            "Clique em “Próximo →”."
+          ], expect: "Avança sem erros para “Conecte seu WhatsApp” (Etapa 3)." },
+      ]},
+      { title: "Etapa 3 de 7 — WhatsApp", items: [
+        { t: "QR Code aparece ou mostra aviso de indisponível.",
+          steps: [
+            "Observe a caixa de QR Code ao entrar na etapa."
+          ], expect: "Neste ambiente de teste (Evolution API não configurado), é esperado ver <b>“WhatsApp não configurado neste ambiente. Você pode avançar e conectar depois.”</b> — isso não é um bug." },
+        { t: "É possível avançar sem conectar o WhatsApp.",
+          steps: [
+            "Sem escanear nada, clique em “Próximo →”."
+          ], expect: "Avança normalmente para a etapa de Persona." },
+        { t: "Selecionar dias e horários atualiza o resumo.",
+          steps: [
+            "Clique nas pills de dias (Seg a Dom) para marcar/desmarcar.",
+            "Mude os seletores de hora/minuto de início e fim."
+          ], expect: "O texto “A IA enviará mensagens de … às … nos dias: …” no rodapé atualiza em tempo real." },
+        { t: "Horário de início depois do fim mostra erro.", tag:"valid",
+          steps: [
+            "Configure o início às 20h e o fim às 08h.",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“Horário de início deve ser anterior ao fim.”</b>" },
+      ]},
+      { title: "Etapa 4 de 7 — Persona da IA", items: [
+        { t: "Nome da assistente é obrigatório.", tag:"valid",
+          steps: [
+            "Deixe “Nome da assistente” vazio.",
+            "Clique em “Próximo →”."
+          ], expect: "Mostra <b>“Dê um nome para sua assistente.”</b>" },
+        { t: "Prévia da mensagem atualiza com o nome digitado.",
+          steps: [
+            "Digite <code>Sofia</code> no campo “Nome da assistente”.",
+            "Clique em um dos tons, ex: “Próximo e cordial”.",
+            "Observe o balão de prévia."
+          ], expect: "O balão muda para “Olá! Sou Sofia, assistente virtual do escritório. Em que posso ajudar?” e o tom escolhido fica destacado." },
+      ]},
+      { title: "Etapa 5 de 7 — Importar dados (opcional)", items: [
+        { t: "Selecionar arquivo que não é .csv mostra erro.", tag:"erro",
+          steps: [
+            "Clique na área “Arraste o CSV ou clique para selecionar”.",
+            "Escolha um arquivo que não seja .csv (ex: uma foto)."
+          ], expect: "Mostra <b>“Selecione um arquivo .csv”</b>." },
+        { t: "CSV válido mostra prévia e importa.",
+          steps: [
+            "Prepare um .csv com colunas <code>nome</code>, <code>telefone_whatsapp</code>, <code>numero_processo</code> (esta última opcional).",
+            "Selecione o arquivo na área de upload.",
+            "Confira a prévia com a contagem de Clientes/Processos/Erros.",
+            "Clique em “Importar N clientes”."
+          ], expect: "Mostra a tela “Dados importados!” com o total de clientes e processos novos." },
+        { t: "É possível pular esta etapa sem enviar nada.",
+          steps: [
+            "Sem selecionar arquivo nenhum, clique em “Pular esta etapa →”."
+          ], expect: "Avança direto para “Conformidade OAB”." },
+      ]},
+      { title: "Etapa 6 de 7 — Conformidade OAB", items: [
+        { t: "Avançar sem marcar o aceite é bloqueado.", tag:"valid",
+          steps: [
+            "Sem marcar a caixa de aceite, clique em “Aceitar e continuar →”."
+          ], expect: "Mostra <b>“⚠ Obrigatório para avançar.”</b>" },
+        { t: "Marcar o aceite libera o avanço.",
+          steps: [
+            "Marque a caixa “Declaro que li e concordo…”.",
+            "Clique em “Aceitar e continuar →”."
+          ], expect: "Avança para “Ativar o escritório” (Etapa 7)." },
+      ]},
+      { title: "Etapa 7 de 7 — Revisão e ativação", items: [
+        { t: "Tela de revisão mostra os dados certos de todas as etapas.",
+          steps: [
+            "Confira linha por linha: e-mail, nome do escritório, OAB, status do WhatsApp, janela de envio, assistente e conformidade."
+          ], expect: "Cada linha reflete exatamente o que foi preenchido nas etapas anteriores." },
+        { t: "Ativar conclui o cadastro e leva ao painel.",
+          steps: [
+            "Clique em “Ativar escritório →”.",
+            "Na tela “Escritório ativado!”, clique em “Acessar o dashboard →”."
+          ], expect: "Você entra logado no painel principal, já com a nova conta criada." },
+        { t: "Cadastro parcial é retomado do ponto certo ao voltar.",
+          steps: [
+            "Durante o cadastro, logo depois de concluir a Etapa 2 (conta já criada no backend), recarregue a página (F5) ou feche e abra de novo em <code>http://localhost:5174</code>."
+          ], expect: "O assistente retoma direto na etapa “Conecte seu WhatsApp” — não pede para criar a conta de novo." },
+      ]},
+    ],
+  },
+  {
+    id: "hub-painel",
+    title: "Hub do Advogado — Navegação pós-login",
+    chip: "real", chipLabel: "backend real",
+    note: "Barra flutuante (dock) na parte inferior da tela, com ícones para cada seção.",
+    groups: [
+      { title: "Abas da dock", items: [
+        { t: "Painel carrega sem erro.",
+          steps: ["Estando logado, clique no ícone <strong>Painel</strong> na dock."],
+          expect: "A tela muda para o resumo do painel, sem mensagem de erro nem tela em branco." },
+        { t: "Hub IA carrega sem erro.",
+          steps: ["Clique no ícone <strong>Hub IA</strong> na dock."],
+          expect: "Carrega o conteúdo da seção sem erro." },
+        { t: "Clientes lista os clientes do escritório.",
+          steps: ["Clique no ícone <strong>Clientes</strong> na dock."],
+          expect: "Aparece uma lista incluindo Carlos Eduardo Santos, Maria Aparecida Oliveira e João Paulo Rodrigues (dados de exemplo do banco de testes)." },
+        { t: "Relacionamento (CRM) carrega sem erro.",
+          steps: ["Clique no ícone <strong>Relacionamento</strong> na dock."],
+          expect: "Carrega sem erro." },
+        { t: "Captação carrega sem erro.",
+          steps: ["Clique no ícone <strong>Captação</strong> na dock."],
+          expect: "Carrega sem erro." },
+        { t: "Documentos carrega sem erro.",
+          steps: ["Clique no ícone <strong>Documentos</strong> na dock."],
+          expect: "Carrega sem erro." },
+        { t: "Configurações carrega sem erro.",
+          steps: ["Clique no ícone <strong>Configurações</strong> na dock."],
+          expect: "Carrega sem erro." },
+        { t: "Clicar num cliente do Painel abre o detalhe dele em Clientes.",
+          steps: [
+            "Na seção Painel, clique em um dos cartões de cliente listados."
+          ], expect: "A navegação muda para a seção Clientes já com aquele cliente aberto/selecionado." },
+      ]},
+    ],
+  },
+  {
+    id: "admin-acesso",
+    title: "Painel Admin — Acesso e cadastro",
+    chip: "real", chipLabel: "backend real",
+    note: "http://localhost:5173 — painel administrativo, rotas protegidas por login.",
+    groups: [
+      { title: "Guarda de rota", items: [
+        { t: "Acessar /hub sem login redireciona para /login.",
+          steps: [
+            "Se estiver logado, clique em “Sair” na barra lateral primeiro.",
+            "Digite <code>http://localhost:5173/hub</code> direto na barra de endereço e aperte Enter."
+          ], expect: "É redirecionado automaticamente para <code>http://localhost:5173/login</code>." },
+      ]},
+      { title: "Aba Entrar", items: [
+        { t: "Campos vazios não submetem (validação do navegador).",
+          steps: [
+            "Na aba “Entrar”, clique no botão “Entrar” sem preencher nada."
+          ], expect: "O navegador mostra o aviso nativo “Preencha este campo” e não chega a chamar a API." },
+        { t: "Credenciais erradas mostram alerta de erro.", tag:"erro",
+          steps: [
+            "E-mail: <code>admin@silvarodrigue.adv.br</code>",
+            "Senha: <code>senha-errada</code>",
+            "Clique em “Entrar”."
+          ], expect: "Aparece uma caixa de alerta vermelha com a mensagem de erro, sem sair da tela de login." },
+        { t: "Credenciais corretas entram no painel.",
+          steps: [
+            "E-mail: <code>admin@silvarodrigue.adv.br</code>",
+            "Senha: <code>Admin@123</code>",
+            "Clique em “Entrar”."
+          ], expect: "Você é levado para <code>/hub</code> já logado." },
+      ]},
+      { title: "Aba Criar conta", items: [
+        { t: "CNPJ já usado é recusado.", tag:"erro",
+          steps: [
+            "Clique na aba “Criar conta”.",
+            "Preencha com um CNPJ que você já cadastrou antes (aqui mesmo ou no cadastro do hub-react).",
+            "Clique em “Criar conta”."
+          ], expect: "Aparece um alerta de CNPJ duplicado." },
+        { t: "Senha curta é bloqueada pelo próprio campo.", tag:"valid",
+          steps: [
+            "Na aba “Criar conta”, digite uma senha com menos de 8 caracteres.",
+            "Tente enviar o formulário."
+          ], expect: "O navegador bloqueia o envio (o campo exige mínimo de 8 caracteres)." },
+        { t: "Cadastro completo cria a conta e avança.",
+          steps: [
+            "Escritório: <code>Admin QA Escritório</code>",
+            "CNPJ: um CNPJ novo e válido",
+            "Responsável: <code>Dra. Teste Admin</code>",
+            "OAB: <code>SP888888</code>",
+            "E-mail: um e-mail novo, ex: <code>qaadmin@teste.com</code>",
+            "Senha: 8+ caracteres, ex: <code>Teste@1234</code>",
+            "Clique em “Criar conta”."
+          ], expect: "A conta é criada e você é levado para a tela de Configurações já logado." },
+      ]},
+    ],
+  },
+  {
+    id: "admin-paginas",
+    title: "Painel Admin — Páginas internas",
+    chip: "real", chipLabel: "backend real",
+    note: "Navegação pela barra lateral esquerda.",
+    groups: [
+      { title: "Navegação", items: [
+        { t: "Hub carrega a lista sem erro.",
+          steps: ["Clique em <strong>“Hub”</strong> na barra lateral."],
+          expect: "A lista principal do Hub carrega sem erro." },
+        { t: "Abrir um cliente mostra a página de detalhe.",
+          steps: ["Na lista do Hub, clique em um cliente qualquer."],
+          expect: "Abre a página de detalhe daquele cliente." },
+        { t: "CRM carrega sem erro.",
+          steps: ["Clique em <strong>“CRM”</strong> na barra lateral."], expect: "Carrega sem erro." },
+        { t: "Processos carrega sem erro (deve listar os processos do banco de teste).",
+          steps: ["Clique em <strong>“Processos”</strong> na barra lateral."],
+          expect: "Lista os processos de exemplo (ex: números de CNJ do seed)." },
+        { t: "Base RAG carrega sem erro.",
+          steps: ["Clique em <strong>“Base RAG”</strong> na barra lateral."], expect: "Carrega sem erro." },
+        { t: "Analytics carrega sem erro.",
+          steps: ["Clique em <strong>“Analytics”</strong> na barra lateral."], expect: "Carrega sem erro." },
+        { t: "Operações carrega sem erro.",
+          steps: ["Clique em <strong>“Operações”</strong> na barra lateral."], expect: "Carrega sem erro." },
+        { t: "Configurações carrega sem erro.",
+          steps: ["Clique em <strong>“Configurações”</strong> na barra lateral."], expect: "Carrega sem erro." },
+        { t: "Alternar tema claro/escuro funciona.",
+          steps: ["No rodapé da barra lateral, clique no interruptor “Tema” para alternar entre Claro e Escuro."],
+          expect: "As cores da tela mudam imediatamente e a preferência continua depois de recarregar." },
+        { t: "Sair desloga e bloqueia voltar sem login.",
+          steps: [
+            "Clique em <strong>“Sair”</strong> no rodapé da barra lateral.",
+            "Depois de cair em /login, clique no botão “Voltar” do navegador."
+          ], expect: "Você é levado para /login, e voltar no navegador não reabre o painel sem logar de novo." },
+      ]},
+    ],
+  },
+  {
+    id: "estatico",
+    title: "Páginas estáticas (marketing)",
+    chip: "mock", chipLabel: "sem backend",
+    note: "Landing, ajuda/contato e o login estático são só HTML — não chamam a API. Sirvam para revisar visual, não fluxo de dados.",
+    groups: [
+      { title: "Landing", items: [
+        { t: "Página inicial de marketing renderiza corretamente.",
+          steps: [
+            "Abra o arquivo <code>frontend/landing/index.html</code> direto no navegador (duplo clique nele no Explorador de Arquivos)."
+          ], expect: "O hero, o texto e os botões “Começar grátis” e “Falar com a equipe” aparecem formatados corretamente." },
+      ]},
+      { title: "Ajuda / Contato (versão estática)", items: [
+        { t: "Formulário monta um link de WhatsApp com os dados preenchidos.",
+          steps: [
+            "Abra <code>frontend/ajuda-contato/ajuda.html</code> direto no navegador.",
+            "Preencha nome, e-mail, telefone, escritório e mensagem.",
+            "Clique em “Enviar pelo WhatsApp”."
+          ], expect: "Abre uma nova aba do wa.me/WhatsApp Web com o texto da mensagem já preenchido — isso não é uma chamada de API real, é só um link." },
+      ]},
+      { title: "Login estático", items: [
+        { t: "Botão “Entrar” não faz nada (não é o login real).",
+          steps: [
+            "Abra <code>frontend/login/index.html</code> direto no navegador.",
+            "Preencha os campos e clique em “Entrar na plataforma”."
+          ], expect: "Nada acontece — esse formulário é só visual. O login de verdade é o do hub-react (localhost:5174) ou do admin (localhost:5173)." },
+      ]},
+    ],
+  },
+  {
+    id: "agendamento",
+    title: "Agendamento — fila de mensagens do WhatsApp",
+    chip: "real", chipLabel: "backend real",
+    note: "Não tem uma tela própria — é o backend que enfileira uma mensagem em vez de enviar na hora quando ela cai fora do horário de atendimento configurado ou o cliente já recebeu o limite diário de mensagens. Os dois primeiros itens dá pra testar só pela tela; o terceiro é mais técnico (usa o Swagger da API) porque não existe botão para simular uma mensagem chegando.",
+    groups: [
+      { title: "Configuração da janela (o gatilho do agendamento)", items: [
+        { t: "A janela de atendimento configurada no cadastro aparece certa em Configurações.",
+          steps: [
+            "Logado no hub-react (localhost:5174), vá em <strong>Configurações</strong> na dock.",
+            "Localize a seção “Horário de Atendimento”."
+          ], expect: "Os campos de início e fim mostram o mesmo horário que você configurou lá na Etapa 3 do cadastro (ou o padrão 08:00–18:00 se usou a conta semeada)." },
+        { t: "Alterar e salvar a janela de horário funciona.",
+          steps: [
+            "Em Configurações → “Horário de Atendimento”, mude o horário de início e/ou fim.",
+            "Clique em <strong>Salvar</strong> (ícone de disquete no topo da página)."
+          ], expect: "Aparece confirmação de que salvou, e a mudança continua lá se você recarregar a página (F5)." },
+      ]},
+      { title: "Simular o envio fora do horário (técnico — via Swagger)", items: [
+        { t: "Mensagem fora da janela configurada fica pendente em vez de sair na hora.", tag:"erro",
+          steps: [
+            "Em Configurações, defina uma janela que <strong>não inclua o horário atual</strong> (ex: se agora são 15h, configure início 00:00 e fim 00:05) e salve — assim o teste funciona não importa a hora em que você rodar.",
+            "Abra um novo terminal e inicie o worker do Celery: <code>python -m celery -A feature_1_ia_personalizada.workers.celery_app worker --loglevel=info</code> (precisa estar rodando para a mensagem ser processada).",
+            "Abra <code>http://localhost:8000/docs</code> (Swagger da API) e ache <code>POST /webhook/whatsapp</code>.",
+            "Em “Try it out”, no cabeçalho <code>apikey</code>, cole o valor de <code>EVOLUTION_API_KEY</code> do seu arquivo <code>.env</code>.",
+            "No corpo da requisição, cole: <code>{\"event\":\"messages.upsert\",\"instance\":\"instancia-dev\",\"data\":{\"key\":{\"id\":\"teste-qa-1\",\"fromMe\":false,\"remoteJid\":\"5511988880001@s.whatsapp.net\"},\"message\":{\"conversation\":\"Oi, gostaria de saber do meu processo\"}}}</code> — esse telefone é o do cliente Carlos Eduardo Santos, já semeado no banco.",
+            "Clique em Execute e confira que a resposta foi <code>{\"status\":\"queued\"}</code> (200)."
+          ], expect: "Precisa de um <code>ANTHROPIC_API_KEY</code> real no <code>.env</code> para a IA gerar a resposta e o fluxo chegar até a checagem de horário — com a chave falsa padrão, o Celery vai logar um erro de IA antes de chegar nessa etapa. Se tiver uma chave real: nos logs do worker Celery, procure por algo como <code>bloqueado:fora_horario_comercial</code>, confirmando que a mensagem foi para a fila em vez de sair na hora." },
+        { t: "Cliente com preferência 'qualquer horário' não é bloqueado pela janela.",
+          steps: [
+            "Repita o teste anterior trocando o telefone para <code>5511966660003</code> (João Paulo Rodrigues, cadastrado com preferência “qualquer horário”)."
+          ], expect: "Diferente do teste anterior, este cliente deve ser respondido normalmente mesmo fora da janela — não deve aparecer o bloqueio por horário nos logs." },
+      ]},
+      { title: "Despacho da fila", items: [
+        { t: "O worker que reenvia mensagens pendentes roda sem erro.",
+          steps: [
+            "Com o Celery worker do item anterior rodando, aguarde — o despacho da fila (<code>dispatcher_agendadas</code>) roda automaticamente a cada 5 minutos via Celery Beat.",
+            "Para ativar o agendador, abra outro terminal: <code>python -m celery -A feature_1_ia_personalizada.workers.celery_app beat --loglevel=info</code>",
+            "Observe os logs dos dois terminais."
+          ], expect: "Nenhum traceback aparece; a cada 5 minutos o beat dispara a tarefa de despacho, e se havia mensagem pendente do teste anterior, ela é reenviada (ou tenta reenviar) quando o relógio já estiver dentro da nova janela configurada." },
+      ]},
+    ],
+  },
+];
+
+const STORAGE_KEY = "amicus-qa-checklist-v2";
+const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+function itemId(areaId, gi, ii){ return areaId + "-" + gi + "-" + ii; }
+
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); updateProgress(); }
+
+function updateProgress(){
+  let total = 0, done = 0;
+  DATA.forEach(area => area.groups.forEach((g, gi) => g.items.forEach((it, ii) => {
+    total++;
+    if (state[itemId(area.id, gi, ii) + ":done"]) done++;
+  })));
+  document.getElementById("progressFill").style.width = (total ? (done/total*100) : 0) + "%";
+  document.getElementById("progressLabel").textContent = done + " / " + total;
+
+  DATA.forEach(area => {
+    let areaTotal = 0, areaDone = 0;
+    area.groups.forEach((g, gi) => g.items.forEach((it, ii) => {
+      areaTotal++;
+      if (state[itemId(area.id, gi, ii) + ":done"]) areaDone++;
+    }));
+    const el = document.querySelector('[data-count="' + area.id + '"]');
+    if (el) el.textContent = areaDone + "/" + areaTotal;
+  });
+}
+
+function render(){
+  const root = document.getElementById("areas");
+  root.innerHTML = "";
+  DATA.forEach(area => {
+    const sec = document.createElement("section");
+    sec.className = "area";
+    sec.dataset.id = area.id;
+
+    const head = document.createElement("div");
+    head.className = "area-head";
+    head.tabIndex = 0;
+    head.setAttribute("role", "button");
+    head.setAttribute("aria-expanded", "true");
+    head.innerHTML =
+      '<span class="area-chip ' + (area.chip === "real" ? "chip-real" : "chip-mock") + '">' + area.chipLabel + '</span>' +
+      '<span class="area-title">' + area.title + '</span>' +
+      '<span class="area-count" data-count="' + area.id + '"></span>' +
+      '<span class="area-caret">▾</span>';
+    function toggleArea(){
+      sec.classList.toggle("collapsed");
+      head.setAttribute("aria-expanded", String(!sec.classList.contains("collapsed")));
+    }
+    head.addEventListener("click", toggleArea);
+    head.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleArea(); } });
+    sec.appendChild(head);
+
+    if (area.note){
+      const note = document.createElement("div");
+      note.className = "area-note";
+      note.innerHTML = area.note;
+      sec.appendChild(note);
+    }
+
+    const body = document.createElement("div");
+    body.className = "area-body";
+
+    area.groups.forEach((g, gi) => {
+      const gt = document.createElement("div");
+      gt.className = "group-title";
+      gt.textContent = g.title;
+      body.appendChild(gt);
+
+      g.items.forEach((it, ii) => {
+        const id = itemId(area.id, gi, ii);
+        const doneKey = id + ":done";
+        const expKey = id + ":exp";
+
+        const item = document.createElement("div");
+        item.className = "item" + (state[doneKey] ? " checked" : "") + (state[expKey] ? " expanded" : "");
+
+        const row = document.createElement("div");
+        row.className = "item-row";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.id = id;
+        cb.checked = !!state[doneKey];
+        cb.addEventListener("change", () => {
+          state[doneKey] = cb.checked;
+          item.classList.toggle("checked", cb.checked);
+          save();
+        });
+
+        const body2 = document.createElement("div");
+        body2.className = "item-body";
+
+        const textRow = document.createElement("div");
+        textRow.className = "item-text-row";
+        const tag = it.tag === "erro" ? '<span class="tag tag-erro">erro esperado</span>'
+                  : it.tag === "valid" ? '<span class="tag tag-valid">validação</span>' : "";
+        textRow.innerHTML =
+          '<label class="item-text" for="' + id + '">' + it.t + tag + '</label>' +
+          (it.steps ? '<button type="button" class="steps-toggle"><span class="car">▸</span>Como testar</button>' : '');
+
+        body2.appendChild(textRow);
+
+        if (it.hint){
+          const hint = document.createElement("div");
+          hint.className = "item-hint";
+          hint.innerHTML = it.hint;
+          body2.appendChild(hint);
+        }
+
+        if (it.steps){
+          const panel = document.createElement("div");
+          panel.className = "steps-panel";
+          const ol = document.createElement("ol");
+          it.steps.forEach(s => {
+            const li = document.createElement("li");
+            li.innerHTML = s;
+            ol.appendChild(li);
+          });
+          panel.appendChild(ol);
+          if (it.expect){
+            const exp = document.createElement("div");
+            exp.className = "expect";
+            exp.innerHTML = "<b>Esperado:</b> " + it.expect;
+            panel.appendChild(exp);
+          }
+          body2.appendChild(panel);
+
+          const toggleBtn = textRow.querySelector(".steps-toggle");
+          toggleBtn.addEventListener("click", () => {
+            const isExp = item.classList.toggle("expanded");
+            state[expKey] = isExp;
+            save();
+          });
+        }
+
+        row.appendChild(cb);
+        row.appendChild(body2);
+        item.appendChild(row);
+        body.appendChild(item);
+      });
+    });
+
+    sec.appendChild(body);
+    root.appendChild(sec);
+  });
+  updateProgress();
+}
+
+document.getElementById("expandAll").addEventListener("click", () => {
+  document.querySelectorAll("section.area").forEach(s => s.classList.remove("collapsed"));
+  document.querySelectorAll(".item").forEach(it => it.classList.add("expanded"));
+  DATA.forEach(area => area.groups.forEach((g, gi) => g.items.forEach((it, ii) => {
+    if (it.steps) state[itemId(area.id, gi, ii) + ":exp"] = true;
+  })));
+  save();
+});
+document.getElementById("collapseAll").addEventListener("click", () => {
+  document.querySelectorAll("section.area").forEach(s => s.classList.add("collapsed"));
+  document.querySelectorAll(".item").forEach(it => it.classList.remove("expanded"));
+  Object.keys(state).forEach(k => { if (k.endsWith(":exp")) state[k] = false; });
+  save();
+});
+document.getElementById("resetAll").addEventListener("click", () => {
+  if (confirm("Zerar todo o progresso marcado?")) {
+    Object.keys(state).forEach(k => delete state[k]);
+    save();
+    render();
+  }
+});
+
+render();
+</script>
