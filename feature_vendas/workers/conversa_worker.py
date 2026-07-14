@@ -62,23 +62,75 @@ def _socios() -> list[Socio]:
     return socios
 
 
-async def _processar(alvo_id: int, numero: str, texto: str, message_id: str | None) -> None:
-    from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
+async def _processar(
+    alvo_id: int, numero: str, texto: str, message_id: str | None, instancia: str
+) -> None:
     from feature_1_ia_personalizada.services.ai.memory import ConversationMemory
+    from feature_vendas.services.clara_llm import ClaraLLM
+    from feature_vendas.services.contexto_lead import montar_contexto
+    from feature_vendas.services.humanizacao.cadencia import EntregaHumanizada
+    from feature_vendas.services.opt_out import MENSAGEM_CONFIRMACAO, pediu_para_parar
 
     redis = _redis()
     evo = _evolution()
+    inst = instancia or vconfig.instancia_disparo()
+
+    # Contexto do lead: a Clara precisa saber COM QUEM fala e por quê (de onde
+    # veio, o que já viu). Buscamos o alvo antes de responder para montar isso.
+    async with _sessao() as db:
+        alvo = (
+            await db.execute(select(AlvoVendas).where(AlvoVendas.id == alvo_id))
+        ).scalar_one_or_none()
+
+        # OPT-OUT vem antes de tudo: quem pediu para parar não é "conversado",
+        # não gasta token e nunca mais é abordado (nem se voltar numa planilha).
+        if alvo is not None and ((alvo.metadados or {}).get("opt_out") or pediu_para_parar(texto)):
+            ja_confirmado = bool((alvo.metadados or {}).get("opt_out"))
+            alvo.status = "descartado"
+            alvo.proximo_toque_em = None
+            alvo.metadados = {
+                **(alvo.metadados or {}),
+                "opt_out": True,
+                "motivo_descarte": "pediu para não ser mais contatado",
+            }
+            await db.commit()
+            if not ja_confirmado:
+                # UMA confirmação, curta, sem tentar reverter. Insistir depois de
+                # um "pare" é exatamente o que nunca queremos fazer.
+                await EntregaHumanizada(evo, inst).responder(
+                    numero, texto, MENSAGEM_CONFIRMACAO, message_id
+                )
+            logger.info("vendas_opt_out_respeitado", alvo_id=alvo_id)
+            return
+
+        contexto = ""
+        if alvo is not None:
+            contexto = montar_contexto(
+                origem=alvo.origem,
+                template_usado=alvo.template_usado,
+                processo_cnj=alvo.processo_cnj,
+                nome_escritorio=alvo.nome_escritorio,
+                nome_contato=alvo.nome_contato,
+                cidade=alvo.cidade,
+                area=alvo.area,
+            )
+
     conversa = ConversaClara(
         redis=redis,
-        claude=ClaudeClient(settings.ANTHROPIC_API_KEY),
+        clara=ClaraLLM(settings.ANTHROPIC_API_KEY),
         memory=ConversationMemory(redis),
         evolution=evo,
-        instancia=vconfig.instancia_disparo(),
+        # Responde pela instância que recebeu a mensagem (o webhook a repassa).
+        instancia=inst,
         tenant_id=vconfig.tenant_id(),
     )
 
     resultado = await conversa.processar(
-        lead_ref=alvo_id, numero=numero, texto=texto, message_id=message_id
+        lead_ref=alvo_id,
+        numero=numero,
+        texto=texto,
+        message_id=message_id,
+        contexto=contexto,
     )
     if resultado is None:
         return  # outra invocação da rajada assumiu
@@ -114,7 +166,7 @@ async def _processar(alvo_id: int, numero: str, texto: str, message_id: str | No
             qualificacao=Qualificacao(q["num_advogados"], q["area"], q["quem_responde"]),
             trilhas_testadas=[],
         )
-        await HandoffService(evo, vconfig.instancia_disparo()).notificar_socio(socio, briefing)
+        await HandoffService(evo, inst).notificar_socio(socio, briefing)
 
         alvo.status = "quente"
         alvo.respondeu_em = alvo.respondeu_em or datetime.now(UTC)
@@ -129,6 +181,10 @@ async def _processar(alvo_id: int, numero: str, texto: str, message_id: str | No
 
 @shared_task(name="vendas.responder_conversa")
 def responder_conversa(
-    alvo_id: int, numero: str, texto: str, message_id: str | None = None
+    alvo_id: int,
+    numero: str,
+    texto: str,
+    message_id: str | None = None,
+    instancia: str = "",
 ) -> None:
-    asyncio.run(_processar(alvo_id, numero, texto, message_id))
+    asyncio.run(_processar(alvo_id, numero, texto, message_id, instancia))
