@@ -54,8 +54,8 @@ def _validar_config_no_startup() -> None:
 
     _req(bool(settings.DATABASE_URL), "DATABASE_URL ausente.")
     _req(
-        settings.DATABASE_URL.startswith("postgresql+asyncpg://"),
-        "DATABASE_URL inválida (esperado 'postgresql+asyncpg://').",
+        settings.DATABASE_URL.startswith(("postgresql+asyncpg://", "postgresql://")),
+        "DATABASE_URL inválida (esperado 'postgresql://' ou 'postgresql+asyncpg://').",
     )
 
     _req(bool(settings.JWT_SECRET_KEY), "JWT_SECRET_KEY ausente.")
