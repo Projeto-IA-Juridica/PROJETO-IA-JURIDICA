@@ -73,6 +73,25 @@ def test_texto_vazio_nao_gera_balao():
     assert quebrar("   \n  ") == []
 
 
+def test_quebra_de_linha_vira_balao_novo():
+    """
+    Regressão: gente manda ideia nova em mensagem nova. Quando o modelo pula
+    linha, ele mudou de assunto — não pode sair tudo colado num balão só.
+    """
+    resposta = (
+        "opa doutor, sim! foi a IA que escreveu sozinha\n"
+        "quer que eu faça o mesmo com outro processo seu?"
+    )
+    chunks = quebrar(resposta)
+    assert len(chunks) == 2, "quebra de linha é fronteira dura entre balões"
+    assert "\n" not in chunks[0] and "\n" not in chunks[1]
+
+
+def test_uma_linha_curta_continua_um_balao():
+    """O caso mais comum não pode virar metralhadora."""
+    assert len(quebrar("opa, me manda o número do processo")) == 1
+
+
 # ---------------------------------------------------------------------------
 # Cadência
 # ---------------------------------------------------------------------------
@@ -89,6 +108,22 @@ def test_digitacao_proporcional_ao_tamanho():
     curto = calcular_ritmo("oi", ["ok"]).digitacao[0]
     longo = calcular_ritmo("oi", ["x" * 200]).digitacao[0]
     assert longo > curto, "balão maior tem que levar mais tempo digitando"
+
+
+def test_baloes_longos_nao_tem_delay_identico():
+    """
+    Regressão: balões que batem no teto de digitação NÃO podem sair todos com
+    exatamente o mesmo delay (6.5s, 6.5s, 6.5s). Repetição exata de timing é o
+    tique de bot mais fácil de perceber, mesmo com o texto perfeito.
+    """
+    longo = "x" * 200  # estoura o teto de digitação
+    delays = [calcular_ritmo("oi", [longo]).digitacao[0] for _ in range(20)]
+    assert len({round(d, 3) for d in delays}) > 15, "delay do teto precisa de jitter"
+
+
+def test_baloes_curtos_nao_tem_delay_identico():
+    curtos = [calcular_ritmo("oi", ["ok"]).digitacao[0] for _ in range(20)]
+    assert len({round(d, 3) for d in curtos}) > 15, "delay do piso precisa de jitter"
 
 
 def test_latencia_total_nao_estoura_o_razoavel():
