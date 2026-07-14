@@ -79,12 +79,38 @@ async def importar_planilha(
     importados = 0
     desqualificados = 0
     classe_c = 0
+    duplicados = 0
+    opt_outs = 0
+
+    # Números que JÁ existem neste tenant. Reimportar a mesma planilha (ou listas
+    # que se sobrepõem) não pode criar alvo duplicado — seria abordar o mesmo
+    # advogado duas vezes. E quem pediu para sair NUNCA volta, mesmo que o número
+    # reapareça numa lista futura: é isso que faz o opt-out ser eterno.
+    existentes = (
+        await db.execute(
+            select(AlvoVendas.whatsapp, AlvoVendas.metadados).where(
+                AlvoVendas.escritorio_id == tenant
+            )
+        )
+    ).all()
+    ja_no_banco = {w for w, _ in existentes}
+    ja_optaram_por_sair = {w for w, meta in existentes if (meta or {}).get("opt_out")}
+
+    vistos_nesta_planilha: set[str] = set()
 
     for linha in leitor:
         whatsapp = (linha.get("whatsapp") or "").strip()
         nome = (linha.get("nome_escritorio") or "").strip()
         if not whatsapp or not nome:
             continue
+
+        if whatsapp in ja_optaram_por_sair:
+            opt_outs += 1
+            continue
+        if whatsapp in ja_no_banco or whatsapp in vistos_nesta_planilha:
+            duplicados += 1
+            continue
+        vistos_nesta_planilha.add(whatsapp)
 
         resultado = pontuar(
             num_advogados=_int(linha.get("num_advogados")),
@@ -135,12 +161,16 @@ async def importar_planilha(
         importados=importados,
         desqualificados=desqualificados,
         classe_c=classe_c,
+        duplicados=duplicados,
+        opt_outs=opt_outs,
     )
     return {
         "importados": importados,
         "para_enriquecer": importados - desqualificados - classe_c,
         "desqualificados": desqualificados,
         "classe_c_ignorados": classe_c,
+        "duplicados_ignorados": duplicados,
+        "opt_out_respeitados": opt_outs,
     }
 
 

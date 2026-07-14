@@ -90,18 +90,35 @@ async def webhook_vitrine(
         return {"status": "ignored"}
     numero, texto, message_id = extraido
 
+    # Instância que RECEBEU a mensagem: a Clara responde por ela (o mesmo chip
+    # em que o lead escreveu), não pela instância de disparo.
+    instancia = str(body.get("instance") or vconfig.VENDAS_EVOLUTION_INSTANCE or "")
+
     async for db in get_db():
-        alvo = await _resolver_alvo(db, numero)
+        alvo = await _resolver_alvo(db, numero, texto)
 
     # Enfileira a conversa (buffer + Clara + humanização) — import tardio para
     # não acoplar a rota ao Celery quando a feature está desligada.
     from feature_vendas.workers.conversa_worker import responder_conversa
 
-    responder_conversa.delay(alvo_id=alvo, numero=numero, texto=texto, message_id=message_id)
+    responder_conversa.delay(
+        alvo_id=alvo,
+        numero=numero,
+        texto=texto,
+        message_id=message_id,
+        instancia=instancia,
+    )
     return {"status": "enfileirado"}
 
 
-async def _resolver_alvo(db: AsyncSession, numero: str) -> int:
+async def _resolver_alvo(db: AsyncSession, numero: str, primeira_msg: str) -> int:
+    """
+    Acha (ou cria) o alvo daquele número. Para inbound cru, tenta inferir a
+    origem pela primeira mensagem (texto pré-preenchido do link wa.me de cada
+    canal): currículo, calculadora, indicação, site.
+    """
+    from feature_vendas.services.contexto_lead import detectar_origem
+
     tenant = vconfig.VENDAS_TENANT_ID
     alvo = (
         await db.execute(
@@ -112,11 +129,12 @@ async def _resolver_alvo(db: AsyncSession, numero: str) -> int:
     ).scalar_one_or_none()
 
     if alvo is None:
+        origem = detectar_origem(primeira_msg) or "inbound"
         alvo = AlvoVendas(
             escritorio_id=tenant,
             nome_escritorio="(inbound — vitrine)",
             whatsapp=numero,
-            origem="inbound",
+            origem=origem,
             status="respondeu",
         )
         db.add(alvo)

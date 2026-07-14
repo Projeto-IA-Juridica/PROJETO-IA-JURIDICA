@@ -50,15 +50,23 @@ def limpar(texto: str) -> str:
     return t.strip()
 
 
-def _frases(texto: str) -> list[str]:
-    """Divide em frases, preservando quebras de parágrafo como fronteira forte."""
-    partes: list[str] = []
+def _paragrafos(texto: str) -> list[list[str]]:
+    """
+    Parágrafos (separados por quebra de linha), cada um já dividido em frases.
+
+    A quebra de linha é FRONTEIRA DURA: quando o modelo pula linha, ele mudou de
+    ideia — e gente manda ideia nova em mensagem nova. Nunca reagrupamos frases
+    de parágrafos diferentes no mesmo balão.
+    """
+    saida: list[list[str]] = []
     for paragrafo in texto.split("\n"):
         paragrafo = paragrafo.strip()
         if not paragrafo:
             continue
-        partes.extend(f.strip() for f in _RE_FIM_FRASE.split(paragrafo) if f.strip())
-    return partes
+        frases = [f.strip() for f in _RE_FIM_FRASE.split(paragrafo) if f.strip()]
+        if frases:
+            saida.append(frases)
+    return saida
 
 
 def _cortar_longa(frase: str) -> list[str]:
@@ -86,31 +94,41 @@ def quebrar(texto: str) -> list[str]:
     """
     Devolve as mensagens a enviar, na ordem.
 
-    Agrupa frases até se aproximar de _ALVO_CHARS. Se o texto todo já é curto,
-    devolve um único balão (o caso mais comum e o mais natural).
+    Regras, na ordem de prioridade:
+      1. quebra de linha = balão novo (fronteira dura — ideia nova, mensagem nova);
+      2. dentro do parágrafo, agrupa frases até ~_ALVO_CHARS;
+      3. frase gigante é cortada sem partir palavra;
+      4. no máximo _MAX_CHUNKS balões (senão vira metralhadora).
+
+    Texto curto de uma linha só continua um balão único — o caso mais comum e o
+    mais natural.
     """
     limpo = limpar(texto)
     if not limpo:
         return []
 
-    if len(limpo) <= _MAX_CHARS and limpo.count(". ") <= 1:
+    paragrafos = _paragrafos(limpo)
+    if not paragrafos:
+        return []
+
+    # Caso simples: um parágrafo curto, uma ideia → um balão.
+    if len(paragrafos) == 1 and len(limpo) <= _MAX_CHARS and limpo.count(". ") <= 1:
         return [limpo]
 
     chunks: list[str] = []
-    atual = ""
-
-    for frase in _frases(limpo):
-        for pedaco in _cortar_longa(frase) if len(frase) > _MAX_CHARS else [frase]:
-            if not atual:
-                atual = pedaco
-            elif len(atual) + 1 + len(pedaco) <= _ALVO_CHARS:
-                atual = f"{atual} {pedaco}"
-            else:
-                chunks.append(atual)
-                atual = pedaco
-
-    if atual:
-        chunks.append(atual)
+    for frases in paragrafos:
+        atual = ""
+        for frase in frases:
+            for pedaco in _cortar_longa(frase) if len(frase) > _MAX_CHARS else [frase]:
+                if not atual:
+                    atual = pedaco
+                elif len(atual) + 1 + len(pedaco) <= _ALVO_CHARS:
+                    atual = f"{atual} {pedaco}"
+                else:
+                    chunks.append(atual)
+                    atual = pedaco
+        if atual:
+            chunks.append(atual)  # fim do parágrafo fecha o balão
 
     # Estourou o teto de balões: junta o excedente no último.
     if len(chunks) > _MAX_CHUNKS:

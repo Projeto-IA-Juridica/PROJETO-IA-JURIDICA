@@ -47,6 +47,13 @@ ROTAS_PUBLICAS_EXATAS = [
     # Redirect OAuth do Google (sem header Authorization) — validado por state
     # de uso único no Redis; demais rotas /google-calendar/* exigem JWT.
     "/google-calendar/callback",
+    # Webhook do número-vitrine (feature_vendas). A Evolution manda pra cá sem
+    # JWT; a autenticidade é validada por apikey (compare_digest) no handler,
+    # igual ao /webhook/whatsapp. Match EXATO: as demais rotas /vendas/* são
+    # internas e exigem JWT do tenant de vendas.
+    # Só resolve quando a máquina de vendas está habilitada; com ela desligada
+    # a rota não existe e a requisição termina em 404.
+    "/vendas/webhook",
 ]
 
 

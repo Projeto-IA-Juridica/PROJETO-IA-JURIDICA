@@ -74,8 +74,20 @@ def calcular_leitura(texto_recebido: str) -> float:
 
 
 def calcular_digitacao(chunk: str) -> float:
+    """
+    Tempo de digitação de um balão.
+
+    Os limites (min/max) também levam jitter. Sem isso, todo balão longo bate
+    exatamente no teto e a conversa sai com delays idênticos (6.5s, 6.5s, 6.5s)
+    — repetição exata de timing é o tique de bot mais fácil de perceber, mesmo
+    com o texto perfeito.
+    """
     segundos = len(chunk) / _jitter(_CPS)
-    return max(_DIGITACAO_MIN_S, min(segundos, _DIGITACAO_MAX_S))
+    if segundos > _DIGITACAO_MAX_S:
+        return _DIGITACAO_MAX_S * random.uniform(0.80, 1.0)
+    if segundos < _DIGITACAO_MIN_S:
+        return _DIGITACAO_MIN_S * random.uniform(1.0, 1.35)
+    return segundos
 
 
 def calcular_ritmo(texto_recebido: str, chunks: list[str]) -> Ritmo:

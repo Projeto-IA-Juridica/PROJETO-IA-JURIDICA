@@ -77,15 +77,18 @@ class ConversaClara:
         self,
         *,
         redis,  # noqa: ANN001
-        claude,  # noqa: ANN001 — ClaudeClient
+        clara,  # noqa: ANN001 — ClaraLLM (cérebro tunado da Clara)
         memory,  # noqa: ANN001 — ConversationMemory
         evolution,  # noqa: ANN001 — EvolutionHumano
         instancia: str,
         tenant_id: int,
     ) -> None:
         self._buffer = BufferMensagens(redis)
-        self._claude = claude
+        self._clara = clara
         self._memory = memory
+        # A instância é a que RECEBEU a mensagem (o webhook a repassa). Assim a
+        # Clara sempre responde pelo mesmo chip/número em que o lead escreveu,
+        # mesmo quando vitrine e disparo forem chips separados.
         self._entrega = EntregaHumanizada(evolution, instancia)
         self._tenant = tenant_id
 
@@ -97,10 +100,15 @@ class ConversaClara:
         texto: str,
         message_id: str | None = None,
         eh_audio: bool = False,
+        contexto: str = "",
     ) -> dict | None:
         """
         Ponto de entrada. Devolve um dict de resultado (para o worker registrar
         no AlvoVendas), ou None quando outra invocação assumiu a rajada.
+
+        `contexto` é o bloco de contexto do lead (contexto_lead.montar_contexto):
+        de onde veio, o que já viu, quem é. Injetado no system prompt para a
+        Clara saber com quem fala — sem nunca recitar isso.
         """
         log = logger.bind(tenant=self._tenant, lead_ref=lead_ref)
 
@@ -114,14 +122,12 @@ class ConversaClara:
         # 2. Histórico da conversa (Redis, isolado por tenant+lead).
         historico = await self._memory.buscar_historico(self._tenant, lead_ref, limite=20)
 
-        # 3. Claude com o prompt da Clara (prompt caching no wrapper).
-        resultado = await self._claude.enviar_mensagem(
-            system_prompt=system_prompt_clara(),
-            mensagens_historico=historico,
-            mensagem_usuario=consolidado,
-            intencao="vendas",
+        # 3. Clara (Opus) com o prompt + contexto do lead. Caching no cérebro.
+        resposta = await self._clara.responder(
+            system_prompt=system_prompt_clara(contexto),
+            historico=historico,
+            mensagem=consolidado,
         )
-        resposta = resultado["resposta"]
 
         # 4. Persiste antes de enviar (at-least-once).
         await self._memory.salvar_mensagem(self._tenant, lead_ref, "user", consolidado)
