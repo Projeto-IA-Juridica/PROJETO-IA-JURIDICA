@@ -119,6 +119,7 @@ class Settings(BaseSettings):
         "https://app.conciergejuridico.com",
         "https://admin.conciergejuridico.com",
         "https://projeto-ia-juridica-production-4bb1.up.railway.app",
+        "https://amicus.page",
     ]
 
     APP_NAME: str = "Concierge Jurídico Digital"
