@@ -27,7 +27,8 @@ export interface User {
 }
 
 /* Instância sem interceptors — evita dependência circular com client.ts */
-const plain = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } })
+const baseURL = import.meta.env.VITE_API_URL || '/api'
+const plain = axios.create({ baseURL, headers: { 'Content-Type': 'application/json' } })
 
 /* ── Storage helpers ──────────────────────────────────────────────── */
 

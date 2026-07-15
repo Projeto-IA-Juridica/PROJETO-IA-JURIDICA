@@ -7,8 +7,8 @@ export const TOKEN_KEY = KEYS.access
 const MUTATING = new Set(['post', 'put', 'patch', 'delete'])
 
 // Em desenvolvimento: usa /api relativo (Vite proxy redireciona para localhost:8000)
-// Em produção: usa /api relativo (mesmo domínio)
-const baseURL = '/api'
+// Em produção: deve ler VITE_API_URL do ambiente (ex: https://projeto-ia-juridica-production-4bb1.up.railway.app/api/v1)
+const baseURL = import.meta.env.VITE_API_URL || '/api'
 
 export const api = axios.create({
   baseURL,
