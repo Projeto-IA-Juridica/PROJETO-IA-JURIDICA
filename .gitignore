@@ -169,3 +169,5 @@ override.tf.json
 *.db
 postgres_data/
 redis_data/
+# Base de conhecimento — arquivo derivado (gerado por gerar_contexto.sh)
+docs/base_conhecimento/_contexto_completo.md
