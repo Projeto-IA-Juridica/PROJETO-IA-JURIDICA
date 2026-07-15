@@ -158,8 +158,17 @@ O QUE VOCÊ NUNCA FAZ
 
 
 def system_prompt_clara(contexto_extra: str = "") -> str:
-    """Monta o system prompt completo da persona de vendas."""
-    partes = [CLARA_PERSONA, ESTILO_WHATSAPP, REGRA_IDENTIDADE]
+    """
+    Monta o system prompt completo da persona de vendas.
+
+    Ordem pensada para prompt caching: os blocos estáveis (persona, estilo,
+    identidade, conhecimento de produto) vêm primeiro e são idênticos em toda
+    chamada; o contexto do lead, que varia, vem por último. Sem o conhecimento
+    de produto a Clara trava ou alucina em "quanto custa?" / "integra com X?".
+    """
+    from feature_vendas.services.produto import conhecimento_produto
+
+    partes = [CLARA_PERSONA, ESTILO_WHATSAPP, REGRA_IDENTIDADE, conhecimento_produto()]
     if contexto_extra:
         partes.append(contexto_extra)
     return "\n\n".join(partes)
