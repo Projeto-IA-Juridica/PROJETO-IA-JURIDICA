@@ -247,3 +247,22 @@ def test_prompt_proibe_os_tiques():
     baixo = system_prompt_clara().lower()
     for proibicao in ("sem emoji", "sem markdown", "textão", "travessão"):
         assert proibicao in baixo
+
+
+def test_prompt_da_clara_inclui_conhecimento_de_produto():
+    """
+    Regressão: sem o conhecimento de produto no prompt, a Clara trava ou
+    alucina em "quanto custa?" / "integra com o Projuris?". Estes fatos
+    precisam estar no system prompt — e não podem sumir num refactor.
+    """
+    prompt = system_prompt_clara()
+    assert "997" in prompt, "faltou o preço no prompt"
+    assert "Projuris" in prompt, "faltou a lista do que o produto NÃO faz"
+    assert "7 dias" in prompt, "faltou o trial no prompt"
+
+
+def test_contexto_do_lead_vem_por_ultimo_no_prompt():
+    """Estável primeiro (cacheável), contexto do lead por último."""
+    marcador = "CONTEXTO_DE_TESTE_XYZ"
+    prompt = system_prompt_clara(marcador)
+    assert prompt.rstrip().endswith(marcador), "contexto do lead deve fechar o prompt"
