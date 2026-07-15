@@ -57,14 +57,15 @@ def get_database_url() -> str:
         )
     if not url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        
+
     from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
     _parsed = urlparse(url)
     _query = dict(parse_qsl(_parsed.query))
     for k in ["schema", "pgbouncer"]:
         _query.pop(k, None)
     url = urlunparse(_parsed._replace(query=urlencode(_query)))
-        
+
     return url
 
 
