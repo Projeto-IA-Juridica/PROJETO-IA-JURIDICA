@@ -273,7 +273,7 @@ A intenção `agendar_reuniao` tem threshold de confiança próprio — quando d
 ### RAG — Base de Conhecimento do Escritório
 
 - Upload de PDFs (petições, jurisprudências, teses, modelos)
-- Pipeline: extração PyMuPDF → chunks de 512 tokens (50 overlap) → embeddings 1024-dim → armazenamento pgvector
+- Pipeline: extração PyMuPDF → chunks de 512 tokens (50 overlap) → embeddings 1024-dim (Voyage AI `voyage-law-2`, especializado em jurídico; fallback OpenAI `text-embedding-3-small`) → armazenamento pgvector
 - Busca semântica com MMR re-ranking para diversidade de resultados
 - Warm-up automático no startup: os 6 embeddings de queries mais comuns são pré-aquecidos no Redis (TTL 24h) para reduzir latência na primeira requisição
 - O conteúdo relevante é injetado automaticamente no system prompt de cada resposta
@@ -598,6 +598,7 @@ Interface rica para advogados, com animações (`PageTransition`, `DitherShader`
 | IA / LLM | Claude Opus `claude-opus-4-6` (Hub + escalação) + Claude Sonnet `claude-sonnet-5` (orquestrador) + Claude Haiku 4.5 (DNA/matching/títulos) |
 | Orquestração de IA | LangGraph 0.2 + LangChain 0.2 |
 | Confidence Router | Score ponderado por intenção, RAG, contexto — sem dependência de LLM |
+| Embeddings (RAG) | Voyage AI `voyage-law-2` (1024D, jurídico) — fallback OpenAI `text-embedding-3-small` (dimensions=1024) |
 | Transcrição de áudio | OpenAI Whisper |
 | Banco de dados | PostgreSQL 13 + asyncpg 0.29 (prepared statements desativados — compatível com PgBouncer/Railway) |
 | Billing | Stripe (Checkout + Billing Portal + webhooks HMAC) |
@@ -915,7 +916,8 @@ Fase 3 (12+ meses):  Efeito de rede + marca + dados vendáveis
 ```bash
 # IA
 ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...           # Whisper
+OPENAI_API_KEY=sk-...           # Whisper + fallback de embeddings
+VOYAGE_API_KEY=pa-...           # Embeddings RAG (voyage-law-2); sem ela, usa o fallback OpenAI
 
 # Banco
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost/juridico
@@ -1028,6 +1030,7 @@ cd tests/load && locust -f locustfile.py   # painel em :8089
 
 ## Links
 
+- **Base de conhecimento (visão completa do projeto, pronta para RAG):** [docs/base_conhecimento/](docs/base_conhecimento/00_INDICE.md)
 - **Tasks e sub-features:** [TASKS.md](TASKS.md)
 - **Guia de desenvolvimento:** [docs/guides/development.md](docs/guides/development.md)
 - **Checklist de produção:** [docs/guides/production-readiness.md](docs/guides/production-readiness.md)
