@@ -40,8 +40,9 @@ export interface StatusAssinatura {
 export interface PlanoMeta {
   id: PlanoId
   nome: string
-  preco: string           // ex: "R$ 497"
+  preco: string           // ex: "R$ 497" — preço cheio (exibido riscado quando há desconto)
   periodo: string         // ex: "/mês"
+  desconto?: number       // fração de desconto promocional (ex: 0.3 = 30%). Ausente = sem desconto
   descricao: string
   destaque: boolean
   features: string[]
@@ -57,6 +58,7 @@ export const PLANOS: PlanoMeta[] = [
     nome: 'Starter',
     preco: 'R$ 497',
     periodo: '/mês',
+    desconto: 0.3,
     descricao: 'Ideal para advogados autônomos e escritórios boutique.',
     destaque: false,
     features: [
@@ -76,6 +78,7 @@ export const PLANOS: PlanoMeta[] = [
     nome: 'Profissional',
     preco: 'R$ 1.997',
     periodo: '/mês',
+    desconto: 0.4,
     descricao: 'Para escritórios em crescimento com múltiplas áreas.',
     destaque: true,
     features: [
@@ -95,6 +98,7 @@ export const PLANOS: PlanoMeta[] = [
     nome: 'Escritório',
     preco: 'R$ 4.997',
     periodo: '/mês',
+    desconto: 0.5,
     descricao: 'Para escritórios consolidados com grande volume.',
     destaque: false,
     features: [
@@ -110,6 +114,29 @@ export const PLANOS: PlanoMeta[] = [
     tokens: '5M tokens Claude/mês',
   },
 ]
+
+/* ── Desconto promocional ────────────────────────────────────────────────── */
+
+/** Valor numérico do preço mensal cheio (ex: "R$ 1.997" → 1997). */
+function precoNumerico(p: PlanoMeta): number {
+  return Number(p.preco.replace(/\D/g, ''))
+}
+
+/**
+ * Preço já com o desconto aplicado, formatado em BRL (ex: "R$ 347,90").
+ * Retorna null quando o plano não tem desconto.
+ */
+export function precoComDesconto(p: PlanoMeta): string | null {
+  if (!p.desconto) return null
+  const valor = precoNumerico(p) * (1 - p.desconto)
+  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** Rótulo do selo de desconto (ex: 0.3 → "30% OFF"). Null se não há desconto. */
+export function seloDesconto(p: PlanoMeta): string | null {
+  if (!p.desconto) return null
+  return `${Math.round(p.desconto * 100)}% OFF`
+}
 
 /* ── API calls ───────────────────────────────────────────────────────────── */
 

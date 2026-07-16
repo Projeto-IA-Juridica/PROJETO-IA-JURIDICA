@@ -11,6 +11,8 @@ import {
   redirectToPortal,
   labelStatus,
   isAssinaturaAtiva,
+  precoComDesconto,
+  seloDesconto,
   type PlanoId,
 } from '../api/billing'
 
@@ -121,6 +123,10 @@ function PlanoCard({
   const limite   = LIMITE[plano.id]
   const destaque = plano.destaque && !isAtual
 
+  // Desconto promocional: preço final e selo (null quando o plano não tem desconto)
+  const precoFinal = precoComDesconto(plano)
+  const selo       = seloDesconto(plano)
+
   const accentColor  = isAtual ? '#1A9E78' : 'var(--color-am-blue)'
   const shadowBase   = destaque
     ? '0 4px 24px rgba(18,72,190,0.1)'
@@ -180,10 +186,19 @@ function PlanoCard({
 
         {/* Preço + descrição */}
         <div>
+          {precoFinal && selo && (
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm text-am-muted line-through">{plano.preco}</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                style={{ color: '#fff', background: '#1A9E78' }}>
+                {selo}
+              </span>
+            </div>
+          )}
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-black tracking-tight"
               style={{ color: (destaque || isAtual) ? accentColor : 'var(--color-am-ink)' }}>
-              {plano.preco}
+              {precoFinal ?? plano.preco}
             </span>
             <span className="text-xs text-am-muted">{plano.periodo}</span>
           </div>

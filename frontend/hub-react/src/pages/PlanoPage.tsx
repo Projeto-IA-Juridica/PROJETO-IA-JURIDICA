@@ -19,6 +19,8 @@ import {
   PLANOS,
   createCheckout,
   redirectToCheckout,
+  precoComDesconto,
+  seloDesconto,
   type PlanoId,
   type PlanoMeta,
 } from '../api/billing'
@@ -173,8 +175,18 @@ function PlanoCard({ plano, ativo, carregando, onEscolher }: CardProps) {
 
       {/* Preço */}
       <div style={{ marginBottom: 16 }}>
+        {precoComDesconto(plano) && seloDesconto(plano) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <span style={{ fontSize: 14, color: 'var(--color-am-muted)', textDecoration: 'line-through' }}>
+              {plano.preco}
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#1A9E78', padding: '2px 6px', borderRadius: 4 }}>
+              {seloDesconto(plano)}
+            </span>
+          </div>
+        )}
         <span style={{ fontSize: 32, fontWeight: 900, color: 'var(--color-am-ink)', letterSpacing: '-0.04em' }}>
-          {plano.preco}
+          {precoComDesconto(plano) ?? plano.preco}
         </span>
         <span style={{ fontSize: 13, color: 'var(--color-am-muted)', marginLeft: 4 }}>{plano.periodo}</span>
       </div>
