@@ -540,7 +540,7 @@ shared/config/settings.py            → ✅ LinkedIn vars já adicionadas
 # TASKS — Feature Hub do Advogado (Claude Opus — ex-Harvey)
 
 > **Conceito:** Ecossistema de IA dual — cliente usa Claude (fluido), advogado usa Claude Opus (raciocínio jurídico pesado) via WhatsApp dedicado. Um Roteador de Confiança decide quando Claude delega para Claude Opus no fluxo do cliente.
-> **Nota:** Harvey AI foi substituído por Claude Opus (`claude-opus-4-6`) como modelo de escalação. Todos os campos e configs renomeados de `harvey_*` para `escalacao_*`.
+> **Nota:** Harvey AI foi substituído por Claude Opus (`claude-opus-4-8`) como modelo de escalação. Todos os campos e configs renomeados de `harvey_*` para `escalacao_*`.
 > **Acesso:** Hub do Advogado restrito a `advogado` e `admin`. Roteador opera transparentemente no fluxo do cliente.
 > **Referência:** [docs/FEATURE_HARVEY_HUB_ADVOGADO.md](docs/FEATURE_HARVEY_HUB_ADVOGADO.md)
 
@@ -610,7 +610,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ## FASE 1 — Fundação (Claude Opus como escalação) ✅ CONCLUÍDA
 
-> Harvey substituído por `claude-opus-4-6` via SDK Anthropic. Campos renomeados de `harvey_*` para `escalacao_*`.
+> Harvey substituído por `claude-opus-4-8` via SDK Anthropic. Campos renomeados de `harvey_*` para `escalacao_*`.
 
 ---
 
@@ -621,7 +621,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 - [x] Criar dataclass `EscalacaoResponse` (ex-`HarveyResponse`)
 - [x] Criar dataclass `AnaliseEscalacaoResponse` (ex-`AnaliseHarveyResponse`)
 - [x] Criar dataclass `Jurisprudencia`
-- [x] Criar classe `EscalationClient` usando SDK Anthropic com `claude-opus-4-6`
+- [x] Criar classe `EscalationClient` usando SDK Anthropic com `claude-opus-4-8`
 - [x] Implementar retry + backoff + circuit breaker
 - [x] Implementar `gerar_resposta`, `analisar_peticao`, `pesquisar_jurisprudencia`
 - [x] Implementar fallback com `EscalacaoUnavailableError`
@@ -630,7 +630,7 @@ Toda a infraestrutura necessária existe: LangGraph extensível, Evolution API p
 
 ### 1.2 — Variáveis de ambiente (`shared/config/settings.py`) ✅ FEITO
 
-- [x] Adicionado `MODELO_ESCALACAO: str = "claude-opus-4-6"`
+- [x] Adicionado `MODELO_ESCALACAO: str = "claude-opus-4-8"`
 - [x] Adicionado `ESCALACAO_HABILITADO: bool = False`
 
 ---
@@ -1270,7 +1270,7 @@ classificar_intencao
 
 ---
 
-## Motor 2 — Claude Opus 4.6
+## Motor 2 — Claude Opus 4.8
 
 > **Perfil:** Zero nova dependência. Mesmo SDK, mesma API key, mesma `ClaudeClient`. A diferença é o modelo passado para `chamar_direto()`. Claude Opus é ~4x mais capaz que Sonnet em raciocínio mas ~6x mais caro.
 
@@ -1292,7 +1292,7 @@ classificar_intencao
 - [ ] Implementar `ClaudeOpusMotor(MotorIAJuridico)` como thin wrapper:
   ```python
   class ClaudeOpusMotor:
-      MODELO = "claude-opus-4-6"
+      MODELO = "claude-opus-4-8"
       TEMPERATURA = 0.2    # mais determinístico que Sonnet (0.3) para raciocínio jurídico
       MAX_TOKENS = 4096    # Opus pode responder mais longo
 
@@ -1323,11 +1323,11 @@ classificar_intencao
 
 #### O.3 — Extended Thinking para análise de petição
 
-- [ ] Claude Opus 4.6 suporta `extended_thinking` (chain-of-thought explícito):
+- [ ] Claude Opus 4.8 suporta `extended_thinking` (chain-of-thought explícito):
   ```python
   # Na análise de petição com Opus
   response = await client.messages.create(
-      model="claude-opus-4-6",
+      model="claude-opus-4-8",
       max_tokens=16000,
       thinking={"type": "enabled", "budget_tokens": 8000},
       messages=[{"role": "user", "content": conteudo_peticao}],
@@ -1346,7 +1346,7 @@ classificar_intencao
 
 #### O.5 — Preços Opus vs. Sonnet — controle de custo
 
-- [ ] Opus 4.6: ~$15/M input, ~$75/M output (estimativa — verificar pricing atual Anthropic)
+- [ ] Opus 4.8: $5/M input, $25/M output
 - [ ] Sonnet 4.6: $3/M input, $15/M output (valores atuais no `claude_client.py`)
 - [ ] Adicionar constantes em `shared/config/constants.py`:
   ```python
@@ -1565,7 +1565,7 @@ tests/integration/
 
 ### Critérios de aceite da camada plugável
 
-- [ ] `motor_juridico_avancado = "claude_opus"` → análise de petição usa `claude-opus-4-6` com extended thinking
+- [ ] `motor_juridico_avancado = "claude_opus"` → análise de petição usa `claude-opus-4-8` com extended thinking
 - [ ] `motor_juridico_avancado = "openai_o1"` → análise usa `o1-mini` com prompt sem `system` role
 - [ ] `motor_juridico_avancado = "harvey"` → comportamento das Fases 1–5
 - [ ] Harvey com circuit breaker aberto → `MotorRouter` seleciona Claude Opus automaticamente

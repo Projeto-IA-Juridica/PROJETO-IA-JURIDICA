@@ -133,10 +133,10 @@ class TestCalcularCusto:
         assert isinstance(_calcular_custo(100, 50), Decimal)
 
     def test_input_opus(self):
-        assert _calcular_custo(1_000_000, 0) == Decimal("15.00")
+        assert _calcular_custo(1_000_000, 0) == Decimal("5.00")
 
     def test_output_opus(self):
-        assert _calcular_custo(0, 1_000_000) == Decimal("75.00")
+        assert _calcular_custo(0, 1_000_000) == Decimal("25.00")
 
 
 # ---------------------------------------------------------------------------

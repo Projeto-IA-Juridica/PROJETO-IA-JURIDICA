@@ -32,7 +32,7 @@ o RAG é filtrado por `escritorio_id`; um escritório nunca vê dado de outro.
 | Camada | Tecnologia |
 |---|---|
 | API | FastAPI 0.109 + Uvicorn |
-| LLM | Claude Opus `claude-opus-4-6` (Hub/escalação) · Sonnet `claude-sonnet-5` (orquestrador) · Haiku 4.5 (DNA/títulos) |
+| LLM | Claude Opus `claude-opus-4-8` (Hub/escalação) · Sonnet `claude-sonnet-5` (orquestrador) · Haiku 4.5 (DNA/títulos) |
 | Orquestração de IA | LangGraph 0.2 + LangChain 0.2 |
 | Embeddings (RAG) | Voyage AI `voyage-law-2` (1024D, jurídico) — fallback OpenAI `text-embedding-3-small` (dimensions=1024) |
 | Transcrição de áudio | OpenAI Whisper |
@@ -52,7 +52,7 @@ o RAG é filtrado por `escritorio_id`; um escritório nunca vê dado de outro.
 | Qualidade | Ruff + Black + mypy + pytest + mutmut |
 
 > **Nota sobre modelos:** o código referencia majoritariamente
-> `claude-sonnet-5`, `claude-opus-4-6` e `claude-haiku-4-5-20251001`. Há
+> `claude-sonnet-5`, `claude-opus-4-8` e `claude-haiku-4-5-20251001`. Há
 > referências residuais a `claude-sonnet-4-*` em pontos antigos/testes — a
 > direção é padronizar nos três primeiros.
 

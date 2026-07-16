@@ -26,7 +26,7 @@ Sim: ~78% no Essencial, ~72% Profissional, ~71% Escritório (lucro líquido de
 R$ 773 / R$ 1.432 / R$ 3.550 por cliente).
 
 **Que modelos de IA usa?**
-Claude Sonnet (`claude-sonnet-5`) no orquestrador, Claude Opus (`claude-opus-4-6`)
+Claude Sonnet (`claude-sonnet-5`) no orquestrador, Claude Opus (`claude-opus-4-8`)
 no Hub e escalação, Claude Haiku (4.5) em tarefas baratas. Embeddings via Voyage
 `voyage-law-2` (fallback OpenAI). Áudio via Whisper.
 

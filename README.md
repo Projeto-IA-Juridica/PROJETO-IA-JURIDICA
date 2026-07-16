@@ -418,7 +418,7 @@ Além da base RAG (conhecimento do escritório), cada cliente tem seu próprio d
 
 ### Hub do Advogado
 
-Interface exclusiva para advogados, sem as restrições do canal de cliente. Powered by Claude Opus (`claude-opus-4-6`).
+Interface exclusiva para advogados, sem as restrições do canal de cliente. Powered by Claude Opus (`claude-opus-4-8`).
 
 **Endpoints:**
 - `POST /hub/analisar-peticao` — upload de PDF (até 10 MB) + análise estruturada: pontos fortes, fracos, riscos processuais, sugestões de melhoria
@@ -595,7 +595,7 @@ Interface rica para advogados, com animações (`PageTransition`, `DitherShader`
 | Camada | Tecnologia |
 |--------|-----------|
 | API | FastAPI 0.109 + Uvicorn |
-| IA / LLM | Claude Opus `claude-opus-4-6` (Hub + escalação) + Claude Sonnet `claude-sonnet-5` (orquestrador) + Claude Haiku 4.5 (DNA/matching/títulos) |
+| IA / LLM | Claude Opus `claude-opus-4-8` (Hub + escalação) + Claude Sonnet `claude-sonnet-5` (orquestrador) + Claude Haiku 4.5 (DNA/matching/títulos) |
 | Orquestração de IA | LangGraph 0.2 + LangChain 0.2 |
 | Confidence Router | Score ponderado por intenção, RAG, contexto — sem dependência de LLM |
 | Embeddings (RAG) | Voyage AI `voyage-law-2` (1024D, jurídico) — fallback OpenAI `text-embedding-3-small` (dimensions=1024) |

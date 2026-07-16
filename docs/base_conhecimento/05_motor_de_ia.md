@@ -55,7 +55,7 @@ mensagens, TTL 7 dias renovado a cada interação). A IA lembra o contexto da se
 | Modelo | ID | Uso |
 |---|---|---|
 | Sonnet | `claude-sonnet-5` | Resposta padrão do orquestrador |
-| Opus | `claude-opus-4-6` | Escalação premium + Hub do Advogado |
+| Opus | `claude-opus-4-8` | Escalação premium + Hub do Advogado |
 | Haiku | `claude-haiku-4-5-20251001` | DNA de prospecção, títulos de conversa, tarefas baratas |
 
 `MODELO_ESCALACAO` nas settings define o modelo de escalação. Wrapper com retries

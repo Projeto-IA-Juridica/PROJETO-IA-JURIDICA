@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     # Modelo de Escalação — Feature Hub do Advogado
     # Modelo Claude usado quando o ConfidenceRouter decide escalar (score baixo ou forçamento).
     # ESCALACAO_HABILITADO=False por padrão; controle por escritório é via banco (escalacao_habilitada).
-    MODELO_ESCALACAO: str = "claude-opus-4-6"
+    MODELO_ESCALACAO: str = "claude-opus-4-8"
     ESCALACAO_HABILITADO: bool = False
 
     # CORS

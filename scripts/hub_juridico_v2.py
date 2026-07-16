@@ -146,7 +146,7 @@ _TJ_INDICES: dict[str, str] = {
     "27": "api_publica_tjto",
 }
 
-# ── Modelo barato para demo (troca por claude-opus-4-6 em produção) ───────────
+# ── Modelo barato para demo (troca por claude-opus-4-8 em produção) ───────────
 # Haiku 4.5 custa ~$0.80/M input e $4/M output — ideal para testes sem gastar.
 _MODELO_HUB_DEMO = "claude-haiku-4-5-20251001"
 
@@ -167,7 +167,7 @@ class _EscalacaoDemo:
 
     Usa o modelo Haiku (barato/rápido) em vez do Opus para não consumir tokens
     desnecessariamente durante testes. A interface é idêntica ao EscalacaoClient
-    real — trocar _MODELO_HUB_DEMO por "claude-opus-4-6" ativa a versão produção.
+    real — trocar _MODELO_HUB_DEMO por "claude-opus-4-8" ativa a versão produção.
     """
 
     _MAX_TOKENS = 1024  # suficiente para testes; Opus usa 2048
@@ -3834,7 +3834,7 @@ def page_hub_advogado() -> None:
         st.title("⚖️ Hub do Advogado")
         st.caption(
             f"Dr(a). **{nome_advogado}** · {nome_escritorio} · "
-            f"Modelo: `{_MODELO_HUB_DEMO}` *(barato — trocar por `claude-opus-4-6` em prod)*"
+            f"Modelo: `{_MODELO_HUB_DEMO}` *(barato — trocar por `claude-opus-4-8` em prod)*"
         )
     with col_model:
         tin, tout = sessoes.total_tokens

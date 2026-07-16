@@ -6,7 +6,7 @@ Usado pelo ConfidenceRouter quando o score de confiança do Claude padrão
 (Haiku/Sonnet) fica abaixo do threshold ou há forçamento por termos legais.
 
 Usa o mesmo SDK Anthropic já presente no projeto, apenas com um modelo
-mais capaz (claude-opus-4-6 por padrão, configurável via MODELO_ESCALACAO).
+mais capaz (claude-opus-4-8 por padrão, configurável via MODELO_ESCALACAO).
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ from shared.config.settings import settings
 logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Custo estimado Claude Opus 4.6 (verificar em anthropic.com/pricing)
+# Custo estimado Claude Opus 4.8 (verificar em anthropic.com/pricing)
 # ---------------------------------------------------------------------------
-_CUSTO_INPUT_POR_MILHAO = Decimal("15.00")  # USD
-_CUSTO_OUTPUT_POR_MILHAO = Decimal("75.00")  # USD
+_CUSTO_INPUT_POR_MILHAO = Decimal("5.00")  # USD
+_CUSTO_OUTPUT_POR_MILHAO = Decimal("25.00")  # USD
 
 
 def _calcular_custo(tokens_input: int, tokens_output: int) -> Decimal:
@@ -104,7 +104,7 @@ class EscalacaoClient:
     Wrapper sobre o SDK Anthropic usando Claude Opus para escalação jurídica.
 
     Reutiliza a mesma chave ANTHROPIC_API_KEY já configurada no projeto.
-    O modelo é configurável via settings.MODELO_ESCALACAO (padrão: claude-opus-4-6).
+    O modelo é configurável via settings.MODELO_ESCALACAO (padrão: claude-opus-4-8).
 
     Retry de 3 tentativas com backoff — mesmo padrão do ClaudeClient padrão.
     """
