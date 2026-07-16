@@ -34,6 +34,7 @@ from feature_1_ia_personalizada.api.middleware.auth import (
 from feature_1_ia_personalizada.services.ai.escalation_client import (
     EscalacaoClient,
     EscalacaoIndisponivelError,
+    TipoAnalise,
 )
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_HUB_ADVOGADO_BASE
 from feature_1_ia_personalizada.services.ai.titulo_gerador import gerar_titulo_conversa
@@ -49,6 +50,8 @@ from shared.models.sessao_advogado import SessaoAdvogado
 from shared.models.usuario import Usuario
 from shared.schemas.hub_advogado import (
     AdvogadoAtivo,
+    AnalisePeticaoResponse,
+    AnalisePeticaoTextoRequest,
     ConsultaHubRequest,
     ConsultaHubResponse,
     ConversaListItem,
@@ -595,6 +598,98 @@ async def analisar_peticao(
 
     logger.info("hub_rest_peticao_enfileirada", job_id=job_id, escritorio_id=escritorio_id)
     return {"job_id": job_id, "status": "processando"}
+
+
+# ---------------------------------------------------------------------------
+# POST /hub/analisar-peticao-texto
+#
+# Substituto síncrono do fluxo de upload de PDF: o advogado cola o texto da
+# petição e a análise roda dentro do ciclo HTTP — sem Celery, Redis ou polling.
+# Mesmo padrão do POST /hub/consultar, que é o fluxo estável do Hub.
+# ---------------------------------------------------------------------------
+
+_TIMEOUT_ANALISE_SEGUNDOS = 90.0  # Opus leva 15-60s; margem para retry interno
+
+
+@router.post(
+    "/analisar-peticao-texto",
+    response_model=AnalisePeticaoResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def analisar_peticao_texto(
+    body: AnalisePeticaoTextoRequest,
+    advogado_id: int = Depends(get_advogado_id),
+    escritorio_id: int = Depends(get_escritorio_id_advogado),
+    db: AsyncSession = Depends(get_db),
+    escalacao_client: EscalacaoClient = Depends(get_escalacao_client),
+) -> AnalisePeticaoResponse:
+    """
+    Analisa o texto de uma petição colado pelo advogado com Claude Opus.
+
+    Retorna a análise estruturada na própria resposta (síncrono).
+    Textos acima de 15 000 caracteres são truncados — `texto_truncado` e
+    `percentual_analisado` informam o quanto foi efetivamente analisado.
+    """
+    texto = LegalDataCleaner.normalizar_espacos(body.texto)
+
+    if len(texto.strip()) < 50:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Texto muito curto para análise (mínimo de 50 caracteres úteis).",
+        )
+
+    texto_truncado = len(texto) > _MAX_CHARS_ANALISE
+    conteudo_envio = texto[:_MAX_CHARS_ANALISE]
+    percentual_analisado = (
+        round(min(_MAX_CHARS_ANALISE, len(texto)) / len(texto) * 100, 1) if texto else 100.0
+    )
+
+    try:
+        analise = await asyncio.wait_for(
+            escalacao_client.analisar_peca(
+                conteudo_peca=conteudo_envio,
+                tipo_analise=TipoAnalise.ANALISE_COMPLETA,
+                contexto_processo="Análise solicitada via Hub (texto colado).",
+            ),
+            timeout=_TIMEOUT_ANALISE_SEGUNDOS,
+        )
+    except (EscalacaoIndisponivelError, TimeoutError) as exc:
+        logger.error("hub_rest_analise_texto_falhou", erro=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Análise indisponível no momento. Tente novamente em instantes.",
+        ) from exc
+
+    await _salvar_sessao(
+        db,
+        SessaoAdvogado(
+            escritorio_id=escritorio_id,
+            usuario_id=advogado_id,
+            mensagem_advogado=f"[TEXTO] {conteudo_envio[:100]}",
+            resposta_hub=f"Análise de peça ({analise.tipo_peca}) — score {analise.score_geral}/100",
+            intencao="analise_peticao",
+            modelo_ia="claude_opus",
+            tokens_input=analise.tokens_input,
+            tokens_output=analise.tokens_output,
+            custo_estimado=analise.custo_estimado,
+            metadata_json={"texto_truncado": texto_truncado, "origem": "texto_colado"},
+        ),
+    )
+
+    return AnalisePeticaoResponse(
+        tipo_peca=analise.tipo_peca,
+        pontos_fortes=analise.pontos_fortes,
+        vulnerabilidades=analise.vulnerabilidades,
+        argumentos_ausentes=analise.argumentos_ausentes,
+        precedentes_relevantes=analise.precedentes_relevantes,
+        sugestoes=analise.sugestoes,
+        score_geral=analise.score_geral,
+        texto_truncado=texto_truncado,
+        percentual_analisado=percentual_analisado,
+        tokens_input=analise.tokens_input,
+        tokens_output=analise.tokens_output,
+        custo_estimado=analise.custo_estimado,
+    )
 
 
 # ---------------------------------------------------------------------------

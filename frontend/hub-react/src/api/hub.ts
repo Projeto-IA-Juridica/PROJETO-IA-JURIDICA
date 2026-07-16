@@ -91,23 +91,8 @@ export interface PeticaoAnalise {
   custo_estimado: string
 }
 
-export interface HubJobStatus {
-  status: 'processando' | 'concluido' | 'erro'
-  resultado: PeticaoAnalise | null
-  erro: string | null
-}
-
-export async function analisarPeticaoAsync(file: File): Promise<{ job_id: string; status: string }> {
-  const form = new FormData()
-  form.append('arquivo', file)
-  const { data } = await api.post<{ job_id: string; status: string }>('/hub/analisar-peticao', form, {
-    headers: { 'Content-Type': undefined },
-  })
-  return data
-}
-
-export async function pollHubJob(jobId: string): Promise<HubJobStatus> {
-  const { data } = await api.get<HubJobStatus>(`/hub/jobs/${jobId}`)
+export async function analisarPeticaoTexto(texto: string): Promise<PeticaoAnalise> {
+  const { data } = await api.post<PeticaoAnalise>('/hub/analisar-peticao-texto', { texto })
   return data
 }
 

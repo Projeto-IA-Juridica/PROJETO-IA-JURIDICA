@@ -28,6 +28,13 @@ class ConsultaHubRequest(BaseModel):
     conversa_id: str | None = None
 
 
+class AnalisePeticaoTextoRequest(BaseModel):
+    # Texto da petição colado pelo advogado. O backend trunca em
+    # _MAX_CHARS_ANALISE antes de enviar ao modelo — o limite alto aqui
+    # existe só para rejeitar payloads absurdos.
+    texto: Annotated[str, Field(min_length=50, max_length=200_000)]
+
+
 # ---------------------------------------------------------------------------
 # Response schemas — endpoints de consulta
 # ---------------------------------------------------------------------------
@@ -41,6 +48,21 @@ class ConsultaHubResponse(BaseModel):
     custo_estimado: Decimal
     # Retorna o conversa_id confirmado (gerado ou recebido)
     conversa_id: str | None = None
+
+
+class AnalisePeticaoResponse(BaseModel):
+    tipo_peca: str
+    pontos_fortes: list[str]
+    vulnerabilidades: list[str]
+    argumentos_ausentes: list[str]
+    precedentes_relevantes: list[str]
+    sugestoes: list[str]
+    score_geral: int
+    texto_truncado: bool
+    percentual_analisado: float
+    tokens_input: int
+    tokens_output: int
+    custo_estimado: Decimal
 
 
 # ---------------------------------------------------------------------------

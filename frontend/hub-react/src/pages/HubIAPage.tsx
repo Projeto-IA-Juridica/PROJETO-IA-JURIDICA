@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Sparkles, Scale, FileSearch, AlertTriangle, RotateCcw,
-  Upload, X, MessageSquare, Plus, Clock, CheckCircle2, Circle,
+  X, MessageSquare, Plus, Clock, CheckCircle2, Circle,
 } from 'lucide-react'
 import {
-  consultar, analisarPeticaoAsync, pollHubJob,
+  consultar, analisarPeticaoTexto,
   fetchConversas, fetchConversa,
   type PeticaoAnalise, type ConversaListItem, type ConversaMensagem,
 } from '../api/hub'
@@ -188,7 +188,7 @@ function AnalisePeticaoResult({ analise, onReset }: { analise: PeticaoAnalise; o
  * uma progressão por tempo decorrido para comunicar atividade contínua.
  */
 const PETICAO_ETAPAS = [
-  { label: 'Lendo o documento e extraindo o conteúdo', apos: 0 },
+  { label: 'Lendo o texto da petição', apos: 0 },
   { label: 'Identificando pontos fortes e vulnerabilidades', apos: 5 },
   { label: 'Cruzando com jurisprudência relevante', apos: 15 },
   { label: 'Calculando score e finalizando sugestões', apos: 30 },
@@ -256,13 +256,15 @@ function AnalisePeticaoLoading() {
   )
 }
 
-function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
-  onAnalise: (f: File) => void
+const _MIN_CHARS_PETICAO = 50
+
+function AnalisePeticaoTexto({ onAnalise, loading, erro }: {
+  onAnalise: (texto: string) => void
   loading: boolean
   erro: string | null
 }) {
-  const [dragging, setDragging] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [texto, setTexto] = useState('')
+  const valido = texto.trim().length >= _MIN_CHARS_PETICAO
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4">
@@ -272,29 +274,51 @@ function AnalisePeticaoUpload({ onAnalise, loading, erro }: {
           <Scale size={22} className="text-white" />
         </div>
         <p className="text-sm font-semibold text-am-ink">Análise de Petição</p>
-        <p className="text-xs text-am-muted mt-1">Envie um PDF — a IA identifica pontos fortes, vulnerabilidades e sugestões</p>
+        <p className="text-xs text-am-muted mt-1">Cole o texto da petição — a IA identifica pontos fortes, vulnerabilidades e sugestões</p>
+        <p className="text-[11px] text-am-muted mt-2">
+          Tem só o PDF? Abra o arquivo, selecione tudo (<kbd>Ctrl+A</kbd>), copie (<kbd>Ctrl+C</kbd>) e cole aqui.
+        </p>
       </div>
 
-      <button
-        type="button"
-        disabled={loading}
-        onClick={() => fileRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) onAnalise(f) }}
-        className="w-full rounded-2xl flex flex-col items-center gap-3 py-12 transition-all"
-        style={{
-          border: `2px dashed ${dragging ? 'var(--color-am-blue)' : 'rgba(18,72,190,0.25)'}`,
-          background: dragging ? 'rgba(18,72,190,0.04)' : 'white',
-          cursor: loading ? 'not-allowed' : 'pointer',
-        }}>
-        {loading
-          ? <AnalisePeticaoLoading />
-          : <><Upload size={20} style={{ color: 'var(--color-am-blue)' }} /><div className="text-center"><p className="text-sm font-semibold text-am-ink">Arraste o PDF aqui</p><p className="text-xs text-am-muted mt-1">ou clique para selecionar · máx. 10 MB</p></div></>
-        }
-      </button>
-      <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) onAnalise(f); e.target.value = '' }} />
+      {loading ? (
+        <div className="w-full rounded-2xl bg-white" style={{ border: '1px solid var(--color-am-border)' }}>
+          <AnalisePeticaoLoading />
+        </div>
+      ) : (
+        <>
+          <textarea
+            value={texto}
+            onChange={e => setTexto(e.target.value)}
+            placeholder="Cole aqui o texto da petição (Ctrl+V)…"
+            rows={12}
+            className="w-full rounded-2xl px-4 py-3 text-xs text-am-ink leading-relaxed resize-y outline-none"
+            style={{ border: '1px solid var(--color-am-border)', background: 'white', minHeight: '14rem' }}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] text-am-muted">
+              {texto.trim().length.toLocaleString('pt-BR')} caracteres
+              {!valido && texto.trim().length > 0 && ` · mínimo ${_MIN_CHARS_PETICAO}`}
+              {texto.length > 15_000 && ' · acima de 15.000 a análise considera só o início'}
+            </p>
+            <motion.button
+              onClick={() => valido && onAnalise(texto.trim())}
+              disabled={!valido}
+              whileHover={valido ? { scale: 1.03 } : undefined}
+              whileTap={valido ? { scale: 0.96 } : undefined}
+              transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white flex-shrink-0"
+              style={{
+                background: 'linear-gradient(135deg,#1248BE,#3A7AB8)',
+                opacity: valido ? 1 : 0.5,
+                cursor: valido ? 'pointer' : 'not-allowed',
+                boxShadow: valido ? '0 3px 12px rgba(18,72,190,0.25)' : 'none',
+              }}>
+              <Sparkles size={12} />
+              Analisar petição
+            </motion.button>
+          </div>
+        </>
+      )}
 
       {erro && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs"
@@ -491,7 +515,6 @@ export default function HubIAPage() {
   const [messages, setMessages]         = useState<ChatMessage[]>([MSG_INICIAL])
   const [analise, setAnalise]           = useState<PeticaoAnalise | null>(null)
   const [analiseErro, setAnaliseErro]   = useState<string | null>(null)
-  const [peticaoJobId, setPeticaoJobId] = useState<string | null>(null)
   const [showHistorico, setShowHistorico] = useState(false)
   const [conversaId, setConversaId]     = useState<string>(() => crypto.randomUUID())
   const [conversaRestaurada, setConversaRestaurada] = useState(false)
@@ -533,38 +556,13 @@ export default function HubIAPage() {
 
   /* ── Petição ── */
   const submitPeticaoMut = useMutation({
-    mutationFn: analisarPeticaoAsync,
-    onSuccess: ({ job_id }) => { setPeticaoJobId(job_id); setAnaliseErro(null) },
+    mutationFn: analisarPeticaoTexto,
+    onSuccess: resultado => { setAnalise(resultado); setAnaliseErro(null) },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setAnaliseErro(msg ?? 'Erro ao enviar. Verifique se o PDF não está protegido.')
+      setAnaliseErro(msg ?? 'Erro ao analisar. Tente novamente em instantes.')
     },
   })
-
-  const { data: jobStatus } = useQuery({
-    queryKey: ['hub-job', peticaoJobId],
-    queryFn: () => pollHubJob(peticaoJobId!),
-    enabled: peticaoJobId !== null,
-    // Continua tentando enquanto não houver um status terminal — inclusive
-    // quando a última tentativa falhou (ex: 404 transitório), em vez de exigir
-    // status === 'processando', que fica indefinido se algum fetch falhar antes
-    // de qualquer resposta bem-sucedida chegar a existir.
-    refetchInterval: (query) => {
-      const st = query.state.data?.status
-      return st === 'concluido' || st === 'erro' ? false : 2000
-    },
-  })
-
-  useEffect(() => {
-    if (jobStatus?.status === 'concluido' && jobStatus.resultado) {
-      setAnalise(jobStatus.resultado)
-      setAnaliseErro(null)
-      setPeticaoJobId(null)
-    } else if (jobStatus?.status === 'erro') {
-      setAnaliseErro(jobStatus.erro ?? 'Erro ao analisar. Tente novamente.')
-      setPeticaoJobId(null)
-    }
-  }, [jobStatus])
 
   useEffect(() => {
     const el = messagesRef.current
@@ -677,10 +675,10 @@ export default function HubIAPage() {
         {/* Conteúdo central */}
         {tool === 'peticao' ? (
           analise
-            ? <AnalisePeticaoResult analise={analise} onReset={() => { setAnalise(null); setAnaliseErro(null); setPeticaoJobId(null) }} />
-            : <AnalisePeticaoUpload
-                onAnalise={f => submitPeticaoMut.mutate(f)}
-                loading={submitPeticaoMut.isPending || (peticaoJobId !== null && jobStatus?.status === 'processando')}
+            ? <AnalisePeticaoResult analise={analise} onReset={() => { setAnalise(null); setAnaliseErro(null) }} />
+            : <AnalisePeticaoTexto
+                onAnalise={texto => submitPeticaoMut.mutate(texto)}
+                loading={submitPeticaoMut.isPending}
                 erro={analiseErro}
               />
         ) : (
