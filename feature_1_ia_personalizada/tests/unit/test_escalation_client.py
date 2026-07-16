@@ -40,10 +40,14 @@ def _bloco_texto(texto: str) -> MagicMock:
 
 
 def _mock_resposta(
-    texto: str = "Resposta Opus.", tokens_in: int = 200, tokens_out: int = 80
+    texto: str = "Resposta Opus.",
+    tokens_in: int = 200,
+    tokens_out: int = 80,
+    stop_reason: str = "end_turn",
 ) -> MagicMock:
     r = MagicMock(spec=anthropic.types.Message)
     r.content = [_bloco_texto(texto)]
+    r.stop_reason = stop_reason
     r.usage = MagicMock()
     r.usage.input_tokens = tokens_in
     r.usage.output_tokens = tokens_out

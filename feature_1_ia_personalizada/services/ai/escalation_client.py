@@ -110,6 +110,10 @@ class EscalacaoClient:
     """
 
     MAX_TOKENS = 2048
+    # Análises estruturadas (JSON com 6 listas) estouram 2048 tokens com
+    # petições reais — o JSON chega truncado e o parse falha. Limite maior
+    # só para as chamadas que retornam JSON.
+    MAX_TOKENS_JSON = 8192
     MAX_RETRIES = 3
 
     def __init__(self) -> None:
@@ -203,15 +207,15 @@ class EscalacaoClient:
             f"Peça jurídica:\n{conteudo_peca}"
         )
 
-        resposta = await self._chamar_com_retry(system_prompt=system_prompt, mensagem=mensagem)
+        resposta = await self._chamar_com_retry(
+            system_prompt=system_prompt, mensagem=mensagem, max_tokens=self.MAX_TOKENS_JSON
+        )
         conteudo = self._extrair_texto(resposta)
-
-        try:
-            dados = json.loads(conteudo)
-        except json.JSONDecodeError as exc:
+        if resposta.stop_reason == "max_tokens":
             raise EscalacaoIndisponivelError(
-                f"JSON inválido na análise de peça: {conteudo[:200]}"
-            ) from exc
+                "Análise excedeu o limite de tokens de saída — JSON incompleto."
+            )
+        dados = self._extrair_json(conteudo, contexto="análise de peça")
 
         tokens_in = getattr(getattr(resposta, "usage", None), "input_tokens", 0)
         tokens_out = getattr(getattr(resposta, "usage", None), "output_tokens", 0)
@@ -262,15 +266,10 @@ class EscalacaoClient:
         resposta = await self._chamar_com_retry(
             system_prompt=system_prompt,
             mensagem="\n".join(filtros),
+            max_tokens=self.MAX_TOKENS_JSON,
         )
         conteudo = self._extrair_texto(resposta)
-
-        try:
-            dados = json.loads(conteudo)
-        except json.JSONDecodeError as exc:
-            raise EscalacaoIndisponivelError(
-                f"JSON inválido na pesquisa de jurisprudência: {conteudo[:200]}"
-            ) from exc
+        dados = self._extrair_json(conteudo, contexto="pesquisa de jurisprudência")
 
         return [
             Jurisprudencia(
@@ -293,6 +292,7 @@ class EscalacaoClient:
         system_prompt: str,
         mensagem: str,
         historico: list[dict[str, str]] | None = None,
+        max_tokens: int | None = None,
     ) -> anthropic.types.Message:
         """Chama o modelo de escalação com retry e backoff exponencial."""
         import asyncio
@@ -305,7 +305,7 @@ class EscalacaoClient:
             try:
                 return await self._client.messages.create(
                     model=self._modelo,
-                    max_tokens=self.MAX_TOKENS,
+                    max_tokens=max_tokens or self.MAX_TOKENS,
                     system=system_prompt,
                     messages=mensagens,
                 )
@@ -332,3 +332,37 @@ class EscalacaoClient:
         if not blocos:
             raise EscalacaoIndisponivelError("Modelo de escalação não retornou bloco de texto.")
         return str(blocos[0].text)
+
+    @staticmethod
+    def _extrair_json(conteudo: str, contexto: str) -> Any:
+        """
+        Extrai JSON da resposta do modelo de forma tolerante.
+
+        Mesmo instruído a responder "APENAS com JSON válido, sem markdown",
+        o modelo frequentemente envolve a resposta em cercas ```json ... ```
+        ou adiciona uma frase antes/depois. Aqui recortamos do primeiro
+        delimitador de abertura ({ ou [) até o último de fechamento
+        correspondente antes de parsear.
+
+        Raises:
+            EscalacaoIndisponivelError: Se nenhum JSON válido for encontrado.
+        """
+        try:
+            return json.loads(conteudo)
+        except json.JSONDecodeError:
+            pass
+
+        inicio_obj = conteudo.find("{")
+        inicio_lista = conteudo.find("[")
+        candidatos = [i for i in (inicio_obj, inicio_lista) if i != -1]
+        if candidatos:
+            inicio = min(candidatos)
+            fechamento = "}" if inicio == inicio_obj else "]"
+            fim = conteudo.rfind(fechamento)
+            if fim > inicio:
+                try:
+                    return json.loads(conteudo[inicio : fim + 1])
+                except json.JSONDecodeError:
+                    pass
+
+        raise EscalacaoIndisponivelError(f"JSON inválido na {contexto}: {conteudo[:200]}")
