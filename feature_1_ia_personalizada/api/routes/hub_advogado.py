@@ -659,6 +659,15 @@ async def analisar_peticao_texto(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Análise indisponível no momento. Tente novamente em instantes.",
         ) from exc
+    except Exception as exc:
+        # Qualquer falha não prevista viraria um 500 text/plain sem CORS/detail,
+        # que o frontend só consegue exibir como erro genérico. Convertemos em
+        # 503 JSON e registramos o traceback completo para diagnóstico.
+        logger.error("hub_rest_analise_texto_erro_inesperado", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Erro interno ao analisar a petição. A equipe foi notificada.",
+        ) from exc
 
     await _salvar_sessao(
         db,

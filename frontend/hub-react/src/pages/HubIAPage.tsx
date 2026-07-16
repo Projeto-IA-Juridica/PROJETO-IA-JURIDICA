@@ -559,8 +559,12 @@ export default function HubIAPage() {
     mutationFn: analisarPeticaoTexto,
     onSuccess: resultado => { setAnalise(resultado); setAnaliseErro(null) },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setAnaliseErro(msg ?? 'Erro ao analisar. Tente novamente em instantes.')
+      const resp = (e as { response?: { status?: number; data?: { detail?: string } } })?.response
+      const msg = resp?.data?.detail
+        ?? (resp?.status
+          ? `Erro ${resp.status} ao analisar. Tente novamente em instantes.`
+          : 'Sem resposta do servidor (conexão ou timeout). Tente novamente em instantes.')
+      setAnaliseErro(msg)
     },
   })
 
