@@ -11,7 +11,8 @@ from shared.models.interacao import Interacao
 class CalculadoraAnalytics:
     """
     Agrupa funções e métricas de Analytics focadas na retenção e
-    satisfação de clientes (NPS), e no controle de custos e tempo.
+    relacionamento com clientes (score CRM classificado pela IA),
+    e no controle de custos e tempo.
     """
 
     MINUTOS_POR_INTERACAO = 8  # benchmark de tempo para resposta humana manual
@@ -26,7 +27,7 @@ class CalculadoraAnalytics:
         self.dt_inicio_anterior = agora - timedelta(days=dias * 2)
 
     async def obter_resumo(self) -> dict:
-        """Calcula o resumo geral (interações, clientes_ativos, NPS) no período."""
+        """Calcula o resumo geral (interações, clientes_ativos, score CRM) no período."""
         total_interacoes = await self._total_interacoes_periodo()
 
         # Clientes únicos ativos no período
@@ -36,34 +37,25 @@ class CalculadoraAnalytics:
         )
         clientes_ativos = await self.db.scalar(stmt_clientes) or 0
 
-        # NPS médio — período atual
-        stmt_nps = select(func.avg(Interacao.satisfacao)).where(
-            Interacao.escritorio_id == self.escritorio_id,
-            Interacao.satisfacao.is_not(None),
-            Interacao.created_at >= self.dt_inicio,
+        # Score CRM médio — relacionamento classificado pela IA (0-100)
+        stmt_score = select(
+            func.avg(Cliente.crm_score).label("score_medio"),
+            func.count(Cliente.crm_score).label("analisados"),
+        ).where(
+            Cliente.escritorio_id == self.escritorio_id,
+            Cliente.ativo.is_(True),
+            Cliente.crm_score.is_not(None),
         )
-        nps_medio_raw = await self.db.scalar(stmt_nps)
-        nps_medio = round(float(nps_medio_raw), 1) if nps_medio_raw else 0.0
-
-        # NPS médio — período anterior (para variação)
-        stmt_nps_ant = select(func.avg(Interacao.satisfacao)).where(
-            Interacao.escritorio_id == self.escritorio_id,
-            Interacao.satisfacao.is_not(None),
-            Interacao.created_at >= self.dt_inicio_anterior,
-            Interacao.created_at < self.dt_inicio,
+        row_score = (await self.db.execute(stmt_score)).one()
+        score_crm_medio = (
+            round(float(row_score.score_medio), 1) if row_score.score_medio is not None else None
         )
-        nps_ant_raw = await self.db.scalar(stmt_nps_ant)
-        nps_anterior = round(float(nps_ant_raw), 1) if nps_ant_raw else 0.0
-
-        delta = round(nps_medio - nps_anterior, 1)
-        variacao_nps = f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
 
         return {
             "total_interacoes": total_interacoes,
             "clientes_ativos": clientes_ativos,
-            "nps_medio": nps_medio,
-            "nps_anterior": nps_anterior,
-            "variacao_nps": variacao_nps,
+            "score_crm_medio": score_crm_medio,
+            "clientes_analisados": row_score.analisados or 0,
         }
 
     async def _total_interacoes_periodo(self) -> int:
@@ -128,7 +120,6 @@ class CalculadoraAnalytics:
             select(
                 func.date_trunc("week", Interacao.created_at).label("semana"),
                 func.count(Interacao.id).label("total_interacoes"),
-                func.avg(Interacao.satisfacao).label("nps_medio"),
                 func.count(Interacao.id).filter(Interacao.direcao == "saida").label("saidas"),
             )
             .where(
@@ -150,7 +141,6 @@ class CalculadoraAnalytics:
                 {
                     "semana": row.semana.strftime("%Y-W%W") if row.semana else "",
                     "total_interacoes": total,
-                    "nps_medio": round(float(row.nps_medio), 1) if row.nps_medio else 0.0,
                     "autonomia_pct": round(autonomia_pct, 1),
                 }
             )
@@ -158,16 +148,15 @@ class CalculadoraAnalytics:
 
     async def ranking_clientes(self, limite: int = 20) -> list[dict]:
         """
-        Top N clientes por NPS (piores primeiro) com identificação de risco.
-        Clientes em risco: sem interação há > 30 dias E NPS <= 3.
+        Top N clientes por score CRM (piores primeiro) com identificação de risco.
+        Clientes em risco: classificados pela IA como em_risco ou critico.
         """
-        dt_30_dias = datetime.now(UTC) - timedelta(days=30)
-
         stmt = (
             select(
                 Interacao.cliente_id,
                 Cliente.nome,
-                func.avg(Interacao.satisfacao).label("nps_medio"),
+                Cliente.crm_score,
+                Cliente.crm_nivel,
                 func.count(Interacao.id).label("total_interacoes"),
                 func.max(Interacao.created_at).label("ultimo_contato"),
             )
@@ -176,8 +165,8 @@ class CalculadoraAnalytics:
                 Interacao.escritorio_id == self.escritorio_id,
                 Interacao.created_at >= self.dt_inicio,
             )
-            .group_by(Interacao.cliente_id, Cliente.nome)
-            .order_by(func.avg(Interacao.satisfacao).asc().nulls_last())
+            .group_by(Interacao.cliente_id, Cliente.nome, Cliente.crm_score, Cliente.crm_nivel)
+            .order_by(Cliente.crm_score.asc().nulls_last())
             .limit(limite)
         )
         result = await self.db.execute(stmt)
@@ -185,24 +174,20 @@ class CalculadoraAnalytics:
 
         ranking = []
         for row in rows:
-            nps = round(float(row.nps_medio), 1) if row.nps_medio else None
             ultimo = row.ultimo_contato
             if ultimo is not None and ultimo.tzinfo is None:
                 ultimo = ultimo.replace(tzinfo=UTC)
-            sem_contato_recente = (ultimo is None) or (ultimo < dt_30_dias)
-            # em_risco: avaliou mal E está sem contato recente
-            em_risco = sem_contato_recente and nps is not None and nps <= 3
-            # sem_avaliacao: nunca respondeu NPS — estado diferente de insatisfeito
-            sem_avaliacao = nps is None
             ranking.append(
                 {
                     "cliente_id": row.cliente_id,
                     "nome": row.nome,
-                    "nps_medio": nps,
+                    "crm_score": row.crm_score,
+                    "crm_nivel": row.crm_nivel,
                     "total_interacoes": row.total_interacoes,
                     "ultimo_contato": ultimo.isoformat() if ultimo else None,
-                    "em_risco": em_risco,
-                    "sem_avaliacao": sem_avaliacao,
+                    "em_risco": row.crm_nivel in ("em_risco", "critico"),
+                    # sem_analise: cliente ainda não classificado pela IA
+                    "sem_analise": row.crm_nivel is None,
                 }
             )
         return ranking

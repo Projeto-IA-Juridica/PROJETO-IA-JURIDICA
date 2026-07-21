@@ -26,9 +26,18 @@ _CABECALHO_CSV = [
     "Risco",
     "Último Andamento",
     "Data do Andamento",
-    "Satisfação",
+    "Relacionamento",
     "Economia Estimada no Mês",
 ]
+
+# crm_nivel (classificado pela IA) → rótulo do relatório
+_NIVEL_CRM_LABEL = {
+    "excelente": "Excelente",
+    "satisfeito": "Satisfeito",
+    "neutro": "Neutro",
+    "em_risco": "Em risco",
+    "critico": "Crítico",
+}
 
 
 def _parse_mes_ano(mes_ano: str) -> tuple[datetime, datetime]:
@@ -62,7 +71,7 @@ class ExportadorAnalytics:
 
         # Clientes do escritório
         clientes_result = await self.db.execute(
-            select(Cliente.id, Cliente.nome)
+            select(Cliente.id, Cliente.nome, Cliente.crm_nivel)
             .where(Cliente.escritorio_id == self.escritorio_id)
             .order_by(Cliente.nome.asc())
         )
@@ -98,12 +107,11 @@ class ExportadorAnalytics:
         )
         processos = {row.cliente_id: row for row in proc_result.all()}
 
-        # Interações da IA no mês: contagem e NPS médio por cliente
+        # Interações da IA no mês: contagem por cliente
         int_result = await self.db.execute(
             select(
                 Interacao.cliente_id,
                 func.count(Interacao.id).label("total"),
-                func.avg(Interacao.satisfacao).label("nps_medio"),
             )
             .where(
                 Interacao.escritorio_id == self.escritorio_id,
@@ -135,15 +143,8 @@ class ExportadorAnalytics:
                 else "—"
             )
 
-            nps = float(ints.nps_medio) if ints and ints.nps_medio is not None else None
-            if nps is None:
-                satisfacao = "N/D"
-            elif nps >= 4.0:
-                satisfacao = "Satisfeito"
-            elif nps >= 3.0:
-                satisfacao = "Neutro"
-            else:
-                satisfacao = "Insatisfeito"
+            # Relacionamento classificado pela IA (crm_nivel)
+            satisfacao = _NIVEL_CRM_LABEL.get(cliente.crm_nivel or "", "N/D")
 
             total_msgs = ints.total if ints else 0
             horas = round(total_msgs * _MIN_POR_INTERACAO / 60, 1)

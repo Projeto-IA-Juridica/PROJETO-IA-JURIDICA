@@ -568,7 +568,7 @@ async def _handler_insight_cliente(
                 # Resumo de interações
                 resumo_interacoes = (
                     f"{ctx.total_interacoes_30d} interações nos últimos 30 dias; "
-                    f"NPS médio 3m: {ctx.nps_medio_3m or 'N/D'}; "
+                    f"nível CRM: {ctx.crm_nivel_anterior or 'N/D'}; "
                     f"último contato há {ctx.dias_desde_ultimo_contato} dias"
                 )
                 # Resumo de processos
@@ -708,8 +708,8 @@ async def _handler_resumo_processo(
             contexto_crm = (
                 f"Cliente: {nome_cliente}\n"
                 f"CRM Score: {crm_score}/100\n"
+                f"Nível CRM: {ctx.crm_nivel_anterior or 'N/D'}\n"
                 f"Interações (últimos 30d): {ctx.total_interacoes_30d}\n"
-                f"NPS médio (3m): {ctx.nps_medio_3m or 'N/D'}\n"
                 f"Último contato: há {ctx.dias_desde_ultimo_contato} dias\n"
                 f"Última ação CRM sugerida: {ultima_acao}"
             )
