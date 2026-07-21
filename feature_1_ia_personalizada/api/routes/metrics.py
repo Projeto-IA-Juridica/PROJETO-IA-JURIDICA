@@ -14,7 +14,7 @@ Segurança em duas camadas (defense in depth):
 Em desenvolvimento (METRICS_TOKEN=None): endpoint aberto com aviso no log.
 
 Gauges de analytics (atualizados a cada cálculo do dashboard):
-    nps_score_gauge              — NPS médio atual por escritório
+    crm_score_medio_gauge        — score CRM médio (0-100) por escritório
     ia_autonomia_percent_gauge   — % interações resolvidas sem humano por escritório
     escalacoes_pendentes_gauge   — escalações pendentes por escritório
 """
@@ -36,9 +36,9 @@ router = APIRouter(tags=["Monitoramento"])
 # Gauges de analytics — definidos aqui e importados por quem os atualiza
 # ---------------------------------------------------------------------------
 
-nps_score_gauge = Gauge(
-    "nps_score",
-    "NPS médio atual do escritório (escala 1-5)",
+crm_score_medio_gauge = Gauge(
+    "crm_score_medio",
+    "Score CRM médio do escritório (0-100, relacionamento classificado pela IA)",
     labelnames=["escritorio_id"],
 )
 

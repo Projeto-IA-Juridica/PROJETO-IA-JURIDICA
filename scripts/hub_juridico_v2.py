@@ -2268,70 +2268,44 @@ _CRM_ICONES = {
 
 def _calcular_crm_mock(cliente: dict) -> dict:
     """
-    Calcula score CRM mockado a partir dos dados do cliente na sessão.
-    Usa o CRMScoreCalculator real com um CRMContexto sintético.
+    Simula a classificação de relacionamento feita pelo Claude em produção
+    (CRMAnalyzer lê a conversa recente e classifica nível + score).
+    Aqui é tudo sintético e determinístico por cliente, sem chamar a API.
     """
-    from feature_1_ia_personalizada.services.crm.aggregator import (
-        CRMContexto,
-        NPSRegistro,
-        ProcessoResumo,
-    )
-    from feature_1_ia_personalizada.services.crm.score_calculator import calcular_score_crm
-    from datetime import UTC, datetime, timedelta
+    from shared.config.constants import CRM_NIVEL_FAIXAS
     import random
 
     seed = hash(cliente["nome"]) % 10000
     rng = random.Random(seed)
 
-    nps_nota = st.session_state.get(f"nps_{cliente['id']}")
-    nps_historico = [NPSRegistro(data=datetime.now(UTC), nota=nps_nota)] if nps_nota else []
-    nps_medio = float(nps_nota) if nps_nota else None
+    dias_contato = rng.randint(0, 90)
+    interacoes_30d = rng.randint(0, 15)
+    escalacoes_pendentes = rng.choice([0, 0, 0, 1])
 
-    tem_processo = bool(cliente.get("numero_cnj"))
-    processos = (
-        [
-            ProcessoResumo(
-                numero_cnj=cliente["numero_cnj"],
-                tipo_acao=cliente.get("tipo_acao"),
-                fase_processual=None,
-                score_nivel=rng.choice(["baixo", "moderado", "alto"]),
-                score_interpretacao=None,
-            )
-        ]
-        if tem_processo
-        else []
+    # Sinais operacionais em 0-100 (apenas para o expander "por quê")
+    p_recencia = 100 if dias_contato <= 7 else 70 if dias_contato <= 30 else 30
+    p_engajamento = min(interacoes_30d * 10, 100)
+    p_escalacoes = 30 if escalacoes_pendentes else 100
+    p_conversa = rng.randint(20, 100)  # tom da conversa (mock do julgamento do modelo)
+
+    score = round(
+        p_conversa * 0.55 + p_recencia * 0.20 + p_engajamento * 0.10 + p_escalacoes * 0.15
     )
+    nivel = next(n for minimo, n in CRM_NIVEL_FAIXAS if score >= minimo)
 
-    ctx = CRMContexto(
-        cliente_id=cliente["id"],
-        escritorio_id=1,
-        nome=cliente["nome"],
-        profissao=cliente.get("profissao"),
-        empresa=cliente.get("empresa"),
-        data_nascimento=None,
-        nps_historico=nps_historico,
-        nps_medio_3m=nps_medio,
-        total_interacoes_30d=rng.randint(0, 15),
-        total_interacoes_90d=rng.randint(5, 40),
-        dias_desde_ultimo_contato=rng.randint(0, 90),
-        ultimo_contato_at=datetime.now(UTC) - timedelta(days=rng.randint(0, 90)),
-        processos_ativos=processos,
-        pior_score_risco=processos[0].score_nivel if processos else None,
-        escalacoes_pendentes=rng.choice([0, 0, 0, 1]),
-        escalacoes_rejeitadas_30d=rng.choice([0, 0, 1]),
-        crm_score_anterior=None,
-        crm_analisado_em_anterior=None,
-        crm_resumo_anterior=None,
-        crm_acao_sugerida_anterior=None,
-    )
+    fatores = {
+        "conversa": {"pontos": p_conversa},
+        "recencia": {"pontos": p_recencia},
+        "engajamento": {"pontos": p_engajamento},
+        "escalacoes": {"pontos": p_escalacoes},
+    }
 
-    crm = calcular_score_crm(ctx)
     return {
-        "nivel": crm.nivel,
-        "score": crm.score,
-        "fatores": crm.fatores,
-        "dias_contato": ctx.dias_desde_ultimo_contato,
-        "interacoes_30d": ctx.total_interacoes_30d,
+        "nivel": nivel,
+        "score": score,
+        "fatores": fatores,
+        "dias_contato": dias_contato,
+        "interacoes_30d": interacoes_30d,
     }
 
 
@@ -2454,8 +2428,8 @@ def page_crm() -> None:
             with col_detalhe:
                 with st.expander("Por que esta classificação?"):
                     _FATOR_LABEL = {
+                        "conversa": "Tom da conversa recente",
                         "engajamento": "Frequência de contato",
-                        "satisfacao": "Satisfação (NPS)",
                         "risco_processo": "Risco do processo",
                         "recencia": "Há quanto tempo sem contato",
                         "escalacoes": "Escalações pendentes",

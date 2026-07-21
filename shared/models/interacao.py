@@ -112,11 +112,14 @@ class Interacao(Base, TimestampMixin, TenantMixin):
         comment="Latência total em milissegundos (desde recebimento até envio)",
     )
 
-    # --- Feedback do Usuário ---
+    # --- Feedback do Usuário (LEGADO) ---
+    # A pesquisa NPS foi removida em 07/2026 — a satisfação agora é inferida
+    # pela análise CRM (Claude classifica a conversa recente). A coluna é
+    # mantida apenas para não exigir migration destrutiva.
     satisfacao: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
-        comment="Nota NPS de 1 a 5 (preenchida quando cliente responde pesquisa)",
+        comment="LEGADO: nota NPS 1-5 da pesquisa descontinuada. Não é mais preenchida.",
     )
 
     # --- Dados Extras (JSON flexível) ---

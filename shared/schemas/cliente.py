@@ -220,7 +220,6 @@ class CRMClienteCard(BaseModel):
     crm_acao_sugerida: str | None
     crm_analisado_em: datetime | None
     total_processos: int
-    nps_medio: float | None
     ultimo_contato: datetime | None
 
 

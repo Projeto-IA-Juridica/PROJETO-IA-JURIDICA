@@ -151,42 +151,17 @@ SCORE_RISCO_SALARIO_MINIMO_REF: Final[float] = 1_518.00
 
 
 # ---------------------------------------------------------------------------
-# 9) Score CRM (Feature 7)
+# 9) Níveis CRM (Feature 7)
 # ---------------------------------------------------------------------------
-# Usado por CRMScoreCalculator em score_calculator.py.
-# NÃO representa probabilidade de satisfação futura — é um indicador operacional.
-# Os pesos devem somar 1.0.
+# A classificação do relacionamento (nível + score) é feita pelo Claude a
+# partir da conversa recente (ver CRMAnalyzer). As faixas abaixo definem o
+# intervalo de score válido para cada nível e são usadas para validar/
+# normalizar o output do modelo.
+# NÃO representa probabilidade de satisfação futura — é um indicador de
+# relacionamento.
 # ---------------------------------------------------------------------------
 
-CRM_SCORE_PESOS: Final[dict[str, float]] = {
-    "nps": 0.40,  # satisfação direta do cliente
-    "contato": 0.25,  # frequência de relacionamento
-    "engajamento": 0.15,  # volume de interações com a IA
-    "escalacoes": 0.20,  # reclamações e escalações abertas
-}
-
-# Pontuação por nota NPS (1–5); None → 40pts (sem dados = neutro)
-CRM_NPS_PONTOS: Final[dict[int, int]] = {5: 100, 4: 80, 3: 50, 2: 20, 1: 0}
-CRM_NPS_PONTOS_NULO: Final[int] = 40
-
-# Pontuação por dias sem contato
-CRM_CONTATO_PONTOS: Final[list[tuple[int, int]]] = [
-    (7, 100),  # 0–7 dias
-    (30, 70),  # 8–30 dias
-    (60, 30),  # 31–60 dias
-    (9999, 0),  # > 60 dias
-]
-
-# Pontuação por interações nos últimos 30 dias.
-# Semântica: se total_30d > limite → pontos. Iterar em ordem decrescente de limite.
-# >10 → 100pts | 5–10 → 70pts | 1–4 → 40pts | 0 → 0pts
-CRM_ENGAJAMENTO_PONTOS: Final[list[tuple[int, int]]] = [
-    (10, 100),  # > 10 interações/mês
-    (4, 70),  # > 4 (ou seja, 5–10)
-    (0, 40),  # > 0 (ou seja, 1–4)
-]
-
-# Mapeamento score → nível CRM
+# Mapeamento score → nível CRM (score mínimo de cada faixa)
 CRM_NIVEL_FAIXAS: Final[list[tuple[int, str]]] = [
     (76, "excelente"),
     (51, "satisfeito"),

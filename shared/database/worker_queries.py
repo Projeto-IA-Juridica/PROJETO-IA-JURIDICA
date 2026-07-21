@@ -26,7 +26,6 @@ Relacionamento (mensagens_relacionamento.py):
 Notificações (send_notifications.py):
     query_processo_e_cliente(id_processo)
     query_processos_sem_movimentacao()
-    query_clientes_para_pesquisa()
     query_clientes_ativos_por_escritorio(escritorio_id)
     update_ultimo_andamento(id_processo, texto, data_iso)
 
@@ -484,30 +483,6 @@ def query_processos_sem_movimentacao() -> list[ProcessoWorker]:
     return _run(_query_processos_sem_movimentacao())  # type: ignore[no-any-return]
 
 
-async def _query_clientes_para_pesquisa() -> list[ClienteWorker]:
-    async with worker_session_factory() as session:
-        result = await session.execute(
-            select(ClienteModel).where(
-                ClienteModel.ativo == True,  # noqa: E712
-                ClienteModel.aceite_lgpd == True,  # noqa: E712
-            )
-        )
-        return [
-            ClienteWorker(
-                id=c.id,
-                nome=c.nome,
-                telefone=c.telefone_whatsapp,
-                escritorio_id=c.escritorio_id,
-            )
-            for c in result.scalars().all()
-        ]
-
-
-def query_clientes_para_pesquisa() -> list[ClienteWorker]:
-    """SELECT clientes ativos com aceite_lgpd=true para pesquisa de satisfação."""
-    return _run(_query_clientes_para_pesquisa())  # type: ignore[no-any-return]
-
-
 async def _query_clientes_ativos_por_escritorio(
     escritorio_id: int,
 ) -> list[ClienteWorker]:
@@ -584,65 +559,3 @@ def enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) -> None
     _run(_enviar_mensagem_whatsapp(id_cliente, telefone, texto))
 
 
-# ===========================================================================
-# NPS  (mensagens_relacionamento.py)
-# ===========================================================================
-
-
-@dataclass
-class ClienteNPS:
-    id: int
-    nome: str
-    telefone: str
-    escritorio_id: int
-    nome_escritorio: str
-
-
-async def _query_clientes_nps_pendente() -> list[ClienteNPS]:
-    """
-    Retorna clientes cujo processo teve data_ultimo_andamento entre 7 e 8 dias atrás.
-    Esses clientes são candidatos a receber a pesquisa de NPS.
-    Filtros: processo monitorado, cliente ativo e com aceite_lgpd.
-    """
-    agora = datetime.now(UTC)
-    inicio_janela = agora - timedelta(days=8)
-    fim_janela = agora - timedelta(days=7)
-
-    async with worker_session_factory() as session:
-        result = await session.execute(
-            select(
-                ClienteModel.id,
-                ClienteModel.nome,
-                ClienteModel.telefone_whatsapp,
-                ClienteModel.escritorio_id,
-                Escritorio.nome.label("nome_escritorio"),
-            )
-            .join(ProcessoModel, ProcessoModel.cliente_id == ClienteModel.id)
-            .join(Escritorio, Escritorio.id == ClienteModel.escritorio_id)
-            .where(
-                ClienteModel.ativo == True,  # noqa: E712
-                ClienteModel.aceite_lgpd == True,  # noqa: E712
-                ProcessoModel.monitoramento_ativo == True,  # noqa: E712
-                ProcessoModel.data_ultimo_andamento >= inicio_janela,
-                ProcessoModel.data_ultimo_andamento < fim_janela,
-            )
-            .distinct()
-        )
-        return [
-            ClienteNPS(
-                id=row.id,
-                nome=row.nome,
-                telefone=row.telefone_whatsapp,
-                escritorio_id=row.escritorio_id,
-                nome_escritorio=row.nome_escritorio,
-            )
-            for row in result.all()
-        ]
-
-
-def query_clientes_nps_pendente() -> list[ClienteNPS]:
-    """
-    Clientes cujo processo teve andamento entre 7 e 8 dias atrás —
-    janela diária para disparar pesquisa de NPS.
-    """
-    return _run(_query_clientes_nps_pendente())  # type: ignore[no-any-return]

@@ -62,7 +62,6 @@ async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -
             Cliente.crm_acao_sugerida,
             Cliente.crm_analisado_em,
             func.count(Interacao.id).label("total_interacoes"),
-            func.avg(Interacao.satisfacao).label("nps_medio"),
             func.max(Interacao.created_at).label("ultimo_contato"),
         )
         .outerjoin(Interacao, Interacao.cliente_id == Cliente.id)
@@ -109,7 +108,6 @@ async def _get_crm_card(db: AsyncSession, cliente_id: int, escritorio_id: int) -
         crm_acao_sugerida=row.crm_acao_sugerida,
         crm_analisado_em=row.crm_analisado_em,
         total_processos=total_proc,
-        nps_medio=round(float(row.nps_medio), 2) if row.nps_medio else None,
         ultimo_contato=row.ultimo_contato,
     )
 
@@ -148,7 +146,6 @@ async def listar_clientes_crm(
             Cliente.crm_acao_sugerida,
             Cliente.crm_analisado_em,
             func.count(Interacao.id).label("total_interacoes"),
-            func.avg(Interacao.satisfacao).label("nps_medio"),
             func.max(Interacao.created_at).label("ultimo_contato"),
         )
         .outerjoin(Interacao, Interacao.cliente_id == Cliente.id)
@@ -205,7 +202,6 @@ async def listar_clientes_crm(
             crm_acao_sugerida=r.crm_acao_sugerida,
             crm_analisado_em=r.crm_analisado_em,
             total_processos=proc_por_cliente.get(r.id, 0),
-            nps_medio=round(float(r.nps_medio), 2) if r.nps_medio else None,
             ultimo_contato=r.ultimo_contato,
         )
         for r in rows
@@ -261,6 +257,11 @@ async def analisar_cliente(
         if r:
             await r.delete(chave)
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        # Claude indisponível/output inválido — libera o lock para permitir retry
+        if r:
+            await r.delete(chave)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return {
         "nivel": result.nivel,

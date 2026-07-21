@@ -83,9 +83,8 @@ class SendMessageRequest(BaseModel):
 class ResumoDashboard(BaseModel):
     total_interacoes: int
     clientes_ativos: int
-    nps_medio: float
-    nps_anterior: float
-    variacao_nps: str
+    score_crm_medio: float | None
+    clientes_analisados: int
 
 
 class EficienciaDashboard(BaseModel):
@@ -99,17 +98,17 @@ class EficienciaDashboard(BaseModel):
 class ClienteRankingItem(BaseModel):
     cliente_id: int
     nome: str
-    nps_medio: float | None
+    crm_score: int | None
+    crm_nivel: str | None
     total_interacoes: int
     ultimo_contato: str | None
     em_risco: bool
-    sem_avaliacao: bool
+    sem_analise: bool
 
 
 class TendenciaSemanal(BaseModel):
     semana: str
     total_interacoes: int
-    nps_medio: float
     autonomia_pct: float
 
 
@@ -292,13 +291,14 @@ def _atualizar_metricas_prometheus(
     Falhas são silenciosas para não impactar a resposta ao cliente.
     """
     from feature_1_ia_personalizada.api.routes.metrics import (
+        crm_score_medio_gauge,
         ia_autonomia_percent_gauge,
-        nps_score_gauge,
     )
 
     label = str(escritorio_id)
     try:
-        nps_score_gauge.labels(escritorio_id=label).set(payload.resumo.nps_medio)
+        if payload.resumo.score_crm_medio is not None:
+            crm_score_medio_gauge.labels(escritorio_id=label).set(payload.resumo.score_crm_medio)
         ia_autonomia_percent_gauge.labels(escritorio_id=label).set(
             payload.eficiencia.percentual_autonomia
         )
