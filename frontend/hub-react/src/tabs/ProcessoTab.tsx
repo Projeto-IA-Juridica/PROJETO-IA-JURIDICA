@@ -387,11 +387,11 @@ export default function ProcessoTab({ cliente }: { cliente: CRMClienteCard }) {
                 <Phone size={10} className="text-am-muted" />{cliente.telefone_whatsapp ?? '—'}
               </p>
             </div>
-            {cliente.nps_medio != null && (
+            {cliente.crm_score != null && (
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">NPS</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-am-muted mb-0.5">Relacionamento</p>
                 <p className="flex items-center gap-1.5 text-xs font-bold text-am-ink">
-                  <Star size={10} style={{ color: '#D08010' }} />{cliente.nps_medio.toFixed(1)}
+                  <Star size={10} style={{ color: '#D08010' }} />{cliente.crm_score}/100
                 </p>
               </div>
             )}

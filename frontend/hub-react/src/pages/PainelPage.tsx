@@ -268,8 +268,8 @@ export default function PainelPage({ onSelectCliente, onVerAgenda, onVerPendente
   const totalProc     = clientes?.reduce((a, c) => a + c.total_processos, 0) ?? 0
   const clientesRisco = clientes?.filter((c) => c.crm_nivel === 'em_risco' || c.crm_nivel === 'critico') ?? []
   const emRisco       = clientesRisco.length
-  const npsArr        = clientes?.map((c) => c.nps_medio).filter((n): n is number => n !== null) ?? []
-  const npsMedia      = npsArr.length ? +(npsArr.reduce((a, b) => a + b, 0) / npsArr.length).toFixed(1) : null
+  const scoreArr      = clientes?.map((c) => c.crm_score).filter((n): n is number => n !== null) ?? []
+  const scoreMedia    = scoreArr.length ? Math.round(scoreArr.reduce((a, b) => a + b, 0) / scoreArr.length) : null
 
   /* Eficiência estimada (derivada dos dados disponíveis) */
   const semAnalise     = resumo?.sem_analise ?? 0
@@ -352,7 +352,7 @@ export default function PainelPage({ onSelectCliente, onVerAgenda, onVerPendente
               { icon: <Users size={14} />,         label: 'Clientes ativos', value: total,     color: '#1248BE', sub: `${totalProc} processos` },
               { icon: <FileText size={14} />,      label: 'Processos',       value: totalProc, color: '#6B7CFF', sub: 'Total vinculados' },
               { icon: <MessageCircle size={14} />, label: 'Atenção ao cliente', value: emRisco, color: '#C83030', sub: 'Satisfação crítica', delta: emRisco > 0 ? emRisco : undefined },
-              { icon: <Star size={14} />,          label: 'NPS médio',       value: npsMedia !== null ? `${npsMedia}` : '—', color: '#1A9E78', sub: 'Satisfação' },
+              { icon: <Star size={14} />,          label: 'Relacionamento',  value: scoreMedia !== null ? `${scoreMedia}/100` : '—', color: '#1A9E78', sub: 'Score CRM médio' },
             ].map((kpi, i) => (
               <motion.div
                 key={kpi.label}

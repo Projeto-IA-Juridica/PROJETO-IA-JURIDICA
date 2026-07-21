@@ -290,11 +290,6 @@ export default function CRMPage({ onSelectCliente }: Props) {
                 {/* Score */}
                 <div className="hidden sm:block text-xs font-bold text-am-ink whitespace-nowrap">
                   {c.crm_score !== null ? `${c.crm_score}` : '—'}
-                  {c.nps_medio !== null && (
-                    <span className="ml-1 text-[10px] font-medium" style={{ color: '#1A9E78' }}>
-                      <Star size={8} className="inline mb-0.5" /> {c.nps_medio}
-                    </span>
-                  )}
                 </div>
 
                 {/* Nível */}
