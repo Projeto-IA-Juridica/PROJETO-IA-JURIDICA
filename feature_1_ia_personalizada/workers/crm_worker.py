@@ -30,7 +30,7 @@ from .celery_app import DLQTask, celery_app
 
 logger = structlog.get_logger(__name__)
 
-_DEBOUNCE_TTL_SEGUNDOS = 3600  # 1 hora
+_DEBOUNCE_TTL_SEGUNDOS = 10  # 10 segundos (reduzido para testes/MVP)
 _MAX_SIMULTANEAS = 10  # máx análises paralelas por escritório (chord)
 
 
@@ -165,7 +165,7 @@ def disparar_analise_com_debounce(cliente_id: int, escritorio_id: int) -> bool:
         True se disparou, False se estava no debounce.
     """
     r = _redis_client()
-    chave = f"crm_debounce:{cliente_id}"
+    chave = f"crm_debounce_v2:{cliente_id}"
 
     # SET NX — só seta se a chave não existir (atômico)
     setado = r.set(chave, "1", ex=_DEBOUNCE_TTL_SEGUNDOS, nx=True)

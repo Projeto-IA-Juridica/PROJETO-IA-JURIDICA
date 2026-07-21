@@ -202,7 +202,7 @@ async def csrf_token() -> JSONResponse:
         key=_COOKIE_NAME,
         value=token,
         httponly=False,  # precisa ser lido pelo JS (Double Submit Cookie)
-        samesite="lax",  # "strict" bloqueava o cookie em redirecionamentos OAuth
+        samesite="none" if is_prod else "lax",  # "none" exigido para requisições cross-origin (frontend em outro domínio)
         secure=is_prod,  # False em dev (HTTP); True em prod (HTTPS)
         max_age=_COOKIE_MAX_AGE,
     )
