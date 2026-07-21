@@ -64,15 +64,8 @@ TEMPLATE_AGENDAMENTO_CONFIRMADO = (
 )
 
 # -----------------------------------------------------------
-# PESQUISA / RELACIONAMENTO
+# RELACIONAMENTO
 # -----------------------------------------------------------
-
-TEMPLATE_PESQUISA_NPS = (
-    "Olá, {nome_cliente}!\n\n"
-    "Como avalia o atendimento do {nome_escritorio} até agora?\n"
-    "Responda com um número de *1 a 5*:\n"
-    "1 = Muito insatisfeito  |  5 = Muito satisfeito"
-)
 
 TEMPLATE_MENSAGEM_TRIMESTRAL = (
     "Olá, {nome}!\n\n"

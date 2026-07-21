@@ -111,10 +111,6 @@ celery_app.conf.task_routes = {
         "queue": "notificacoes",
         "routing_key": "notificacoes",
     },
-    "feature_1_ia_personalizada.workers.send_notifications.enviar_pesquisa_satisfacao": {
-        "queue": "relacionamento",
-        "routing_key": "relacionamento",
-    },
     # ia (se existir)
     "feature_1_ia_personalizada.workers.send_notifications.processar_mensagem_recebida": {
         "queue": "ia",
@@ -211,10 +207,6 @@ celery_app.conf.beat_schedule = {
     "enviar-sem-movimentacao-semanal-seg-10h": {
         "task": "feature_1_ia_personalizada.workers.send_notifications.enviar_lote_sem_movimentacao",
         "schedule": crontab(minute=0, hour=10, day_of_week=1),
-    },
-    "pesquisa-satisfacao-mensal-dia-1-14h": {
-        "task": "feature_1_ia_personalizada.workers.send_notifications.enviar_pesquisa_satisfacao",
-        "schedule": crontab(minute=0, hour=14, day_of_month="1"),
     },
     "relacionamento-aniversarios-08h": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios",

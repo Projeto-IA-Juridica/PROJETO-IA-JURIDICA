@@ -22,7 +22,6 @@ from shared.config.settings import settings
 from shared.database.worker_queries import (
     insert_interacao,
     query_clientes_ativos_por_escritorio,
-    query_clientes_para_pesquisa,
     query_processo_e_cliente,
     query_processos_sem_movimentacao,
 )
@@ -53,7 +52,6 @@ def get_redis() -> redis.Redis:
 
 
 TEMPO_30_DIAS = 30 * 24 * 60 * 60
-TEMPO_32_DIAS = 32 * 24 * 60 * 60
 TEMPO_5_MINUTOS = 5 * 60
 
 
@@ -69,10 +67,6 @@ MENSAGEM_NOVO_ANDAMENTO = (
 MENSAGEM_SEM_MOVIMENTACAO = (
     "Seu processo está sem movimentação nos últimos 30 dias.\n\n"
     "Isso é comum e não significa necessariamente um problema."
-)
-
-MENSAGEM_PESQUISA_SATISFACAO = (
-    "De 1 a 5, como você avalia nosso atendimento este mês?\nResponda apenas com um número."
 )
 
 MENSAGEM_ERRO_PADRAO = (
@@ -153,10 +147,6 @@ def buscar_processos_sem_movimentacao() -> Any:
     return query_processos_sem_movimentacao()
 
 
-def buscar_clientes_para_pesquisa() -> Any:
-    return query_clientes_para_pesquisa()
-
-
 def buscar_clientes_ativos_por_escritorio(escritorio_id: int) -> Any:
     return query_clientes_ativos_por_escritorio(escritorio_id)
 
@@ -230,39 +220,6 @@ def enviar_lote_sem_movimentacao(self: Any) -> dict[str, Any]:
 
             await service.enviar_sem_movimentacao(processo.id)
             registrar_envio_com_validade(chave, TEMPO_30_DIAS)
-            count += 1
-        await service.evolution_client.close()
-        return count
-
-    enviados = asyncio.run(_enviar_lote())
-    return {"enviados": enviados}
-
-
-@shared_task(bind=True)
-def enviar_pesquisa_satisfacao(self: Any) -> dict[str, Any]:
-
-    momento = agora_local()
-
-    if not horario_permitido(momento):
-        espera = segundos_ate_proximo_horario(momento)
-        raise self.retry(countdown=espera)
-
-    clientes = buscar_clientes_para_pesquisa()
-
-    mes_referencia = momento.strftime("%Y-%m")
-    service = _get_whatsapp_service()
-
-    async def _enviar_lote() -> int:
-        count = 0
-        for cliente in clientes:
-            chave = chave_limite("limite_pesquisa", cliente.id, mes_referencia)
-
-            if envio_recente(chave):
-                continue
-
-            # Assuming cliente record has escritorio_id
-            await service.enviar_pesquisa_satisfacao(cliente.escritorio_id, cliente.id)
-            registrar_envio_com_validade(chave, TEMPO_32_DIAS)
             count += 1
         await service.evolution_client.close()
         return count

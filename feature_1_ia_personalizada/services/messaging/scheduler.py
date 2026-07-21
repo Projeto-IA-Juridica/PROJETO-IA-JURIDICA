@@ -8,7 +8,6 @@ from celery import current_app
 # importa as SUAS tasks
 from feature_1_ia_personalizada.workers.send_notifications import (
     enviar_notificacao_andamento,
-    enviar_pesquisa_satisfacao,
     processar_mensagem_recebida,
 )
 
@@ -24,7 +23,6 @@ class MessageScheduler:
     Agenda tasks do send_notifications.py usando ETA.
 
     - agendar_notificacao_andamento
-    - agendar_pesquisa_satisfacao
     - agendar_processar_mensagem
     - cancelar_agendamento
     """
@@ -72,15 +70,6 @@ class MessageScheduler:
 
         result = enviar_notificacao_andamento.apply_async(
             args=[id_processo, descricao_andamento],
-            eta=eta,
-        )
-        return Agendamento(task_id=result.id, eta=eta)
-
-    def agendar_pesquisa_satisfacao(self, horario_envio: datetime) -> Agendamento:
-        eta = self._ajustar_para_horario_comercial(horario_envio)
-
-        result = enviar_pesquisa_satisfacao.apply_async(
-            args=[],
             eta=eta,
         )
         return Agendamento(task_id=result.id, eta=eta)

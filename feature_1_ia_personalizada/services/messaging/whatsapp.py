@@ -293,48 +293,6 @@ class WhatsAppService:
         texto = tmpl["boas_vindas"]
         return await self.enviar_mensagem(escritorio_id, cliente_id, texto, processo_id=None)
 
-    async def enviar_pesquisa_satisfacao(
-        self, escritorio_id: int, cliente_id: int
-    ) -> dict[str, Any]:
-        """
-        Pesquisa NPS (1-5) via botões.
-        """
-        instancia = await self.repo.obter_instancia_por_escritorio(escritorio_id)
-        numero = await self.repo.obter_numero_cliente(cliente_id)
-
-        texto = "De 1 a 5, como você avalia nosso atendimento hoje? (1 = ruim, 5 = excelente)"
-
-        botoes = [
-            {"buttonId": "nps_1", "buttonText": {"displayText": "1"}, "type": 1},
-            {"buttonId": "nps_2", "buttonText": {"displayText": "2"}, "type": 1},
-            {"buttonId": "nps_3", "buttonText": {"displayText": "3"}, "type": 1},
-            {"buttonId": "nps_4", "buttonText": {"displayText": "4"}, "type": 1},
-            {"buttonId": "nps_5", "buttonText": {"displayText": "5"}, "type": 1},
-        ]
-
-        try:
-            resposta = await self.evolution_client.enviar_botoes(instancia, numero, texto, botoes)
-            await self.repo.salvar_interacao(
-                escritorio_id=escritorio_id,
-                cliente_id=cliente_id,
-                texto=texto,
-                processo_id=None,
-                status="enviado:nps",
-                payload_resposta=resposta,
-                metadata_extra={"aguardando_nps": True},
-            )
-            return {"ok": True, "resposta": resposta}
-        except EvolutionError as e:
-            await self.repo.salvar_interacao(
-                escritorio_id=escritorio_id,
-                cliente_id=cliente_id,
-                texto=texto,
-                processo_id=None,
-                status="falha:nps",
-                payload_resposta={"erro": str(e)},
-            )
-            return {"ok": False, "erro": "falha_envio_nps"}
-
     async def enviar_sem_movimentacao(self, processo_id: int) -> dict[str, Any]:
         contexto = await self._obter_contexto_processo(processo_id)
         if contexto is None:
