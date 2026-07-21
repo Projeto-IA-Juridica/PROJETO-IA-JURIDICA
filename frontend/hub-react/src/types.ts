@@ -20,7 +20,6 @@ export interface CRMClienteCard {
   crm_acao_sugerida: string | null
   crm_analisado_em: string | null
   total_processos: number
-  nps_medio: number | null
   ultimo_contato: string | null
 }
 
