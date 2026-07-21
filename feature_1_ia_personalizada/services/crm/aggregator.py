@@ -29,12 +29,6 @@ logger = structlog.get_logger(__name__)
 
 
 @dataclass
-class NPSRegistro:
-    data: datetime
-    nota: int
-
-
-@dataclass
 class ProcessoResumo:
     numero_cnj: str
     tipo_acao: str | None
@@ -47,6 +41,7 @@ class ProcessoResumo:
 class UltimaMensagem:
     pergunta_cliente: str | None
     resposta_ia: str | None
+    data: datetime | None = None
 
 
 @dataclass
@@ -58,10 +53,6 @@ class CRMContexto:
     profissao: str | None
     empresa: str | None
     data_nascimento: str | None  # ISO date string, para o prompt do Claude
-
-    # NPS
-    nps_historico: list[NPSRegistro]
-    nps_medio_3m: float | None
 
     # Interações
     total_interacoes_30d: int
@@ -78,6 +69,7 @@ class CRMContexto:
     escalacoes_rejeitadas_30d: int
 
     # Estado CRM anterior (para cache check no analyzer — evita roundtrip extra)
+    crm_nivel_anterior: str | None
     crm_score_anterior: int | None
     crm_analisado_em_anterior: datetime | None
     crm_resumo_anterior: str | None
@@ -101,7 +93,7 @@ class CRMDataAggregator:
     async def coletar_contexto_cliente(self, cliente_id: int, escritorio_id: int) -> CRMContexto:
         agora = datetime.now(UTC)
         ha_30d = agora - timedelta(days=30)
-        ha_90d = agora - timedelta(days=90)  # também usado como janela "3 meses" do NPS
+        ha_90d = agora - timedelta(days=90)
 
         log = logger.bind(cliente_id=cliente_id, escritorio_id=escritorio_id)
         log.debug("crm.aggregator.coletando")
@@ -112,6 +104,7 @@ class CRMDataAggregator:
             Cliente.profissao,
             Cliente.empresa_atual,
             Cliente.data_nascimento,
+            Cliente.crm_nivel,
             Cliente.crm_score,
             Cliente.crm_analisado_em,
             Cliente.crm_resumo,
@@ -126,27 +119,10 @@ class CRMDataAggregator:
         if cliente is None:
             raise ValueError(f"Cliente {cliente_id} não encontrado no escritório {escritorio_id}")
 
-        # --- 2. NPS histórico (últimos 6 registros com nota) ---
-        stmt_nps = (
-            select(Interacao.created_at, Interacao.satisfacao)
-            .where(
-                Interacao.cliente_id == cliente_id,
-                Interacao.escritorio_id == escritorio_id,
-                Interacao.satisfacao.isnot(None),
-            )
-            .order_by(Interacao.created_at.desc())
-            .limit(6)
-        )
-        rows_nps = (await self._db.execute(stmt_nps)).all()
-        nps_historico = [NPSRegistro(data=r.created_at, nota=r.satisfacao) for r in rows_nps]
-
         def _tz(dt: datetime) -> datetime:
             return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
-        nps_3m = [r.nota for r in nps_historico if _tz(r.data) >= ha_90d]
-        nps_medio_3m = round(sum(nps_3m) / len(nps_3m), 2) if nps_3m else None
-
-        # --- 3. Contagens de interações e último contato ---
+        # --- 2. Contagens de interações e último contato ---
         stmt_stats = select(
             func.count().filter(Interacao.created_at >= ha_30d).label("total_30d"),
             func.count().filter(Interacao.created_at >= ha_90d).label("total_90d"),
@@ -163,7 +139,7 @@ class CRMDataAggregator:
         else:
             dias_desde = 999
 
-        # --- 4. Processos ativos ---
+        # --- 3. Processos ativos ---
         stmt_proc = select(
             Processo.numero_cnj,
             Processo.tipo_acao,
@@ -193,7 +169,7 @@ class CRMDataAggregator:
             default=None,
         )
 
-        # --- 5. Escalações (uma única roundtrip com contagens condicionais) ---
+        # --- 4. Escalações (uma única roundtrip com contagens condicionais) ---
         esc_status = Interacao.metadata_json["escalacao_status"].as_string()
         stmt_esc = select(
             func.count().filter(esc_status == "pendente").label("pendentes"),
@@ -208,9 +184,10 @@ class CRMDataAggregator:
         escalacoes_pendentes: int = row_esc.pendentes
         escalacoes_rejeitadas_30d: int = row_esc.rejeitadas_30d
 
-        # --- 6. Últimas 5 mensagens (pares pergunta/resposta) ---
+        # --- 5. Conversa recente (últimos 15 pares pergunta/resposta) ---
+        # É o insumo principal da classificação de relacionamento feita pelo Claude.
         stmt_msgs = (
-            select(Interacao.mensagem_cliente, Interacao.mensagem_ia)
+            select(Interacao.mensagem_cliente, Interacao.mensagem_ia, Interacao.created_at)
             .where(
                 Interacao.cliente_id == cliente_id,
                 Interacao.escritorio_id == escritorio_id,
@@ -220,15 +197,17 @@ class CRMDataAggregator:
                 ),
             )
             .order_by(Interacao.created_at.desc())
-            .limit(5)
+            .limit(15)
         )
         rows_msgs = (await self._db.execute(stmt_msgs)).all()
+        # Invertido para ordem cronológica — mais legível para o modelo
         ultimas_mensagens = [
             UltimaMensagem(
                 pergunta_cliente=r.mensagem_cliente,
                 resposta_ia=r.mensagem_ia,
+                data=r.created_at,
             )
-            for r in rows_msgs
+            for r in reversed(rows_msgs)
         ]
 
         log.debug("crm.aggregator.concluido", processos=len(processos_ativos))
@@ -242,12 +221,11 @@ class CRMDataAggregator:
             data_nascimento=(
                 cliente.data_nascimento.isoformat() if cliente.data_nascimento else None
             ),
+            crm_nivel_anterior=cliente.crm_nivel,
             crm_score_anterior=cliente.crm_score,
             crm_analisado_em_anterior=cliente.crm_analisado_em,
             crm_resumo_anterior=cliente.crm_resumo,
             crm_acao_sugerida_anterior=cliente.crm_acao_sugerida,
-            nps_historico=nps_historico,
-            nps_medio_3m=nps_medio_3m,
             total_interacoes_30d=stats.total_30d,
             total_interacoes_90d=stats.total_90d,
             dias_desde_ultimo_contato=dias_desde,

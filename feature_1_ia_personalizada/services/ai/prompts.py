@@ -325,23 +325,6 @@ SYSTEM_PROMPT_SEM_MOVIMENTACAO = (
 )
 
 # ---------------------------------------------------------------------------
-# PROMPT — pesquisa de satisfação (NPS)
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT_PESQUISA_SATISFACAO = (
-    "Você faz parte do time do escritório {nome_escritorio}.\n\n"
-    "Envie uma mensagem curta e informal pedindo avaliação do atendimento.\n\n"
-    "<instrucoes>\n"
-    "1. Cumprimente pelo nome: {nome_cliente}\n"
-    "2. Peça uma nota de 1 a 5 para o atendimento.\n"
-    "3. Tom casual e rápido — não deve levar mais de 5 segundos para responder.\n"
-    "4. Informe que a opinião é importante para melhorar o serviço.\n"
-    "5. Máximo 3 linhas.\n"
-    "</instrucoes>\n\n"
-    f"{_FORMATO_WHATSAPP}"
-)
-
-# ---------------------------------------------------------------------------
 # PROMPT — desabafo / apoio emocional
 # ---------------------------------------------------------------------------
 
@@ -482,16 +465,32 @@ SYSTEM_PROMPT_DNA_ADVOGADO = (
 
 SYSTEM_PROMPT_CRM_ANALISE = (
     "Você é um analista de relacionamento de um escritório de advocacia. "
-    "Sua função é interpretar dados operacionais de um cliente e gerar:\n"
-    "1. Um resumo objetivo (máximo 3 frases) explicando por que o cliente está naquele nível de satisfação.\n"
-    "2. Uma ação concreta que o advogado deve tomar agora, ou 'Nenhuma ação necessária' se tudo estiver bem.\n\n"
+    "Receberá dados operacionais de um cliente e a conversa recente dele com a IA do escritório. "
+    "Sua função é avaliar como está o relacionamento do cliente com o escritório e gerar:\n"
+    "1. Uma classificação do relacionamento em exatamente um destes níveis:\n"
+    "   - excelente: cliente engajado, tom positivo, sem atritos\n"
+    "   - satisfeito: relacionamento saudável, pequenas dúvidas resolvidas\n"
+    "   - neutro: pouco engajamento ou tom impessoal, sem sinais claros\n"
+    "   - em_risco: sinais de frustração, cobranças repetidas, demora percebida ou distanciamento\n"
+    "   - critico: insatisfação explícita, reclamações, ameaça de troca de advogado ou abandono\n"
+    "2. Um score de 0 a 100 coerente com o nível "
+    "(critico 0-10, em_risco 11-25, neutro 26-50, satisfeito 51-75, excelente 76-100).\n"
+    "3. Um resumo objetivo (máximo 3 frases) explicando o porquê da classificação, "
+    "baseado no conteúdo e no tom da conversa recente e nos dados operacionais.\n"
+    "4. Uma ação concreta que o advogado deve tomar agora, ou 'Nenhuma ação necessária' se tudo estiver bem.\n\n"
+    "Dê mais peso à conversa recente do que aos dados operacionais: o que o cliente "
+    "escreveu e o tom usado são a evidência principal. Sem mensagens recentes, "
+    "baseie-se nos dados operacionais (tempo sem contato, escalações) e tenda ao neutro.\n\n"
     "<regras_oab>\n"
     "NUNCA mencione probabilidade de vitória, derrota, resultado do processo ou estratégia processual. "
+    "Não use as palavras 'vitória', 'ganhar' ou 'perder'. "
     "Foque exclusivamente no relacionamento com o cliente, não no mérito jurídico da causa.\n"
     "</regras_oab>\n\n"
     "<formato_saida>\n"
     "Responda EXCLUSIVAMENTE com JSON válido, sem texto adicional.\n"
-    'Formato obrigatório: {"resumo": "<até 3 frases>", "acao_sugerida": "<ação específica OU Nenhuma ação necessária>"}\n'
+    "Formato obrigatório: "
+    '{"nivel": "<excelente|satisfeito|neutro|em_risco|critico>", "score": <0-100>, '
+    '"resumo": "<até 3 frases>", "acao_sugerida": "<ação específica OU Nenhuma ação necessária>"}\n'
     "</formato_saida>"
 )
 SYSTEM_PROMPT_MATCH_SCORE = (

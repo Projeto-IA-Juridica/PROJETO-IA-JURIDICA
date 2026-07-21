@@ -1,14 +1,13 @@
 """
 feature_1_ia_personalizada/services/crm/analyzer.py
 =====================================================
-CRMAnalyzer — orquestra agregação, score e chamada ao Claude para análise CRM.
+CRMAnalyzer — orquestra agregação e chamada ao Claude para análise CRM.
 
 Fluxo:
-  1. CRMDataAggregator  → coleta dados reais do cliente
-  2. CRMScoreCalculator → score determinístico (sem Claude)
-  3. Cache check        → se score não mudou e análise < 24h, retorna sem chamar Claude
-  4. Claude Haiku       → gera resumo e ação sugerida
-  5. UPDATE no banco    → persiste crm_nivel, crm_score, crm_resumo, crm_acao_sugerida, crm_analisado_em
+  1. CRMDataAggregator  → coleta dados reais do cliente (conversa recente + sinais operacionais)
+  2. Cache check        → se análise < 24h e sem interação nova, retorna sem chamar Claude
+  3. Claude Haiku       → classifica o relacionamento (nível + score) e gera resumo e ação sugerida
+  4. UPDATE no banco    → persiste crm_nivel, crm_score, crm_resumo, crm_acao_sugerida, crm_analisado_em
 """
 
 from __future__ import annotations
@@ -25,17 +24,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.ai.prompts import SYSTEM_PROMPT_CRM_ANALISE
 from feature_1_ia_personalizada.services.crm.aggregator import CRMContexto, CRMDataAggregator
-from feature_1_ia_personalizada.services.crm.score_calculator import calcular_score_crm
+from shared.config.constants import CRM_NIVEL_FAIXAS
 from shared.models.cliente import Cliente
 
 logger = structlog.get_logger(__name__)
 
 _MODELO_CRM = "claude-haiku-4-5-20251001"
-_MAX_TOKENS_CRM = 300
+_MAX_TOKENS_CRM = 500
 _CACHE_TTL_HORAS = 24
 
 # Palavras proibidas por compliance OAB (usadas na validação do output)
 _PALAVRAS_PROIBIDAS = {"vitória", "vitoria", "ganhar", "perder", "probabilidade de"}
+
+# Faixa de score válida por nível, derivada de CRM_NIVEL_FAIXAS
+# (ex.: {"excelente": (76, 100), "satisfeito": (51, 75), ...})
+_FAIXA_POR_NIVEL: dict[str, tuple[int, int]] = {}
+_teto = 100
+for _minimo, _nivel in CRM_NIVEL_FAIXAS:
+    _FAIXA_POR_NIVEL[_nivel] = (_minimo, _teto)
+    _teto = _minimo - 1
 
 
 @dataclass
@@ -50,27 +57,55 @@ class CRMAnaliseResult:
     cache_hit: bool = False
 
 
-def _construir_input_claude(ctx: CRMContexto, nivel: str, score: int) -> str:
-    msgs_txt = (
-        "\n".join(
-            f"  Cliente: {m.pergunta_cliente}\n  IA: {m.resposta_ia}" for m in ctx.ultimas_mensagens
-        )
-        or "  Sem mensagens recentes"
-    )
+def _tz(dt: datetime) -> datetime:
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def _construir_input_claude(ctx: CRMContexto) -> str:
+    linhas_msgs = []
+    for m in ctx.ultimas_mensagens:
+        data_txt = f"[{_tz(m.data).strftime('%d/%m/%Y')}] " if m.data else ""
+        linhas_msgs.append(f"  {data_txt}Cliente: {m.pergunta_cliente}\n  IA: {m.resposta_ia}")
+    msgs_txt = "\n".join(linhas_msgs) or "  Sem mensagens recentes"
 
     return (
         f"Cliente: {ctx.nome}"
         + (f", {ctx.profissao}" if ctx.profissao else "")
         + (f" em {ctx.empresa}" if ctx.empresa else "")
-        + f"\nNível de satisfação: {nivel} (score {score}/100)"
-        + f"\nNPS médio 3 meses: {ctx.nps_medio_3m if ctx.nps_medio_3m is not None else 'sem dados'}"
-        + f" ({len(ctx.nps_historico)} avaliações)"
         + f"\nÚltimo contato: {ctx.dias_desde_ultimo_contato} dias atrás"
         + f"\nInterações com a IA nos últimos 30 dias: {ctx.total_interacoes_30d}"
+        + f"\nProcessos ativos: {len(ctx.processos_ativos)}"
         + f"\nEscalações: {ctx.escalacoes_pendentes} pendente(s),"
         + f" {ctx.escalacoes_rejeitadas_30d} rejeitada(s) nos últimos 30 dias"
-        + f"\nHistórico de conversas:\n{msgs_txt}"
+        + f"\n\nConversa recente (ordem cronológica):\n{msgs_txt}"
     )
+
+
+def _extrair_json(texto: str) -> dict:
+    """Extrai o objeto JSON da resposta, tolerando cercas de código e texto ao redor."""
+    inicio = texto.find("{")
+    fim = texto.rfind("}")
+    if inicio == -1 or fim == -1 or fim <= inicio:
+        raise ValueError("Resposta do Claude não contém JSON")
+    dados = json.loads(texto[inicio : fim + 1])
+    if not isinstance(dados, dict):
+        raise ValueError("JSON da resposta não é um objeto")
+    return dados
+
+
+def _normalizar_classificacao(dados: dict) -> tuple[str, int]:
+    """Valida o nível e força o score para dentro da faixa do nível."""
+    nivel = str(dados.get("nivel", "")).strip().lower()
+    if nivel not in _FAIXA_POR_NIVEL:
+        raise ValueError(f"Nível inválido retornado pelo Claude: '{nivel}'")
+
+    minimo, maximo = _FAIXA_POR_NIVEL[nivel]
+    try:
+        score = int(dados.get("score"))
+    except (TypeError, ValueError):
+        score = (minimo + maximo) // 2
+    score = max(minimo, min(maximo, score))
+    return nivel, score
 
 
 def _validar_output(resumo: str, acao: str) -> None:
@@ -92,21 +127,23 @@ class CRMAnalyzer:
         aggregator = CRMDataAggregator(self._db)
         ctx: CRMContexto = await aggregator.coletar_contexto_cliente(cliente_id, escritorio_id)
 
-        # 2. Score determinístico
-        crm_score = calcular_score_crm(ctx)
-
-        # 3. Cache check — usa dados já carregados pelo aggregator (sem roundtrip extra)
+        # 2. Cache check — reutiliza a análise se for recente e não houver interação nova
         if (
             ctx.crm_analisado_em_anterior
+            and ctx.crm_nivel_anterior
             and ctx.crm_resumo_anterior
-            and ctx.crm_score_anterior == crm_score.score
-            and (datetime.now(UTC) - ctx.crm_analisado_em_anterior)
+            and ctx.crm_score_anterior is not None
+            and (datetime.now(UTC) - _tz(ctx.crm_analisado_em_anterior))
             < timedelta(hours=_CACHE_TTL_HORAS)
+            and (
+                ctx.ultimo_contato_at is None
+                or _tz(ctx.ultimo_contato_at) <= _tz(ctx.crm_analisado_em_anterior)
+            )
         ):
             log.info("crm.analyzer.cache_hit")
             return CRMAnaliseResult(
-                nivel=crm_score.nivel,
-                score=crm_score.score,
+                nivel=ctx.crm_nivel_anterior,
+                score=ctx.crm_score_anterior,
                 resumo=ctx.crm_resumo_anterior,
                 acao_sugerida=ctx.crm_acao_sugerida_anterior or "Nenhuma ação necessária",
                 tokens_input=0,
@@ -115,24 +152,25 @@ class CRMAnalyzer:
                 cache_hit=True,
             )
 
-        # 4. Chama Claude Haiku
-        input_txt = _construir_input_claude(ctx, crm_score.nivel, crm_score.score)
-        log.info("crm.analyzer.chamando_claude", score=crm_score.score, nivel=crm_score.nivel)
+        # 3. Chama Claude Haiku — classifica o relacionamento pela conversa recente
+        input_txt = _construir_input_claude(ctx)
+        log.info("crm.analyzer.chamando_claude", mensagens=len(ctx.ultimas_mensagens))
 
         try:
             resp = await self._claude._client.messages.create(
                 model=_MODELO_CRM,
                 max_tokens=_MAX_TOKENS_CRM,
-                temperature=0.3,
+                temperature=0.2,
                 system=SYSTEM_PROMPT_CRM_ANALISE,
                 messages=[{"role": "user", "content": input_txt}],
             )
 
             bloco = resp.content[0]
             texto = bloco.text if hasattr(bloco, "text") else ""
-            dados = json.loads(texto)
-            resumo = dados.get("resumo", "").strip()
-            acao = dados.get("acao_sugerida", "Nenhuma ação necessária").strip()
+            dados = _extrair_json(texto)
+            nivel, score = _normalizar_classificacao(dados)
+            resumo = str(dados.get("resumo", "")).strip()
+            acao = str(dados.get("acao_sugerida", "Nenhuma ação necessária")).strip()
 
             _validar_output(resumo, acao)
 
@@ -143,21 +181,19 @@ class CRMAnalyzer:
             )
 
         except Exception as exc:
-            # Graceful degradation: persiste score sem resumo
+            # Sem classificação do modelo não há o que persistir — a análise
+            # anterior (se existir) permanece intacta no banco.
             log.warning("crm.analyzer.claude_falhou", erro=str(exc))
-            resumo = ""
-            acao = "Nenhuma ação necessária"
-            tokens_in = tokens_out = 0
-            custo = Decimal("0")
+            raise RuntimeError("Análise CRM indisponível no momento") from exc
 
-        # 5. Persiste resultado
+        # 4. Persiste resultado
         agora = datetime.now(UTC)
         await self._db.execute(
             update(Cliente)
             .where(Cliente.id == cliente_id)
             .values(
-                crm_nivel=crm_score.nivel,
-                crm_score=crm_score.score,
+                crm_nivel=nivel,
+                crm_score=score,
                 crm_resumo=resumo or None,
                 crm_acao_sugerida=acao or None,
                 crm_analisado_em=agora,
@@ -165,11 +201,11 @@ class CRMAnalyzer:
         )
         await self._db.commit()
 
-        log.info("crm.analyzer.concluido", nivel=crm_score.nivel, score=crm_score.score)
+        log.info("crm.analyzer.concluido", nivel=nivel, score=score)
 
         return CRMAnaliseResult(
-            nivel=crm_score.nivel,
-            score=crm_score.score,
+            nivel=nivel,
+            score=score,
             resumo=resumo,
             acao_sugerida=acao,
             tokens_input=tokens_in,
