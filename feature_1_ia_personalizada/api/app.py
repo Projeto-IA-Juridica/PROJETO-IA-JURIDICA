@@ -253,6 +253,17 @@ else:
         _cors_origins = [o.strip() for o in str(origins).split(",") if o.strip()]
     _cors_credentials = True
 
+# Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
+# Fluxo ao receber requisição: 1. Logging -> 2. CORS -> 3. Rate Limit -> 4. CSRF -> 5. JWT -> 6. Rotas
+app.add_middleware(JWTAuthMiddleware)
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(RateLimitMiddleware)
+
+# CORS adicionado DEPOIS dos middlewares de segurança = executa ANTES deles.
+# Isso garante que respostas geradas pelos próprios middlewares (403 de JWT/CSRF,
+# 429 do rate limit) também recebam os headers Access-Control-Allow-*. Quando o
+# CORS ficava por dentro (adicionado primeiro), esses erros saíam sem headers e
+# o browser bloqueava a leitura — o frontend só via um erro genérico sem detail.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -261,12 +272,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
-
-# Registrando nossos custom middlewares (a ordem de registro importa, o último empilhado executa ANTES)
-# Fluxo ao receber requisição: 1. Rate Limit -> 2. CSRF -> 3. Autenticação JWT -> 4. Rotas
-app.add_middleware(JWTAuthMiddleware)
-app.add_middleware(CSRFMiddleware)
-app.add_middleware(RateLimitMiddleware)
 # RequestLoggingMiddleware adicionado por último = executa PRIMEIRO (outermost)
 # Garante que request_id está disponível para todos os middlewares internos e rotas
 app.add_middleware(RequestLoggingMiddleware)

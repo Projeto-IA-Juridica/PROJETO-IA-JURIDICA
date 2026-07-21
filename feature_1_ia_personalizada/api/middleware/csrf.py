@@ -71,6 +71,19 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method in _METODOS_MUTANTES and not _rota_isenta(request.url.path):
+            # Requisições autenticadas via header Authorization: Bearer não são
+            # vulneráveis a CSRF: o token JWT vive no localStorage e é anexado
+            # explicitamente pelo JS — um site atacante não consegue forjar esse
+            # header (CSRF explora apenas credenciais que o browser envia sozinho,
+            # como cookies). A validação do JWT em si é feita pelo JWTAuthMiddleware.
+            # Isso também é necessário em produção: o frontend (amicus.page) e a
+            # API (railway.app) são cross-site, e o cookie csrf_token SameSite=Lax
+            # nunca é enviado nesse cenário — sem esta isenção, todo POST do site
+            # publicado era rejeitado com 403.
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.lower().startswith("bearer "):
+                return await call_next(request)
+
             token_cookie = request.cookies.get(_COOKIE_NAME)
             token_header = request.headers.get(_HEADER_NAME)
 
