@@ -253,21 +253,23 @@ async def _montar_bloco_processo(processo: Processo, nome_cliente: str | None = 
 
 
 async def _montar_bloco_satisfacao(db: AsyncSession, cliente_id: int, escritorio_id: int) -> str:
-    """Calcula NPS médio do cliente a partir das interações do WhatsApp."""
+    """Resume o relacionamento do cliente conforme classificado pela análise CRM (IA)."""
     resultado = await db.execute(
-        select(func.avg(Interacao.satisfacao), func.count(Interacao.satisfacao)).where(
-            Interacao.cliente_id == cliente_id,
-            Interacao.escritorio_id == escritorio_id,
-            Interacao.satisfacao.is_not(None),
+        select(Cliente.crm_nivel, Cliente.crm_score, Cliente.crm_resumo).where(
+            Cliente.id == cliente_id,
+            Cliente.escritorio_id == escritorio_id,
         )
     )
-    media_nps, total_nps = resultado.one()
-    if not total_nps:
+    row = resultado.one_or_none()
+    if row is None or row.crm_nivel is None:
         return ""
-    return (
-        "=== SATISFAÇÃO DO CLIENTE ===\n"
-        f"NPS médio: {float(media_nps):.1f}/5 (baseado em {total_nps} avaliações)"
-    )
+    linhas = [
+        "=== RELACIONAMENTO COM O CLIENTE (análise CRM) ===",
+        f"Nível: {row.crm_nivel} (score {row.crm_score}/100)",
+    ]
+    if row.crm_resumo:
+        linhas.append(f"Resumo: {row.crm_resumo}")
+    return "\n".join(linhas)
 
 
 async def _montar_bloco_historico_whatsapp(
@@ -433,7 +435,7 @@ async def _montar_contexto_consulta(
 ) -> str:
     """
     Monta o bloco de contexto completo injetado no system prompt do Opus:
-    dados do cliente, processo(s), score de outro modelo, NPS, histórico de
+    dados do cliente, processo(s), score de outro modelo, relacionamento CRM, histórico de
     WhatsApp e documentos — tudo que o advogado vê em outras abas do Hub.
 
     Funciona com apenas `processos` (sem cliente) ou apenas `cliente` (sem
