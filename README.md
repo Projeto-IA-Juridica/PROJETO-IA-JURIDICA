@@ -9,7 +9,7 @@
 
 --- 
 
-## O Problema
+## O Problema 
 
 Escritórios de advocacia perdem clientes por falta de comunicação — não por falta de competência. O cliente não sabe o que está acontecendo com seu processo, precisa ligar para obter uma atualização básica, e o advogado gasta horas por semana respondendo perguntas repetitivas no WhatsApp como _"tem novidade?"_ e _"o que significa esse termo?"_.
 
