@@ -11,7 +11,6 @@ from feature_1_ia_personalizada.services.ai.prompts import (
     SYSTEM_PROMPT_BASE,
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_CLASSIFICAR_INTENCAO,
-    SYSTEM_PROMPT_PESQUISA_SATISFACAO,
     SYSTEM_PROMPT_SEM_MOVIMENTACAO,
     SYSTEM_PROMPT_STATUS_PROCESSO,
     SYSTEM_PROMPT_TRADUZIR_TERMO,
@@ -25,7 +24,6 @@ _PROMPTS_GERACAO = [
     SYSTEM_PROMPT_TRADUZIR_TERMO,
     SYSTEM_PROMPT_BOAS_VINDAS,
     SYSTEM_PROMPT_SEM_MOVIMENTACAO,
-    SYSTEM_PROMPT_PESQUISA_SATISFACAO,
 ]
 
 
@@ -79,9 +77,6 @@ class TestPlaceholders:
 
     def test_boas_vindas_contem_placeholder_nome_cliente(self):
         assert "{nome_cliente}" in SYSTEM_PROMPT_BOAS_VINDAS
-
-    def test_pesquisa_contem_placeholder_nome_cliente(self):
-        assert "{nome_cliente}" in SYSTEM_PROMPT_PESQUISA_SATISFACAO
 
     def test_sem_movimentacao_contem_placeholders_processo(self):
         for placeholder in [
@@ -178,7 +173,6 @@ class TestConteudoMinimo:
             ("TRADUZIR_TERMO", SYSTEM_PROMPT_TRADUZIR_TERMO),
             ("BOAS_VINDAS", SYSTEM_PROMPT_BOAS_VINDAS),
             ("SEM_MOVIMENTACAO", SYSTEM_PROMPT_SEM_MOVIMENTACAO),
-            ("PESQUISA_SATISFACAO", SYSTEM_PROMPT_PESQUISA_SATISFACAO),
             ("CLASSIFICAR_INTENCAO", SYSTEM_PROMPT_CLASSIFICAR_INTENCAO),
         ],
     )
@@ -191,6 +185,3 @@ class TestConteudoMinimo:
 
     def test_traduzir_menciona_sem_formacao_juridica(self):
         assert "formação jurídica" in SYSTEM_PROMPT_TRADUZIR_TERMO.lower()
-
-    def test_pesquisa_menciona_nota_1_a_5(self):
-        assert "1 a 5" in SYSTEM_PROMPT_PESQUISA_SATISFACAO

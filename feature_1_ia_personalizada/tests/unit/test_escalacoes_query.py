@@ -152,3 +152,43 @@ class TestContagemDoAggregator:
             Interacao.cliente_id == cliente.id
         )
         assert (await db_session.execute(stmt)).one().total == 0
+
+
+class TestRotaHTTP:
+    """Exercita GET /escalacoes de ponta a ponta — era 500 em 100% das chamadas."""
+
+    async def test_listagem_responde_200_com_os_dados(
+        self, async_client, db_session, escritorio_factory, cliente_factory, usuario_factory, auth_token
+    ):
+        escritorio = await escritorio_factory()
+        usuario = await usuario_factory(escritorio_id=escritorio.id)
+        cliente = await cliente_factory(escritorio_id=escritorio.id, nome="Construtora Alfa")
+        db_session.add(_escalacao(escritorio.id, cliente.id, "pendente"))
+        db_session.add(_escalacao(escritorio.id, cliente.id, "aprovada"))
+        await db_session.commit()
+
+        token = auth_token(user_id=usuario.id, escritorio_id=escritorio.id, role="advogado")
+        resposta = await async_client.get(
+            "/escalacoes", params={"status": "pendente"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resposta.status_code == 200, resposta.text
+        corpo = resposta.json()
+        assert len(corpo) == 1
+        assert corpo[0]["status_escalacao"] == "pendente"
+        assert corpo[0]["cliente_nome"] == "Construtora Alfa"
+        assert corpo[0]["sugestao_resposta"] == "Sugestão gerada pela IA"
+
+    async def test_status_invalido_retorna_422(
+        self, async_client, escritorio_factory, usuario_factory, auth_token
+    ):
+        escritorio = await escritorio_factory()
+        usuario = await usuario_factory(escritorio_id=escritorio.id)
+        token = auth_token(user_id=usuario.id, escritorio_id=escritorio.id, role="advogado")
+
+        resposta = await async_client.get(
+            "/escalacoes", params={"status": "inexistente"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resposta.status_code == 422

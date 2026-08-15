@@ -557,5 +557,3 @@ def enviar_mensagem_whatsapp(id_cliente: int, telefone: str, texto: str) -> None
     Loga aviso e retorna silenciosamente se a instância não estiver configurada.
     """
     _run(_enviar_mensagem_whatsapp(id_cliente, telefone, texto))
-
-

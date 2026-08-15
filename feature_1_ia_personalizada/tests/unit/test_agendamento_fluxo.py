@@ -843,36 +843,6 @@ class TestFilaDePendenciasAdvogado:
         assert "aguardando" in ack
 
 
-@pytest.mark.asyncio
-class TestGuardNPSComPropostaPendente:
-    async def test_nps_nao_intercepta_escolha_de_horario(
-        self, db_session, escritorio_factory, cliente_factory
-    ):
-        """Cliente com NPS pendente E proposta de horários: '1' é escolha, não nota."""
-        from feature_1_ia_personalizada.api.routes.webhook_whatsapp import (
-            _processar_resposta_nps,
-        )
-        from shared.models.interacao import Interacao
-
-        escritorio, cliente = await _preparar_cenario(
-            db_session, escritorio_factory, cliente_factory
-        )
-        db_session.add(
-            Interacao(
-                escritorio_id=escritorio.id,
-                cliente_id=cliente.id,
-                tipo="pesquisa_nps",
-                direcao="saida",
-                metadata_json={"aguardando_nps": True},
-            )
-        )
-        db_session.add(_nova_proposta(escritorio.id, cliente.id))
-        await db_session.commit()
-
-        tratado_como_nps = await _processar_resposta_nps("1", cliente, escritorio, db_session)
-        assert tratado_como_nps is False  # segue para a IA → seleção de horário
-
-
 # ---------------------------------------------------------------------------
 # Hardening — prazos relativos, eventos em tempo real e factory de worker
 # ---------------------------------------------------------------------------

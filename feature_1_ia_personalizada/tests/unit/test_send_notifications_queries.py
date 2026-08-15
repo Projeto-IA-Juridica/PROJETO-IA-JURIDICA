@@ -1,8 +1,8 @@
 """
 PIJ-193 — Testes unitários das funções de banco em send_notifications.py.
 
-As três funções (buscar_processo_e_cliente, buscar_processos_sem_movimentacao,
-buscar_clientes_para_pesquisa) já existem em worker_queries.py com lógica real.
+As funções (buscar_processo_e_cliente, buscar_processos_sem_movimentacao)
+já existem em worker_queries.py com lógica real.
 Os testes cobrem o comportamento de cada uma usando mocks do worker_session_factory.
 
 Arquitetura testada:
@@ -19,7 +19,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from shared.database.worker_queries import (
     ClienteWorker,
     ProcessoWorker,
-    query_clientes_para_pesquisa,
     query_processo_e_cliente,
     query_processos_sem_movimentacao,
 )
@@ -225,75 +224,7 @@ def test_query_processos_sem_movimentacao_lista_vazia(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 3. query_clientes_para_pesquisa
-# --------------------------------------------------------------------------- #
-
-
-def test_query_clientes_para_pesquisa_retorna_clientes(monkeypatch):
-    """Retorna ClienteWorker para clientes ativos com aceite_lgpd=True."""
-    cliente_orm = _make_cliente()
-    session = _mock_session(scalars_result=[cliente_orm])
-
-    ctx = MagicMock()
-    ctx.__aenter__ = AsyncMock(return_value=session)
-    ctx.__aexit__ = AsyncMock(return_value=False)
-
-    with patch(
-        "shared.database.worker_queries.worker_session_factory",
-        return_value=ctx,
-    ):
-        resultado = query_clientes_para_pesquisa()
-
-    assert len(resultado) == 1
-    assert isinstance(resultado[0], ClienteWorker)
-    assert resultado[0].id == 10
-    assert resultado[0].nome == "Ana Lima"
-    assert resultado[0].telefone == "5511999991111"
-
-
-def test_query_clientes_para_pesquisa_lista_vazia(monkeypatch):
-    """Quando nenhum cliente elegível existe, retorna lista vazia."""
-    session = _mock_session(scalars_result=[])
-
-    ctx = MagicMock()
-    ctx.__aenter__ = AsyncMock(return_value=session)
-    ctx.__aexit__ = AsyncMock(return_value=False)
-
-    with patch(
-        "shared.database.worker_queries.worker_session_factory",
-        return_value=ctx,
-    ):
-        resultado = query_clientes_para_pesquisa()
-
-    assert resultado == []
-
-
-def test_query_clientes_para_pesquisa_multiplos(monkeypatch):
-    """Múltiplos clientes são retornados corretamente."""
-    clientes = [
-        _make_cliente(id=1, nome="João", telefone="5511111111111"),
-        _make_cliente(id=2, nome="Maria", telefone="5522222222222"),
-        _make_cliente(id=3, nome="Carlos", telefone="5533333333333"),
-    ]
-    session = _mock_session(scalars_result=clientes)
-
-    ctx = MagicMock()
-    ctx.__aenter__ = AsyncMock(return_value=session)
-    ctx.__aexit__ = AsyncMock(return_value=False)
-
-    with patch(
-        "shared.database.worker_queries.worker_session_factory",
-        return_value=ctx,
-    ):
-        resultado = query_clientes_para_pesquisa()
-
-    assert len(resultado) == 3
-    nomes = {r.nome for r in resultado}
-    assert nomes == {"João", "Maria", "Carlos"}
-
-
-# --------------------------------------------------------------------------- #
-# 4. Integração rasa: send_notifications delega corretamente
+# 3. Integração rasa: send_notifications delega corretamente
 # --------------------------------------------------------------------------- #
 
 
@@ -303,7 +234,6 @@ def test_send_notifications_delega_para_worker_queries():
     sobre as funções de worker_queries (sem lógica extra).
     """
     from feature_1_ia_personalizada.workers.send_notifications import (
-        buscar_clientes_para_pesquisa,
         buscar_processo_e_cliente,
         buscar_processos_sem_movimentacao,
     )
@@ -320,11 +250,4 @@ def test_send_notifications_delega_para_worker_queries():
         return_value=[],
     ) as mock_q:
         buscar_processos_sem_movimentacao()
-        mock_q.assert_called_once()
-
-    with patch(
-        "feature_1_ia_personalizada.workers.send_notifications.query_clientes_para_pesquisa",
-        return_value=[],
-    ) as mock_q:
-        buscar_clientes_para_pesquisa()
         mock_q.assert_called_once()

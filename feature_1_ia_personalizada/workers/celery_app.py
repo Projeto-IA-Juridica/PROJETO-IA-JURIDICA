@@ -116,6 +116,18 @@ celery_app.conf.task_routes = {
         "queue": "ia",
         "routing_key": "ia",
     },
+    # Disparadas pelo webhook do WhatsApp. Sem rota explícita caíam na fila
+    # default "celery", que o worker não consome (ele escuta apenas
+    # monitoramento/notificacoes/ia/relacionamento/hub_advogado) — as mensagens
+    # ficavam enfileiradas para sempre e nunca eram processadas.
+    "feature_1_ia_personalizada.workers.send_notifications.enviar_boas_vindas_escritorio": {
+        "queue": "notificacoes",
+        "routing_key": "notificacoes",
+    },
+    "feature_1_ia_personalizada.workers.send_notifications.processar_resposta_advogado": {
+        "queue": "ia",
+        "routing_key": "ia",
+    },
     # mensagens_relacionamento.py
     "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios": {
         "queue": "relacionamento",

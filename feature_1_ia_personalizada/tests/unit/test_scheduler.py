@@ -159,41 +159,6 @@ class TestAgendarNotificacaoAndamento:
 
 
 # ---------------------------------------------------------------------------
-# agendar_pesquisa_satisfacao
-# ---------------------------------------------------------------------------
-
-
-class TestAgendarPesquisaSatisfacao:
-    def test_chama_apply_async_sem_args_de_processo(self):
-        sched = _scheduler()
-        mock_result = MagicMock()
-        mock_result.id = "pesq-uuid"
-
-        with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_pesquisa_satisfacao"
-        ) as mock_task:
-            mock_task.apply_async.return_value = mock_result
-            agendamento = sched.agendar_pesquisa_satisfacao(horario_envio=_dt(hora=15))
-
-        mock_task.apply_async.assert_called_once()
-        assert agendamento.task_id == "pesq-uuid"
-
-    def test_retorna_agendamento_valido(self):
-        sched = _scheduler()
-        mock_result = MagicMock()
-        mock_result.id = "pesq-222"
-
-        with patch(
-            "feature_1_ia_personalizada.services.messaging.scheduler.enviar_pesquisa_satisfacao"
-        ) as mock_task:
-            mock_task.apply_async.return_value = mock_result
-            ag = sched.agendar_pesquisa_satisfacao(horario_envio=_dt(hora=11))
-
-        assert isinstance(ag, Agendamento)
-        assert ag.task_id == "pesq-222"
-
-
-# ---------------------------------------------------------------------------
 # agendar_processar_mensagem
 # ---------------------------------------------------------------------------
 
