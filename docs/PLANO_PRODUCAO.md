@@ -9,6 +9,12 @@
 Esforço total estimado até o go-live: **~90–165 h** (60–115 h das quatro
 funcionalidades + gaps; ~30–50 h do restante).
 
+> **Atualização 14/08 — P0 de código concluído.** Itens 1, 3 e 4 foram
+> corrigidos e verificados (suíte 1350 testes verde, ruff/black/mypy limpos).
+> Restam do P0: **item 0** (produção fora do ar — ação no painel do Railway) e
+> **item 2** (as 4 funcionalidades vendidas, 60–115 h de desenvolvimento).
+> Detalhes de cada correção estão marcados ✅ nas seções abaixo.
+
 ---
 
 ## P0 — Bloqueia qualquer entrega (resolver imediatamente)
@@ -38,7 +44,7 @@ derrubou o serviço.
 
 **Nada mais pode ser validado em produção enquanto isso não voltar.**
 
-### 1. Suíte de testes quebrada na main (CI vermelho) — 4–6 h
+### 1. ✅ RESOLVIDO — Suíte de testes quebrada na main (CI vermelho)
 
 O refactor que removeu o NPS deixou fallout maior do que o mapeado antes.
 Estado medido em 14/08 (`pytest` unit + shared):
@@ -72,6 +78,26 @@ Há ainda **testes de integração** referenciando NPS (`test_crm_real.py`,
 Corrigir **atualizando os testes para o comportamento novo** (nunca revertendo o
 refactor — código do Bruno).
 
+**Correção aplicada (14/08):** todos os testes foram atualizados para o
+comportamento novo; nenhum código de produção do refactor foi revertido.
+
+| Arquivo | O que foi feito |
+|---|---|
+| `test_crm_analyzer.py` | **Reescrito** para o analyzer novo: cache por recência + contato posterior, classificação pelo Claude, normalização de score na faixa do nível, JSON com cerca de markdown, e falhas (nível inválido / Claude fora / palavra proibida) que não podem persistir nada |
+| `test_prompts.py`, `test_templates.py` | Removidas as referências ao prompt/template de NPS |
+| `test_send_notifications_queries.py` | Removido o bloco de `query_clientes_para_pesquisa` (função não existe mais) |
+| `test_whatsapp_service.py` | Removida a classe `TestEnviarPesquisaSatisfacao` (10 testes de método removido) |
+| `test_analytics_calculadora.py` | **Atualizado para score CRM**: resumo agora valida `score_crm_medio`/`clientes_analisados`, ranking valida `crm_score`/`crm_nivel`/`sem_analise` |
+| `test_scheduler.py` | Removida a classe `TestAgendarPesquisaSatisfacao` |
+| `test_agendamento_fluxo.py` | Removido o guard de NPS vs proposta de horário |
+
+Também foi corrigido 1 erro de **mypy** pré-existente em `crm/analyzer.py:104`
+(`int(dados.get("score"))` com `Any | None`), que quebrava o CI
+independentemente dos testes.
+
+**Estado verificado:** `1350 passed`, 0 falhas, 0 erros de coleta ·
+`ruff` limpo · `black --check` limpo · `mypy` sem erros em 223 arquivos.
+
 ### 2. As 4 funcionalidades vendidas não existem — 60–115 h (com gaps)
 
 | Funcionalidade | Estado | Esforço |
@@ -82,7 +108,7 @@ refactor — código do Bruno).
 | Alerta de cliente em risco → advogado | Não existe (alerta atual é SLA de escalação; CRM não notifica ninguém) | 8–16 h |
 | Gaps estruturais compartilhados (ver seção Gaps) | — | +16–29 h |
 
-### 3. Celery beat ausente em produção — 2–4 h
+### 3. ⚠️ PARCIAL — Celery beat ausente em produção
 
 `railway.worker.json` define só o **worker**; não há processo `celery beat` em
 nenhuma config de deploy (o Procfile tem a linha, mas Railway usa os JSONs).
@@ -90,11 +116,27 @@ Sem beat, **nada agendado roda**: monitoramento de processos, mensagens de
 relacionamento, lembretes, dispatcher de agendadas — e as futuras agenda diária
 e relatórios agendados.
 
-- [ ] Conferir no painel Railway se worker e beat existem e estão de pé
-- [ ] Criar serviço beat (`celery -A feature_1_ia_personalizada.workers.celery_app beat`)
+- [x] **Criado `railway.beat.json`** — config de deploy do serviço beat, espelhando
+      o `railway.worker.json` (mesmo Dockerfile, `numReplicas: 1` — mais de uma
+      réplica de beat duplicaria toda tarefa agendada). O scheduler é o RedBeat
+      (já configurado em `celery_app.py`), que guarda o schedule no Redis.
+- [ ] **Falta ação no Railway:** criar o serviço apontando para `railway.beat.json`
+      e confirmar que worker e beat estão de pé
 - [ ] Alerta se worker/beat caírem (ver P1.8)
 
-### 4. `/escalacoes` — 500 em 100% das chamadas · CAUSA CONFIRMADA — 1–2 h
+**Bônus corrigido — 2 tasks caíam em fila não consumida.**
+`enviar_boas_vindas_escritorio` e `processar_resposta_advogado` são disparadas
+pelo webhook do WhatsApp mas não tinham entrada em `task_routes`: iam para a fila
+default `celery`, que o worker não escuta (ele consome apenas
+monitoramento/notificacoes/ia/relacionamento/hub_advogado). Ficavam enfileiradas
+para sempre — o e-mail de boas-vindas do escritório e a resposta do advogado por
+WhatsApp nunca eram processados. Ambas foram roteadas (`notificacoes` e `ia`).
+
+Verificado: toda task registrada agora tem rota para uma fila que o worker
+consome (exceto as `vendas.*`, cujo módulo está desabilitado), e o beat carrega
+as 11 entradas agendadas.
+
+### 4. ✅ RESOLVIDO — `/escalacoes` dava 500 em 100% das chamadas
 
 Reproduzido localmente sem banco. A rota monta o filtro assim
 (`api/routes/escalacoes.py:127`):
@@ -123,6 +165,21 @@ intermitente nem de dados. Correções possíveis: trocar a coluna para `JSONB`
 `{"escalacao": {"status": ...}}`. A expressão é válida, então não estoura: apenas
 **conta sempre zero escalações** — a contagem de escalações pendentes/rejeitadas
 que alimenta a análise de CRM está sistematicamente errada.
+
+**Correção aplicada (14/08):** ambos passaram a usar
+`metadata_json["escalacao"]["status"].as_string()`, que compila tanto em
+PostgreSQL quanto em SQLite (verificado nos dois dialetos) — mesmo padrão que o
+aggregator já usava. A coluna continua `JSON` genérico, sem migration.
+
+Varredura confirmou que os outros usos de `.astext` no projeto
+(`services/rag/vector_store.py`) são legítimos: ali a coluna é `JSONB` de
+verdade.
+
+**Regressão criada** — `tests/unit/test_escalacoes_query.py`, 10 testes:
+compilação nos dois dialetos, filtro por status com banco real, isolamento entre
+escritórios, contagem correta do aggregator, prova de que a chave plana antiga
+retornava zero, e o **handler real da rota** devolvendo os dados (onde antes
+estourava). Todos passando.
 
 ### 4b. Validação ponta a ponta pendente — 2–4 h
 

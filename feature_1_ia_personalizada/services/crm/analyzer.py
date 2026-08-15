@@ -101,8 +101,10 @@ def _normalizar_classificacao(dados: dict) -> tuple[str, int]:
 
     minimo, maximo = _FAIXA_POR_NIVEL[nivel]
     try:
-        score = int(dados.get("score"))
-    except (TypeError, ValueError):
+        # Indexação direta (e não .get) para o mypy não ver `Any | None` em int();
+        # a chave ausente cai no mesmo fallback, agora via KeyError.
+        score = int(dados["score"])
+    except (KeyError, TypeError, ValueError):
         score = (minimo + maximo) // 2
     score = max(minimo, min(maximo, score))
     return nivel, score
