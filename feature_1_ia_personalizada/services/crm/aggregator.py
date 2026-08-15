@@ -170,7 +170,12 @@ class CRMDataAggregator:
         )
 
         # --- 4. Escalações (uma única roundtrip com contagens condicionais) ---
-        esc_status = Interacao.metadata_json["escalacao_status"].as_string()
+        # O caminho é aninhado — EscalacaoManager grava
+        # metadata_json = {"escalacao": {"status": ..., ...}}.
+        # Antes lia-se a chave plana "escalacao_status", que nunca é escrita:
+        # a query não falhava, apenas contava sempre zero escalações, distorcendo
+        # silenciosamente a análise de CRM.
+        esc_status = Interacao.metadata_json["escalacao"]["status"].as_string()
         stmt_esc = select(
             func.count().filter(esc_status == "pendente").label("pendentes"),
             func.count()

@@ -24,7 +24,6 @@ from feature_1_ia_personalizada.services.messaging.templates import (
     TEMPLATE_ERRO_GENERICO,
     TEMPLATE_MENSAGEM_TRIMESTRAL,
     TEMPLATE_NOVO_ANDAMENTO,
-    TEMPLATE_PESQUISA_NPS,
     TEMPLATE_SEM_MOVIMENTACAO,
 )
 
@@ -35,7 +34,6 @@ _TODOS_OS_TEMPLATES = [
     ("CLIENTE_SEM_PROCESSO", TEMPLATE_CLIENTE_SEM_PROCESSO),
     ("CLIENTE_NAO_ENCONTRADO", TEMPLATE_CLIENTE_NAO_ENCONTRADO),
     ("AGENDAMENTO_CONFIRMADO", TEMPLATE_AGENDAMENTO_CONFIRMADO),
-    ("PESQUISA_NPS", TEMPLATE_PESQUISA_NPS),
     ("MENSAGEM_TRIMESTRAL", TEMPLATE_MENSAGEM_TRIMESTRAL),
     ("ANIVERSARIO", TEMPLATE_ANIVERSARIO),
     ("DIA_BANCARIO", TEMPLATE_DIA_BANCARIO),
@@ -113,10 +111,6 @@ class TestSemPlaceholders:
 
     def test_cliente_nao_encontrado_menciona_cadastro(self):
         assert "cadastro" in TEMPLATE_CLIENTE_NAO_ENCONTRADO.lower()
-
-    def test_pesquisa_nps_contem_escala_1_a_5(self):
-        assert "1" in TEMPLATE_PESQUISA_NPS
-        assert "5" in TEMPLATE_PESQUISA_NPS
 
     def test_erro_generico_menciona_escritorio(self):
         assert "escritório" in TEMPLATE_ERRO_GENERICO.lower()

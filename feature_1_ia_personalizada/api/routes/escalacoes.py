@@ -124,7 +124,12 @@ async def listar_escalacoes(
         .where(
             Interacao.escritorio_id == escritorio_id,
             Interacao.tipo == "escalacao",
-            Interacao.metadata_json["escalacao"]["status"].astext == status_filtro,
+            # `.as_string()` e não `.astext`: metadata_json é JSON genérico (não
+            # JSONB), e `.astext` só existe no tipo JSONB do dialeto Postgres —
+            # usá-lo aqui levantava AttributeError na construção da query, antes
+            # mesmo de tocar o banco, causando 500 em toda listagem de escalações.
+            # `.as_string()` compila tanto em Postgres quanto em SQLite (testes).
+            Interacao.metadata_json["escalacao"]["status"].as_string() == status_filtro,
         )
         .order_by(Interacao.created_at.desc())
         .offset(offset)
