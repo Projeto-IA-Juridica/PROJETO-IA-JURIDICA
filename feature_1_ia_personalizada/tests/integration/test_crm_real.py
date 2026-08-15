@@ -59,7 +59,6 @@ async def _criar_interacao(
     db: AsyncSession,
     cliente_id: int,
     escritorio_id: int,
-    satisfacao: int | None = None,
 ) -> Interacao:
     interacao = Interacao(
         cliente_id=cliente_id,
@@ -68,7 +67,6 @@ async def _criar_interacao(
         direcao="entrada",
         mensagem_cliente="Olá, como está meu processo?",
         mensagem_ia="Seu processo está em andamento.",
-        satisfacao=satisfacao,
     )
     db.add(interacao)
     await db.commit()
@@ -111,18 +109,18 @@ async def test_aggregator_sem_duplicatas(
     escritorio = await escritorio_factory()
     cliente = await _criar_cliente(async_db, escritorio.id)
 
-    # Cria 3 interações com NPS
-    for nota in [3, 4, 5]:
-        await _criar_interacao(async_db, cliente.id, escritorio.id, satisfacao=nota)
+    # 3 conversas + 1 processo: o JOIN com processos não pode multiplicar as
+    # mensagens coletadas (era o bug que este teste guarda).
+    for _ in range(3):
+        await _criar_interacao(async_db, cliente.id, escritorio.id)
     await _criar_processo(async_db, cliente.id, escritorio.id)
 
     aggregator = CRMDataAggregator(async_db)
     ctx = await aggregator.coletar_contexto_cliente(cliente.id, escritorio.id)
 
-    # NPS histórico deve ter exatamente 3 registros (sem duplicatas por JOIN)
-    assert len(ctx.nps_historico) == 3
-    assert ctx.nps_medio_3m is not None
-    assert round(ctx.nps_medio_3m, 1) == round((3 + 4 + 5) / 3, 1)
+    assert len(ctx.ultimas_mensagens) == 3
+    assert ctx.total_interacoes_30d == 3
+    assert len(ctx.processos_ativos) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -201,10 +199,14 @@ async def test_analisar_cliente_persiste_no_banco(
     headers = _headers(user_id=usuario.id, escritorio_id=escritorio.id)
 
     cliente = await _criar_cliente(async_db, escritorio.id, "Cliente Análise")
-    await _criar_interacao(async_db, cliente.id, escritorio.id, satisfacao=4)
+    await _criar_interacao(async_db, cliente.id, escritorio.id)
 
+    # O analyzer passou a exigir a classificação (nivel + score) vinda do modelo,
+    # além do texto — sem ela a análise é rejeitada.
     payload_claude = json.dumps(
         {
+            "nivel": "satisfeito",
+            "score": 64,
             "resumo": "Cliente com bom engajamento.",
             "acao_sugerida": "Nenhuma ação necessária",
         }

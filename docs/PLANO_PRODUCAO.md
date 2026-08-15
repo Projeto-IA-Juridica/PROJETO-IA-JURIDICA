@@ -95,8 +95,37 @@ Também foi corrigido 1 erro de **mypy** pré-existente em `crm/analyzer.py:104`
 (`int(dados.get("score"))` com `Any | None`), que quebrava o CI
 independentemente dos testes.
 
-**Estado verificado:** `1350 passed`, 0 falhas, 0 erros de coleta ·
-`ruff` limpo · `black --check` limpo · `mypy` sem erros em 223 arquivos.
+**Segunda rodada — os testes de INTEGRAÇÃO também quebravam.** A primeira
+verificação cobriu só o job 1 do CI (unitários, SQLite). O `ci.yml` tem um
+segundo job obrigatório (`integration-postgres`, com Postgres real) e o deploy
+depende dos dois (`needs: [test, integration-postgres]`). Três arquivos de
+integração ainda assumiam o mundo do NPS e falhariam lá:
+
+| Arquivo | Problema | Correção |
+|---|---|---|
+| `test_crm_real.py` | usava `ctx.nps_historico` / `ctx.nps_medio_3m` (campos que não existem mais) e mockava o Claude sem `nivel`/`score` | passou a validar `ultimas_mensagens`/`processos_ativos` e o mock agora devolve a classificação exigida |
+| `test_analytics_dashboard.py` | fixtures e asserts com `nps_medio`/`variacao_nps`/`sem_avaliacao` | migrados para `score_crm_medio`/`clientes_analisados`/`sem_analise` |
+| `test_analytics_calculadora_real.py` | mesma coisa, com dados reais no banco | reescrito para score CRM (média de `crm_score`, risco pelo `crm_nivel`) |
+
+`test_confidence_router.py` foi analisado e **não precisa mudar**: ele usa o
+campo legado `Interacao.satisfacao`, que ainda existe e é mockado — o
+ConfidenceRouter continua lendo esse campo.
+
+**Estado verificado (com o FastAPI pinado, `0.109.0`, igual ao CI):**
+
+```
+Job 1 (pytest completo) ......... 1541 passed, 1 skipped, 0 falhas
+Job 2 (integração + shared) ......  446 passed, 1 skipped, 0 falhas
+ruff .............................. limpo
+black --check ..................... 223 arquivos, nenhuma mudança
+mypy .............................. 0 erros em 223 arquivos
+```
+
+> ⚠️ **Rodar os testes localmente exige o FastAPI da versão pinada.** Com o
+> 0.139 instalado na máquina, ~14 testes que usam o cliente HTTP falham com
+> `'_IncludedRouter' object has no attribute 'path'` — é o
+> `prometheus-fastapi-instrumentator` quebrando, não o código (ver P2). Um
+> `python -m venv --system-site-packages` com `fastapi==0.109.0` reproduz o CI.
 
 ### 2. As 4 funcionalidades vendidas não existem — 60–115 h (com gaps)
 

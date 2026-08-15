@@ -9,14 +9,14 @@ Estratégia:
   - tendencia_semanal usa date_trunc (PostgreSQL-only) → skipado com marca explícita.
 
 Cobertura:
-  - obter_resumo: total_interacoes, clientes_ativos, nps_medio, variacao_nps
+  - obter_resumo: total_interacoes, clientes_ativos, score_crm_medio
   - obter_resumo: zero interações (edge case)
   - obter_resumo: isolamento multi-tenant
   - obter_eficiencia: percentual_autonomia, custo_total, horas_economizadas
   - obter_eficiencia: zero interações (sem divisão por zero)
-  - ranking_clientes: em_risco=True (NPS baixo + sem contato recente)
-  - ranking_clientes: sem_avaliacao=True (nenhum NPS respondido)
-  - ranking_clientes: NPS baixo mas contato recente → não em_risco
+  - ranking_clientes: em_risco=True (nivel classificado pela IA)
+  - ranking_clientes: sem_analise=True (cliente ainda não classificado)
+  - ranking_clientes: score baixo mas nivel saudável → não em_risco
   - ranking_clientes: isolamento multi-tenant (outro escritório não aparece)
 """
 
@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.analytics.calculadora import CalculadoraAnalytics
@@ -66,7 +66,6 @@ async def _criar_interacao(
     escritorio_id: int,
     cliente_id: int,
     direcao: str = "saida",
-    satisfacao: int | None = None,
     custo: Decimal = Decimal("0.01"),
     tempo_ms: int | None = 500,
 ) -> Interacao:
@@ -76,7 +75,6 @@ async def _criar_interacao(
         tipo="whatsapp_texto",
         direcao=direcao,
         mensagem_cliente="Olá",
-        satisfacao=satisfacao,
         custo_estimado=custo,
         tempo_resposta_ms=tempo_ms,
     )
@@ -126,23 +124,33 @@ async def test_obter_resumo_clientes_ativos_distintos(async_db: AsyncSession, es
 
 
 @pytest.mark.asyncio
-async def test_obter_resumo_nps_medio_calculado(async_db: AsyncSession, escritorio_factory):
+async def test_obter_resumo_score_crm_medio_calculado(async_db: AsyncSession, escritorio_factory):
     escritorio = await escritorio_factory()
-    cliente = await _criar_cliente(async_db, escritorio.id)
+    c1 = await _criar_cliente(async_db, escritorio.id)
+    c2 = await _criar_cliente(async_db, escritorio.id)
+    c3 = await _criar_cliente(async_db, escritorio.id)
 
-    # NPS: 4, 2, 5 → média = 3.7
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=4)
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=2)
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=5)
-    # Interação sem NPS — não deve entrar na média
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=None)
+    for cliente in (c1, c2, c3):
+        await _criar_interacao(async_db, escritorio.id, cliente.id)
+
+    # Scores 80, 40 e 60 → média 60.0. O cliente sem análise fica de fora.
+    await async_db.execute(
+        update(Cliente).where(Cliente.id == c1.id).values(crm_score=80, crm_nivel="excelente")
+    )
+    await async_db.execute(
+        update(Cliente).where(Cliente.id == c2.id).values(crm_score=40, crm_nivel="neutro")
+    )
+    await async_db.execute(
+        update(Cliente).where(Cliente.id == c3.id).values(crm_score=60, crm_nivel="satisfeito")
+    )
     await async_db.commit()
 
     calc = CalculadoraAnalytics(async_db, escritorio_id=escritorio.id, dias=30)
     result = await calc.obter_resumo()
 
-    assert result["nps_medio"] == 3.7
-    assert result["total_interacoes"] == 4
+    assert result["score_crm_medio"] == 60.0
+    assert result["clientes_analisados"] == 3
+    assert result["total_interacoes"] == 3
 
 
 @pytest.mark.asyncio
@@ -154,8 +162,9 @@ async def test_obter_resumo_zero_interacoes(async_db: AsyncSession, escritorio_f
 
     assert result["total_interacoes"] == 0
     assert result["clientes_ativos"] == 0
-    assert result["nps_medio"] == 0.0
-    assert result["variacao_nps"] == "+0.0"
+    # Sem nenhum cliente analisado o score é None (0 significaria "péssimo").
+    assert result["score_crm_medio"] is None
+    assert result["clientes_analisados"] == 0
 
 
 @pytest.mark.asyncio
@@ -247,11 +256,14 @@ async def test_obter_eficiencia_zero_interacoes_sem_divisao_por_zero(
 
 @pytest.mark.asyncio
 async def test_ranking_clientes_em_risco_real(async_db: AsyncSession, escritorio_factory):
-    """NPS baixo + sem contato há > 30 dias → em_risco=True."""
+    """Cliente classificado pela IA como em_risco entra sinalizado."""
     escritorio = await escritorio_factory()
     cliente = await _criar_cliente(async_db, escritorio.id, "Maria em Risco")
 
-    interacao = await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=2)
+    interacao = await _criar_interacao(async_db, escritorio.id, cliente.id)
+    await async_db.execute(
+        update(Cliente).where(Cliente.id == cliente.id).values(crm_score=18, crm_nivel="em_risco")
+    )
     await async_db.commit()
 
     # Simula contato antigo: 45 dias atrás
@@ -267,46 +279,48 @@ async def test_ranking_clientes_em_risco_real(async_db: AsyncSession, escritorio
     assert len(result) == 1
     assert result[0]["nome"] == "Maria em Risco"
     assert result[0]["em_risco"] is True
-    assert result[0]["sem_avaliacao"] is False
-    assert result[0]["nps_medio"] == 2.0
+    assert result[0]["sem_analise"] is False
+    assert result[0]["crm_score"] == 18
 
 
 @pytest.mark.asyncio
-async def test_ranking_clientes_sem_avaliacao_real(async_db: AsyncSession, escritorio_factory):
-    """Interações sem nota NPS → sem_avaliacao=True, em_risco=False."""
+async def test_ranking_clientes_sem_analise_real(async_db: AsyncSession, escritorio_factory):
+    """Cliente que a IA ainda não classificou → sem_analise=True, em_risco=False."""
     escritorio = await escritorio_factory()
     cliente = await _criar_cliente(async_db, escritorio.id, "João Sem Nota")
 
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=None)
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=None)
+    await _criar_interacao(async_db, escritorio.id, cliente.id)
+    await _criar_interacao(async_db, escritorio.id, cliente.id)
     await async_db.commit()
 
     calc = CalculadoraAnalytics(async_db, escritorio_id=escritorio.id, dias=30)
     result = await calc.ranking_clientes()
 
     assert len(result) == 1
-    assert result[0]["sem_avaliacao"] is True
+    assert result[0]["sem_analise"] is True
     assert result[0]["em_risco"] is False
-    assert result[0]["nps_medio"] is None
+    assert result[0]["crm_score"] is None
 
 
 @pytest.mark.asyncio
-async def test_ranking_clientes_nps_baixo_contato_recente_nao_em_risco(
+async def test_ranking_clientes_score_baixo_nivel_saudavel_nao_em_risco(
     async_db: AsyncSession, escritorio_factory
 ):
-    """NPS baixo mas contato recente (< 30 dias) → não é em_risco."""
+    """Score baixo não basta: o sinal de risco vem do nível classificado pela IA."""
     escritorio = await escritorio_factory()
     cliente = await _criar_cliente(async_db, escritorio.id, "Ana Insatisfeita Ativa")
 
-    # Interação com NPS baixo e created_at agora (recente)
-    await _criar_interacao(async_db, escritorio.id, cliente.id, satisfacao=1)
+    await _criar_interacao(async_db, escritorio.id, cliente.id)
+    await async_db.execute(
+        update(Cliente).where(Cliente.id == cliente.id).values(crm_score=35, crm_nivel="neutro")
+    )
     await async_db.commit()
 
     calc = CalculadoraAnalytics(async_db, escritorio_id=escritorio.id, dias=30)
     result = await calc.ranking_clientes()
 
     assert result[0]["em_risco"] is False
-    assert result[0]["nps_medio"] == 1.0
+    assert result[0]["crm_score"] == 35
 
 
 @pytest.mark.asyncio
@@ -320,8 +334,8 @@ async def test_ranking_clientes_isolamento_multitenancy_real(
     c1 = await _criar_cliente(async_db, esc1.id, "Cliente do ESC1")
     c2 = await _criar_cliente(async_db, esc2.id, "Cliente do ESC2")
 
-    await _criar_interacao(async_db, esc1.id, c1.id, satisfacao=4)
-    await _criar_interacao(async_db, esc2.id, c2.id, satisfacao=2)
+    await _criar_interacao(async_db, esc1.id, c1.id)
+    await _criar_interacao(async_db, esc2.id, c2.id)
     await async_db.commit()
 
     ranking_esc1 = await CalculadoraAnalytics(

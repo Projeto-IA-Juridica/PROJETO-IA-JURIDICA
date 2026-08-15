@@ -44,9 +44,8 @@ class _FakeAnalyticsRedis:
 _RESUMO_FAKE = {
     "total_interacoes": 100,
     "clientes_ativos": 15,
-    "nps_medio": 4.1,
-    "nps_anterior": 3.9,
-    "variacao_nps": "+0.2",
+    "score_crm_medio": 72.4,
+    "clientes_analisados": 12,
 }
 
 _EFICIENCIA_FAKE = {
@@ -58,18 +57,19 @@ _EFICIENCIA_FAKE = {
 }
 
 _TENDENCIA_FAKE = [
-    {"semana": "2026-W10", "total_interacoes": 25, "nps_medio": 4.0, "autonomia_pct": 68.0},
+    {"semana": "2026-W10", "total_interacoes": 25, "autonomia_pct": 68.0},
 ]
 
 _RANKING_FAKE = [
     {
         "cliente_id": 1,
         "nome": "João",
-        "nps_medio": 2.5,
+        "crm_score": 22,
+        "crm_nivel": "em_risco",
         "total_interacoes": 5,
         "ultimo_contato": "2026-01-01T00:00:00+00:00",
         "em_risco": True,
-        "sem_avaliacao": False,
+        "sem_analise": False,
     }
 ]
 
@@ -184,12 +184,12 @@ async def test_dashboard_retorna_estrutura_completa(app_client):
     assert "score_risco_distribuicao" in data
 
     assert data["resumo"]["total_interacoes"] == 100
-    assert data["resumo"]["nps_medio"] == 4.1
-    assert data["resumo"]["variacao_nps"] == "+0.2"
+    assert data["resumo"]["score_crm_medio"] == 72.4
+    assert data["resumo"]["clientes_analisados"] == 12
     assert data["eficiencia"]["percentual_autonomia"] == 70.0
     assert data["tendencia_semanal"][0]["semana"] == "2026-W10"
     assert data["por_cliente"][0]["em_risco"] is True
-    assert data["por_cliente"][0]["sem_avaliacao"] is False
+    assert data["por_cliente"][0]["sem_analise"] is False
 
 
 # ---------------------------------------------------------------------------
