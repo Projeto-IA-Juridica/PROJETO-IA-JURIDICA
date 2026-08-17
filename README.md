@@ -2,7 +2,7 @@
 
 > Plataforma B2B SaaS de IA conversacional para escritórios de advocacia — monitoramento de processos, comunicação proativa com clientes, agendamento inteligente de reuniões, prospecção de leads e hub de análise jurídica para advogados.
 
-![Python](https://img.shields.io/badge/python-3.12+-blue)
+![Python](https://img.shields.io/badge/python-3.12+-blue) 
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)
 ![Deploy](https://img.shields.io/badge/deploy-Railway-purple)
 ![Cobertura](https://img.shields.io/badge/cobertura-70%25%20mínimo-brightgreen)
