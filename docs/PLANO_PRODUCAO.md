@@ -127,15 +127,29 @@ mypy .............................. 0 erros em 223 arquivos
 > `prometheus-fastapi-instrumentator` quebrando, não o código (ver P2). Um
 > `python -m venv --system-site-packages` com `fastapi==0.109.0` reproduz o CI.
 
-### 2. As 4 funcionalidades vendidas não existem — 60–115 h (com gaps)
+### 2. ✅ RESOLVIDO — As 4 funcionalidades vendidas
 
-| Funcionalidade | Estado | Esforço |
+Implementadas em 14/08, na ordem que os gaps impunham. Tudo em
+`services/relacionamento/`, com os blocos compartilhados construídos primeiro.
+
+| Entrega | Onde | O que faz |
 |---|---|---|
-| Relatório personalizado por cliente | Não existe (só CSV do escritório) | 16–30 h |
-| Agenda diária do advogado | Não existe (só aniversários + dashboard on-demand) | 12–24 h |
-| Resumo das conversas de WhatsApp | Não existe | 8–16 h |
-| Alerta de cliente em risco → advogado | Não existe (alerta atual é SLA de escalação; CRM não notifica ninguém) | 8–16 h |
-| Gaps estruturais compartilhados (ver seção Gaps) | — | +16–29 h |
+| **Gap A** — responsabilidade | `responsavel.py` + coluna `clientes.advogado_responsavel_id` (migration `20260814_1000`, com backfill do processo mais recente) | Descobre de quem é o cliente: atribuição direta → responsável do processo → ninguém. Só devolve advogado ativo e com WhatsApp |
+| **Gap C** — falar com o advogado | `notificador.py` | Envio ao advogado com trava anti-spam por chave+janela (`SET NX EX`, atômico). Sem Redis, envia — perder alerta é pior que repetir |
+| **Feature 4** — alerta de risco | `alerta_risco.py` + hook no `crm_worker` | Classificou `em_risco`/`critico` → avisa o responsável no WhatsApp. Trava por cliente **e nível**: permanecer no nível é silencioso, piorar fura a trava |
+| **Feature 3** — resumo de conversas | `resumo_conversa.py` + `GET /crm/clientes/{id}/resumo-conversas` | Resume o atendimento com Haiku. Sem conversa não chama o modelo; falha do modelo não propaga. Mensagens do cliente entram delimitadas por tag com sufixo aleatório (anti prompt-injection) |
+| **Feature 2** — agenda diária | `agenda_diaria.py` + `agenda_diaria_worker.py` (beat 7h30) | Prazos de 7 dias + reuniões de hoje + clientes em risco, **por carteira**. Advogado sem nada não recebe mensagem. Uma task por escritório, trava por advogado+dia |
+| **Feature 1** — relatório por cliente | `relatorio_cliente.py` + `GET /crm/clientes/{id}/relatorio` | Processos, andamentos, prazos e resumo do período. **Não expõe score/nível/resumo do CRM** — é documento que o cliente lê |
+
+**Cobertura:** 41 testes novos (12 alerta de risco, 10 resumo, 10 agenda, 9
+relatório), incluindo os casos que fazem a diferença em produção: repetição de
+alerta suprimida, piora de nível furando a trava, carteira de um advogado não
+vazando para outro, e dado interno do CRM ficando fora do relatório do cliente.
+
+**Ainda por fazer nestas features:** preencher `advogado_responsavel_id` no
+import CSV e criar a tela de atribuição (o backfill da migration cobre quem já
+tem processo com responsável, mas carteira nova continua chegando sem dono);
+expor as três telas novas no frontend.
 
 ### 3. ⚠️ PARCIAL — Celery beat ausente em produção
 
