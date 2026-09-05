@@ -18,10 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from feature_1_ia_personalizada.services.ai.claude_client import ClaudeClient
 from feature_1_ia_personalizada.services.crm.analyzer import CRMAnaliseResult, CRMAnalyzer
+from feature_1_ia_personalizada.services.relacionamento.relatorio_cliente import (
+    gerar_relatorio,
+)
+from feature_1_ia_personalizada.services.relacionamento.resumo_conversa import (
+    resumir_conversa,
+)
 from feature_1_ia_personalizada.workers.crm_worker import crm_analisar_escritorio
 from shared.config.settings import settings
 from shared.database.session import get_db
 from shared.models.cliente import Cliente
+from shared.models.escritorio import Escritorio
 from shared.models.interacao import Interacao
 from shared.schemas.cliente import CRMClienteCard
 
@@ -32,6 +39,8 @@ router = APIRouter(prefix="/crm", tags=["CRM Inteligente"])
 _NIVEIS_VALIDOS = {"excelente", "satisfeito", "neutro", "em_risco", "critico"}
 _RATE_LIMIT_ANALISE_MANUAL_TTL = 300  # 5 minutos por cliente
 _RATE_LIMIT_ESCRITORIO_TTL = 14_400  # 4 horas por escritório
+_RATE_LIMIT_RESUMO_TTL = 60  # 1 minuto por cliente/janela
+_RATE_LIMIT_RELATORIO_TTL = 60  # 1 minuto por cliente/período
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +307,126 @@ async def analisar_escritorio(request: Request) -> dict[str, Any]:
     job = crm_analisar_escritorio.delay(eid)
 
     return {"job_id": job.id, "escritorio_id": eid}
+
+
+# ---------------------------------------------------------------------------
+# GET /crm/clientes/{id}/resumo-conversas
+# ---------------------------------------------------------------------------
+
+
+@router.get("/clientes/{cliente_id}/resumo-conversas", response_model=dict)
+async def resumo_conversas_cliente(
+    cliente_id: int,
+    request: Request,
+    dias: int = Query(30, ge=1, le=365, description="Janela em dias"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    Resume as conversas de WhatsApp do cliente no período.
+
+    Evita que o advogado precise rolar o histórico inteiro para entender onde
+    a conta parou. Rate-limit de 1 min por cliente: o resumo é gerado por IA e
+    a tela pode ser reaberta várias vezes seguidas.
+    """
+    eid = _escritorio_id(request)
+    r = _redis(request)
+
+    cliente = (
+        (
+            await db.execute(
+                select(Cliente).where(
+                    Cliente.id == cliente_id,
+                    Cliente.escritorio_id == eid,
+                    Cliente.ativo.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if cliente is None:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    if r:
+        chave = f"crm_rate_resumo:{eid}:{cliente_id}:{dias}"
+        if not await r.set(chave, "1", ex=_RATE_LIMIT_RESUMO_TTL, nx=True):
+            raise HTTPException(
+                status_code=429,
+                detail="Resumo gerado recentemente. Aguarde um instante.",
+            )
+
+    claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
+    resultado = await resumir_conversa(db, claude, cliente_id, eid, cliente.nome, dias=dias)
+
+    return {
+        "cliente_id": cliente_id,
+        "cliente_nome": cliente.nome,
+        "dias": dias,
+        "resumo": resultado.texto,
+        "mensagens_consideradas": resultado.mensagens_consideradas,
+        "houve_conversa": resultado.houve_conversa,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /crm/clientes/{id}/relatorio
+# ---------------------------------------------------------------------------
+
+
+@router.get("/clientes/{cliente_id}/relatorio", response_model=dict)
+async def relatorio_cliente(
+    cliente_id: int,
+    request: Request,
+    dias: int = Query(30, ge=1, le=365, description="Período coberto pelo relatório"),
+    incluir_resumo: bool = Query(True, description="Inclui resumo do atendimento (IA)"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    Relatório de acompanhamento do cliente, pronto para enviar.
+
+    Traz processos, andamentos, próximos prazos e um resumo do atendimento no
+    período. É um documento que o CLIENTE pode ler: não inclui score de risco
+    nem classificação de relacionamento, que são dados internos do escritório.
+    """
+    eid = _escritorio_id(request)
+    r = _redis(request)
+
+    if r and incluir_resumo:
+        chave = f"crm_rate_relatorio:{eid}:{cliente_id}:{dias}"
+        if not await r.set(chave, "1", ex=_RATE_LIMIT_RELATORIO_TTL, nx=True):
+            raise HTTPException(
+                status_code=429,
+                detail="Relatório gerado recentemente. Aguarde um instante.",
+            )
+
+    escritorio_nome = (
+        await db.execute(select(Escritorio.nome).where(Escritorio.id == eid))
+    ).scalar_one_or_none() or ""
+
+    claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
+    relatorio = await gerar_relatorio(
+        db,
+        claude,
+        cliente_id,
+        eid,
+        dias=dias,
+        nome_escritorio=escritorio_nome,
+        incluir_resumo=incluir_resumo,
+    )
+    if relatorio is None:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    return {
+        "cliente_id": relatorio.cliente_id,
+        "cliente_nome": relatorio.cliente_nome,
+        "periodo_dias": relatorio.periodo_dias,
+        "gerado_em": relatorio.gerado_em.isoformat(),
+        "processos": relatorio.processos,
+        "prazos": relatorio.prazos,
+        "total_interacoes": relatorio.total_interacoes,
+        "resumo_atendimento": relatorio.resumo_atendimento,
+        "texto": relatorio.texto,
+    }
 
 
 # ---------------------------------------------------------------------------

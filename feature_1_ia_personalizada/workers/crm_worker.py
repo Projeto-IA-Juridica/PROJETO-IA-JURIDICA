@@ -66,11 +66,38 @@ def crm_analisar_cliente(cliente_id: int, escritorio_id: int) -> dict[str, Any]:
                 claude = ClaudeClient(api_key=settings.ANTHROPIC_API_KEY)
                 analyzer = CRMAnalyzer(claude_client=claude, db=db)
                 result = await analyzer.analisar_cliente(cliente_id, escritorio_id)
+
+                # Classificar não bastava: até aqui o nível de risco ficava só
+                # no banco esperando alguém abrir o painel. Um cliente prestes a
+                # sair vira aviso no WhatsApp do advogado responsável.
+                # Não alerta em cache_hit — a classificação não mudou.
+                alertado = False
+                if not result.cache_hit:
+                    import redis.asyncio as redis_async
+
+                    from feature_1_ia_personalizada.services.relacionamento.alerta_risco import (
+                        alertar_se_em_risco,
+                    )
+
+                    redis_client = redis_async.from_url(settings.REDIS_URL, decode_responses=True)
+                    try:
+                        alertado = await alertar_se_em_risco(
+                            db,
+                            cliente_id,
+                            escritorio_id,
+                            result.nivel,
+                            result.score,
+                            redis=redis_client,
+                        )
+                    finally:
+                        await redis_client.aclose()
+
                 return {
                     "cliente_id": cliente_id,
                     "nivel": result.nivel,
                     "score": result.score,
                     "cache_hit": result.cache_hit,
+                    "alerta_enviado": alertado,
                     "tokens_input": result.tokens_input,
                     "tokens_output": result.tokens_output,
                 }

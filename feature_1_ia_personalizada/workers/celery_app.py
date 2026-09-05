@@ -208,6 +208,15 @@ celery_app.conf.task_routes = {
         "queue": "ia",
         "routing_key": "ia",
     },
+    # agenda_diaria_worker.py — aviso matinal por advogado
+    "workers.relacionamento.disparar_agendas_diarias": {
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
+    },
+    "workers.relacionamento.enviar_agenda_diaria": {
+        "queue": "relacionamento",
+        "routing_key": "relacionamento",
+    },
 }
 
 #  BEAT: usar o NOME REAL da task (mesmo padrão)
@@ -219,6 +228,12 @@ celery_app.conf.beat_schedule = {
     "enviar-sem-movimentacao-semanal-seg-10h": {
         "task": "feature_1_ia_personalizada.workers.send_notifications.enviar_lote_sem_movimentacao",
         "schedule": crontab(minute=0, hour=10, day_of_week=1),
+    },
+    # Agenda do dia: 7h30, antes do expediente, para o advogado abrir o dia
+    # já sabendo o que exige atenção. Uma task por escritório é enfileirada.
+    "relacionamento-agenda-diaria-0730": {
+        "task": "workers.relacionamento.disparar_agendas_diarias",
+        "schedule": crontab(hour=7, minute=30),
     },
     "relacionamento-aniversarios-08h": {
         "task": "feature_1_ia_personalizada.workers.mensagens_relacionamento.verificar_aniversarios_diarios",
@@ -347,6 +362,7 @@ def _init_worker_process(**kwargs: Any) -> None:
 
 
 #  IMPORT EXPLÍCITO (mais confiável no MVP)
+import feature_1_ia_personalizada.workers.agenda_diaria_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.agendamento_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.crm_worker  # noqa: F401
 import feature_1_ia_personalizada.workers.dead_letter  # noqa: F401
