@@ -21,6 +21,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Enum,
+    ForeignKey,
     Index,
     Integer,
     SmallInteger,
@@ -37,6 +38,7 @@ if TYPE_CHECKING:
     from shared.models.escritorio import Escritorio
     from shared.models.interacao import Interacao
     from shared.models.processo import Processo
+    from shared.models.usuario import Usuario
 
 
 class Cliente(Base, TimestampMixin, TenantMixin):
@@ -105,6 +107,18 @@ class Cliente(Base, TimestampMixin, TenantMixin):
     # --- Status ---
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # --- Responsabilidade ---
+    # Advogado dono da conta. É quem recebe o alerta de risco e para quem o
+    # cliente entra na agenda diária. Quando nulo, o responsável é inferido do
+    # processo mais recente (ver services/relacionamento/responsavel.py).
+    advogado_responsavel_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Advogado responsável pela conta do cliente",
+    )
+
     # --- CRM Inteligente ---
     crm_nivel: Mapped[str | None] = mapped_column(
         Enum(
@@ -142,6 +156,9 @@ class Cliente(Base, TimestampMixin, TenantMixin):
     # --- Relacionamentos ---
     escritorio: Mapped["Escritorio"] = relationship(  # noqa: F821
         "Escritorio", back_populates="clientes"
+    )
+    advogado_responsavel: Mapped["Usuario"] = relationship(  # noqa: F821
+        "Usuario", foreign_keys=[advogado_responsavel_id], lazy="selectin"
     )
     processos: Mapped[list["Processo"]] = relationship(  # noqa: F821
         "Processo", back_populates="cliente", cascade="all, delete-orphan"
