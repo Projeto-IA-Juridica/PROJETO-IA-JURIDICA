@@ -2,7 +2,7 @@
 
 > Plataforma B2B SaaS de IA conversacional para escritórios de advocacia — monitoramento de processos, comunicação proativa com clientes, agendamento inteligente de reuniões, prospecção de leads e hub de análise jurídica para advogados.
 
-![Python](https://img.shields.io/badge/python-3.12+-blue)
+![Python](https://img.shields.io/badge/python-3.12+-blue) 
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)
 ![Deploy](https://img.shields.io/badge/deploy-Railway-purple)
 ![Cobertura](https://img.shields.io/badge/cobertura-70%25%20mínimo-brightgreen)
@@ -13,7 +13,7 @@
 
 Escritórios de advocacia perdem clientes por falta de comunicação — não por falta de competência. O cliente não sabe o que está acontecendo com seu processo, precisa ligar para obter uma atualização básica, e o advogado gasta horas por semana respondendo perguntas repetitivas no WhatsApp como _"tem novidade?"_ e _"o que significa esse termo?"_.
 
-Ao mesmo tempo, captar novos clientes é artesanal: esperar indicação, pagar por anúncios genéricos ou garimpar manualmente no Jusbrasil sem critério.
+Ao mesmo tempo, captar novos clientes é artesanal: esperar indicação, pagar por anúncios genéricos ou garimpar manualmente no Jusbrasil sem critério. 
 
 ---
 
